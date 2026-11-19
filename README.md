@@ -3,6 +3,7 @@
 > 아이디어 단계 레포. 아직 코드 없음.
 
 설계 문서: [docs/design-v0.md](docs/design-v0.md) (개발자 도구 설계 v0)
+언어 조사: [docs/language-survey.md](docs/language-survey.md) (대상 언어·UI 스택 전수조사, 추천 순서)
 
 ## 한 줄
 코드베이스를 읽어서 앱의 **모든 화면 × 모든 상태 × 반응형 폭**을 Figma처럼 무한 캔버스에 한눈에 펼쳐 보여주는 도구. 웹과 데스크톱 앱(네이티브 포함)을 같이 다룬다.
