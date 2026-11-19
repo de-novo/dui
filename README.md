@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 > **Principle #1 — AI-native (2026-11-19)**: dui is AI-native. **AI uses everything; humans only look at the canvas.** AI agents drive dui through the `dui` CLI and MCP server (analyze, inject, render, verify, and fix `unverified` cells). Humans see only the canvas (screens × states × widths × transitions) and leave comments on cells; AI reads the comments, fixes the code, and the canvas re-renders. See [design §0](docs/en/design-v0.md#0-core-principle-ai-native).
 
-> **Principle #2 — official-compiler-dependent (2026-11-19)**: dui relies on each language's **official compiler / toolchain** (TypeScript: `tsc` from Microsoft's `typescript` package; Rust: `rustc` + rust-analyzer; later Swift: `swiftc` + SourceKit-LSP; Kotlin: `kotlinc`). It uses the official compiler already in your project and never reimplements type checking. Unofficial or alternative compilers / toolchains are `unsupported`. Only stacks released in 2026 or later are supported. See [design: Tech stack](docs/en/design-v0.md#tech-stack-decided-2026-11-19).
+> **Principle #2 — official-compiler-dependent (2026-11-19)**: dui relies on each language's **official compiler / toolchain** (TypeScript: `tsc` from Microsoft's `typescript` package, 7.0+ only; Rust: `rustc` + rust-analyzer; later Swift: `swiftc` + SourceKit-LSP; Kotlin: `kotlinc`). It uses the official compiler already in your project and never reimplements type checking. Unofficial or alternative compilers / toolchains are `unsupported`. Only stacks released in 2026 or later are supported. See [design: Tech stack](docs/en/design-v0.md#tech-stack-decided-2026-11-19).
 
 > Idea-stage repository. No code yet.
 

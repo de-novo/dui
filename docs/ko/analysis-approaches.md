@@ -139,7 +139,7 @@ GPUI는 상태가 `Entity<T>` 모델 필드에 모이므로 "모델 타입 찾�
 2026-11-19 결정(자세한 내용: [설계: 기술 스택](design-v0.md#기술-스택-2026-11-19-결정)):
 
 - **본체**: Rust 바이너리 하나(CLI, `rmcp`로 MCP, 분석기, 조합 규칙). 코드 그래프는 tree-sitter + oxc로 자체 구현. Graphify와 CodeGraph는 참고만.
-- **TS**: tree-sitter(빠른 스캔) → oxc(파싱·의미 분석) → **`TypeOracle`로 프로젝트의 공식 TypeScript 컴파일러에서 타입** (TS 6 API, 또는 작은 Node 사이드카로 TS 7.1 `typescript/sync`) → dui 자체 데이터 흐름(React Compiler 방식) → oxc 변환(주입).
+- **TS**: tree-sitter(빠른 스캔) → oxc(파싱·의미 분석) → **`TypeOracle`로 프로젝트의 공식 TypeScript 컴파일러에서 타입** (TS 7.0 이상만, 작은 Node 사이드카로 TS 7.1 `typescript/sync`) → dui 자체 데이터 흐름(React Compiler 방식) → oxc 변환(주입).
 - **Rust**: tree-sitter 스캔 → **rust-analyzer `ra_ap_*`(버전 고정)로 타입** → syn proc-macro(주입).
 - **렌더**: Rust에서 CDP로 Chromium 구동(chromiumoxide). 네트워크 목은 CDP Fetch 도메인으로.
 - AI는 `추정됨` 칸 채우기·이름 붙이기에만. 조합·커버리지는 결정적 알고리즘.

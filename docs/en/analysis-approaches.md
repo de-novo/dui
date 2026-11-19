@@ -137,7 +137,7 @@ In GPUI, state gathers in `Entity<T>` model fields, so "find model types → fie
 Decided 2026-11-19 (details: [design: Tech stack](design-v0.md#tech-stack-decided-2026-11-19)):
 
 - **Core**: Rust single binary (CLI, MCP via `rmcp`, analyzer, combination rules). Code graph built in-house on tree-sitter + oxc; Graphify and CodeGraph are reference only.
-- **TS**: tree-sitter (fast scan) → oxc (parse, semantics) → **types from the project's official TypeScript compiler via `TypeOracle`** (TS 6 API or TS 7.1 `typescript/sync` through a small Node sidecar) → dui's own data flow (React Compiler style) → oxc transform (injection).
+- **TS**: tree-sitter (fast scan) → oxc (parse, semantics) → **types from the project's official TypeScript compiler via `TypeOracle`** (TS 7.0+ only; TS 7.1 `typescript/sync` through a small Node sidecar) → dui's own data flow (React Compiler style) → oxc transform (injection).
 - **Rust**: tree-sitter scan → **rust-analyzer `ra_ap_*` (pinned) for types** → syn proc-macro (injection).
 - **Rendering**: Chromium over CDP from Rust (chromiumoxide); network mocks through the CDP Fetch domain.
 - AI only fills `inferred` cells and names things. Combinations and coverage use deterministic algorithms.

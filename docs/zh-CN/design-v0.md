@@ -25,7 +25,7 @@
 
 **dui 是依赖官方编译器的项目。**
 
-- 只支持各语言的**官方编译器 / 工具链**：TypeScript → Microsoft `typescript` 包中的 `tsc`；Rust → `rustc`（Cargo），类型查询用 rust-analyzer；以后 Swift → `swiftc` + SourceKit-LSP；Kotlin → `kotlinc`。
+- 只支持各语言的**官方编译器 / 工具链**：TypeScript → Microsoft `typescript` 包中的 `tsc`，**仅 7.0+**；Rust → `rustc`（Cargo），类型查询用 rust-analyzer；以后 Swift → `swiftc` + SourceKit-LSP；Kotlin → `kotlinc`。
 - 非官方或替代的编译器 / 工具链为 **`不支持`**。
 - dui 使用用户项目中已有的官方编译器（版本完全一致）。**不重新实现类型检查**。
 - 详见[技术栈](#技术栈2026-11-19-决定)。
@@ -326,7 +326,7 @@ dui **不**内嵌 Whiteboard：它内置（vendor）了 Code-OSS（打包很重�
 
 | 阶段 | 内容 | 完成标准 |
 |---|---|---|
-| **M0 spike** | obora-web 审核界面 1 个。用 oxc 转换注入 + CDP Fetch 拦截 + 通过 CDP 驱动的 Chromium 把手选的 5 个状态按 3 种宽度渲染，全部由 Rust 二进制驱动 | 至少 1 个本地状态从外部注入并渲染成功，图像 15 张 |
+| **M0 spike** | obora-web 审核界面 1 个（obora 先迁移到 TS 7；TS < 7 为 `不支持`）。用 oxc 转换注入 + CDP Fetch 拦截 + 通过 CDP 驱动的 Chromium 把手选的 5 个状态按 3 种宽度渲染，全部由 Rust 二进制驱动 | 至少 1 个本地状态从外部注入并渲染成功，图像 15 张 |
 | **M1 自动状态** | 分析器 + 模拟生成器 + 规划器。自动列举数据形态和代码分支，测量覆盖率，补充循环 | 输出审核界面的分支覆盖率数字和未验证列表 |
 | **M2 GPUI spike** | pippip 界面 1 个。确认离屏渲染是否可行，做 `#[dui::state]` 宏原型 | 状态文件 → 图像 1 张 |
 | **M3 顺序状态** | 提取事件 → 状态变更规则，展开，用 CDP 回放验证，把边标记为 `已验证` | 自动生成并验证审核界面"批准最后一页之后"这类顺序状态 |
@@ -424,10 +424,12 @@ AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确�
 
 | 技术栈 | 支持 | 首个稳定版（来源） | 不支持（示例） |
 |---|---|---|---|
-| TypeScript | 6.0+、7.x | 6.0.2：2026-03-23；7.0.2：2026-07-08（npm） | 5.9（5.9.2：2025-07-31）及更早 |
+| TypeScript | **仅 7.0+** | 7.0.2：2026-07-08（npm） | 6.x（6.0.2：2026-03-23）及更早，按决定（见下文） |
 | React | 19.3+ | 19.3.0：2026-09-09（npm） | 19.0（2024-12-05）、19.1（2025-03-28）、19.2（2025-10-01），即使它们在 2026 年仍有补丁版本 |
 | Rust 工具链 | 1.93+ | 1.93.0：2026-01-22（[GitHub release](https://github.com/rust-lang/rust/releases/tag/1.93.0)） | 1.92 及更早 |
 | Rust edition | 2024 | 在 1.85.0 中稳定，2025-02-20；在 [Edition Guide](https://doc.rust-lang.org/edition-guide/) 中仍是最新 edition | 2021 及更早 |
 | GPUI（`gpui-pre`） | 0.3.0+ | 0.3.0：2026-09-03（crates.io；所有已发布版本都在 2026 年） | — |
 
-Edition 2024 是日期规则的例外：它是最新的 edition，不存在 2026 edition。
+日期规则有两个例外：
+- **TypeScript 仅支持 7.0+**（2026-11-19 决定），比日期规则更严格：TS 6.x 虽然发布于 2026 年，但为 `不支持`，因为 dui 使用 TS 7 原生编译器及其 API。obora（M0 目标）将迁移到 TS 7。
+- 允许 edition 2024：它是最新的 edition，不存在 2026 edition。

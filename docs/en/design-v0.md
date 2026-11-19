@@ -23,7 +23,7 @@ Every component below is designed for this split: anything a person would "run" 
 
 **dui is an official-compiler-dependent project.**
 
-- Only each language's **official compiler / toolchain** is supported: TypeScript → `tsc` from Microsoft's `typescript` package; Rust → `rustc` (Cargo) with rust-analyzer for type queries; later Swift → `swiftc` + SourceKit-LSP; Kotlin → `kotlinc`.
+- Only each language's **official compiler / toolchain** is supported: TypeScript → `tsc` from Microsoft's `typescript` package, **7.0+ only**; Rust → `rustc` (Cargo) with rust-analyzer for type queries; later Swift → `swiftc` + SourceKit-LSP; Kotlin → `kotlinc`.
 - Unofficial or alternative compilers / toolchains are **`unsupported`**.
 - dui uses the official compiler already in the user's project (exact version). It **does not reimplement type checking**.
 - Details: [Tech stack](#tech-stack-decided-2026-11-19).
@@ -324,7 +324,7 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 
 | Milestone | Content | Done when |
 |---|---|---|
-| **M0 spike** | One obora-web screen: review. Render 5 hand-picked states at 3 widths with oxc-transform injection + CDP Fetch interception + Chromium via CDP, all driven by the Rust binary | At least one local state injected from outside and rendered; 15 images |
+| **M0 spike** | One obora-web screen: review (obora will move to TS 7 first; TS < 7 is `unsupported`). Render 5 hand-picked states at 3 widths with oxc-transform injection + CDP Fetch interception + Chromium via CDP, all driven by the Rust binary | At least one local state injected from outside and rendered; 15 images |
 | **M1 automatic states** | Analyzer + mock generator + planner. Auto-enumerate data shapes and code branches, measure coverage, fill-in loop | Branch coverage number for the review screen, list of unverified cells |
 | **M2 GPUI spike** | One pippip screen. Check offscreen rendering, prototype the `#[dui::state]` macro | State file → one image |
 | **M3 sequence states** | Extract event → state-change rules, expand, verify by CDP replay, mark edges `verified` | Sequence states such as "after approving the last page" on the review screen generated and verified automatically |
@@ -422,10 +422,12 @@ Principle:
 
 | Stack | Supported | First stable release (source) | Not supported (examples) |
 |---|---|---|---|
-| TypeScript | 6.0+, 7.x | 6.0.2: 2026-03-23; 7.0.2: 2026-07-08 (npm) | 5.9 (5.9.2: 2025-07-31) and older |
+| TypeScript | **7.0+ only** | 7.0.2: 2026-07-08 (npm) | 6.x (6.0.2: 2026-03-23) and older, by decision (see below) |
 | React | 19.3+ | 19.3.0: 2026-09-09 (npm) | 19.0 (2024-12-05), 19.1 (2025-03-28), 19.2 (2025-10-01), even though they still get patch releases in 2026 |
 | Rust toolchain | 1.93+ | 1.93.0: 2026-01-22 ([GitHub release](https://github.com/rust-lang/rust/releases/tag/1.93.0)) | 1.92 and older |
 | Rust edition | 2024 | Stabilized in 1.85.0, 2025-02-20; still the newest edition in the [Edition Guide](https://doc.rust-lang.org/edition-guide/) | 2021 and older |
 | GPUI (`gpui-pre`) | 0.3.0+ | 0.3.0: 2026-09-03 (crates.io; every published version is from 2026) | — |
 
-Edition 2024 is an exception to the date rule: it is the newest edition and there is no 2026 edition.
+Two exceptions to the date rule:
+- **TypeScript is 7.0+ only** (decided 2026-11-19), stricter than the date rule: TS 6.x came out in 2026 but is `unsupported`, because dui uses the TS 7 native compiler and its API. obora (the M0 target) will move to TS 7.
+- Edition 2024 is allowed: it is the newest edition and there is no 2026 edition.

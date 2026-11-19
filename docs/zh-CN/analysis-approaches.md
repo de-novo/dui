@@ -139,7 +139,7 @@ GPUI 的状态集中在 `Entity<T>` 模型字段中，所以"找到模型类型 
 2026-11-19 决定（详见[设计：技术栈](design-v0.md#技术栈2026-11-19-决定)）：
 
 - **核心**：Rust 单一二进制（CLI、通过 `rmcp` 的 MCP、分析器、组合规则）。代码图基于 tree-sitter + oxc 自研；Graphify 和 CodeGraph 仅参考。
-- **TS**：tree-sitter（快速扫描）→ oxc（解析、语义）→ **通过 `TypeOracle` 从项目的官方 TypeScript 编译器获取类型**（TS 6 API，或通过小型 Node 边车使用 TS 7.1 `typescript/sync`）→ dui 自己的数据流（React Compiler 方式）→ oxc 转换（注入）。
+- **TS**：tree-sitter（快速扫描）→ oxc（解析、语义）→ **通过 `TypeOracle` 从项目的官方 TypeScript 编译器获取类型**（仅 TS 7.0+；通过小型 Node 边车使用 TS 7.1 `typescript/sync`）→ dui 自己的数据流（React Compiler 方式）→ oxc 转换（注入）。
 - **Rust**：tree-sitter 扫描 → **rust-analyzer `ra_ap_*`（固定版本）获取类型** → syn proc-macro（注入）。
 - **渲染**：由 Rust 通过 CDP 驱动 Chromium（chromiumoxide）；网络模拟通过 CDP Fetch 域。
 - AI 只用于填补 `已推断` 格子和命名。组合与覆盖率用确定性算法。

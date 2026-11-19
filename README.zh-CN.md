@@ -10,7 +10,7 @@
 
 > **原则 #1 —— AI 原生（2026-11-19）**：dui 是 AI 原生的。**一切由 AI 使用；人只看画布。** AI 代理通过 `dui` CLI 和 MCP 服务器驱动 dui（分析、注入、渲染、验证，并修复 `未验证` 格子）。人只看画布（界面 × 状态 × 宽度 × 转换）并在格子上留言；AI 读取留言、修复代码，画布随之重新渲染。见[设计 §0](docs/zh-CN/design-v0.md#0-核心原则ai-原生)。
 
-> **原则 #2 —— 依赖官方编译器（2026-11-19）**：dui 依赖各语言的**官方编译器 / 工具链**（TypeScript：Microsoft `typescript` 包中的 `tsc`；Rust：`rustc` + rust-analyzer；以后 Swift：`swiftc` + SourceKit-LSP；Kotlin：`kotlinc`）。它使用你项目中已有的官方编译器，绝不重新实现类型检查。非官方或替代的编译器 / 工具链为 `不支持`。只支持 2026 年及以后发布的技术栈。见[设计：技术栈](docs/zh-CN/design-v0.md#技术栈2026-11-19-决定)。
+> **原则 #2 —— 依赖官方编译器（2026-11-19）**：dui 依赖各语言的**官方编译器 / 工具链**（TypeScript：Microsoft `typescript` 包中的 `tsc`，仅 7.0+；Rust：`rustc` + rust-analyzer；以后 Swift：`swiftc` + SourceKit-LSP；Kotlin：`kotlinc`）。它使用你项目中已有的官方编译器，绝不重新实现类型检查。非官方或替代的编译器 / 工具链为 `不支持`。只支持 2026 年及以后发布的技术栈。见[设计：技术栈](docs/zh-CN/design-v0.md#技术栈2026-11-19-决定)。
 
 > 处于构想阶段的仓库，尚无代码。
 
