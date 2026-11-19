@@ -175,9 +175,12 @@ type VerificationStatus =
   | { kind: "verified" }                          // 通过验证
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
   | { kind: "suspect"; reason: string };          // 仅视觉检查失败，需要人工确认
+  | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // 在此环境中无法渲染；见“渲染限制”
 ```
 
 `未验证` = 所有 `unverified`。在画布上显示为灰色斜线格子 + 原因。
+
+`无法渲染`（`unrenderable`）是单独的状态，不属于 `未验证`：该格子在当前渲染环境中根本画不出来。在画布上显示为“无法渲染（原因）”。
 
 ## 6. 流水线
 
@@ -331,3 +334,19 @@ AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确�
 5. 不可能的组合用类型和代码条件（可辨识联合、守卫）去除。
 
 **保证范围**：只保证用类型、enum、可辨识联合、状态机明确表达的状态。分散的隐式状态如实显示为 `未验证`。状态写得越明确，覆盖率越高——这就是 dui 提供的"通往好代码的捷径"。
+
+## 渲染限制（2026-11-19 决定）
+
+有些 UI 不能在任何环境中渲染。最典型的例子是 Apple 生态：
+
+| 限制 | 详情 |
+|---|---|
+| 工具链绑定 | SwiftUI / UIKit / AppKit 只能在装有 Xcode 工具链的 macOS 上渲染。需要 Mac 运行器；Linux CI 无法渲染 |
+| iOS 渲染 | 需要模拟器、`ImageRenderer` 或快照测试。都很慢，而且只能在 Mac 上运行 |
+| 系统 UI | 应用之外的 UI（权限弹窗、通知、键盘、部分 sheet）无法注入，也无法渲染 |
+| 依赖操作系统的渲染 | 字体、深色模式、Dynamic Type、操作系统版本都会改变结果，因此不同操作系统版本的渲染可能不同 |
+
+原则：
+
+1. 无法渲染的格子绝不隐藏。它们在画布上以单独的状态 **无法渲染（原因）** 显示，与 `未验证` 区分。
+2. 每个平台都要写明所需的渲染环境（例如 Apple 平台需要装有 Xcode 的 Mac 运行器）。

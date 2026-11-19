@@ -173,9 +173,12 @@ type VerificationStatus =
   | { kind: "verified" }                          // passed verification
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
   | { kind: "suspect"; reason: string };          // only the visual check failed; needs a human
+  | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // cannot be rendered in this environment; see "Rendering limits"
 ```
 
 `unverified` = every `unverified` kind. On the canvas it shows as a grey hatched cell with the reason.
+
+`unrenderable` is a separate status, not a kind of `unverified`: the cell can't be drawn at all in the current render environment. It shows on the canvas as "unrenderable (reason)".
 
 ## 6. Pipeline
 
@@ -329,3 +332,19 @@ AI is used **only to find where state lives and what type it is**. Which combina
 5. Impossible combinations are removed by type and code conditions (discriminated unions, guards).
 
 **Guarantee scope**: only states expressed clearly with types, enums, discriminated unions, or state machines are guaranteed. Scattered implicit state is honestly shown as `unverified`. The more clearly state is written, the higher the coverage — that is the "shortcut to good code" dui offers.
+
+## Rendering limits (decided 2026-11-19)
+
+Some UI can't be rendered everywhere. The Apple ecosystem is the main example:
+
+| Limit | Details |
+|---|---|
+| Toolchain lock-in | SwiftUI / UIKit / AppKit render only on macOS with the Xcode toolchain. A Mac runner is required; Linux CI can't render them |
+| iOS rendering | Needs the simulator, `ImageRenderer`, or snapshot testing. All are slow and run only on a Mac |
+| System UI | UI outside the app (permission prompts, notifications, keyboard, some sheets) can't be injected or rendered |
+| OS-dependent rendering | Fonts, dark mode, Dynamic Type, and OS version can change the result, so renders may differ between OS versions |
+
+Principle:
+
+1. Cells that can't be rendered are never hidden. They show on the canvas as a separate status, **unrenderable (reason)**, distinct from `unverified`.
+2. Each platform documents the render environment it requires (e.g. a Mac runner with Xcode for Apple platforms).
