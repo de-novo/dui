@@ -2,7 +2,7 @@
 
 English | [简体中文](../zh-CN/analysis-approaches.md) | [한국어](../ko/analysis-approaches.md)
 
-> Written 2026-11-19. Compiled by reading each tool's README, source, and official docs directly. Anything not confirmed is `unverified`.
+> Written 2026-11-19. Compiled by reading each tool's README, source, and official docs directly. Anything not confirmed is `unconfirmed`.
 > ★ and licenses are GitHub API values as of 2026-11-19 (when `spdx_id` is empty, confirmed from the LICENSE text or package metadata).
 > Premise (준혁's conclusion): state locations, types, branches, and `event → setState` rules can mostly be derived from **AST + type info**. AI only fills gaps, and combinations are produced by deterministic algorithms.
 
@@ -28,17 +28,17 @@ English | [简体中文](../zh-CN/analysis-approaches.md) | [한국어](../ko/an
 | [Axon](https://github.com/harshkedia177/axon) | 820 / MIT (pyproject) | tree-sitter (Python, TS, JS) | Calls, type relations, communities, execution flows; KuzuDB | None ("Zero cloud") | Local 384-dim (bge-small) + BM25 hybrid | `--watch` | 3 |
 | [Descry](https://github.com/06chaynes/descry) | 1 / MIT | Regex (+ast-grep) + **SCIP overlay for type resolution** | Calls, imports, definitions; resolutions labelled resolved / unresolved / external | None | Optional (sentence-transformers) | Cache | All SCIP-supported languages |
 | [SCIP](https://github.com/scip-code/scip) (+ scip-typescript etc.) | 892 / Apache-2.0 | Per-language compilers: scip-typescript uses the TS compiler API (`ts.createProgram`, `getTypeChecker`); Rust uses `rust-analyzer scip` | Definitions, references, implementations (precise) | None | None | Depends on indexer | TS/JS, Rust, Java/Kotlin, C#, C/C++, Dart, Go, etc. |
-| Sourcegraph Cody | unverified (repository visibility unverified) | Keyword search + SCIP code graph | SCIP definitions / references | Answer generation, candidate reranking | Yes (embedding search) | unverified | Many |
+| Sourcegraph Cody | unconfirmed (repository visibility unconfirmed) | Keyword search + SCIP code graph | SCIP definitions / references | Answer generation, candidate reranking | Yes (embedding search) | unconfirmed | Many |
 | [Aider repo map](https://aider.chat/docs/repomap.html) | 50,182 / Apache-2.0 | tree-sitter + per-language `*-tags.scm` queries (def/ref tags); Pygments fills refs for languages without them | **File graph** (referencing file → defining file) + **personalized PageRank** ranking | The map summarizes context for the LLM | None | File mtime cache | tree-sitter languages |
 | [Continue](https://github.com/continuedev/continue) | 36,519 / Apache-2.0 | tree-sitter chunks per function / class (`core/indexing/chunk/code.ts`) | None (search-oriented) | Answers | **Yes**, LanceDB vector store | Cache-key based | Many |
-| Cursor | Closed | Per public docs: Instant Grep (local regex index) + an explore subagent | unverified | Summarizing search results, exploration | Current docs state it "does not store embeddings of your codebase for search" ([docs](https://cursor.com/docs/context/semantic-search)) | Local index | Language-agnostic |
-| Windsurf (Codeium) | Closed | "Parses code into blocks using its structure" (parser type unverified) | unverified | Reranking, answers | **Yes** (local indexing: fragments sent to a server for embedding, stored locally) | Remote index re-indexed periodically | Language-agnostic |
+| Cursor | Closed | Per public docs: Instant Grep (local regex index) + an explore subagent | unconfirmed | Summarizing search results, exploration | Current docs state it "does not store embeddings of your codebase for search" ([docs](https://cursor.com/docs/context/semantic-search)) | Local index | Language-agnostic |
+| Windsurf (Codeium) | Closed | "Parses code into blocks using its structure" (parser type unconfirmed) | unconfirmed | Reranking, answers | **Yes** (local indexing: fragments sent to a server for embedding, stored locally) | Remote index re-indexed periodically | Language-agnostic |
 | GitHub code navigation | [stack-graphs](https://github.com/github/stack-graphs) 877 / Apache·MIT, **archived 2025-09-09** | tree-sitter + a DSL for name-binding rules (stack graphs) | Definitions / references (built per file, merged at query time → incremental) | None | None | Per-file incremental | Python, TS, etc. |
 | [Serena](https://github.com/oraios/serena) | 31,530 / **SolidLSP MIT, Serena app GPL-3.0+** | **LSP** (40+ language servers) or a JetBrains plugin | No stored graph; LSP queried on demand (definitions, references, symbols) | Used as tools by an agent | None | Handled by LSP | 40+ |
-| [Joern](https://github.com/joernio/joern) | 3,655 / Apache-2.0 | Per-language frontends (including fuzzy parsers) | **Code Property Graph**: AST + CFG + PDG (data flow) in one graph | None | None | unverified | C/C++, Java, JS, Python, Go, Kotlin, PHP, Ruby, Swift |
+| [Joern](https://github.com/joernio/joern) | 3,655 / Apache-2.0 | Per-language frontends (including fuzzy parsers) | **Code Property Graph**: AST + CFG + PDG (data flow) in one graph | None | None | unconfirmed | C/C++, Java, JS, Python, Go, Kotlin, PHP, Ruby, Swift |
 | [CodeQL](https://github.com/github/codeql) | 10,385 / queries MIT, **CLI under separate terms**: analyzing private code requires paid GitHub Code Security | Compiler-level extractors (observing builds) | Relational DB + data-flow / taint libraries | None | None | No (re-extraction) | ~10 |
-| [Semgrep](https://github.com/semgrep/semgrep) | 17,822 / LGPL-2.1 (engine) | Per-language parsers → generic AST | Pattern matching + intra-function data flow (cross-file analysis in the paid edition, unverified) | None (open engine) | None | unverified | 30+ (unverified) |
-| [Kythe](https://github.com/kythe/kythe) | 2,171 / Apache-2.0 | Per-language indexers (compiler-integrated) | Definition, reference, and type graph | None | None | unverified | C++, Java, Go, TS, etc. |
+| [Semgrep](https://github.com/semgrep/semgrep) | 17,822 / LGPL-2.1 (engine) | Per-language parsers → generic AST | Pattern matching + intra-function data flow (cross-file analysis in the paid edition, unconfirmed) | None (open engine) | None | unconfirmed | 30+ (unconfirmed) |
+| [Kythe](https://github.com/kythe/kythe) | 2,171 / Apache-2.0 | Per-language indexers (compiler-integrated) | Definition, reference, and type graph | None | None | unconfirmed | C++, Java, Go, TS, etc. |
 
 ## 2. UI- and state-specific static analysis
 
@@ -52,8 +52,8 @@ English | [简体中文](../zh-CN/analysis-approaches.md) | [한국어](../ko/an
 | [Storybook 11 `write-stories`](https://storybook.js.org/docs/11/ai/skills/write-stories) | An **agent (LLM)** writes per-state stories for each component (default, loading, empty, error, disabled) + MSW mocks | An example of leaving state enumeration to an LLM. Results are non-deterministic with no coverage number → where dui differentiates |
 | rust-analyzer (MIT/Apache, ★17,008) | Usable as a library via the `ra_ap_*` crates (`ra_ap_hir`, etc.). **No backward-compatibility guarantee** | Rust type and name resolution. Also outputs SCIP via `rust-analyzer scip` |
 | syn (Apache/MIT, ★3,448) | Rust syntax parser. No type resolution | For writing proc-macros (injection). Not enough as the main analyzer |
-| Swift: SwiftSyntax, SourceKit-LSP | Syntax tree + LSP (details unverified) | For future Swift support |
-| Kotlin: Kotlin Analysis API (K2), PSI | Compiler-based analysis (details unverified) | For future Kotlin support |
+| Swift: SwiftSyntax, SourceKit-LSP | Syntax tree + LSP (details unconfirmed) | For future Swift support |
+| Kotlin: Kotlin Analysis API (K2), PSI | Compiler-based analysis (details unconfirmed) | For future Kotlin support |
 
 ## 3. Academia: extracting UI transition graphs from code
 
@@ -62,7 +62,7 @@ English | [简体中文](../zh-CN/analysis-approaches.md) | [한국어](../ko/an
 | GATOR / [Static Window Transition Graphs for Android (ASE 2015)](https://dacongy.github.io/papers/yang-ase15.pdf) | Static analysis builds a graph where **windows = nodes and event-triggered transitions = edges** (WTG). Edges are annotated with window-stack push/pop and callback sequences | Same shape as dui's `state + event → next state`. Evidence that this is possible with static analysis alone |
 | [On the unsoundness of static analysis for Android GUIs](https://doi.org/10.1145/2931021.2931026) | Analyzes cases static GUI analysis misses | Static analysis alone cannot reach 100% → evidence that **replay verification is needed** |
 | [FlowDroid](https://github.com/secure-software-engineering/FlowDroid) (LGPL-2.1, ★1,275) | Android lifecycle modeling + taint data flow | Lesson: framework callbacks (events) must be modeled for flows to connect |
-| Model-based GUI testing (building a state model while running the app, e.g. the DroidBot / Stoat family) | Run the app and collect a screen-state graph | **Supplement by execution** the states static analysis misses. Per-tool details and licenses unverified |
+| Model-based GUI testing (building a state model while running the app, e.g. the DroidBot / Stoat family) | Run the app and collect a screen-state graph | **Supplement by execution** the states static analysis misses. Per-tool details and licenses unconfirmed |
 
 ## 4. Common pattern: which technology is used at which layer
 
@@ -93,9 +93,9 @@ Observations
 | SCIP (scip-typescript) | Precise definitions / references, language-neutral format | No type **structure** (fields, union arms) and no data flow | Not used (cross-reference helper if needed) |
 | Babel/SWC AST | Where the injection transform goes | No types | **Injector only** (Vite plugin) |
 
-TS version risk: per InfoQ (2026-11-06), TS 7.0 (2026-07, Go native) dropped the compiler API, and the 7.1 beta **restored the API through new entry points** such as `typescript/sync`, `typescript/async`, and `typescript/ast` (not compatible with the old `ts.createProgram`; the official blog post is unverified). obora keeps `typescript ^5.9.3` for tooling and runs TS7 separately via tsgo (confirmed in pnpm-workspace.yaml). → **dui keeps the analysis layer behind a `TypeOracle` interface: v0 uses the TS 5.x/6 API (ts-morph), and a new-API implementation is added once TS 7.1 is stable.**
+TS version risk: per InfoQ (2026-11-06), TS 7.0 (2026-07, Go native) dropped the compiler API, and the 7.1 beta **restored the API through new entry points** such as `typescript/sync`, `typescript/async`, and `typescript/ast` (not compatible with the old `ts.createProgram`; the official blog post is unconfirmed). obora keeps `typescript ^5.9.3` for tooling and runs TS7 separately via tsgo (confirmed in pnpm-workspace.yaml). → **dui keeps the analysis layer behind a `TypeOracle` interface: v0 uses the TS 5.x/6 API (ts-morph), and a new-API implementation is added once TS 7.1 is stable.**
 
-Data flow (state → JSX, handler → setState) is **implemented by dui itself**, like React Compiler, as per-function control flow + simple data flow (React's hook rules keep the scope narrow). Whether React Compiler internals can be reused as a library is `unverified` (not a public API) → check in M1.
+Data flow (state → JSX, handler → setState) is **implemented by dui itself**, like React Compiler, as per-function control flow + simple data flow (React's hook rules keep the scope narrow). Whether React Compiler internals can be reused as a library is `unconfirmed` (not a public API) → check in M1.
 
 ### 5.2 Rust
 

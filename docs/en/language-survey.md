@@ -3,7 +3,7 @@
 English | [简体中文](../zh-CN/language-survey.md) | [한국어](../ko/language-survey.md)
 
 > Written 2026-11-19. Purpose: choose the languages and frameworks dui supports, based on evidence.
-> Only numbers with a source are given. Anything not confirmed is `unverified`. Star counts are GitHub API values as of 2026-11-19.
+> Only numbers with a source are given. Anything not confirmed is `unconfirmed`. Star counts are GitHub API values as of 2026-11-19.
 > Licenses here are those of the **target frameworks**, separate from dui's dependency policy (dui is Apache-2.0 open source; its dependencies must allow commercial use). dui only inserts dev-time code into the user's project; it does not redistribute those frameworks.
 
 ## 0. Four things dui needs from each stack
@@ -27,17 +27,17 @@ Source B: [GitHub Octoverse 2025](https://github.blog/news-insights/octoverse/oc
 | TypeScript | 43.6% | **#1**, 2,636,006 monthly contributors, +66.6% YoY | Static, structural. Can be bypassed with `any` |
 | Java | 29.4% | #4 | Static, strong |
 | C# | 27.8% | #5 | Static, strong |
-| C++ | 23.5% | unverified | Static; templates and macros make analysis hard |
-| Go | 16.4% | unverified | Static, simple |
-| Rust | 14.8% | unverified | Static, very strong (enums, pattern matching) |
-| Kotlin | 10.8% | unverified | Static, strong (sealed classes, null safety) |
-| Dart | 5.9% | unverified | Static, sound null safety |
-| Swift | 5.4% | unverified | Static, strong (enums, optionals) |
+| C++ | 23.5% | unconfirmed | Static; templates and macros make analysis hard |
+| Go | 16.4% | unconfirmed | Static, simple |
+| Rust | 14.8% | unconfirmed | Static, very strong (enums, pattern matching) |
+| Kotlin | 10.8% | unconfirmed | Static, strong (sealed classes, null safety) |
+| Dart | 5.9% | unconfirmed | Static, sound null safety |
+| Swift | 5.4% | unconfirmed | Static, strong (enums, optionals) |
 
 Note: JavaScript 66% and Python 57.9% are untyped and out of scope (a non-goal of design v0).
-Caution: the SO survey skews toward web and backend developers, so mobile languages (Swift, Kotlin, Dart) may come out lower than in reality. Mobile-specific usage numbers are `unverified` (needs further checking, e.g. JetBrains State of Developer Ecosystem).
+Caution: the SO survey skews toward web and backend developers, so mobile languages (Swift, Kotlin, Dart) may come out lower than in reality. Mobile-specific usage numbers are `unconfirmed` (needs further checking, e.g. JetBrains State of Developer Ecosystem).
 
-UI framework usage (SO 2025 web frameworks, all respondents): React 44.7%, Next.js 20.8%, Angular 18.2%, Vue.js 17.6%, Svelte 7.2%, Blazor 7.0%. 2025 usage for mobile and desktop frameworks (Flutter, React Native, SwiftUI, Compose, Electron, etc.) is `unverified` (those items were not found on this page).
+UI framework usage (SO 2025 web frameworks, all respondents): React 44.7%, Next.js 20.8%, Angular 18.2%, Vue.js 17.6%, Svelte 7.2%, Blazor 7.0%. 2025 usage for mobile and desktop frameworks (Flutter, React Native, SwiftUI, Compose, Electron, etc.) is `unconfirmed` (those items were not found on this page).
 
 ## 2. Per-stack survey
 
@@ -51,7 +51,7 @@ UI framework usage (SO 2025 web frameworks, all respondents): React 44.7%, Next.
 | Solid | 36,760 | signals, stores | Babel transform | MSW | Playwright | Storybook | low |
 | Angular | 101,461 | Component fields, signals, services (DI) | Swap services via DI + build transform | `HttpClient` interceptors / MSW | Playwright | Storybook | medium (own build chain) |
 | React Native | react-native 126,964 (Expo 53,662) | Same as React | Babel (Metro) transform | JS fetch mocks / MSW native | **Needs a simulator**. react-native-web is a workaround but may differ from the real thing | Storybook RN | medium |
-| Lynx | 15,264 | React family (ReactLynx) | unverified | unverified | unverified | unverified | unverified |
+| Lynx | 15,264 | React family (ReactLynx) | unconfirmed | unconfirmed | unconfirmed | unconfirmed | unconfirmed |
 | Electron (webview) | 123,999 | Renderer same as web + IPC | Same as web; mock preload/IPC | MSW | Playwright (Electron support) | Storybook | low |
 | Tauri (webview) | 112,993 | Web + `invoke` | Same as web; mock `invoke` | MSW | Render in a browser | Storybook | low |
 | Ionic/Capacitor | ionic 52,763 | Same as web | Same as web | MSW | Playwright | Storybook | low |
@@ -67,10 +67,10 @@ UI framework usage (SO 2025 web frameworks, all respondents): React 44.7%, Next.
 
 | Stack | ★ | Where state lives | Forced injection | Network | Render without window | Existing preview | Difficulty |
 |---|---|---|---|---|---|---|---|
-| Jetpack Compose (Android) | unverified | `remember { mutableStateOf }`, ViewModel `StateFlow` | **Kotlin compiler plugin** (Compose itself is a compiler plugin). Official stability of the plugin API is unverified | OkHttp interceptor / MockWebServer | On the JVM without a device: [Paparazzi](https://github.com/cashapp/paparazzi) (Apache-2.0, ★2,641), [Roborazzi](https://github.com/takahirom/roborazzi) (Apache-2.0, ★1,084), [Compose Preview Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing) (experimental; the standalone plugin is no longer maintained and is moving to AGP 9.5+ test suites) | `@Preview` | medium |
-| Compose Multiplatform | 19,488 | Same as above | Same as above | Ktor client mock engine | Desktop offscreen rendering (`ImageComposeScene`) believed to exist, docs unverified | `@Preview` | medium |
+| Jetpack Compose (Android) | unconfirmed | `remember { mutableStateOf }`, ViewModel `StateFlow` | **Kotlin compiler plugin** (Compose itself is a compiler plugin). Official stability of the plugin API is unconfirmed | OkHttp interceptor / MockWebServer | On the JVM without a device: [Paparazzi](https://github.com/cashapp/paparazzi) (Apache-2.0, ★2,641), [Roborazzi](https://github.com/takahirom/roborazzi) (Apache-2.0, ★1,084), [Compose Preview Screenshot Testing](https://developer.android.com/studio/preview/compose-screenshot-testing) (experimental; the standalone plugin is no longer maintained and is moving to AGP 9.5+ test suites) | `@Preview` | medium |
+| Compose Multiplatform | 19,488 | Same as above | Same as above | Ktor client mock engine | Desktop offscreen rendering (`ImageComposeScene`) believed to exist, docs unconfirmed | `@Preview` | medium |
 | Android Views (Kotlin/Java) | — | View / Fragment fields, XML | Bytecode transform (AGP Instrumentation / ASM) — harder than source level | OkHttp interceptor | Paparazzi and Roborazzi also support Views | Layout Editor | high |
-| Swing / JavaFX | jfx 3,310 (GPL-2.0) | Component fields | Annotation processors only generate new files → bytecode transform needed | Replace `HttpClient` | Swing can paint into a `BufferedImage`; JavaFX headless (Monocle) unverified | none | high |
+| Swing / JavaFX | jfx 3,310 (GPL-2.0) | Component fields | Annotation processors only generate new files → bytecode transform needed | Replace `HttpClient` | Swing can paint into a `BufferedImage`; JavaFX headless (Monocle) unconfirmed | none | high |
 
 ### 2.4 Dart (Flutter)
 
@@ -82,22 +82,22 @@ UI framework usage (SO 2025 web frameworks, all respondents): React 44.7%, Next.
 
 | Stack | ★ | Where state lives | Forced injection | Network | Render without window | Existing preview | Difficulty |
 |---|---|---|---|---|---|---|---|
-| Avalonia | 31,847 | MVVM ViewModels (`INotifyPropertyChanged`) | Source generators (add-only) + [interceptors](https://github.com/dotnet/roslyn/blob/main/docs/features/interceptors.md) (replace call sites; secondary sources say stable from .NET 9.0.2xx SDK, primary source unverified) | Swap `HttpMessageHandler` | Avalonia.Headless (docs unverified) | XAML previewer | medium |
+| Avalonia | 31,847 | MVVM ViewModels (`INotifyPropertyChanged`) | Source generators (add-only) + [interceptors](https://github.com/dotnet/roslyn/blob/main/docs/features/interceptors.md) (replace call sites; secondary sources say stable from .NET 9.0.2xx SDK, primary source unconfirmed) | Swap `HttpMessageHandler` | Avalonia.Headless (docs unconfirmed) | XAML previewer | medium |
 | WPF | 7,758 | ViewModels | Same as above | Same as above | `RenderTargetBitmap`, **Windows only** | XAML designer | medium |
-| WinUI 3 | microsoft-ui-xaml 8,618 | ViewModels | Same as above | Same as above | unverified | XAML Hot Reload | high |
-| .NET MAUI | 23,322 | ViewModels | Same as above | Same as above | Needs a device / emulator; headless unverified | XAML Hot Reload | high |
-| Uno Platform | 10,125 | ViewModels | Same as above | Same as above | unverified | unverified | unverified |
+| WinUI 3 | microsoft-ui-xaml 8,618 | ViewModels | Same as above | Same as above | unconfirmed | XAML Hot Reload | high |
+| .NET MAUI | 23,322 | ViewModels | Same as above | Same as above | Needs a device / emulator; headless unconfirmed | XAML Hot Reload | high |
+| Uno Platform | 10,125 | ViewModels | Same as above | Same as above | unconfirmed | unconfirmed | unconfirmed |
 | Blazor | aspnetcore 38,533 / SO usage 7.0% | Component fields, cascading values | Source generators / render tree is DOM | Swap `HttpClient` | Playwright (output is web) | bUnit (testing) | medium |
 
 ### 2.6 Rust
 
 | Stack | ★ | Where state lives | Forced injection | Network | Render without window | Existing preview | Difficulty |
 |---|---|---|---|---|---|---|---|
-| **GPUI** (pippip) | zed 95,318 (gpui crate Apache-2.0) | `Entity<T>` models, View fields | proc-macro + dev feature | Swap HTTP client (reqwest) | **Present in code**: confirmed that the `gpui-pre 0.3.12` source used by pippip has `HeadlessAppContext::capture_screenshot` and `Window::render_to_image` (`test-support` feature). Actually running it is unverified | none | medium |
+| **GPUI** (pippip) | zed 95,318 (gpui crate Apache-2.0) | `Entity<T>` models, View fields | proc-macro + dev feature | Swap HTTP client (reqwest) | **Present in code**: confirmed that the `gpui-pre 0.3.12` source used by pippip has `HeadlessAppContext::capture_screenshot` and `Window::render_to_image` (`test-support` feature). Actually running it is unconfirmed | none | medium |
 | egui | 32,385 | App struct fields (immediate mode) | proc-macro | Swap client | [egui_kittest](https://docs.rs/egui_kittest) `image_snapshot`, wgpu headless | none | low–medium |
 | Iced | 32,080 | Elm-style single State + Message | State is in one place, so injection is easy | Swap client | `iced_test` simulator snapshots, GPU-free via tiny-skia | none | low–medium |
 | Slint | 24,644 (custom license, GitHub shows NOASSERTION) | `.slint` DSL properties + Rust models | DSL properties can be set from Rust | Swap client | Testing backend `take_snapshot`, `SLINT_BACKEND=headless-software` | Slint live preview | medium |
-| Dioxus | 39,850 | signals, hooks | proc-macro / RSX transform | Swap client | Web and desktop (webview) via Playwright; native (Blitz) unverified | none | medium |
+| Dioxus | 39,850 | signals, hooks | proc-macro / RSX transform | Swap client | Web and desktop (webview) via Playwright; native (Blitz) unconfirmed | none | medium |
 | Leptos | 21,560 | signals | proc-macro | Swap client | Output is web → Playwright | none | medium |
 | Tauri (Rust side) | 112,993 | Screens are web | Handled on the web (TS) side | Mock `invoke` | Playwright | Storybook | low |
 
@@ -105,8 +105,8 @@ UI framework usage (SO 2025 web frameworks, all respondents): React 44.7%, Next.
 
 | Stack | ★ | Where state lives | Forced injection | Network | Render without window | Existing preview | Difficulty |
 |---|---|---|---|---|---|---|---|
-| Qt Widgets / QML | Official repos are outside GitHub (★ unverified) | QObject properties; QML is JS-like | Source rewriting with Clang tooling is possible but heavy. QML is dynamic | Swap `QNetworkAccessManager` | `-platform offscreen` + `grabToImage` | Qt Design Studio | high |
-| Fyne (Go) | 28,850 | Widget fields, bindings | Go has no macros → `go generate` / source rewriting | Swap `http.RoundTripper` | Software rendering in the test package (unverified) | none | high |
+| Qt Widgets / QML | Official repos are outside GitHub (★ unconfirmed) | QObject properties; QML is JS-like | Source rewriting with Clang tooling is possible but heavy. QML is dynamic | Swap `QNetworkAccessManager` | `-platform offscreen` + `grabToImage` | Qt Design Studio | high |
+| Fyne (Go) | 28,850 | Widget fields, bindings | Go has no macros → `go generate` / source rewriting | Swap `http.RoundTripper` | Software rendering in the test package (unconfirmed) | none | high |
 | Wails (Go) | 37,160 | Screens are web | Handled on the web (TS) side | Mock bindings | Playwright | Storybook | low |
 
 ## 3. Existing preview tools vs dui
@@ -143,7 +143,7 @@ Conclusion: **start by fixing the languages to "TS + Rust", but keep the design 
 
 ## 5. Still to confirm
 
-- Usage numbers for mobile languages and frameworks (JetBrains State of Developer Ecosystem, etc.): unverified.
-- Stability of the Kotlin compiler plugin API; primary source for when C# interceptors became stable: unverified.
-- Compose Desktop `ImageComposeScene`, Avalonia.Headless, Fyne test rendering: docs unverified.
-- Actually running GPUI headless capture on pippip: unverified (M2 spike).
+- Usage numbers for mobile languages and frameworks (JetBrains State of Developer Ecosystem, etc.): unconfirmed.
+- Stability of the Kotlin compiler plugin API; primary source for when C# interceptors became stable: unconfirmed.
+- Compose Desktop `ImageComposeScene`, Avalonia.Headless, Fyne test rendering: docs unconfirmed.
+- Actually running GPUI headless capture on pippip: unconfirmed (M2 spike).

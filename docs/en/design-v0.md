@@ -3,7 +3,7 @@
 English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md)
 
 > Status: draft · written 2026-11-19 · audience: developers building dui
-> External facts in this document (licenses, star counts, versions) were checked with the GitHub API on 2026-11-19. Anything not confirmed is marked `unverified`.
+> External facts in this document (licenses, star counts, versions) were checked with the GitHub API on 2026-11-19. Anything not confirmed is marked `unconfirmed`.
 
 ## 1. Problem and users
 
@@ -183,7 +183,7 @@ type VerificationStatus =
 "It rendered" is different from "it rendered the intended state". Three checks:
 
 1. **Value check** (required): right after rendering, read back the actual value of each injected slot and compare with the intended value. A mismatch means injection failed.
-2. **Semantic check** (required): run assertions generated from the state against the DOM / accessibility tree (web) or the GPUI element tree (native; feasibility `unverified`). E.g. "empty-list state → 0 list items + an empty-state message", "error state → role=alert exists".
+2. **Semantic check** (required): run assertions generated from the state against the DOM / accessibility tree (web) or the GPUI element tree (native; feasibility `unconfirmed`). E.g. "empty-list state → 0 list items + an empty-state message", "error state → role=alert exists".
 3. **Visual check** (auxiliary): AI looks at the image and judges whether it matches the state description. If only this fails, the result is `suspect`.
 
 Also a **coverage check**: confirm via coverage that the branches the state aimed at (`targets`) actually executed. If not, `unverified: assert-failed`.
@@ -229,9 +229,9 @@ pippip uses `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, and `reqwest` for HTTP (confi
 | State injection | Under a dev feature only, attach a `#[dui::state]` proc-macro to model types that generates `serde` serialization + a "start with this value" constructor. AI generates the patch that attaches it during the build step |
 | Extracting state | The same macro dumps current state (also used to collect states during real use) |
 | Network | Under a dev feature, point the HTTP client at a local mock server, or swap the client behind a wrapping trait |
-| Rendering | In-app `dui` gallery mode: read a state file, build the View, draw at each width's window size, save an image. Confirmed that the `gpui-pre 0.3.12` source has `HeadlessAppContext::capture_screenshot` and `Window::render_to_image` (`test-support` feature) (2026-11-19, [language survey](language-survey.md)). Actually running it in pippip is `unverified` → top priority of the M2 spike. If it does not work, fall back to a hidden window + OS capture |
+| Rendering | In-app `dui` gallery mode: read a state file, build the View, draw at each width's window size, save an image. Confirmed that the `gpui-pre 0.3.12` source has `HeadlessAppContext::capture_screenshot` and `Window::render_to_image` (`test-support` feature) (2026-11-19, [language survey](language-survey.md)). Actually running it in pippip is `unconfirmed` → top priority of the M2 spike. If it does not work, fall back to a hidden window + OS capture |
 | Sequence replay | Replay by dispatching actions in gallery mode |
-| Verification | Value checks via dump comparison. Element-tree-based semantic checks are `unverified` |
+| Verification | Value checks via dump comparison. Element-tree-based semantic checks are `unconfirmed` |
 
 Precondition rule: screen state lives in Entities / models. State scattered inside Views is missed by dump / injection and is marked `not-injectable`.
 
@@ -239,7 +239,7 @@ Precondition rule: screen state lives in Entities / models. State scattered insi
 
 - First choice **Graphify** (Apache-2.0, ★150,430, checked 2026-11-19): ~40 languages via tree-sitter, `EXTRACTED` / `INFERRED` tags on every edge (confirmed in the README). dui adds a state-transition layer on top and extends the tags to `extracted` / `inferred` / `verified`.
 - Second choice **CodeGraph** (MIT, ★78,082, checked 2026-11-19): framework-aware routes, TypeScript and Rust support (confirmed in the README).
-- How to integrate (call it as a library or read its CLI output files) is `unverified` → decided in M0.
+- How to integrate (call it as a library or read its CLI output files) is `unconfirmed` → decided in M0.
 - To keep the graph engine replaceable, dui has only one internal interface, `CodeGraphPort` (read nodes and edges).
 
 ## 11. Canvas
@@ -250,7 +250,7 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 |---|---|---|
 | React Flow (`xyflow/xyflow`) | MIT, ★39,087 | **First choice**. Image or iframe inside nodes (live DOM for web) |
 | tldraw (`tldraw/tldraw`) | Custom license (GitHub shows NOASSERTION). LICENSE.md: free in development environments only; **production use requires a separate commercial or trial license key**; license key and watermark are enforced; usage data may be sent | **Excluded from v0**. Its production terms would pass on to users and companies who use dui commercially, so not used until cost and terms are checked |
-| Figma export | Figma plugin / REST API (pricing and limits `unverified`) | Secondary output. Same layout as image nodes |
+| Figma export | Figma plugin / REST API (pricing and limits `unconfirmed`) | Secondary output. Same layout as image nodes |
 
 ## 12. License policy
 
@@ -301,7 +301,7 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 3. What expansion limits (depth, representative values) for sequence states cover all meaningful states within a practical number of renders?
 4. Whether to use Graphify as a library or only read its CLI output, and how to merge it with TS type info.
 5. Whether to ship the canvas as a web app (developer-local `dui open`) or a hosted service. Hosting needs a review of snapshot storage cost and security.
-6. Figma export pricing and API limits (`unverified`).
+6. Figma export pricing and API limits (`unconfirmed`).
 
 ## Principle: combinations are produced by the system, not by AI (decided 2026-11-19)
 AI is used **only to find where state lives and what type it is**. Which combinations to draw is decided by deterministic algorithms so the result is the same every time.
