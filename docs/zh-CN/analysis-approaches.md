@@ -86,6 +86,8 @@
 
 ## 5. dui 分析器推荐
 
+> **2026-11-19 更新**：dui 的核心现在是 Rust，并且只依赖官方编译器。下文中的 ts-morph、Babel / SWC 以及把 Graphify 作为引擎的方案已被[设计：技术栈](design-v0.md#技术栈2026-11-19-决定)取代。下面的表格作为调研记录保留。
+
 ### 5.1 TypeScript
 
 | 候选 | 优点 | 缺点 | 判断 |
@@ -95,7 +97,7 @@
 | SCIP（scip-typescript） | 定义、引用精确，语言中立格式 | 没有类型**结构**（字段、联合分支）和数据流 | 不使用（必要时作为交叉引用辅助） |
 | Babel/SWC AST | 放置注入转换的地方 | 无类型 | **仅用于注入器**（Vite 插件） |
 
-TS 版本风险：据 InfoQ（2026-11-06），TS 7.0（2026-07，Go 原生）移除了编译器 API，7.1 beta 通过 `typescript/sync`、`typescript/async`、`typescript/ast` 等**新入口恢复了 API**（与旧的 `ts.createProgram` 不兼容；官方博客原文未确认）。obora 在工具中保留 `typescript ^5.9.3`，TS7 用 tsgo 单独运行（已在 pnpm-workspace.yaml 中确认）。→ **dui 把分析层放在 `TypeOracle` 接口之后：v0 使用 TS 5.x/6 API（ts-morph），TS 7.1 稳定版发布后再加新 API 的实现。**
+TS 版本风险：据 InfoQ（2026-11-06），TS 7.0（2026-07，Go 原生）移除了编译器 API，7.1 beta 通过 `typescript/sync`、`typescript/async`、`typescript/ast` 等**新入口恢复了 API**（与旧的 `ts.createProgram` 不兼容；已在[官方 TS 7.1 beta 博客](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)中确认，其中还列出了 `typescript/fs`）。obora 在工具中保留 `typescript ^5.9.3`，TS7 用 tsgo 单独运行（已在 pnpm-workspace.yaml 中确认）。→ **dui 把分析层放在 `TypeOracle` 接口之后：v0 使用 TS 5.x/6 API（ts-morph），TS 7.1 稳定版发布后再加新 API 的实现。**
 
 数据流（state → JSX，处理函数 → setState）像 React Compiler 一样，以函数为单位的控制流 + 简单数据流**由 dui 自己实现**（React 的 hook 规则让范围很窄）。能否把 React Compiler 内部作为库复用 `未确认`（不是公开 API）→ 在 M1 中确认。
 
@@ -134,7 +136,11 @@ GPUI 的状态集中在 `Entity<T>` 模型字段中，所以"找到模型类型 
 
 ## 6. 结论（推荐技术栈）
 
-- **TS**：tree-sitter（快速扫描）→ **ts-morph / TS compiler API（类型、符号）** → dui 自己的数据流（React Compiler 方式）→ Babel/SWC 转换（注入）。图用 Graphify。
-- **Rust**：Graphify（tree-sitter）图 → **rust-analyzer `ra_ap_*`（固定版本）获取类型** → syn proc-macro（注入）。
+2026-11-19 决定（详见[设计：技术栈](design-v0.md#技术栈2026-11-19-决定)）：
+
+- **核心**：Rust 单一二进制（CLI、通过 `rmcp` 的 MCP、分析器、组合规则）。代码图基于 tree-sitter + oxc 自研；Graphify 和 CodeGraph 仅参考。
+- **TS**：tree-sitter（快速扫描）→ oxc（解析、语义）→ **通过 `TypeOracle` 从项目的官方 TypeScript 编译器获取类型**（TS 6 API，或通过小型 Node 边车使用 TS 7.1 `typescript/sync`）→ dui 自己的数据流（React Compiler 方式）→ oxc 转换（注入）。
+- **Rust**：tree-sitter 扫描 → **rust-analyzer `ra_ap_*`（固定版本）获取类型** → syn proc-macro（注入）。
+- **渲染**：由 Rust 通过 CDP 驱动 Chromium（chromiumoxide）；网络模拟通过 CDP Fetch 域。
 - AI 只用于填补 `已推断` 格子和命名。组合与覆盖率用确定性算法。
-- 待确认：React Compiler 内部能否复用，TS 7.1 新 API 是否提供足够的类型检查能力，固定 `ra_ap_hir` 版本的成本。
+- 待确认：React Compiler 内部能否复用，TS 7.1 API 是否提供足够的类型检查能力，不经 Node 从 Rust 查询 TS 7 的方法（`未确认`），固定 `ra_ap_hir` 版本的成本。

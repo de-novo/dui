@@ -5,6 +5,8 @@ English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md
 > Status: draft · written 2026-11-19 · audience: developers building dui
 > External facts in this document (licenses, star counts, versions) were checked with the GitHub API on 2026-11-19. Anything not confirmed is marked `unconfirmed`.
 
+> **Positioning**: design-generation tools show *how it will be built*: AI imagines screens that do not exist yet. dui shows *how it is actually built*: it reads existing code through the official compilers and really renders every state that exists. Nothing is invented; what cannot be shown is marked `unverified` or `unrenderable`.
+
 ## 0. Core principle: AI-native
 
 **dui is AI-native. AI uses everything; humans only look at the canvas.** (decided 2026-11-19)
@@ -16,6 +18,15 @@ English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md
 | Loop | Both | A human comments on a canvas cell → AI reads the comments via MCP → fixes the code → the canvas re-renders |
 
 Every component below is designed for this split: anything a person would "run" is run by an AI agent; anything a person needs to "see" is on the canvas.
+
+### Principle #2: official-compiler-dependent (decided 2026-11-19)
+
+**dui is an official-compiler-dependent project.**
+
+- Only each language's **official compiler / toolchain** is supported: TypeScript → `tsc` from Microsoft's `typescript` package; Rust → `rustc` (Cargo) with rust-analyzer for type queries; later Swift → `swiftc` + SourceKit-LSP; Kotlin → `kotlinc`.
+- Unofficial or alternative compilers / toolchains are **`unsupported`**.
+- dui uses the official compiler already in the user's project (exact version). It **does not reimplement type checking**.
+- Details: [Tech stack](#tech-stack-decided-2026-11-19).
 
 ## 1. Problem and users
 
@@ -47,7 +58,7 @@ Every component below is designed for this split: anything a person would "run" 
 ## 3. Core ideas
 
 1. **AI finds every place where state lives**: global stores, component-local state (`useState`, etc.), context, URL / route, server response caches, GPUI Entity / model fields.
-2. **Insert forced-injection code at build time**: leave the source as is and create a "start with this value" entry point with a dev-build transform (Vite/Babel/SWC plugin for TS, proc-macro / build script for Rust). That way even local state can be set from outside.
+2. **Insert forced-injection code at build time**: leave the source as is and create a "start with this value" entry point with a dev-build transform (oxc transform for TS, proc-macro / build script for Rust; see [Tech stack](#tech-stack-decided-2026-11-19)). That way even local state can be set from outside.
 3. **Intercept APIs at the network level**: respond with mocks generated from types.
 4. **Inject, render, check**: inject the state, render at each width, and check that the result matches the intended state. If it does not, it is `unverified`.
 
@@ -59,14 +70,14 @@ Why types are the key: with types we can (a) enumerate state shapes completely, 
 flowchart LR
   subgraph CLI["dui CLI"]
     A[Analyzer]
-    G[(Code graph<br/>Graphify)]
+    G[(Code graph<br/>in-house: tree-sitter + oxc)]
     I[Injector<br/>build transform]
     M[Mock Generator]
     P[Planner<br/>state expansion]
   end
   subgraph Run["Run"]
     N[Network Interceptor]
-    R[Render workers<br/>Playwright / GPUI gallery]
+    R[Render workers<br/>Chromium via CDP / GPUI gallery]
     V[Verifier]
   end
   S[(Snapshot store<br/>.dui/)]
@@ -98,7 +109,7 @@ flowchart LR
 |---|---|---|
 | `dui` CLI | Entry point **for AI agents** (not for humans): runs everything, caching, config. `dui scan`, `dui render`, `dui open`. JSON output, stable exit codes, no prompts, idempotent | config file → run |
 | MCP server | Same operations as the CLI for AI agents, plus reading and resolving canvas cell comments | MCP calls → JSON |
-| Analyzer | Finds screens, state locations, events, state-change points, transition rules. Graphify graph + type info + AI | code → `Screen`, `StateSlot`, `Rule` |
+| Analyzer | Finds screens, state locations, events, state-change points, transition rules. In-house code graph + type info from the official compiler + AI | code → `Screen`, `StateSlot`, `Rule` |
 | Injector | Inserts a dev-only injection entry point at each state location at build time | `StateSlot` → transformed dev build |
 | Mock generator | Generates representative values from types / schemas (zod, OpenAPI, Rust types) | type → value sets |
 | Planner | Combines data shapes × branches × sequences into the list of states to render; re-plans for uncovered branches | rules, coverage → `State[]` |
@@ -183,7 +194,7 @@ type VerificationStatus =
 ## 6. Pipeline
 
 1. **Scan** (`dui scan`)
-   - Build the call / import graph with Graphify.
+   - Build the call / import graph with dui's in-house code graph (tree-sitter + oxc).
    - Find screens: router definitions (TanStack Router, Next app directory, etc.), GPUI root Views.
    - Find state locations: type info + AI. Result: `StateSlot[]`.
    - List code branches: render branches reachable from the screen (conditional JSX, early return, `match`).
@@ -216,6 +227,7 @@ Measured as a number, not a feeling. The denominator is defined explicitly.
   - Render branches: conditional render branches (conditional JSX, ternaries, early returns, `match` arms) inside components reachable from the screen root. Branches with no effect on what is drawn (logging, etc.) are removed by exclusion rules.
   - Because the analyzer builds the denominator itself, "branches missing from the denominator" are measured separately: compare with the full branch list from runtime coverage tools (V8 coverage / istanbul; for Rust, the `cargo llvm-cov` family).
 - **Unrenderable cells** (see "Rendering limits") are **excluded from the denominator** but always reported as a separate count with reasons. So coverage = `verified` cells ÷ renderable cells.
+- **Unsupported** projects / modules (versions released before 2026 or non-official compilers; see Tech stack) are rejected before scanning and are not measured at all.
 - **Numerator** = the number of `verified` cells in the denominator.
 - **Report**: renderable coverage % per screen and per kind + a list of unverified cells (with reasons) + the unrenderable count (with reasons). E.g. `review 97.8% (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths; unrenderable 2 (system-ui)`.
 - **Condition for 99%**: our code (obora, pippip) follows a rule to gather screen state in one place with types, reducers, or state machines. That keeps the sequence-state denominator accurate.
@@ -227,15 +239,15 @@ Measured as a number, not a feeling. The denominator is defined explicitly.
 | Item | Approach |
 |---|---|
 | Finding screens | Static analysis of router definitions (TanStack Router, React Router, Next app directory). obora-web uses TanStack Router (confirmed) |
-| Types | Resolve slot types with the TypeScript compiler API. Prefer zod schemas when present (obora-web uses zod, confirmed) |
-| Local state injection | A Vite plugin (internally a Babel or SWC transform) rewrites `useState(init)` to the form `useState(__dui.get("slotId") ?? init)`. Same approach for `useReducer` and context Provider values |
+| Types | Resolve slot types through `TypeOracle` with the project's official TypeScript compiler (see Tech stack). Prefer zod schemas when present (obora-web uses zod, confirmed) |
+| Local state injection | An oxc transform in the dev build rewrites `useState(init)` to the form `useState(__dui.get("slotId") ?? init)`. Same approach for `useReducer` and context Provider values |
 | Store injection | Wrap initial values at creation sites for Zustand, Redux, Jotai, etc. in the same way |
 | Server cache | TanStack Query: pre-fill the `QueryClient` before rendering, or mock the network |
-| Network | Service Worker interception like MSW (MIT, confirmed). Node-side requests via MSW node mode |
-| Rendering | Render per viewport width with Playwright (Apache-2.0, confirmed). Image + DOM + accessibility tree + V8 coverage |
-| Electron | Renderer is the same as web. Mock preload / IPC calls and open the renderer bundle in a browser, or use Playwright's Electron mode |
+| Network | Intercept requests with the CDP Fetch domain and answer with mocks (no MSW). Interception of requests made outside the browser (server side) is `unconfirmed` |
+| Rendering | Drive Chromium over CDP from Rust (chromiumoxide) and render per viewport width. Image + DOM + accessibility tree + V8 coverage |
+| Electron | Renderer is the same as web. Mock preload / IPC calls and open the renderer bundle in Chromium via CDP |
 | Tauri | Mock `invoke` calls and render the same as web |
-| Sequence replay | Replay real clicks and key presses with Playwright |
+| Sequence replay | Replay real clicks and key presses via CDP input events |
 
 The `__dui` injection runtime is included only in dev builds; the transform is off for production builds. CI checks that `__dui` is absent from build output.
 
@@ -258,9 +270,9 @@ Precondition rule: screen state lives in Entities / models. State scattered insi
 
 ## 10. Graph engine
 
-- First choice **Graphify** (Apache-2.0, ★150,430, checked 2026-11-19): ~40 languages via tree-sitter, `EXTRACTED` / `INFERRED` tags on every edge (confirmed in the README). dui adds a state-transition layer on top and extends the tags to `extracted` / `inferred` / `verified`.
-- Second choice **CodeGraph** (MIT, ★78,082, checked 2026-11-19): framework-aware routes, TypeScript and Rust support (confirmed in the README).
-- How to integrate (call it as a library or read its CLI output files) is `unconfirmed` → decided in M0.
+- **Changed 2026-11-19**: the core is Rust, so the code graph is **built in-house on tree-sitter + oxc** inside the dui binary. Graphify is Python and cannot be the embedded engine.
+- **Graphify** (Apache-2.0, ★150,430, checked 2026-11-19) is now **reference only (ideas)**: ~40 languages via tree-sitter and `EXTRACTED` / `INFERRED` tags on every edge (confirmed in the README). dui keeps the idea and extends the tags to `extracted` / `inferred` / `verified`.
+- **CodeGraph** (MIT, ★78,082, checked 2026-11-19): reference only for framework-aware routes (confirmed in the README).
 - To keep the graph engine replaceable, dui has only one internal interface, `CodeGraphPort` (read nodes and edges).
 
 ## 11. Canvas
@@ -294,11 +306,14 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 
 | Dependency | License | Status |
 |---|---|---|
-| Graphify | Apache-2.0 | Allowed |
-| CodeGraph | MIT | Allowed |
+| Graphify | Apache-2.0 | Allowed (reference only, not a dependency) |
+| CodeGraph | MIT | Allowed (reference only, not a dependency) |
 | React Flow | MIT | Allowed |
-| MSW | MIT | Allowed |
-| Playwright | Apache-2.0 | Allowed |
+| rmcp (official Rust MCP SDK) | Apache-2.0 | Allowed |
+| oxc | MIT | Allowed |
+| tree-sitter | MIT | Allowed |
+| chromiumoxide | MIT OR Apache-2.0 | Allowed |
+| syn, `ra_ap_*` | MIT OR Apache-2.0 | Allowed |
 | GPUI (crate) | Apache-2.0 | Allowed |
 | GitNexus | PolyForm Noncommercial | Forbidden |
 | tldraw | Custom (production requires a paid contract) | On hold |
@@ -309,10 +324,10 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 
 | Milestone | Content | Done when |
 |---|---|---|
-| **M0 spike** | One obora-web screen: review. Render 5 hand-picked states at 3 widths with Vite-transform injection + MSW + Playwright. Run Graphify on obora and decide how to integrate it | At least one local state injected from outside and rendered; 15 images |
+| **M0 spike** | One obora-web screen: review. Render 5 hand-picked states at 3 widths with oxc-transform injection + CDP Fetch interception + Chromium via CDP, all driven by the Rust binary | At least one local state injected from outside and rendered; 15 images |
 | **M1 automatic states** | Analyzer + mock generator + planner. Auto-enumerate data shapes and code branches, measure coverage, fill-in loop | Branch coverage number for the review screen, list of unverified cells |
 | **M2 GPUI spike** | One pippip screen. Check offscreen rendering, prototype the `#[dui::state]` macro | State file → one image |
-| **M3 sequence states** | Extract event → state-change rules, expand, verify by Playwright replay, mark edges `verified` | Sequence states such as "after approving the last page" on the review screen generated and verified automatically |
+| **M3 sequence states** | Extract event → state-change rules, expand, verify by CDP replay, mark edges `verified` | Sequence states such as "after approving the last page" on the review screen generated and verified automatically |
 | **M4 canvas** | React Flow canvas (rows = states, columns = widths, edges = transitions, unverified and unrenderable marks); the AI agent opens it via CLI / MCP (`dui open`), humans only view it | All 3 obora screens laid out |
 | **M5 obora 99% attempt** | 99% target for the 3 screens, apply the explicit-state rule, Figma export | Coverage report per screen |
 | M6 and later | All of pippip, Electron (obora-desktop), Vue, Svelte | — |
@@ -326,13 +341,13 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 - **Non-deterministic rendering**: time, randomness, animations, font loading. → Freeze clock and randomness, disable animations, wait for fonts.
 - **GPUI rendering path uncertainty**: if offscreen rendering does not work we must use OS capture, which brings macOS permission and speed problems.
 - **AI cost and time**: scan cost on large codebases. → Cache graphs and results per commit; redo only changed files.
-- **Dependency on Graphify**: an external project's direction may change. → Keep it replaceable via `CodeGraphPort`.
+- **Dependency on official compiler APIs**: the TS 7 programmatic API is new (7.1 beta) and `ra_ap_*` has no compatibility guarantee. → Keep them behind `TypeOracle`; pin versions.
 
 **Open questions** (in order of importance)
 1. Does GPUI's (`gpui-pre 0.3.12`) headless capture API (confirmed to exist in code) actually work on pippip screens? If not, what is the native rendering path?
 2. How to automatically remove "branches with no effect on the screen" from the coverage denominator. This rule defines what 99% means.
 3. What expansion limits (depth, representative values) for sequence states cover all meaningful states within a practical number of renders?
-4. Whether to use Graphify as a library or only read its CLI output, and how to merge it with TS type info.
+4. How the TS adapter talks to TS 7.1's API from Rust (a small Node sidecar using `typescript/sync`, or a documented wire protocol, which is `unconfirmed`).
 5. Whether to ship the canvas as a local web app (the AI agent runs `dui open`; humans only view it) or a hosted service. Hosting needs a review of snapshot storage cost and security.
 6. Figma export pricing and API limits (`unconfirmed`).
 
@@ -361,3 +376,56 @@ Principle:
 
 1. Cells that can't be rendered are never hidden. They show on the canvas as a separate status, **unrenderable (reason)**, distinct from `unverified`.
 2. Each platform documents the render environment it requires (e.g. a Mac runner with Xcode for Apple platforms).
+
+## Tech stack (decided 2026-11-19)
+
+**Rust core from day one**: one binary with no Node or Python runtime of its own. The CLI, the MCP server, the analyzer, and the deterministic combination rules all live in Rust. This replaces earlier mentions of Vite / Babel / SWC, MSW, Playwright, ts-morph, and Graphify as an engine. Versions and licenses were checked on 2026-11-19 (crates.io, npm, GitHub).
+
+| Layer | Choice | License | Notes |
+|---|---|---|---|
+| Core | Rust, edition 2024 | — | Single binary. Building dui needs Rust ≥ 1.98 because oxc 0.159.0 and `ra_ap_hir` 0.0.363 declare `rust-version` 1.98 (crates.io) |
+| MCP server | `rmcp` 3.11.0 (official SDK, [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)) | Apache-2.0 (workspace `Cargo.toml`; GitHub shows NOASSERTION) | Same operations as the CLI + reading canvas comments |
+| Fast scan | `tree-sitter` 0.27.2 | MIT | Screen and file lists, any language |
+| TS/JS parsing + injection transform | `oxc` 0.159.0 (`oxc_parser`, `oxc_semantic`, `oxc_transformer`) | MIT | Replaces Babel / SWC / Vite plugins |
+| Code graph | In-house on tree-sitter + oxc, behind `CodeGraphPort` | — | Graphify (Python) and CodeGraph are reference only |
+| TS types | `TypeOracle` → TypeScript adapter → the project's official compiler | Apache-2.0 ([microsoft/TypeScript](https://github.com/microsoft/TypeScript)) | See "TypeScript compiler status" below. If types are unavailable, the result is `inferred` |
+| Rust types | `ra_ap_*` (pinned; `ra_ap_hir` 0.0.363) + `syn` 3.0.10 | MIT OR Apache-2.0 | `ra_ap_*` has no compatibility guarantee → pin |
+| Web rendering | `chromiumoxide` 0.9.1 (released 2026-02-25), Chromium over CDP, one viewport per width | MIT OR Apache-2.0 | Last release 2026-02-25 → watch maintenance |
+| Network interception | CDP Fetch domain (`Fetch.pdl` and `examples/interception.rs` in chromiumoxide) | — | No MSW |
+| GPUI rendering | Later, in the same Rust process (`gpui-pre`) | Apache-2.0 | See §9.2 |
+| Canvas UI | React + React Flow, static assets served by the Rust binary | MIT | Humans only look at it (§0) |
+
+**TypeScript compiler status** (official sources):
+- TS 7.0 is the Go-native compiler. Stable `typescript` 7.0.2 on npm on 2026-07-08. From 7.0 RC on, the command is `tsc` (the preview name `tsgo` is gone) ([typescript-go README](https://github.com/microsoft/typescript-go), now archived; development moved to microsoft/TypeScript). TS 7 provides an LSP language server ([TS 7.0 announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)).
+- The programmatic API returns in **TS 7.1** (beta 2026-10-20) as JS entry points `typescript/sync`, `typescript/async`, `typescript/fs`, `typescript/ast` ([TS 7.1 beta announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)).
+- So the TS adapter runs a small sidecar on the project's own Node that loads the project's `typescript` and answers type queries. Calling the native compiler directly from Rust without Node needs a documented protocol, which is `unconfirmed`.
+
+### Language adapters: the core is language-agnostic
+
+- The Rust core knows no language. Each language plugs in through one **language adapter** = `TypeOracle` (type info from the official compiler) + injector + **renderer plugin**.
+- **Adding a language = adding one adapter.** The core does not change.
+- **Compiler resolution policy**:
+  1. Use the official compiler already in the user's project, with the **exact version** the project uses.
+  2. Only if it is missing, download the **official distribution** of the version the project declares and cache it.
+  3. Otherwise the project is `unsupported` (reason shown).
+
+| Language | Official compiler / toolchain | License (source) | Status |
+|---|---|---|---|
+| TypeScript | `tsc` from npm `typescript` (Microsoft) | Apache-2.0 ([microsoft/TypeScript](https://github.com/microsoft/TypeScript)) | v0 |
+| Rust | `rustc` / Cargo; rust-analyzer for type queries | MIT and Apache-2.0 ([rust-lang/rust README](https://github.com/rust-lang/rust)); rust-analyzer MIT OR Apache-2.0 | v0 |
+| Swift | `swiftc` + SourceKit-LSP | Apache-2.0 with Runtime Library Exception ([swiftlang/swift LICENSE.txt](https://github.com/swiftlang/swift/blob/main/LICENSE.txt)); SourceKit-LSP Apache-2.0 | Later. Apple-platform rendering needs Xcode (Apple's license) → dui uses an installed Xcode and never downloads or redistributes it |
+| Kotlin | `kotlinc` (JetBrains) | Apache-2.0 ([JetBrains/kotlin license/README.md](https://github.com/JetBrains/kotlin/blob/master/license/README.md); GitHub shows no SPDX id) | Later |
+
+### Supported versions: 2026 or later only
+
+**Rule**: a version line is supported only if its **first stable release is on or after 2026-01-01**. Older lines are rejected up front by `dui scan` as **`unsupported` (reason)**: this is not `unrenderable`, is not a cell status, and is excluded from coverage (§8). Unofficial compilers are `unsupported` the same way.
+
+| Stack | Supported | First stable release (source) | Not supported (examples) |
+|---|---|---|---|
+| TypeScript | 6.0+, 7.x | 6.0.2: 2026-03-23; 7.0.2: 2026-07-08 (npm) | 5.9 (5.9.2: 2025-07-31) and older |
+| React | 19.3+ | 19.3.0: 2026-09-09 (npm) | 19.0 (2024-12-05), 19.1 (2025-03-28), 19.2 (2025-10-01), even though they still get patch releases in 2026 |
+| Rust toolchain | 1.93+ | 1.93.0: 2026-01-22 ([GitHub release](https://github.com/rust-lang/rust/releases/tag/1.93.0)) | 1.92 and older |
+| Rust edition | 2024 | Stabilized in 1.85.0, 2025-02-20; still the newest edition in the [Edition Guide](https://doc.rust-lang.org/edition-guide/) | 2021 and older |
+| GPUI (`gpui-pre`) | 0.3.0+ | 0.3.0: 2026-09-03 (crates.io; every published version is from 2026) | — |
+
+Edition 2024 is an exception to the date rule: it is the newest edition and there is no 2026 edition.

@@ -84,6 +84,8 @@ Observations
 
 ## 5. Recommendation for dui's analyzer
 
+> **Updated 2026-11-19**: dui's core is now Rust and depends only on official compilers. ts-morph, Babel / SWC, and Graphify-as-engine below are superseded by the [design: Tech stack](design-v0.md#tech-stack-decided-2026-11-19). The tables below are kept as research.
+
 ### 5.1 TypeScript
 
 | Candidate | Pros | Cons | Decision |
@@ -93,7 +95,7 @@ Observations
 | SCIP (scip-typescript) | Precise definitions / references, language-neutral format | No type **structure** (fields, union arms) and no data flow | Not used (cross-reference helper if needed) |
 | Babel/SWC AST | Where the injection transform goes | No types | **Injector only** (Vite plugin) |
 
-TS version risk: per InfoQ (2026-11-06), TS 7.0 (2026-07, Go native) dropped the compiler API, and the 7.1 beta **restored the API through new entry points** such as `typescript/sync`, `typescript/async`, and `typescript/ast` (not compatible with the old `ts.createProgram`; the official blog post is unconfirmed). obora keeps `typescript ^5.9.3` for tooling and runs TS7 separately via tsgo (confirmed in pnpm-workspace.yaml). → **dui keeps the analysis layer behind a `TypeOracle` interface: v0 uses the TS 5.x/6 API (ts-morph), and a new-API implementation is added once TS 7.1 is stable.**
+TS version risk: per InfoQ (2026-11-06), TS 7.0 (2026-07, Go native) dropped the compiler API, and the 7.1 beta **restored the API through new entry points** such as `typescript/sync`, `typescript/async`, and `typescript/ast` (not compatible with the old `ts.createProgram`; confirmed in the [official TS 7.1 beta post](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/), which also lists `typescript/fs`). obora keeps `typescript ^5.9.3` for tooling and runs TS7 separately via tsgo (confirmed in pnpm-workspace.yaml). → **dui keeps the analysis layer behind a `TypeOracle` interface: v0 uses the TS 5.x/6 API (ts-morph), and a new-API implementation is added once TS 7.1 is stable.**
 
 Data flow (state → JSX, handler → setState) is **implemented by dui itself**, like React Compiler, as per-function control flow + simple data flow (React's hook rules keep the scope narrow). Whether React Compiler internals can be reused as a library is `unconfirmed` (not a public API) → check in M1.
 
@@ -132,7 +134,11 @@ In GPUI, state gathers in `Entity<T>` model fields, so "find model types → fie
 
 ## 6. Conclusion (recommended stack)
 
-- **TS**: tree-sitter (fast scan) → **ts-morph / TS compiler API (types, symbols)** → dui's own data flow (React Compiler style) → Babel/SWC transform (injection). Graph from Graphify.
-- **Rust**: Graphify (tree-sitter) graph → **rust-analyzer `ra_ap_*` (pinned) for types** → syn proc-macro (injection).
+Decided 2026-11-19 (details: [design: Tech stack](design-v0.md#tech-stack-decided-2026-11-19)):
+
+- **Core**: Rust single binary (CLI, MCP via `rmcp`, analyzer, combination rules). Code graph built in-house on tree-sitter + oxc; Graphify and CodeGraph are reference only.
+- **TS**: tree-sitter (fast scan) → oxc (parse, semantics) → **types from the project's official TypeScript compiler via `TypeOracle`** (TS 6 API or TS 7.1 `typescript/sync` through a small Node sidecar) → dui's own data flow (React Compiler style) → oxc transform (injection).
+- **Rust**: tree-sitter scan → **rust-analyzer `ra_ap_*` (pinned) for types** → syn proc-macro (injection).
+- **Rendering**: Chromium over CDP from Rust (chromiumoxide); network mocks through the CDP Fetch domain.
 - AI only fills `inferred` cells and names things. Combinations and coverage use deterministic algorithms.
-- Open checks: whether React Compiler internals can be reused, whether the TS 7.1 new API offers enough type-checker capability, the cost of pinning `ra_ap_hir`.
+- Open checks: whether React Compiler internals can be reused, whether the TS 7.1 API offers enough type-checker capability, a Node-free way to query TS 7 from Rust (`unconfirmed`), the cost of pinning `ra_ap_hir`.

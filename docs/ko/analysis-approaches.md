@@ -86,6 +86,8 @@
 
 ## 5. dui 분석기 추천
 
+> **2026-11-19 갱신**: dui 본체는 이제 Rust이고 공식 컴파일러에만 의존한다. 아래의 ts-morph, Babel / SWC, 엔진으로서의 Graphify는 [설계: 기술 스택](design-v0.md#기술-스택-2026-11-19-결정)으로 대체됐다. 아래 표는 조사 기록으로 남겨둔다.
+
 ### 5.1 TypeScript
 
 | 후보 | 장점 | 단점 | 판단 |
@@ -95,7 +97,7 @@
 | SCIP(scip-typescript) | 정의·참조가 정확, 언어 중립 형식 | 타입 **구조**(필드·유니온 갈래)와 데이터 흐름은 없음 | 쓰지 않음(필요 시 교차 참조 보조) |
 | Babel/SWC AST | 주입 변환을 넣는 곳 | 타입 없음 | **주입기 전용**(Vite 플러그인) |
 
-TS 버전 위험: InfoQ(2026-11-06)에 따르면 TS 7.0(2026-07, Go 네이티브)은 컴파일러 API를 뺐고, 7.1 베타가 `typescript/sync`·`typescript/async`·`typescript/ast` 등 **새 진입점으로 API를 되살렸다**(옛 `ts.createProgram`과 호환 아님, 원문 공식 블로그 미확인). obora는 도구용 `typescript ^5.9.3`을 유지하고 TS7은 tsgo로 따로 돌린다(pnpm-workspace.yaml 확인). → **dui는 분석 계층을 `TypeOracle` 인터페이스 뒤에 두고, v0은 TS 5.x/6 API(ts-morph), TS 7.1 안정판이 나오면 새 API 구현을 추가**한다.
+TS 버전 위험: InfoQ(2026-11-06)에 따르면 TS 7.0(2026-07, Go 네이티브)은 컴파일러 API를 뺐고, 7.1 베타가 `typescript/sync`·`typescript/async`·`typescript/ast` 등 **새 진입점으로 API를 되살렸다**(옛 `ts.createProgram`과 호환 아님. [공식 TS 7.1 beta 글](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)에서 확인했고, 여기에는 `typescript/fs`도 있다). obora는 도구용 `typescript ^5.9.3`을 유지하고 TS7은 tsgo로 따로 돌린다(pnpm-workspace.yaml 확인). → **dui는 분석 계층을 `TypeOracle` 인터페이스 뒤에 두고, v0은 TS 5.x/6 API(ts-morph), TS 7.1 안정판이 나오면 새 API 구현을 추가**한다.
 
 데이터 흐름(state → JSX, 핸들러 → setState)은 React Compiler처럼 함수 단위 제어 흐름 + 단순 데이터 흐름을 **직접 구현**한다(React 훅 규칙 덕분에 범위가 좁다). React Compiler 내부를 라이브러리로 재사용할 수 있는지는 `미확인`(공개 API 아님) → M1에서 확인.
 
@@ -134,7 +136,11 @@ GPUI는 상태가 `Entity<T>` 모델 필드에 모이므로 "모델 타입 찾�
 
 ## 6. 결론 (추천 스택)
 
-- **TS**: tree-sitter(빠른 스캔) → **ts-morph/TS compiler API(타입·심볼)** → dui 자체 데이터 흐름(React Compiler 방식) → Babel/SWC 변환(주입). 그래프는 Graphify.
-- **Rust**: Graphify(tree-sitter) 그래프 → **rust-analyzer `ra_ap_*`(버전 고정)로 타입** → syn proc-macro(주입).
+2026-11-19 결정(자세한 내용: [설계: 기술 스택](design-v0.md#기술-스택-2026-11-19-결정)):
+
+- **본체**: Rust 바이너리 하나(CLI, `rmcp`로 MCP, 분석기, 조합 규칙). 코드 그래프는 tree-sitter + oxc로 자체 구현. Graphify와 CodeGraph는 참고만.
+- **TS**: tree-sitter(빠른 스캔) → oxc(파싱·의미 분석) → **`TypeOracle`로 프로젝트의 공식 TypeScript 컴파일러에서 타입** (TS 6 API, 또는 작은 Node 사이드카로 TS 7.1 `typescript/sync`) → dui 자체 데이터 흐름(React Compiler 방식) → oxc 변환(주입).
+- **Rust**: tree-sitter 스캔 → **rust-analyzer `ra_ap_*`(버전 고정)로 타입** → syn proc-macro(주입).
+- **렌더**: Rust에서 CDP로 Chromium 구동(chromiumoxide). 네트워크 목은 CDP Fetch 도메인으로.
 - AI는 `추정됨` 칸 채우기·이름 붙이기에만. 조합·커버리지는 결정적 알고리즘.
-- 열린 확인: React Compiler 내부 재사용 가능성, TS 7.1 새 API로 타입 체커 기능이 충분한지, `ra_ap_hir` 버전 고정 비용.
+- 열린 확인: React Compiler 내부 재사용 가능성, TS 7.1 API로 타입 체커 기능이 충분한지, Node 없이 Rust에서 TS 7에 묻는 방법(`미확인`), `ra_ap_hir` 버전 고정 비용.

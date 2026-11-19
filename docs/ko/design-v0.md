@@ -7,6 +7,8 @@
 > 상태: 초안 · 작성 2026-11-19 · 대상 독자: dui를 만들 개발자
 > 이 문서의 외부 사실(라이선스·스타 수·버전)은 2026-11-19에 GitHub API로 확인했다. 확인 못 한 것은 `미확인`으로 적는다.
 
+> **위치**: 디자인 생성 도구는 *이렇게 만들 것이다*를 보여준다: 아직 없는 화면을 AI가 상상해서 그린다. dui는 *실제로 이렇게 만들어져 있다*를 보여준다: 공식 컴파일러로 지금 있는 코드를 읽고, 실제로 존재하는 모든 상태를 진짜로 렌더한다. 아무것도 지어내지 않는다. 보여줄 수 없는 것은 `미검증` 또는 `렌더 불가`로 표시한다.
+
 ## 0. 핵심 원칙: AI 네이티브
 
 **dui는 AI 네이티브다. 모든 건 AI가 쓰고, 사람은 캔버스만 본다.** (2026-11-19 결정)
@@ -18,6 +20,15 @@
 | 고리 | 둘 다 | 사람이 캔버스 칸에 코멘트 → AI가 MCP로 코멘트를 읽음 → 코드 수정 → 캔버스 다시 렌더 |
 
 아래 모든 구성요소는 이 분담을 따른다: 사람이 "실행"할 것은 AI 에이전트가 실행하고, 사람이 "봐야" 할 것은 캔버스에 있다.
+
+### 원칙 #2: 공식 컴파일러 의존 (2026-11-19 결정)
+
+**dui는 공식 컴파일러에 의존하는 프로젝트다.**
+
+- 각 언어의 **공식 컴파일러·툴체인**만 지원한다: TypeScript → Microsoft `typescript` 패키지의 `tsc`, Rust → `rustc`(Cargo)와 타입 조회용 rust-analyzer, 나중에 Swift → `swiftc` + SourceKit-LSP, Kotlin → `kotlinc`.
+- 비공식·대체 컴파일러와 툴체인은 **`미지원`**이다.
+- dui는 사용자 프로젝트에 이미 있는 공식 컴파일러를 쓴다(버전까지 똑같이). **타입 검사를 다시 만들지 않는다**.
+- 자세한 내용: [기술 스택](#기술-스택-2026-11-19-결정).
 
 ## 1. 문제와 사용자
 
@@ -49,7 +60,7 @@
 ## 3. 핵심 아이디어
 
 1. **AI가 상태가 사는 곳을 전부 찾는다**: 전역 store, 컴포넌트 로컬 상태(`useState` 등), context, URL·라우트, 서버 응답 캐시, GPUI Entity/모델 필드.
-2. **빌드할 때 강제 주입 코드를 끼운다**: 소스는 그대로 두고, 개발 빌드 변환(TS는 Vite/Babel/SWC 플러그인, Rust는 proc-macro·build 스크립트)으로 "이 값으로 시작하라" 입구를 만든다. 그래서 로컬 상태도 밖에서 넣을 수 있다.
+2. **빌드할 때 강제 주입 코드를 끼운다**: 소스는 그대로 두고, 개발 빌드 변환(TS는 oxc 변환, Rust는 proc-macro·build 스크립트, [기술 스택](#기술-스택-2026-11-19-결정) 참고)으로 "이 값으로 시작하라" 입구를 만든다. 그래서 로컬 상태도 밖에서 넣을 수 있다.
 3. **API는 네트워크에서 가로챈다**: 타입에서 생성한 목으로 응답한다.
 4. **넣고, 그리고, 검사한다**: 상태를 주입해 폭별로 렌더하고, 렌더 결과가 의도한 상태와 맞는지 검사한다. 안 맞으면 `미검증`.
 
@@ -61,14 +72,14 @@
 flowchart LR
   subgraph CLI["dui CLI"]
     A[분석기 Analyzer]
-    G[(코드 그래프<br/>Graphify)]
+    G[(코드 그래프<br/>자체 구현: tree-sitter + oxc)]
     I[주입기 Injector<br/>빌드 변환]
     M[목 생성기<br/>Mock Generator]
     P[계획기 Planner<br/>상태 펼치기]
   end
   subgraph Run["실행"]
     N[네트워크 가로채기<br/>Interceptor]
-    R[렌더 워커들<br/>Playwright / GPUI 갤러리]
+    R[렌더 워커들<br/>CDP로 Chromium 구동 / GPUI 갤러리]
     V[검증기 Verifier]
   end
   S[(스냅샷 저장소<br/>.dui/)]
@@ -100,7 +111,7 @@ flowchart LR
 |---|---|---|
 | `dui` CLI | **AI 에이전트용** 입구(사람용 아님): 전체 실행·캐시·설정. `dui scan`, `dui render`, `dui open`. JSON 출력, 고정 종료 코드, 질문 없음, 멱등 | 설정 파일 → 실행 |
 | MCP 서버 | CLI와 같은 작업을 AI 에이전트에게 제공 + 캔버스 칸 코멘트 읽기·처리 | MCP 호출 → JSON |
-| 분석기 | 화면·상태 위치·이벤트·상태 변경 지점·전환 규칙 찾기. Graphify 그래프 + 타입 정보 + AI | 코드 → `Screen`, `StateSlot`, `Rule` |
+| 분석기 | 화면·상태 위치·이벤트·상태 변경 지점·전환 규칙 찾기. 자체 코드 그래프 + 공식 컴파일러의 타입 정보 + AI | 코드 → `Screen`, `StateSlot`, `Rule` |
 | 주입기 | 상태 위치마다 개발용 주입 입구를 빌드 시 삽입 | `StateSlot` → 변환된 개발 빌드 |
 | 목 생성기 | 타입·스키마(zod, OpenAPI, Rust 타입)에서 대표값 생성 | 타입 → 값 묶음 |
 | 계획기 | 데이터 모양 × 분기 × 순서를 조합해 렌더할 상태 목록 생성, 안 덮인 분기는 다시 계획 | 규칙·커버리지 → `State[]` |
@@ -185,7 +196,7 @@ type VerificationStatus =
 ## 6. 파이프라인
 
 1. **스캔** (`dui scan`)
-   - Graphify로 호출·import 그래프 생성.
+   - dui 자체 코드 그래프(tree-sitter + oxc)로 호출·import 그래프 생성.
    - 화면 찾기: 라우터 정의(TanStack Router, Next app 디렉터리 등), GPUI 루트 View.
    - 상태 위치 찾기: 타입 정보 + AI. 결과는 `StateSlot[]`.
    - 코드 분기 목록: 화면에서 도달 가능한 렌더 분기(조건부 JSX, early return, `match`).
@@ -218,6 +229,7 @@ type VerificationStatus =
   - 렌더 분기: 화면 루트에서 도달 가능한 컴포넌트 안의 조건부 렌더 분기(조건부 JSX, 삼항, early return, `match` 갈래). 화면에 그려지는 것에 영향 없는 분기(로깅 등)는 제외 규칙으로 뺀다.
   - 분모 자체도 분석기가 만든 것이므로 "분모에서 빠진 분기"를 따로 잰다: 런타임 커버리지 도구(V8 coverage / istanbul, Rust는 `cargo llvm-cov` 계열)의 전체 분기 목록과 대조.
 - **렌더 불가 칸**("렌더링 한계" 참고)은 **분모에서 뺀다**. 대신 항상 별도 개수와 이유를 함께 보고한다. 그래서 커버리지 = `verified` 칸 수 ÷ 렌더 가능한 칸 수.
+- **미지원** 프로젝트·모듈(2026년 이전에 나온 버전 또는 비공식 컴파일러, 기술 스택 참고)은 스캔 전에 거절하고 아예 재지 않는다.
 - **분자** = 분모 중 `verified` 칸 수.
 - **보고**: 화면별·종류별 렌더 가능 커버리지 % + 미검증 칸 목록(이유 포함) + 렌더 불가 개수(이유 포함). 예: `review 97.8% (분기 44/45, 모양 18/18, 순서 23/24) × 3폭; 렌더 불가 2 (system-ui)`.
 - **99% 조건**: 우리 코드(obora, pippip)는 화면 상태를 타입·reducer·상태 기계로 한곳에 모으는 규칙을 둔다. 그래야 순서 상태의 분모가 정확해진다.
@@ -229,15 +241,15 @@ type VerificationStatus =
 | 항목 | 방법 |
 |---|---|
 | 화면 찾기 | 라우터 정의 정적 분석(TanStack Router, React Router, Next app 디렉터리). obora-web은 TanStack Router(확인됨) |
-| 타입 | TypeScript 컴파일러 API로 슬롯 타입 해석. zod 스키마가 있으면 우선 사용(obora-web은 zod 사용, 확인됨) |
-| 로컬 상태 주입 | Vite 플러그인(내부는 Babel 또는 SWC 변환)이 `useState(init)`을 `useState(__dui.get("slotId") ?? init)` 꼴로 바꾼다. `useReducer`, context Provider value도 같은 방식 |
+| 타입 | `TypeOracle`을 통해 프로젝트의 공식 TypeScript 컴파일러로 슬롯 타입 해석(기술 스택 참고). zod 스키마가 있으면 우선 사용(obora-web은 zod 사용, 확인됨) |
+| 로컬 상태 주입 | 개발 빌드의 oxc 변환이 `useState(init)`을 `useState(__dui.get("slotId") ?? init)` 꼴로 바꾼다. `useReducer`, context Provider value도 같은 방식 |
 | store 주입 | Zustand·Redux·Jotai 등은 생성 지점에서 초기값을 같은 방식으로 감싼다 |
 | 서버 캐시 | TanStack Query는 렌더 전 `QueryClient`에 데이터 미리 채우기 또는 네트워크 목 |
-| 네트워크 | MSW(MIT, 확인됨) 같은 Service Worker 가로채기. Node 쪽 요청은 MSW node 모드 |
-| 렌더 | Playwright(Apache-2.0, 확인됨)로 폭별 뷰포트 렌더. 이미지 + DOM + 접근성 트리 + V8 커버리지 |
-| Electron | 렌더러는 웹과 같다. preload/IPC 호출은 목으로 막고 렌더러 번들을 브라우저에서 띄우거나 Playwright Electron 모드 사용 |
+| 네트워크 | CDP Fetch 도메인으로 요청을 가로채 목 응답을 준다(MSW 없음). 브라우저 밖(서버 쪽)에서 나가는 요청을 가로채는 방법은 `미확인` |
+| 렌더 | Rust에서 CDP로 Chromium을 구동(chromiumoxide)해 폭별 뷰포트 렌더. 이미지 + DOM + 접근성 트리 + V8 커버리지 |
+| Electron | 렌더러는 웹과 같다. preload/IPC 호출은 목으로 막고 렌더러 번들을 CDP로 Chromium에서 띄운다 |
 | Tauri | `invoke` 호출을 목으로 막고 웹과 동일하게 렌더 |
-| 순서 재생 | Playwright로 실제 클릭·키 입력 재생 |
+| 순서 재생 | CDP 입력 이벤트로 실제 클릭·키 입력 재생 |
 
 주입 런타임 `__dui`는 개발 빌드에만 들어가고, 프로덕션 빌드에서는 변환이 꺼진다. 빌드 산출물에 `__dui`가 없음을 CI에서 검사한다.
 
@@ -260,9 +272,9 @@ pippip은 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, HTTP는 `reqwest` 사용(Cargo.
 
 ## 10. 그래프 엔진
 
-- 1순위 **Graphify** (Apache-2.0, ★150,430, 2026-11-19 확인): tree-sitter로 약 40개 언어, 선마다 `EXTRACTED`/`INFERRED` 태그(README에서 확인). dui는 이 위에 상태 전환 층을 얹고 태그를 `추출됨`/`추정됨`/`검증됨`으로 확장한다.
-- 2순위 **CodeGraph** (MIT, ★78,082, 2026-11-19 확인): 프레임워크별 라우트 인식, TypeScript·Rust 지원(README에서 확인).
-- 통합 방식(라이브러리로 부를지, CLI 출력 파일을 읽을지)은 `미확인` → M0에서 결정.
+- **2026-11-19 변경**: 본체가 Rust라서 코드 그래프는 dui 바이너리 안에서 **tree-sitter + oxc로 직접 만든다**. Graphify는 Python이라 내장 엔진이 될 수 없다.
+- **Graphify** (Apache-2.0, ★150,430, 2026-11-19 확인)는 이제 **참고만(아이디어)** 한다: tree-sitter로 약 40개 언어, 선마다 `EXTRACTED`/`INFERRED` 태그(README에서 확인). dui는 이 아이디어를 가져와 태그를 `추출됨`/`추정됨`/`검증됨`으로 확장한다.
+- **CodeGraph** (MIT, ★78,082, 2026-11-19 확인): 프레임워크별 라우트 인식 방식만 참고(README에서 확인).
 - 그래프 엔진은 바꿀 수 있게 dui 내부에는 `CodeGraphPort`(노드·선 읽기) 한 가지 인터페이스만 둔다.
 
 ## 11. 캔버스
@@ -296,11 +308,14 @@ dui는 Whiteboard를 **내장하지 않는다**: Code-OSS를 통째로 포함(ve
 
 | 의존성 | 라이선스 | 상태 |
 |---|---|---|
-| Graphify | Apache-2.0 | 허용 |
-| CodeGraph | MIT | 허용 |
+| Graphify | Apache-2.0 | 허용(참고만, 의존성 아님) |
+| CodeGraph | MIT | 허용(참고만, 의존성 아님) |
 | React Flow | MIT | 허용 |
-| MSW | MIT | 허용 |
-| Playwright | Apache-2.0 | 허용 |
+| rmcp (공식 Rust MCP SDK) | Apache-2.0 | 허용 |
+| oxc | MIT | 허용 |
+| tree-sitter | MIT | 허용 |
+| chromiumoxide | MIT OR Apache-2.0 | 허용 |
+| syn, `ra_ap_*` | MIT OR Apache-2.0 | 허용 |
 | GPUI (crate) | Apache-2.0 | 허용 |
 | GitNexus | PolyForm Noncommercial | 금지 |
 | tldraw | 자체(프로덕션은 유료 계약) | 보류 |
@@ -311,10 +326,10 @@ dui는 Whiteboard를 **내장하지 않는다**: Code-OSS를 통째로 포함(ve
 
 | 단계 | 내용 | 완료 기준 |
 |---|---|---|
-| **M0 스파이크** | obora-web 검수 화면 1개. 손으로 고른 상태 5개를 Vite 변환 주입 + MSW + Playwright로 3폭 렌더. Graphify를 obora에 돌려 통합 방식 결정 | 로컬 상태 1개 이상을 밖에서 주입해 렌더 성공, 이미지 15장 |
+| **M0 스파이크** | obora-web 검수 화면 1개. 손으로 고른 상태 5개를 oxc 변환 주입 + CDP Fetch 가로채기 + CDP로 구동한 Chromium으로 3폭 렌더. 모두 Rust 바이너리가 구동 | 로컬 상태 1개 이상을 밖에서 주입해 렌더 성공, 이미지 15장 |
 | **M1 자동 상태** | 분석기 + 목 생성기 + 계획기. 데이터 모양·코드 분기 자동 나열, 커버리지 측정, 보충 반복 | 검수 화면 분기 커버리지 숫자 출력, 미검증 목록 |
 | **M2 GPUI 스파이크** | pippip 화면 1개. 오프스크린 렌더 가능 여부 확인, `#[dui::state]` 매크로 시제품 | 상태 파일 → 이미지 1장 |
-| **M3 순서 상태** | 이벤트→상태 변경 규칙 추출, 펼치기, Playwright 재생 검증, 선 `검증됨` 표시 | 검수 화면 "마지막 장 승인 후" 같은 순서 상태 자동 생성·검증 |
+| **M3 순서 상태** | 이벤트→상태 변경 규칙 추출, 펼치기, CDP 재생 검증, 선 `검증됨` 표시 | 검수 화면 "마지막 장 승인 후" 같은 순서 상태 자동 생성·검증 |
 | **M4 캔버스** | React Flow 캔버스(행=상태, 열=폭, 선=전환, 미검증·렌더 불가 표시). AI 에이전트가 CLI / MCP로 연다(`dui open`), 사람은 보기만 | obora 화면 3개 전체 배치 |
 | **M5 obora 99% 시도** | 3개 화면 99% 목표, 상태 명시 규칙 적용, Figma 내보내기 | 화면별 커버리지 보고 |
 | M6 이후 | pippip 전체, Electron(obora-desktop), Vue·Svelte | — |
@@ -328,13 +343,13 @@ dui는 Whiteboard를 **내장하지 않는다**: Code-OSS를 통째로 포함(ve
 - **비결정 렌더**: 시간·난수·애니메이션·폰트 로딩. → 시계·난수 고정, 애니메이션 끄기, 폰트 로딩 대기.
 - **GPUI 렌더 경로 불확실**: 오프스크린 렌더가 안 되면 OS 캡처로 가야 하고 macOS 권한·속도 문제가 생긴다.
 - **AI 비용·시간**: 큰 코드베이스에서 스캔 비용. → 그래프·결과를 커밋 단위 캐시, 바뀐 파일만 다시.
-- **Graphify 의존**: 외부 프로젝트 방향이 바뀔 수 있다. → `CodeGraphPort`로 교체 가능하게.
+- **공식 컴파일러 API 의존**: TS 7의 프로그래밍 API는 새것(7.1 beta)이고 `ra_ap_*`는 호환성 보장이 없다. → `TypeOracle` 뒤에 두고 버전 고정.
 
 **열린 질문** (중요한 순)
 1. GPUI(`gpui-pre 0.3.12`)의 헤드리스 캡처 API(코드에 존재 확인)가 pippip 화면에서 실제로 동작하나? 안 되면 네이티브 렌더 경로를 무엇으로 하나.
 2. 커버리지 분모에서 "화면에 영향 없는 분기"를 어떻게 자동으로 빼나. 이 규칙이 99%의 의미를 결정한다.
 3. 순서 상태의 펼침 한도(깊이, 대표값)를 얼마로 잡아야 실용적인 렌더 수 안에서 의미 있는 상태를 다 덮나.
-4. Graphify를 라이브러리로 쓸지 CLI 출력만 읽을지, 그리고 TS 타입 정보와 어떻게 합칠지.
+4. TS 어댑터가 Rust에서 TS 7.1 API를 어떻게 부를지(`typescript/sync`를 쓰는 작은 Node 사이드카, 또는 문서화된 통신 프로토콜. 후자는 `미확인`).
 5. 캔버스를 로컬 웹 앱으로 낼지(AI 에이전트가 `dui open` 실행, 사람은 보기만) 호스팅 서비스로 낼지. 호스팅이면 스냅샷 저장 비용·보안 검토 필요.
 6. Figma 내보내기의 요금·API 한도 (`미확인`).
 
@@ -363,3 +378,56 @@ AI는 상태가 **어디 있고 무슨 타입인지 찾는 데만** 쓴다. 어�
 
 1. 렌더할 수 없는 칸은 절대 숨기지 않는다. 캔버스에 `미검증`과 구분되는 별도 상태 **렌더 불가(이유)** 로 보여준다.
 2. 플랫폼마다 필요한 렌더 환경을 문서에 명시한다(예: 애플 플랫폼은 Xcode가 있는 Mac 러너).
+
+## 기술 스택 (2026-11-19 결정)
+
+**처음부터 본체는 Rust**: 바이너리 하나이고 자체적으로 Node나 Python 런타임이 필요 없다. CLI, MCP 서버, 분석기, 결정적 조합 규칙이 모두 Rust 안에 있다. 앞에 나온 Vite / Babel / SWC, MSW, Playwright, ts-morph, 엔진으로서의 Graphify는 이것으로 대체한다. 버전과 라이선스는 2026-11-19에 확인했다(crates.io, npm, GitHub).
+
+| 층 | 선택 | 라이선스 | 비고 |
+|---|---|---|---|
+| 본체 | Rust, edition 2024 | — | 바이너리 하나. dui를 빌드하려면 Rust ≥ 1.98 필요: oxc 0.159.0과 `ra_ap_hir` 0.0.363이 `rust-version` 1.98을 선언(crates.io) |
+| MCP 서버 | `rmcp` 3.11.0 (공식 SDK, [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)) | Apache-2.0 (workspace `Cargo.toml`, GitHub 표기는 NOASSERTION) | CLI와 같은 작업 + 캔버스 코멘트 읽기 |
+| 빠른 훑기 | `tree-sitter` 0.27.2 | MIT | 화면·파일 목록, 모든 언어 |
+| TS/JS 파싱 + 주입 변환 | `oxc` 0.159.0 (`oxc_parser`, `oxc_semantic`, `oxc_transformer`) | MIT | Babel / SWC / Vite 플러그인 대체 |
+| 코드 그래프 | tree-sitter + oxc로 자체 구현, `CodeGraphPort` 뒤 | — | Graphify(Python)와 CodeGraph는 참고만 |
+| TS 타입 | `TypeOracle` → TypeScript 어댑터 → 프로젝트의 공식 컴파일러 | Apache-2.0 ([microsoft/TypeScript](https://github.com/microsoft/TypeScript)) | 아래 "TypeScript 컴파일러 현황" 참고. 타입을 못 구하면 결과는 `추정됨` |
+| Rust 타입 | `ra_ap_*`(버전 고정, `ra_ap_hir` 0.0.363) + `syn` 3.0.10 | MIT OR Apache-2.0 | `ra_ap_*`는 호환성 보장이 없다 → 버전 고정 |
+| 웹 렌더 | `chromiumoxide` 0.9.1 (2026-02-25 출시), CDP로 Chromium 구동, 폭마다 뷰포트 하나 | MIT OR Apache-2.0 | 마지막 출시 2026-02-25 → 유지보수 지켜보기 |
+| 네트워크 가로채기 | CDP Fetch 도메인 (chromiumoxide의 `Fetch.pdl`, `examples/interception.rs`) | — | MSW 없음 |
+| GPUI 렌더 | 나중에 같은 Rust 프로세스 안에서 (`gpui-pre`) | Apache-2.0 | §9.2 참고 |
+| 캔버스 UI | React + React Flow, 정적 파일을 Rust 바이너리가 직접 띄움 | MIT | 사람은 이것만 본다(§0) |
+
+**TypeScript 컴파일러 현황** (공식 자료):
+- TS 7.0은 Go 네이티브 컴파일러다. npm 정식판 `typescript` 7.0.2가 2026-07-08에 나왔다. 7.0 RC부터 명령 이름은 `tsc`다(미리보기 이름 `tsgo`는 더 이상 안 씀) ([typescript-go README](https://github.com/microsoft/typescript-go), 지금은 보관 처리됐고 개발은 microsoft/TypeScript로 옮겨감). TS 7은 LSP 언어 서버를 제공한다([TS 7.0 발표](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)).
+- 프로그래밍 API는 **TS 7.1**(beta 2026-10-20)에서 JS 진입점 `typescript/sync`, `typescript/async`, `typescript/fs`, `typescript/ast`로 돌아온다([TS 7.1 beta 발표](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)).
+- 그래서 TS 어댑터는 프로젝트 자체의 Node 위에 작은 사이드카를 띄워 프로젝트의 `typescript`를 불러 타입 질문에 답하게 한다. Node 없이 Rust에서 네이티브 컴파일러를 바로 부르려면 문서화된 프로토콜이 필요한데, 이건 `미확인`이다.
+
+### 언어 어댑터: 본체는 언어를 모른다
+
+- Rust 본체는 어떤 언어도 모른다. 언어마다 **언어 어댑터** 하나로 붙는다 = `TypeOracle`(공식 컴파일러에서 받은 타입 정보) + 주입기 + **렌더러 플러그인**.
+- **언어 추가 = 어댑터 하나 추가.** 본체는 그대로다.
+- **컴파일러 선택 규칙**:
+  1. 사용자 프로젝트에 이미 있는 공식 컴파일러를 프로젝트와 **똑같은 버전**으로 쓴다.
+  2. 없을 때만 프로젝트가 선언한 버전의 **공식 배포본**을 받아 캐시한다.
+  3. 그것도 안 되면 그 프로젝트는 `미지원`(이유 표시).
+
+| 언어 | 공식 컴파일러·툴체인 | 라이선스(출처) | 상태 |
+|---|---|---|---|
+| TypeScript | npm `typescript`(Microsoft)의 `tsc` | Apache-2.0 ([microsoft/TypeScript](https://github.com/microsoft/TypeScript)) | v0 |
+| Rust | `rustc` / Cargo, 타입 조회는 rust-analyzer | MIT와 Apache-2.0 ([rust-lang/rust README](https://github.com/rust-lang/rust)), rust-analyzer MIT OR Apache-2.0 | v0 |
+| Swift | `swiftc` + SourceKit-LSP | Apache-2.0 + Runtime Library Exception ([swiftlang/swift LICENSE.txt](https://github.com/swiftlang/swift/blob/main/LICENSE.txt)), SourceKit-LSP Apache-2.0 | 나중. Apple 플랫폼 렌더에는 Xcode(Apple 라이선스)가 필요 → dui는 설치된 Xcode를 쓰고, 절대 받거나 재배포하지 않는다 |
+| Kotlin | `kotlinc` (JetBrains) | Apache-2.0 ([JetBrains/kotlin license/README.md](https://github.com/JetBrains/kotlin/blob/master/license/README.md), GitHub에는 SPDX 표기 없음) | 나중 |
+
+### 지원 버전: 2026년 이후만
+
+**규칙**: 한 버전 줄은 **첫 정식판이 2026-01-01 이후에 나왔을 때만** 지원한다. 그보다 오래된 줄은 `dui scan`이 처음에 **`미지원`(이유)**으로 거절한다: 이건 `렌더 불가`가 아니고, 칸 상태도 아니며, 커버리지에서 빠진다(§8). 비공식 컴파일러도 똑같이 `미지원`이다.
+
+| 스택 | 지원 | 첫 정식판(출처) | 미지원(예) |
+|---|---|---|---|
+| TypeScript | 6.0+, 7.x | 6.0.2: 2026-03-23, 7.0.2: 2026-07-08 (npm) | 5.9 (5.9.2: 2025-07-31)와 그 이전 |
+| React | 19.3+ | 19.3.0: 2026-09-09 (npm) | 19.0 (2024-12-05), 19.1 (2025-03-28), 19.2 (2025-10-01). 2026년에도 패치판이 나오지만 미지원 |
+| Rust 툴체인 | 1.93+ | 1.93.0: 2026-01-22 ([GitHub release](https://github.com/rust-lang/rust/releases/tag/1.93.0)) | 1.92와 그 이전 |
+| Rust edition | 2024 | 1.85.0에서 안정화, 2025-02-20. [Edition Guide](https://doc.rust-lang.org/edition-guide/) 기준 아직 최신 edition | 2021과 그 이전 |
+| GPUI (`gpui-pre`) | 0.3.0+ | 0.3.0: 2026-09-03 (crates.io, 공개된 모든 버전이 2026년) | — |
+
+Edition 2024는 날짜 규칙의 예외다: 가장 최신 edition이고 2026 edition은 없다.

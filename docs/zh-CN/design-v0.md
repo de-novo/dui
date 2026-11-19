@@ -7,6 +7,8 @@
 > 状态：草案 · 编写于 2026-11-19 · 读者：构建 dui 的开发者
 > 本文中的外部事实（许可证、star 数、版本）已于 2026-11-19 通过 GitHub API 核实。无法确认的标记为 `未确认`。
 
+> **定位**：设计生成类工具展示的是*将会怎样构建*：由 AI 想象尚不存在的界面。dui 展示的是*实际上是怎样构建的*：它通过官方编译器读取现有代码，把真实存在的每个状态都真正渲染出来。不编造任何东西；无法展示的部分标为 `未验证` 或 `无法渲染`。
+
 ## 0. 核心原则：AI 原生
 
 **dui 是 AI 原生的。一切由 AI 使用；人只看画布。**（2026-11-19 决定）
@@ -18,6 +20,15 @@
 | 循环 | 双方 | 人在画布格子上留言 → AI 通过 MCP 读取留言 → 修复代码 → 画布重新渲染 |
 
 下面的所有组件都按这种分工设计：凡是需要"运行"的都由 AI 代理运行；凡是人需要"看"的都在画布上。
+
+### 原则 #2：依赖官方编译器（2026-11-19 决定）
+
+**dui 是依赖官方编译器的项目。**
+
+- 只支持各语言的**官方编译器 / 工具链**：TypeScript → Microsoft `typescript` 包中的 `tsc`；Rust → `rustc`（Cargo），类型查询用 rust-analyzer；以后 Swift → `swiftc` + SourceKit-LSP；Kotlin → `kotlinc`。
+- 非官方或替代的编译器 / 工具链为 **`不支持`**。
+- dui 使用用户项目中已有的官方编译器（版本完全一致）。**不重新实现类型检查**。
+- 详见[技术栈](#技术栈2026-11-19-决定)。
 
 ## 1. 问题与用户
 
@@ -49,7 +60,7 @@
 ## 3. 核心思路
 
 1. **AI 找出状态所在的所有位置**：全局 store、组件本地状态（`useState` 等）、context、URL / 路由、服务器响应缓存、GPUI Entity / 模型字段。
-2. **在构建时插入强制注入代码**：源码保持不变，通过开发构建转换（TS 用 Vite/Babel/SWC 插件，Rust 用 proc-macro / 构建脚本）创建"以这个值开始"的入口。因此连本地状态也可以从外部注入。
+2. **在构建时插入强制注入代码**：源码保持不变，通过开发构建转换（TS 用 oxc 转换，Rust 用 proc-macro / 构建脚本；见[技术栈](#技术栈2026-11-19-决定)）创建"以这个值开始"的入口。因此连本地状态也可以从外部注入。
 3. **在网络层拦截 API**：用从类型生成的模拟数据响应。
 4. **注入、渲染、检查**：注入状态，按宽度渲染，检查渲染结果是否与预期状态一致。不一致则为 `未验证`。
 
@@ -61,14 +72,14 @@
 flowchart LR
   subgraph CLI["dui CLI"]
     A[分析器 Analyzer]
-    G[(代码图<br/>Graphify)]
+    G[(代码图<br/>自研：tree-sitter + oxc)]
     I[注入器 Injector<br/>构建转换]
     M[模拟生成器<br/>Mock Generator]
     P[规划器 Planner<br/>状态展开]
   end
   subgraph Run["运行"]
     N[网络拦截<br/>Interceptor]
-    R[渲染工作进程<br/>Playwright / GPUI 画廊]
+    R[渲染工作进程<br/>通过 CDP 驱动 Chromium / GPUI 画廊]
     V[验证器 Verifier]
   end
   S[(快照存储<br/>.dui/)]
@@ -100,7 +111,7 @@ flowchart LR
 |---|---|---|
 | `dui` CLI | **供 AI 代理使用**的入口（不是给人用的）：整体运行、缓存、配置。`dui scan`、`dui render`、`dui open`。JSON 输出、稳定退出码、无交互提问、幂等 | 配置文件 → 运行 |
 | MCP 服务器 | 为 AI 代理提供与 CLI 相同的操作，并可读取、处理画布格子上的留言 | MCP 调用 → JSON |
-| 分析器 | 查找界面、状态位置、事件、状态变更点、转换规则。Graphify 图 + 类型信息 + AI | 代码 → `Screen`、`StateSlot`、`Rule` |
+| 分析器 | 查找界面、状态位置、事件、状态变更点、转换规则。自研代码图 + 官方编译器提供的类型信息 + AI | 代码 → `Screen`、`StateSlot`、`Rule` |
 | 注入器 | 在构建时为每个状态位置插入开发用注入入口 | `StateSlot` → 转换后的开发构建 |
 | 模拟生成器 | 从类型 / 模式（zod、OpenAPI、Rust 类型）生成代表值 | 类型 → 值集合 |
 | 规划器 | 把数据形态 × 分支 × 顺序组合成要渲染的状态列表，并为未覆盖分支重新规划 | 规则、覆盖率 → `State[]` |
@@ -185,7 +196,7 @@ type VerificationStatus =
 ## 6. 流水线
 
 1. **扫描**（`dui scan`）
-   - 用 Graphify 生成调用 / import 图。
+   - 用 dui 自研的代码图（tree-sitter + oxc）生成调用 / import 图。
    - 查找界面：路由定义（TanStack Router、Next app 目录等）、GPUI 根 View。
    - 查找状态位置：类型信息 + AI。结果为 `StateSlot[]`。
    - 代码分支列表：从界面可达的渲染分支（条件 JSX、early return、`match`）。
@@ -218,6 +229,7 @@ type VerificationStatus =
   - 渲染分支：从界面根可达的组件内的条件渲染分支（条件 JSX、三元表达式、early return、`match` 分支）。对画面无影响的分支（日志等）通过排除规则去掉。
   - 分母本身也是分析器生成的，因此要单独测量"分母之外的分支"：与运行时覆盖率工具（V8 coverage / istanbul，Rust 用 `cargo llvm-cov` 系列）给出的全部分支列表对照。
 - **无法渲染的格子**（见“渲染限制”）**不计入分母**，但始终作为单独的数量连同原因一起报告。因此覆盖率 = `verified` 格子数 ÷ 可渲染格子数。
+- **不支持**的项目 / 模块（2026 年之前发布的版本或非官方编译器；见技术栈）在扫描前就被拒绝，完全不参与测量。
 - **分子** = 分母中 `verified` 格子的数量。
 - **报告**：按界面、按类型的可渲染覆盖率 % + 未验证格子列表（含原因）+ 无法渲染的数量（含原因）。例：`review 97.8%（分支 44/45，形态 18/18，顺序 23/24）× 3 种宽度；无法渲染 2（system-ui）`。
 - **达到 99% 的条件**：我们的代码（obora、pippip）遵守规则，把界面状态用类型、reducer、状态机集中在一处。这样顺序状态的分母才准确。
@@ -229,15 +241,15 @@ type VerificationStatus =
 | 项目 | 方法 |
 |---|---|
 | 查找界面 | 静态分析路由定义（TanStack Router、React Router、Next app 目录）。obora-web 使用 TanStack Router（已确认） |
-| 类型 | 用 TypeScript 编译器 API 解析槽类型。有 zod 模式时优先使用（obora-web 使用 zod，已确认） |
-| 本地状态注入 | Vite 插件（内部为 Babel 或 SWC 转换）把 `useState(init)` 改写为 `useState(__dui.get("slotId") ?? init)` 的形式。`useReducer`、context Provider 的 value 同理 |
+| 类型 | 通过 `TypeOracle` 用项目中的官方 TypeScript 编译器解析槽类型（见技术栈）。有 zod 模式时优先使用（obora-web 使用 zod，已确认） |
+| 本地状态注入 | 开发构建中的 oxc 转换把 `useState(init)` 改写为 `useState(__dui.get("slotId") ?? init)` 的形式。`useReducer`、context Provider 的 value 同理 |
 | store 注入 | Zustand、Redux、Jotai 等在创建处用同样方式包装初始值 |
 | 服务器缓存 | TanStack Query：渲染前预先填充 `QueryClient`，或模拟网络 |
-| 网络 | 类似 MSW（MIT，已确认）的 Service Worker 拦截。Node 侧请求用 MSW node 模式 |
-| 渲染 | 用 Playwright（Apache-2.0，已确认）按视口宽度渲染。图像 + DOM + 无障碍树 + V8 覆盖率 |
-| Electron | 渲染进程与 Web 相同。模拟 preload / IPC 调用，在浏览器中打开渲染进程包，或使用 Playwright 的 Electron 模式 |
+| 网络 | 用 CDP Fetch 域拦截请求并返回模拟响应（不用 MSW）。浏览器之外（服务器端）发出的请求如何拦截 `未确认` |
+| 渲染 | 由 Rust 通过 CDP 驱动 Chromium（chromiumoxide），按视口宽度渲染。图像 + DOM + 无障碍树 + V8 覆盖率 |
+| Electron | 渲染进程与 Web 相同。模拟 preload / IPC 调用，通过 CDP 在 Chromium 中打开渲染进程包 |
 | Tauri | 模拟 `invoke` 调用，与 Web 同样渲染 |
-| 顺序回放 | 用 Playwright 回放真实点击和按键 |
+| 顺序回放 | 通过 CDP 输入事件回放真实点击和按键 |
 
 注入运行时 `__dui` 只包含在开发构建中，生产构建中关闭转换。CI 检查构建产物中不存在 `__dui`。
 
@@ -260,9 +272,9 @@ pippip 使用 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`，HTTP 使用 `reqwest`（�
 
 ## 10. 图引擎
 
-- 第一选择 **Graphify**（Apache-2.0，★150,430，2026-11-19 确认）：通过 tree-sitter 支持约 40 种语言，每条边带 `EXTRACTED` / `INFERRED` 标签（已在 README 中确认）。dui 在其上叠加状态转换层，并把标签扩展为 `已提取` / `已推断` / `已验证`。
-- 第二选择 **CodeGraph**（MIT，★78,082，2026-11-19 确认）：识别框架路由，支持 TypeScript 和 Rust（已在 README 中确认）。
-- 集成方式（作为库调用，还是读取 CLI 输出文件）`未确认` → 在 M0 中决定。
+- **2026-11-19 变更**：核心是 Rust，因此代码图在 dui 二进制内部**基于 tree-sitter + oxc 自研**。Graphify 是 Python，不能作为内嵌引擎。
+- **Graphify**（Apache-2.0，★150,430，2026-11-19 确认）现在**仅参考（思路）**：通过 tree-sitter 支持约 40 种语言，每条边带 `EXTRACTED` / `INFERRED` 标签（已在 README 中确认）。dui 沿用这一思路，并把标签扩展为 `已提取` / `已推断` / `已验证`。
+- **CodeGraph**（MIT，★78,082，2026-11-19 确认）：仅参考其识别框架路由的方式（已在 README 中确认）。
 - 为保证图引擎可替换，dui 内部只保留一个接口 `CodeGraphPort`（读取节点和边）。
 
 ## 11. 画布
@@ -296,11 +308,14 @@ dui **不**内嵌 Whiteboard：它内置（vendor）了 Code-OSS（打包很重�
 
 | 依赖 | 许可证 | 状态 |
 |---|---|---|
-| Graphify | Apache-2.0 | 允许 |
-| CodeGraph | MIT | 允许 |
+| Graphify | Apache-2.0 | 允许（仅参考，不是依赖） |
+| CodeGraph | MIT | 允许（仅参考，不是依赖） |
 | React Flow | MIT | 允许 |
-| MSW | MIT | 允许 |
-| Playwright | Apache-2.0 | 允许 |
+| rmcp（官方 Rust MCP SDK） | Apache-2.0 | 允许 |
+| oxc | MIT | 允许 |
+| tree-sitter | MIT | 允许 |
+| chromiumoxide | MIT OR Apache-2.0 | 允许 |
+| syn、`ra_ap_*` | MIT OR Apache-2.0 | 允许 |
 | GPUI（crate） | Apache-2.0 | 允许 |
 | GitNexus | PolyForm Noncommercial | 禁止 |
 | tldraw | 自有（生产需付费合同） | 暂缓 |
@@ -311,10 +326,10 @@ dui **不**内嵌 Whiteboard：它内置（vendor）了 Code-OSS（打包很重�
 
 | 阶段 | 内容 | 完成标准 |
 |---|---|---|
-| **M0 spike** | obora-web 审核界面 1 个。用 Vite 转换注入 + MSW + Playwright 把手选的 5 个状态按 3 种宽度渲染。在 obora 上运行 Graphify 并决定集成方式 | 至少 1 个本地状态从外部注入并渲染成功，图像 15 张 |
+| **M0 spike** | obora-web 审核界面 1 个。用 oxc 转换注入 + CDP Fetch 拦截 + 通过 CDP 驱动的 Chromium 把手选的 5 个状态按 3 种宽度渲染，全部由 Rust 二进制驱动 | 至少 1 个本地状态从外部注入并渲染成功，图像 15 张 |
 | **M1 自动状态** | 分析器 + 模拟生成器 + 规划器。自动列举数据形态和代码分支，测量覆盖率，补充循环 | 输出审核界面的分支覆盖率数字和未验证列表 |
 | **M2 GPUI spike** | pippip 界面 1 个。确认离屏渲染是否可行，做 `#[dui::state]` 宏原型 | 状态文件 → 图像 1 张 |
-| **M3 顺序状态** | 提取事件 → 状态变更规则，展开，用 Playwright 回放验证，把边标记为 `已验证` | 自动生成并验证审核界面"批准最后一页之后"这类顺序状态 |
+| **M3 顺序状态** | 提取事件 → 状态变更规则，展开，用 CDP 回放验证，把边标记为 `已验证` | 自动生成并验证审核界面"批准最后一页之后"这类顺序状态 |
 | **M4 画布** | React Flow 画布（行 = 状态，列 = 宽度，边 = 转换，未验证和无法渲染标记）；由 AI 代理通过 CLI / MCP 打开（`dui open`），人只查看 | 排布 obora 全部 3 个界面 |
 | **M5 obora 99% 尝试** | 3 个界面以 99% 为目标，应用状态显式化规则，Figma 导出 | 每个界面的覆盖率报告 |
 | M6 以后 | pippip 全部、Electron（obora-desktop）、Vue、Svelte | — |
@@ -328,13 +343,13 @@ dui **不**内嵌 Whiteboard：它内置（vendor）了 Code-OSS（打包很重�
 - **渲染不确定性**：时间、随机数、动画、字体加载。→ 固定时钟和随机数，关闭动画，等待字体加载。
 - **GPUI 渲染路径不确定**：如果离屏渲染不可行，就要用系统截图，会带来 macOS 权限和速度问题。
 - **AI 成本与时间**：大型代码库的扫描成本。→ 按提交缓存图和结果，只重做变更的文件。
-- **对 Graphify 的依赖**：外部项目的方向可能改变。→ 通过 `CodeGraphPort` 保持可替换。
+- **对官方编译器 API 的依赖**：TS 7 的编程 API 是新的（7.1 beta），`ra_ap_*` 没有兼容性保证。→ 放在 `TypeOracle` 之后；固定版本。
 
 **待定问题**（按重要性排序）
 1. GPUI（`gpui-pre 0.3.12`）的无头截图 API（已确认代码中存在）在 pippip 界面上能否实际工作？如果不行，原生渲染路径用什么？
 2. 如何自动从覆盖率分母中去掉"对画面无影响的分支"？这条规则决定了 99% 的含义。
 3. 顺序状态的展开上限（深度、代表值）定为多少，才能在可接受的渲染数量内覆盖所有有意义的状态？
-4. Graphify 是作为库使用还是只读取 CLI 输出，以及如何与 TS 类型信息合并。
+4. TS 适配器如何从 Rust 调用 TS 7.1 的 API（用 `typescript/sync` 的小型 Node 边车进程，或有文档的通信协议，后者 `未确认`）。
 5. 画布是做成本地 Web 应用（由 AI 代理运行 `dui open`，人只查看）还是托管服务。若托管，需要评估快照存储成本和安全性。
 6. Figma 导出的费用和 API 限额（`未确认`）。
 
@@ -363,3 +378,56 @@ AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确�
 
 1. 无法渲染的格子绝不隐藏。它们在画布上以单独的状态 **无法渲染（原因）** 显示，与 `未验证` 区分。
 2. 每个平台都要写明所需的渲染环境（例如 Apple 平台需要装有 Xcode 的 Mac 运行器）。
+
+## 技术栈（2026-11-19 决定）
+
+**从第一天起核心就是 Rust**：一个二进制文件，自身不需要 Node 或 Python 运行时。CLI、MCP 服务器、分析器和确定性组合规则全部用 Rust 实现。这取代了前文中 Vite / Babel / SWC、MSW、Playwright、ts-morph 以及把 Graphify 作为引擎的说法。版本和许可证于 2026-11-19 确认（crates.io、npm、GitHub）。
+
+| 层 | 选择 | 许可证 | 说明 |
+|---|---|---|---|
+| 核心 | Rust，edition 2024 | — | 单一二进制。构建 dui 需要 Rust ≥ 1.98，因为 oxc 0.159.0 和 `ra_ap_hir` 0.0.363 声明 `rust-version` 1.98（crates.io） |
+| MCP 服务器 | `rmcp` 3.11.0（官方 SDK，[modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)） | Apache-2.0（workspace `Cargo.toml`；GitHub 显示 NOASSERTION） | 与 CLI 相同的操作 + 读取画布留言 |
+| 快速扫描 | `tree-sitter` 0.27.2 | MIT | 界面和文件列表，任何语言 |
+| TS/JS 解析 + 注入转换 | `oxc` 0.159.0（`oxc_parser`、`oxc_semantic`、`oxc_transformer`） | MIT | 取代 Babel / SWC / Vite 插件 |
+| 代码图 | 基于 tree-sitter + oxc 自研，放在 `CodeGraphPort` 之后 | — | Graphify（Python）和 CodeGraph 仅参考 |
+| TS 类型 | `TypeOracle` → TypeScript 适配器 → 项目中的官方编译器 | Apache-2.0（[microsoft/TypeScript](https://github.com/microsoft/TypeScript)） | 见下方“TypeScript 编译器现状”。拿不到类型时结果为 `已推断` |
+| Rust 类型 | `ra_ap_*`（固定版本；`ra_ap_hir` 0.0.363）+ `syn` 3.0.10 | MIT OR Apache-2.0 | `ra_ap_*` 没有兼容性保证 → 固定版本 |
+| Web 渲染 | `chromiumoxide` 0.9.1（2026-02-25 发布），通过 CDP 驱动 Chromium，每种宽度一个视口 | MIT OR Apache-2.0 | 最近一次发布为 2026-02-25 → 关注维护情况 |
+| 网络拦截 | CDP Fetch 域（chromiumoxide 中的 `Fetch.pdl` 和 `examples/interception.rs`） | — | 不用 MSW |
+| GPUI 渲染 | 以后在同一个 Rust 进程中（`gpui-pre`） | Apache-2.0 | 见 §9.2 |
+| 画布 UI | React + React Flow，静态资源由 Rust 二进制提供 | MIT | 人只看它（§0） |
+
+**TypeScript 编译器现状**（官方来源）：
+- TS 7.0 是 Go 原生编译器。npm 上的稳定版 `typescript` 7.0.2 发布于 2026-07-08。从 7.0 RC 起命令是 `tsc`（预览名 `tsgo` 已不再使用）（[typescript-go README](https://github.com/microsoft/typescript-go)，该仓库已归档，开发转回 microsoft/TypeScript）。TS 7 提供 LSP 语言服务器（[TS 7.0 发布公告](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)）。
+- 编程 API 在 **TS 7.1**（beta 2026-10-20）中以 JS 入口 `typescript/sync`、`typescript/async`、`typescript/fs`、`typescript/ast` 回归（[TS 7.1 beta 公告](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)）。
+- 因此 TS 适配器在项目自己的 Node 上运行一个小型边车进程，加载项目的 `typescript` 并回答类型查询。不经 Node 直接从 Rust 调用原生编译器需要有文档的协议，这一点 `未确认`。
+
+### 语言适配器：核心与语言无关
+
+- Rust 核心不认识任何语言。每种语言通过一个**语言适配器**接入 = `TypeOracle`（来自官方编译器的类型信息）+ 注入器 + **渲染器插件**。
+- **增加一种语言 = 增加一个适配器。**核心不变。
+- **编译器选择策略**：
+  1. 使用用户项目中已有的官方编译器，版本与项目**完全一致**。
+  2. 只有缺失时，才下载项目声明版本的**官方发行版**并缓存。
+  3. 否则该项目为 `不支持`（显示原因）。
+
+| 语言 | 官方编译器 / 工具链 | 许可证（来源） | 状态 |
+|---|---|---|---|
+| TypeScript | npm `typescript`（Microsoft）中的 `tsc` | Apache-2.0（[microsoft/TypeScript](https://github.com/microsoft/TypeScript)） | v0 |
+| Rust | `rustc` / Cargo；类型查询用 rust-analyzer | MIT 和 Apache-2.0（[rust-lang/rust README](https://github.com/rust-lang/rust)）；rust-analyzer MIT OR Apache-2.0 | v0 |
+| Swift | `swiftc` + SourceKit-LSP | Apache-2.0 附 Runtime Library Exception（[swiftlang/swift LICENSE.txt](https://github.com/swiftlang/swift/blob/main/LICENSE.txt)）；SourceKit-LSP Apache-2.0 | 以后。Apple 平台渲染需要 Xcode（Apple 许可）→ dui 使用已安装的 Xcode，绝不下载或再分发 |
+| Kotlin | `kotlinc`（JetBrains） | Apache-2.0（[JetBrains/kotlin license/README.md](https://github.com/JetBrains/kotlin/blob/master/license/README.md)；GitHub 未显示 SPDX 标识） | 以后 |
+
+### 支持的版本：只支持 2026 年及以后
+
+**规则**：一个版本线只有在其**首个稳定版发布于 2026-01-01 或之后**时才受支持。更旧的版本线由 `dui scan` 事先拒绝，标为 **`不支持`（原因）**：这不是 `无法渲染`，也不是格子状态，不计入覆盖率（§8）。非官方编译器同样为 `不支持`。
+
+| 技术栈 | 支持 | 首个稳定版（来源） | 不支持（示例） |
+|---|---|---|---|
+| TypeScript | 6.0+、7.x | 6.0.2：2026-03-23；7.0.2：2026-07-08（npm） | 5.9（5.9.2：2025-07-31）及更早 |
+| React | 19.3+ | 19.3.0：2026-09-09（npm） | 19.0（2024-12-05）、19.1（2025-03-28）、19.2（2025-10-01），即使它们在 2026 年仍有补丁版本 |
+| Rust 工具链 | 1.93+ | 1.93.0：2026-01-22（[GitHub release](https://github.com/rust-lang/rust/releases/tag/1.93.0)） | 1.92 及更早 |
+| Rust edition | 2024 | 在 1.85.0 中稳定，2025-02-20；在 [Edition Guide](https://doc.rust-lang.org/edition-guide/) 中仍是最新 edition | 2021 及更早 |
+| GPUI（`gpui-pre`） | 0.3.0+ | 0.3.0：2026-09-03（crates.io；所有已发布版本都在 2026 年） | — |
+
+Edition 2024 是日期规则的例外：它是最新的 edition，不存在 2026 edition。
