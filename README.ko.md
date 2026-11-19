@@ -1,12 +1,16 @@
 # dui (de-novo-ui)
 
+[English](README.md) | [简体中文](README.zh-CN.md) | 한국어
+
+> 이 문서는 [영어 원문](README.md)의 한국어 번역이다. 내용이 다르면 영어가 기준이다.
+
 > **비전 (2026-11-19)**: dui는 *잘 만든 프로덕트*만 지원한다. 상태가 타입으로, API가 DTO로 명확하면 모든 화면·상태·폭이 한 캔버스에 그려진다. 다 그려지면 좋은 코드, `미검증`이 많으면 상태 관리가 흐트러졌다는 신호다. 목표는 UI 코드 품질의 업계 표준: ① 지원 기준을 공개 규칙(+lint)으로, ② "UI 상태 커버리지 %" 한 숫자로, ③ 상태 그래프·스냅샷은 오픈 포맷으로.
 
 > 아이디어 단계 레포. 아직 코드 없음.
 
-설계 문서: [docs/design-v0.md](docs/design-v0.md) (개발자 도구 설계 v0)
-언어 조사: [docs/language-survey.md](docs/language-survey.md) (대상 언어·UI 스택 전수조사, 추천 순서)
-분석 방식 조사: [docs/analysis-approaches.md](docs/analysis-approaches.md) (코드 분석 AI 도구들의 접근법, dui 분석기 스택 추천)
+설계 문서: [docs/ko/design-v0.md](docs/ko/design-v0.md) (개발자 도구 설계 v0)
+언어 조사: [docs/ko/language-survey.md](docs/ko/language-survey.md) (대상 언어·UI 스택 전수조사, 추천 순서)
+분석 방식 조사: [docs/ko/analysis-approaches.md](docs/ko/analysis-approaches.md) (코드 분석 AI 도구들의 접근법, dui 분석기 스택 추천)
 
 ## 한 줄
 코드베이스를 읽어서 앱의 **모든 화면 × 모든 상태 × 반응형 폭**을 Figma처럼 무한 캔버스에 한눈에 펼쳐 보여주는 도구. 웹과 데스크톱 앱(네이티브 포함)을 같이 다룬다.
@@ -45,7 +49,7 @@
 
 ## 보는 곳 (캔버스)
 - 1안: **Figma**에 자동 배치 (화면별 한 줄, 상태는 가로, 폭은 옆). Figma 커넥터로 바로 시제품 가능.
-- 2안: React Flow(MIT)로 자체 무한 캔버스. 코드 바뀌면 자동 갱신. tldraw는 프로덕션 사용에 별도 상업 라이선스가 필요해 보류(설계 문서 §11).
+- 2안: React Flow(MIT)로 자체 무한 캔버스. 코드 바뀌면 자동 갱신. tldraw는 프로덕션 사용에 별도 상업 라이선스가 필요해 보류([설계 문서](docs/ko/design-v0.md) §11).
 
 ## 비슷한 것들 (조사 2026-11-19)
 - Storybook (+AI 워크플로·MCP): 상태별 스토리, 실제 코드. 단 목록 형태, 웹만.
@@ -91,5 +95,6 @@ dui는 **오픈소스**로 공개할 예정이다(공개 시점은 준혁 승인
 3. **금지 라이선스는 열어보고 베끼지도 않는다.** GPL·AGPL·LGPL·PolyForm Noncommercial·SSPL·BSL·tldraw 라이선스처럼 제약이 있는 코드(GitNexus, Serena, Semgrep 엔진, FlowDroid, CodeQL 등)는 구현할 때 소스를 보지 않는다(클린룸). 공개 문서·논문 수준의 개념만 쓴다.
 4. **AI가 쓴 코드도 같은 기준.** AI 에이전트에게 "특정 프로젝트 코드를 가져오지 말 것, 의존성은 허용 라이선스만"을 작업 규칙으로 준다. 의존성 라이선스는 CI에서 자동 검사한다(예: `license-checker`, `cargo-deny`).
 5. **이름·상표.** Storybook, Figma, Graphify 같은 남의 이름을 제품명·패키지명에 쓰지 않는다. "~와 호환" 같은 설명에만 쓴다.
-6. **dui 자체 라이선스 후보: Apache-2.0.** 특허 허여 조항이 있어 기업이 쓰기 편하고, 업계 표준을 노리기에 유리하다. 기여자에게는 DCO(커밋 서명)를 받는다. 확정은 공개 전에 한다.
-7. **공개 전 점검:** 저장소 전체에서 외부 코드 조각·비밀값·내부 경로(obora/pippip 내부 정보) 검사.
+6. **dui 자체 라이선스: Apache-2.0 (확정, 2026-11-19).** 특허 허여 조항이 있어 기업이 쓰기 편하고, 업계 표준을 노리기에 유리하다. 기여자에게는 DCO(커밋 서명, `git commit -s`)를 받는다. 전문은 [LICENSE](LICENSE), 고지는 [NOTICE](NOTICE), 기여 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md).
+7. **다국어 (2026-11-19 결정).** 프로젝트 문서는 영어·중국어(간체)·한국어 세 언어로 둔다. **영어가 기준**이고, 바꿀 때는 영어를 먼저 고치고 같은 PR에서 중국어·한국어를 맞추거나 "outdated" 배너를 단다. 규칙과 용어집: [docs/i18n.md](docs/i18n.md).
+8. **공개 전 점검:** 저장소 전체에서 외부 코드 조각·비밀값·내부 경로(obora/pippip 내부 정보) 검사.
