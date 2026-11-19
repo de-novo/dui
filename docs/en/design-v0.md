@@ -7,8 +7,6 @@ English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md
 
 > **Positioning**: design-generation tools show *how it will be built*: AI imagines screens that do not exist yet. dui shows *how it is actually built*: it reads existing code through the official compilers and really renders every state that exists. Nothing is invented; what cannot be shown is marked `unverified` or `unrenderable`.
 
-> **Who it's for**: dui is not meant to make everyone comfortable. It is for people who actively use AI and build new products on the latest stacks. That is why only the current latest stable major of each stack is supported; older stacks are intentionally out of scope ([supported versions](#supported-versions-current-latest-stable-major-only)).
-
 ## 0. Core principle: AI-native
 
 **dui is AI-native. AI uses everything; humans only look at the canvas.** (decided 2026-11-19)
