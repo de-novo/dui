@@ -215,8 +215,9 @@ Measured as a number, not a feeling. The denominator is defined explicitly.
 - **Denominator** = (render branches per screen + data-shape representative values per screen + reachable sequence states within the depth limit) × number of configured widths.
   - Render branches: conditional render branches (conditional JSX, ternaries, early returns, `match` arms) inside components reachable from the screen root. Branches with no effect on what is drawn (logging, etc.) are removed by exclusion rules.
   - Because the analyzer builds the denominator itself, "branches missing from the denominator" are measured separately: compare with the full branch list from runtime coverage tools (V8 coverage / istanbul; for Rust, the `cargo llvm-cov` family).
+- **Unrenderable cells** (see "Rendering limits") are **excluded from the denominator** but always reported as a separate count with reasons. So coverage = `verified` cells ÷ renderable cells.
 - **Numerator** = the number of `verified` cells in the denominator.
-- **Report**: % per screen and per kind + a list of unverified cells (with reasons). E.g. `review 97.8% (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths`.
+- **Report**: renderable coverage % per screen and per kind + a list of unverified cells (with reasons) + the unrenderable count (with reasons). E.g. `review 97.8% (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths; unrenderable 2 (system-ui)`.
 - **Condition for 99%**: our code (obora, pippip) follows a rule to gather screen state in one place with types, reducers, or state machines. That keeps the sequence-state denominator accurate.
 
 ## 9. Per-language specifics
@@ -272,6 +273,18 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 | tldraw (`tldraw/tldraw`) | Custom license (GitHub shows NOASSERTION). LICENSE.md: free in development environments only; **production use requires a separate commercial or trial license key**; license key and watermark are enforced; usage data may be sent | **Excluded from v0**. Its production terms would pass on to users and companies who use dui commercially, so not used until cost and terms are checked |
 | Figma export | Figma plugin / REST API (pricing and limits `unconfirmed`) | Secondary output. Same layout as image nodes |
 
+### Referenced project: Whiteboard (ideas only)
+
+[devdotfast/whiteboard](https://github.com/devdotfast/whiteboard) (MIT, ★3,553, checked 2026-11-19) is a desktop app where humans and AI agents design software on a shared canvas. dui references **ideas only; no code is copied**:
+
+| Idea in Whiteboard | How dui uses the idea |
+|---|---|
+| An SDK that lets the agent draw on the canvas (AI draws through an API) | Model for the canvas side of dui's MCP server |
+| Clicking a canvas item jumps to the underlying code | Clicking a dui cell jumps to the code where that state is defined |
+| A human highlights something and the agent redraws | Same as dui's loop: canvas cell comment → AI fixes code → canvas re-renders |
+
+dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sends anonymous telemetry unless the user turns it off. A possible future integration is showing dui results as a Whiteboard plugin. dui names never use the Whiteboard trademark.
+
 ## 12. License policy
 
 - dui is **Apache-2.0 open source**. Dependencies must allow commercial use (MIT, Apache-2.0, BSD, ISC) so that users and companies can use dui commercially.
@@ -300,7 +313,7 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 | **M1 automatic states** | Analyzer + mock generator + planner. Auto-enumerate data shapes and code branches, measure coverage, fill-in loop | Branch coverage number for the review screen, list of unverified cells |
 | **M2 GPUI spike** | One pippip screen. Check offscreen rendering, prototype the `#[dui::state]` macro | State file → one image |
 | **M3 sequence states** | Extract event → state-change rules, expand, verify by Playwright replay, mark edges `verified` | Sequence states such as "after approving the last page" on the review screen generated and verified automatically |
-| **M4 canvas** | React Flow canvas (rows = states, columns = widths, edges = transitions, unverified marks), `dui open` | All 3 obora screens laid out |
+| **M4 canvas** | React Flow canvas (rows = states, columns = widths, edges = transitions, unverified and unrenderable marks); the AI agent opens it via CLI / MCP (`dui open`), humans only view it | All 3 obora screens laid out |
 | **M5 obora 99% attempt** | 99% target for the 3 screens, apply the explicit-state rule, Figma export | Coverage report per screen |
 | M6 and later | All of pippip, Electron (obora-desktop), Vue, Svelte | — |
 
@@ -320,7 +333,7 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 2. How to automatically remove "branches with no effect on the screen" from the coverage denominator. This rule defines what 99% means.
 3. What expansion limits (depth, representative values) for sequence states cover all meaningful states within a practical number of renders?
 4. Whether to use Graphify as a library or only read its CLI output, and how to merge it with TS type info.
-5. Whether to ship the canvas as a web app (developer-local `dui open`) or a hosted service. Hosting needs a review of snapshot storage cost and security.
+5. Whether to ship the canvas as a local web app (the AI agent runs `dui open`; humans only view it) or a hosted service. Hosting needs a review of snapshot storage cost and security.
 6. Figma export pricing and API limits (`unconfirmed`).
 
 ## Principle: combinations are produced by the system, not by AI (decided 2026-11-19)
