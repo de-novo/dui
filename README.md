@@ -56,9 +56,9 @@ obora 웹 화면 몇 개(검수, 내보내기, 설정)를 상태별·폭별로 �
 
 ## 바닥 엔진 후보: 코드 지식 그래프 오픈소스 (2026-11-19)
 함수 호출·의존 그래프는 이미 잘 만드는 오픈소스가 있다. dui는 이걸 바닥으로 쓰고 **상태 전환 층**만 얹는다.
-- [Graphify](https://github.com/Graphify-Labs/graphify/) (★ 약 15만): tree-sitter로 ~40개 언어, `graph.html` 시각화, 선마다 `EXTRACTED`/`INFERRED` 표시. **1순위 후보**.
-- [CodeGraph](https://github.com/colbymchenry/codegraph/) (★ 약 7.8만): 자동 갱신, 웹 라우트↔핸들러 연결, Tauri 웹↔Rust 호출 추적.
-- [GitNexus](https://github.com/abhigyanpatwari/GitNexus/) (★ 약 4.9만): 웹 그래프 탐색, 실행 흐름·영향 범위.
+- [Graphify](https://github.com/Graphify-Labs/graphify/) (★ 약 15만, Apache-2.0): tree-sitter로 ~40개 언어, `graph.html` 시각화, 선마다 `EXTRACTED`/`INFERRED` 표시. **1순위 후보**.
+- [CodeGraph](https://github.com/colbymchenry/codegraph/) (★ 약 7.8만, MIT): 자동 갱신, 웹 라우트↔핸들러 연결, Tauri 웹↔Rust 호출 추적.
+- ~~[GitNexus](https://github.com/abhigyanpatwari/GitNexus/)~~ (★ 약 4.9만): PolyForm Noncommercial 라이선스라 **제외**.
 
 ### 상태 전환 층 (dui가 만드는 것)
 호출 그래프 = "함수 A가 B를 부른다"(코드 구조). dui가 원하는 것 = "이 상태에서 이 동작을 하면 이 상태/화면이 된다"(화면 동작).
@@ -76,3 +76,6 @@ obora 웹 화면 몇 개(검수, 내보내기, 설정)를 상태별·폭별로 �
 | 데이터 모양 | 빈 목록, 1개, 아주 많음, 긴 텍스트, 값 없음 | 타입·API 스키마에서 목 자동 생성 | 높음 |
 | 코드 분기 | loading, error, 권한, `length === 0` | 정적 분석 + 커버리지 측정 | 높음 (99% 목표 가능) |
 | 순서로 생기는 상태 | 업로드 중, 마지막 장 승인 후, 입력하다 만 모달 | 이벤트→상태 변경 추적 + 펼치기 + 재생 | 중간 → 상태를 한 타입/reducer에 모으는 규칙으로 높임 |
+
+## 라이선스 기준 (2026-11-19 결정)
+dui는 **상업용**으로 간다. 가져다 쓰는 오픈소스는 MIT·Apache-2.0·BSD 같은 상업 사용 허용 라이선스만 쓴다. 비상업(PolyForm Noncommercial 등)·강한 카피레프트(AGPL 등)는 쓰지 않는다. 쓸 때는 라이선스·저작권 고지를 남긴다.
