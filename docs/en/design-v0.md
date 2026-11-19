@@ -7,7 +7,7 @@ English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md
 
 > **Positioning**: design-generation tools show *how it will be built*: AI imagines screens that do not exist yet. dui shows *how it is actually built*: it reads existing code through the official compilers and really renders every state that exists. Nothing is invented; what cannot be shown is marked `unverified` or `unrenderable`.
 
-> **Who it's for**: dui is not meant to make everyone comfortable. It is for people who actively use AI and build new products on the latest stacks. That is why only 2026+ stacks and TypeScript 7+ are supported; older stacks are intentionally out of scope ([supported versions](#supported-versions-2026-or-later-only)).
+> **Who it's for**: dui is not meant to make everyone comfortable. It is for people who actively use AI and build new products on the latest stacks. That is why only the current latest stable major of each stack is supported; older stacks are intentionally out of scope ([supported versions](#supported-versions-current-latest-stable-major-only)).
 
 ## 0. Core principle: AI-native
 
@@ -229,7 +229,7 @@ Measured as a number, not a feeling. The denominator is defined explicitly.
   - Render branches: conditional render branches (conditional JSX, ternaries, early returns, `match` arms) inside components reachable from the screen root. Branches with no effect on what is drawn (logging, etc.) are removed by exclusion rules.
   - Because the analyzer builds the denominator itself, "branches missing from the denominator" are measured separately: compare with the full branch list from runtime coverage tools (V8 coverage / istanbul; for Rust, the `cargo llvm-cov` family).
 - **Unrenderable cells** (see "Rendering limits") are **excluded from the denominator** but always reported as a separate count with reasons. So coverage = `verified` cells ÷ renderable cells.
-- **Unsupported** projects / modules (versions released before 2026 or non-official compilers; see Tech stack) are rejected before scanning and are not measured at all.
+- **Unsupported** projects / modules (older than the current latest stable major, or non-official compilers; see Tech stack) are rejected before scanning and are not measured at all.
 - **Numerator** = the number of `verified` cells in the denominator.
 - **Report**: renderable coverage % per screen and per kind + a list of unverified cells (with reasons) + the unrenderable count (with reasons). E.g. `review 97.8% (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths; unrenderable 2 (system-ui)`.
 - **Condition for 99%**: our code (obora, pippip) follows a rule to gather screen state in one place with types, reducers, or state machines. That keeps the sequence-state denominator accurate.
@@ -418,18 +418,23 @@ Principle:
 | Swift | `swiftc` + SourceKit-LSP | Apache-2.0 with Runtime Library Exception ([swiftlang/swift LICENSE.txt](https://github.com/swiftlang/swift/blob/main/LICENSE.txt)); SourceKit-LSP Apache-2.0 | Later. Apple-platform rendering needs Xcode (Apple's license) → dui uses an installed Xcode and never downloads or redistributes it |
 | Kotlin | `kotlinc` (JetBrains) | Apache-2.0 ([JetBrains/kotlin license/README.md](https://github.com/JetBrains/kotlin/blob/master/license/README.md); GitHub shows no SPDX id) | Later |
 
-### Supported versions: 2026 or later only
+### Supported versions: current latest stable major only
 
-**Rule**: a version line is supported only if its **first stable release is on or after 2026-01-01**. Older lines are rejected up front by `dui scan` as **`unsupported` (reason)**: this is not `unrenderable`, is not a cell status, and is excluded from coverage (§8). Unofficial compilers are `unsupported` the same way.
+**Rule (decided 2026-11-20)**: for each stack, dui supports **only the current latest stable major version** (as of November 2026) and anything newer. Newer versions are always supported. Older majors are rejected up front by `dui scan` as **`unsupported` (reason)**: this is not `unrenderable`, is not a cell status, and is excluded from coverage (§8). Unofficial compilers are `unsupported` the same way. The baseline is only raised in a **future dui major release**.
 
-| Stack | Supported | First stable release (source) | Not supported (examples) |
+Checked 2026-11-20 against official sources (npm registry, crates.io, GitHub releases, nodejs.org):
+
+| Stack | Supported baseline | Latest stable (date, source) | Unsupported |
 |---|---|---|---|
-| TypeScript | **7.0+ only** | 7.0.2: 2026-07-08 (npm) | 6.x (6.0.2: 2026-03-23) and older, by decision (see below) |
-| React | 19.3+ | 19.3.0: 2026-09-09 (npm) | 19.0 (2024-12-05), 19.1 (2025-03-28), 19.2 (2025-10-01), even though they still get patch releases in 2026 |
-| Rust toolchain | 1.93+ | 1.93.0: 2026-01-22 ([GitHub release](https://github.com/rust-lang/rust/releases/tag/1.93.0)) | 1.92 and older |
-| Rust edition | 2024 | Stabilized in 1.85.0, 2025-02-20; still the newest edition in the [Edition Guide](https://doc.rust-lang.org/edition-guide/) | 2021 and older |
-| GPUI (`gpui-pre`) | 0.3.0+ | 0.3.0: 2026-09-03 (crates.io; every published version is from 2026) | — |
+| TypeScript | **7.x** (7.0+) | 7.0.2 (2026-07-08, npm `latest`; 7.1.0 is still beta) | 6.x and older |
+| React | **19.x** (19.0+) | 19.3.1 (2026-10-14, npm `latest`) | 18.x and older |
+| Node.js (runs the TS sidecar, from the project) | **26.x** | 26.13.1 (2026-11-10, LTS "Lithium"; nodejs.org; 26.0.0: 2026-05-05; 27 is only alpha) | 25.x and older |
+| Rust | **edition 2024** | Latest edition per the [Edition Guide](https://doc.rust-lang.org/edition-guide/); latest toolchain 1.100.0 (2026-11-12, GitHub release) | edition 2021 and older |
+| GPUI (`gpui-pre`) | **0.3.x** | 0.3.13 (2026-11-16, crates.io) | 0.2.x and older |
 
-Two exceptions to the date rule:
-- **TypeScript is 7.0+ only** (decided 2026-11-19), stricter than the date rule: TS 6.x came out in 2026 but is `unsupported`, because dui uses the TS 7 native compiler and its API. obora (the M0 target) will move to TS 7.
-- Edition 2024 is allowed: it is the newest edition and there is no 2026 edition.
+Notes:
+- **Rust** has no major release after 1.0, so the edition is used as the "major". Whether to also require a minimum toolchain version is an open decision (`unconfirmed`).
+- **`gpui-pre`** is a 0.x crate. Under Cargo's semver rules a 0.x minor bump is breaking, so 0.3 is treated as the major line.
+- **TypeScript**: the type API dui uses (`typescript/sync`) arrives in 7.1, which is still beta. Until 7.1 is stable, the TS adapter's API path is `unconfirmed`.
+- **Chromium**: not pinned in v0. Which browser binary dui drives over CDP is `unconfirmed`.
+- obora (the M0 target) will move to TS 7.

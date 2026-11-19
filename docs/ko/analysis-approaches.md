@@ -97,7 +97,7 @@
 | SCIP(scip-typescript) | 정의·참조가 정확, 언어 중립 형식 | 타입 **구조**(필드·유니온 갈래)와 데이터 흐름은 없음 | 쓰지 않음(필요 시 교차 참조 보조) |
 | Babel/SWC AST | 주입 변환을 넣는 곳 | 타입 없음 | **주입기 전용**(Vite 플러그인) |
 
-TS 버전 위험: InfoQ(2026-11-06)에 따르면 TS 7.0(2026-07, Go 네이티브)은 컴파일러 API를 뺐고, 7.1 베타가 `typescript/sync`·`typescript/async`·`typescript/ast` 등 **새 진입점으로 API를 되살렸다**(옛 `ts.createProgram`과 호환 아님. [공식 TS 7.1 beta 글](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)에서 확인했고, 여기에는 `typescript/fs`도 있다). obora는 도구용 `typescript ^5.9.3`을 유지하고 TS7은 tsgo로 따로 돌린다(pnpm-workspace.yaml 확인). → **dui는 분석 계층을 `TypeOracle` 인터페이스 뒤에 두고, TS 7.0 이상만 지원한다(2026-11-19 결정). obora는 TS 7로 옮길 예정이다. 타입 조회는 TS 7.1 API를 쓴다.**
+TS 버전 위험: InfoQ(2026-11-06)에 따르면 TS 7.0(2026-07, Go 네이티브)은 컴파일러 API를 뺐고, 7.1 베타가 `typescript/sync`·`typescript/async`·`typescript/ast` 등 **새 진입점으로 API를 되살렸다**(옛 `ts.createProgram`과 호환 아님. [공식 TS 7.1 beta 글](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)에서 확인했고, 여기에는 `typescript/fs`도 있다). obora는 도구용 `typescript ^5.9.3`을 유지하고 TS7은 tsgo로 따로 돌린다(pnpm-workspace.yaml 확인). → **dui는 분석 계층을 `TypeOracle` 인터페이스 뒤에 두고, 현재 최신 안정 메이저, 즉 TS 7.x만 지원한다(2026-11-20 결정한 규칙). obora는 TS 7로 옮길 예정이다. 타입 조회는 TS 7.1 API를 쓴다.**
 
 데이터 흐름(state → JSX, 핸들러 → setState)은 React Compiler처럼 함수 단위 제어 흐름 + 단순 데이터 흐름을 **직접 구현**한다(React 훅 규칙 덕분에 범위가 좁다). React Compiler 내부를 라이브러리로 재사용할 수 있는지는 `미확인`(공개 API 아님) → M1에서 확인.
 

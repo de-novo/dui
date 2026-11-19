@@ -97,7 +97,7 @@
 | SCIP（scip-typescript） | 定义、引用精确，语言中立格式 | 没有类型**结构**（字段、联合分支）和数据流 | 不使用（必要时作为交叉引用辅助） |
 | Babel/SWC AST | 放置注入转换的地方 | 无类型 | **仅用于注入器**（Vite 插件） |
 
-TS 版本风险：据 InfoQ（2026-11-06），TS 7.0（2026-07，Go 原生）移除了编译器 API，7.1 beta 通过 `typescript/sync`、`typescript/async`、`typescript/ast` 等**新入口恢复了 API**（与旧的 `ts.createProgram` 不兼容；已在[官方 TS 7.1 beta 博客](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)中确认，其中还列出了 `typescript/fs`）。obora 在工具中保留 `typescript ^5.9.3`，TS7 用 tsgo 单独运行（已在 pnpm-workspace.yaml 中确认）。→ **dui 把分析层放在 `TypeOracle` 接口之后，并且只支持 TS 7.0+（2026-11-19 决定）；obora 将迁移到 TS 7。类型查询使用 TS 7.1 API。**
+TS 版本风险：据 InfoQ（2026-11-06），TS 7.0（2026-07，Go 原生）移除了编译器 API，7.1 beta 通过 `typescript/sync`、`typescript/async`、`typescript/ast` 等**新入口恢复了 API**（与旧的 `ts.createProgram` 不兼容；已在[官方 TS 7.1 beta 博客](https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/)中确认，其中还列出了 `typescript/fs`）。obora 在工具中保留 `typescript ^5.9.3`，TS7 用 tsgo 单独运行（已在 pnpm-workspace.yaml 中确认）。→ **dui 把分析层放在 `TypeOracle` 接口之后，并且只支持当前最新稳定主版本，即 TS 7.x（2026-11-20 决定的规则）；obora 将迁移到 TS 7。类型查询使用 TS 7.1 API。**
 
 数据流（state → JSX，处理函数 → setState）像 React Compiler 一样，以函数为单位的控制流 + 简单数据流**由 dui 自己实现**（React 的 hook 规则让范围很窄）。能否把 React Compiler 内部作为库复用 `未确认`（不是公开 API）→ 在 M1 中确认。
 
