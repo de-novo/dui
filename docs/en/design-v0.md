@@ -5,6 +5,18 @@ English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md
 > Status: draft · written 2026-11-19 · audience: developers building dui
 > External facts in this document (licenses, star counts, versions) were checked with the GitHub API on 2026-11-19. Anything not confirmed is marked `unconfirmed`.
 
+## 0. Core principle: AI-native
+
+**dui is AI-native. AI uses everything; humans only look at the canvas.** (decided 2026-11-19)
+
+| Surface | Who | What |
+|---|---|---|
+| AI surface | AI agents | The `dui` CLI + an MCP server. JSON output, stable exit codes, no interactive prompts, idempotent commands. AI runs analyze / inject / render / verify and fixes `unverified` cells itself |
+| Human surface | Humans | **The canvas only.** No settings screens and no command instructions in the UI. It shows screens × states × widths × transitions |
+| Loop | Both | A human comments on a canvas cell → AI reads the comments via MCP → fixes the code → the canvas re-renders |
+
+Every component below is designed for this split: anything a person would "run" is run by an AI agent; anything a person needs to "see" is on the canvas.
+
 ## 1. Problem and users
 
 **Users**: developers, designers, and QA who build UI in TypeScript or Rust.
@@ -76,11 +88,16 @@ flowchart LR
   S --> C
   S --> F
   V -->|uncovered branches| P
+  AI[AI agent] -->|CLI / MCP| A
+  AI -->|CLI / MCP| R
+  H[Human] -->|views, comments on cells| C
+  C -->|cell comments via MCP| AI
 ```
 
 | Component | What it does | Input → output |
 |---|---|---|
-| `dui` CLI | Runs everything, caching, config. `dui scan`, `dui render`, `dui open` | config file → run |
+| `dui` CLI | Entry point **for AI agents** (not for humans): runs everything, caching, config. `dui scan`, `dui render`, `dui open`. JSON output, stable exit codes, no prompts, idempotent | config file → run |
+| MCP server | Same operations as the CLI for AI agents, plus reading and resolving canvas cell comments | MCP calls → JSON |
 | Analyzer | Finds screens, state locations, events, state-change points, transition rules. Graphify graph + type info + AI | code → `Screen`, `StateSlot`, `Rule` |
 | Injector | Inserts a dev-only injection entry point at each state location at build time | `StateSlot` → transformed dev build |
 | Mock generator | Generates representative values from types / schemas (zod, OpenAPI, Rust types) | type → value sets |
@@ -176,7 +193,7 @@ type VerificationStatus =
 5. **Verify**: §7.
 6. **Fill-in loop**: if uncovered branches remain, go back to step 2 and create states for those branches. Stop when there is no improvement or the iteration limit is reached.
 7. **Sequence replay verification**: for sequence states, not only inject but actually replay the events along the path from the initial state and check the same screen appears. If it matches, the edge becomes `verified`.
-8. **View** (`dui open`): launch the canvas app or export to Figma.
+8. **View**: the AI agent publishes the canvas (`dui open`) or exports to Figma; humans only look at the canvas and comment on cells. Comments go back to step 1 via MCP.
 
 ## 7. Verification
 

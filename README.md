@@ -4,6 +4,8 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 > **Vision (2026-11-19)**: dui supports *well-built products* only. When state is expressed in types and APIs in DTOs, every screen, state, and width is drawn on one canvas. Fully drawn means good code; many `unverified` cells signal scattered state management. The goal is an industry standard for UI code quality: ① support criteria as public rules (+ lint), ② a single number, "UI state coverage %", ③ an open format for state graphs and snapshots.
 
+> **Principle #1 — AI-native (2026-11-19)**: dui is AI-native. **AI uses everything; humans only look at the canvas.** AI agents drive dui through the `dui` CLI and MCP server (analyze, inject, render, verify, and fix `unverified` cells). Humans see only the canvas (screens × states × widths × transitions) and leave comments on cells; AI reads the comments, fixes the code, and the canvas re-renders. See [design §0](docs/en/design-v0.md#0-core-principle-ai-native).
+
 > Idea-stage repository. No code yet.
 
 Design: [docs/en/design-v0.md](docs/en/design-v0.md) (developer tool design v0)
