@@ -251,12 +251,12 @@ pippip은 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, HTTP는 `reqwest` 사용(Cargo.
 | 후보 | 라이선스(2026-11-19 확인) | 판단 |
 |---|---|---|
 | React Flow (`xyflow/xyflow`) | MIT, ★39,087 | **1순위**. 노드 안에 이미지 또는 iframe(웹은 살아있는 DOM) |
-| tldraw (`tldraw/tldraw`) | 자체 라이선스(GitHub 표기 NOASSERTION). LICENSE.md: 개발 환경에서만 무료, **프로덕션 사용은 별도 상업 라이선스 또는 체험 라이선스 키 필요**, 라이선스 키·워터마크 강제, 사용 데이터 전송 가능 | **v0에서 제외**. dui가 상업 제품이라 비용·조건 확인 전에는 쓰지 않음 |
+| tldraw (`tldraw/tldraw`) | 자체 라이선스(GitHub 표기 NOASSERTION). LICENSE.md: 개발 환경에서만 무료, **프로덕션 사용은 별도 상업 라이선스 또는 체험 라이선스 키 필요**, 라이선스 키·워터마크 강제, 사용 데이터 전송 가능 | **v0에서 제외**. 프로덕션 조건이 dui를 상업적으로 쓰는 사용자·기업에게 넘어가므로 비용·조건 확인 전에는 쓰지 않음 |
 | Figma 내보내기 | Figma 플러그인/REST API (요금·한도 `미확인`) | 보조 출력. 이미지 노드로 같은 배치 생성 |
 
 ## 12. 라이선스 정책
 
-- dui는 **상업용**이다. 의존성은 MIT·Apache-2.0·BSD·ISC 등 상업 사용 허용 라이선스만.
+- dui는 **Apache-2.0 오픈소스**다. 사용자와 기업이 dui를 상업적으로 쓸 수 있도록, 의존성은 상업 사용을 허용하는 라이선스(MIT·Apache-2.0·BSD·ISC)만 쓴다.
 - 금지: 비상업(PolyForm Noncommercial 등), AGPL·GPL 같은 강한 카피레프트, tldraw처럼 프로덕션 사용에 별도 계약이 필요한 것(계약 전까지).
 - 확인 방법: 새 의존성은 `gh api repos/<owner>/<repo> --jq .license.spdx_id`와 LICENSE 원문으로 확인하고, JS는 라이선스 검사 도구, Rust는 `cargo deny`로 CI에서 막는다.
 - 배포물에 라이선스·저작권 고지를 남긴다(Apache-2.0은 NOTICE 포함).

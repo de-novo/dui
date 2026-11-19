@@ -249,12 +249,12 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 | Candidate | License (checked 2026-11-19) | Decision |
 |---|---|---|
 | React Flow (`xyflow/xyflow`) | MIT, ★39,087 | **First choice**. Image or iframe inside nodes (live DOM for web) |
-| tldraw (`tldraw/tldraw`) | Custom license (GitHub shows NOASSERTION). LICENSE.md: free in development environments only; **production use requires a separate commercial or trial license key**; license key and watermark are enforced; usage data may be sent | **Excluded from v0**. dui is a commercial product, so not used until cost and terms are checked |
+| tldraw (`tldraw/tldraw`) | Custom license (GitHub shows NOASSERTION). LICENSE.md: free in development environments only; **production use requires a separate commercial or trial license key**; license key and watermark are enforced; usage data may be sent | **Excluded from v0**. Its production terms would pass on to users and companies who use dui commercially, so not used until cost and terms are checked |
 | Figma export | Figma plugin / REST API (pricing and limits `unverified`) | Secondary output. Same layout as image nodes |
 
 ## 12. License policy
 
-- dui is **commercial**. Dependencies must use licenses that allow commercial use: MIT, Apache-2.0, BSD, ISC, etc.
+- dui is **Apache-2.0 open source**. Dependencies must allow commercial use (MIT, Apache-2.0, BSD, ISC) so that users and companies can use dui commercially.
 - Forbidden: noncommercial (PolyForm Noncommercial, etc.), strong copyleft such as AGPL and GPL, and anything like tldraw that needs a separate contract for production use (until such a contract exists).
 - How to check: for each new dependency, check `gh api repos/<owner>/<repo> --jq .license.spdx_id` and the LICENSE text, and block in CI with a license checker for JS and `cargo deny` for Rust.
 - Keep license and copyright notices in distributions (including NOTICE for Apache-2.0).

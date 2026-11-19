@@ -119,7 +119,7 @@ In GPUI, state gathers in `Entity<T>` model fields, so "find model types → fie
 | **State-location detection, state → render data flow, event → state-change rules, representative values and combination generation, coverage denominator** | None (only GATOR WTG and React Compiler designs as references) | **dui's core = build ourselves** |
 | AI | — | Only cells left as `inferred` above, and naming |
 
-### 5.4 License fit (dui is commercial: MIT, Apache, BSD only)
+### 5.4 License fit (dui is Apache-2.0 open source; dependencies must allow commercial use — MIT, Apache, BSD, ISC — so users and companies can use dui commercially)
 
 | Target | Decision |
 |---|---|

@@ -4,7 +4,7 @@ English | [简体中文](../zh-CN/language-survey.md) | [한국어](../ko/langua
 
 > Written 2026-11-19. Purpose: choose the languages and frameworks dui supports, based on evidence.
 > Only numbers with a source are given. Anything not confirmed is `unverified`. Star counts are GitHub API values as of 2026-11-19.
-> Licenses here are those of the **target frameworks**, separate from dui's dependency policy (commercial-use only). dui only inserts dev-time code into the user's project; it does not redistribute those frameworks.
+> Licenses here are those of the **target frameworks**, separate from dui's dependency policy (dui is Apache-2.0 open source; its dependencies must allow commercial use). dui only inserts dev-time code into the user's project; it does not redistribute those frameworks.
 
 ## 0. Four things dui needs from each stack
 

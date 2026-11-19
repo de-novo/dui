@@ -251,12 +251,12 @@ pippip 使用 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`，HTTP 使用 `reqwest`（�
 | 候选 | 许可证（2026-11-19 确认） | 判断 |
 |---|---|---|
 | React Flow（`xyflow/xyflow`） | MIT，★39,087 | **第一选择**。节点内放图像或 iframe（Web 为实时 DOM） |
-| tldraw（`tldraw/tldraw`） | 自有许可证（GitHub 显示 NOASSERTION）。LICENSE.md：仅在开发环境免费，**生产使用需要另行购买商业许可或试用许可密钥**，强制许可密钥和水印，可能发送使用数据 | **v0 中排除**。dui 是商业产品，在确认费用和条件之前不使用 |
+| tldraw（`tldraw/tldraw`） | 自有许可证（GitHub 显示 NOASSERTION）。LICENSE.md：仅在开发环境免费，**生产使用需要另行购买商业许可或试用许可密钥**，强制许可密钥和水印，可能发送使用数据 | **v0 中排除**。其生产使用条款会转嫁给商业使用 dui 的用户和企业，在确认费用和条件之前不使用 |
 | Figma 导出 | Figma 插件 / REST API（费用、限额 `未确认`） | 辅助输出。以图像节点生成相同布局 |
 
 ## 12. 许可证政策
 
-- dui 是**商业用途**。依赖只能使用允许商用的许可证：MIT、Apache-2.0、BSD、ISC 等。
+- dui 是 **Apache-2.0 开源项目**。为了让用户和企业可以商业使用 dui，依赖只能使用允许商用的许可证（MIT、Apache-2.0、BSD、ISC）。
 - 禁止：非商业（PolyForm Noncommercial 等）、AGPL / GPL 等强 copyleft，以及像 tldraw 这样生产使用需要另签合同的（在签约之前）。
 - 检查方法：新依赖用 `gh api repos/<owner>/<repo> --jq .license.spdx_id` 和 LICENSE 原文确认；JS 用许可证检查工具、Rust 用 `cargo deny` 在 CI 中拦截。
 - 在分发物中保留许可证和版权声明（Apache-2.0 需包含 NOTICE）。
