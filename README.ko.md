@@ -44,10 +44,21 @@
 - AI 추론: 조건부 이동, 동적 주소 → `추정` 표시.
 - 실행 기록: 실제로 돌아다닌 기록과 겹쳐 검증.
 
-## 대상 프레임워크 (전부 할 필요 없음, 우리가 쓰는 것부터)
+## 지원 프레임워크
+
+우선순위 1–3의 38개 스택은 모두 공식 지원 대상이고, 우선순위는 구현 순서일 뿐이다. 아직 미지원인 11개 스택은 막힌 점이 풀리는 즉시 추가한다(대부분: 공식 도구가 TypeScript 7을 받아들일 때). 버전, 이유, 열린 질문: [docs/ko/supported-frameworks.md](docs/ko/supported-frameworks.md).
+
+| 우선순위 | 개수 | 스택 |
+|---|---:|---|
+| 우선순위 1 (MVP) | 8 | TypeScript, Node.js, React, Vite, TanStack Router, TanStack Query, zod, Chromium (Chrome stable) |
+| 우선순위 2 | 15 | Rust, GPUI (`gpui-pre`), gpui-component / gpui-kit, Zustand, Redux Toolkit, Jotai, XState, React Hook Form, valibot, Next.js, React Router, TanStack Start, Electron, Radix UI, shadcn/ui |
+| 우선순위 3 | 15 | Solid, SolidStart, Preact, Rspack / Rsbuild, Tauri, Dioxus, Leptos, egui, Iced, React Native, Expo, Flutter / Dart, SwiftUI / Swift, Jetpack Compose / Kotlin, Compose Multiplatform |
+| 아직 미지원 | 11 | Vue, Nuxt, Svelte, SvelteKit, Astro, Angular, Qwik, Remix, Turbopack, Slint, Playwright |
+
+## 계열별 렌더 방법
 | 계열 | 예 | 렌더 방식 | 난이도 |
 |---|---|---|---|
-| 웹 | React, Vite, Next.js, Vue, Svelte | 브라우저에서 목(MSW·모듈 목)으로 렌더 | 쉬움 |
+| 웹 | React, Vite, Next.js, Solid, Preact | 브라우저에서 목(MSW·모듈 목)으로 렌더 | 쉬움 |
 | 웹 기반 데스크톱 | Electron, Tauri | 웹과 동일 (Tauri는 invoke 목) | 쉬움 |
 | 네이티브 | GPUI (pippip) | 앱 안의 갤러리 모드로 상태별 렌더 | 손 많이 감 |
 

@@ -45,10 +45,21 @@
 - AI 推断：条件跳转、动态地址 → 标记为 `推断`。
 - 运行记录：与实际浏览记录叠加进行验证。
 
-## 目标框架（不必全部支持，先做我们在用的）
+## 支持的框架
+
+优先级 1–3 中的全部 38 个技术栈都是正式支持目标；优先级只表示实现顺序。暂不支持的 11 个技术栈在阻碍消除后立即加入（多数情况：其官方工具接受 TypeScript 7）。版本、原因和待定问题：[docs/zh-CN/supported-frameworks.md](docs/zh-CN/supported-frameworks.md)。
+
+| 优先级 | 数量 | 技术栈 |
+|---|---:|---|
+| 优先级 1（MVP） | 8 | TypeScript, Node.js, React, Vite, TanStack Router, TanStack Query, zod, Chromium (Chrome stable) |
+| 优先级 2 | 15 | Rust, GPUI (`gpui-pre`), gpui-component / gpui-kit, Zustand, Redux Toolkit, Jotai, XState, React Hook Form, valibot, Next.js, React Router, TanStack Start, Electron, Radix UI, shadcn/ui |
+| 优先级 3 | 15 | Solid, SolidStart, Preact, Rspack / Rsbuild, Tauri, Dioxus, Leptos, egui, Iced, React Native, Expo, Flutter / Dart, SwiftUI / Swift, Jetpack Compose / Kotlin, Compose Multiplatform |
+| 暂不支持 | 11 | Vue, Nuxt, Svelte, SvelteKit, Astro, Angular, Qwik, Remix, Turbopack, Slint, Playwright |
+
+## 各类别的渲染方式
 | 类别 | 例子 | 渲染方式 | 难度 |
 |---|---|---|---|
-| Web | React、Vite、Next.js、Vue、Svelte | 在浏览器中用模拟（MSW、模块模拟）渲染 | 容易 |
+| Web | React、Vite、Next.js、Solid、Preact | 在浏览器中用模拟（MSW、模块模拟）渲染 | 容易 |
 | 基于 Web 的桌面 | Electron、Tauri | 与 Web 相同（Tauri 模拟 invoke） | 容易 |
 | 原生 | GPUI（pippip） | 在应用内的画廊模式中按状态渲染 | 费工夫 |
 

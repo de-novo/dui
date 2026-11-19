@@ -43,10 +43,21 @@ A tool that reads a codebase and lays out **every screen × every state × every
 - AI inference: conditional navigation, dynamic URLs → marked `inferred`.
 - Execution traces: overlay with recordings of real navigation to verify.
 
-## Target frameworks (no need to do all; start with what we use)
+## Supported frameworks
+
+All 38 stacks in priorities 1–3 are official support targets; the priority is only the implementation order. The 11 stacks not supported yet are added as soon as their blocker clears (for most: their official tooling accepts TypeScript 7). Versions, reasons, and open questions: [docs/en/supported-frameworks.md](docs/en/supported-frameworks.md).
+
+| Priority | Count | Stacks |
+|---|---:|---|
+| Priority 1 (MVP) | 8 | TypeScript, Node.js, React, Vite, TanStack Router, TanStack Query, zod, Chromium (Chrome stable) |
+| Priority 2 | 15 | Rust, GPUI (`gpui-pre`), gpui-component / gpui-kit, Zustand, Redux Toolkit, Jotai, XState, React Hook Form, valibot, Next.js, React Router, TanStack Start, Electron, Radix UI, shadcn/ui |
+| Priority 3 | 15 | Solid, SolidStart, Preact, Rspack / Rsbuild, Tauri, Dioxus, Leptos, egui, Iced, React Native, Expo, Flutter / Dart, SwiftUI / Swift, Jetpack Compose / Kotlin, Compose Multiplatform |
+| Not supported yet | 11 | Vue, Nuxt, Svelte, SvelteKit, Astro, Angular, Qwik, Remix, Turbopack, Slint, Playwright |
+
+## How each family is rendered
 | Family | Examples | How to render | Difficulty |
 |---|---|---|---|
-| Web | React, Vite, Next.js, Vue, Svelte | Render in a browser with mocks (MSW, module mocks) | Easy |
+| Web | React, Vite, Next.js, Solid, Preact | Render in a browser with mocks (MSW, module mocks) | Easy |
 | Web-based desktop | Electron, Tauri | Same as web (Tauri: mock `invoke`) | Easy |
 | Native | GPUI (pippip) | Render per state in an in-app gallery mode | Labor-intensive |
 

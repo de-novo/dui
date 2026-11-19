@@ -436,3 +436,5 @@ Notes:
 - **TypeScript**: the type API dui uses (`typescript/sync`) arrives in 7.1, which is still beta. Until 7.1 is stable, the TS adapter's API path is `unconfirmed`.
 - **Chromium**: not pinned in v0. Which browser binary dui drives over CDP is `unconfirmed`.
 - obora (the M0 target) will move to TS 7.
+
+**Supported frameworks**: the full list of supported stacks (38, in priority order), the 11 not supported yet, and the condition for adding each is in [Supported frameworks](supported-frameworks.md). It follows the rule above: one baseline per stack, the current latest stable major.
