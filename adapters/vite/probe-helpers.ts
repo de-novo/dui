@@ -25,17 +25,10 @@ function __duiToolsCreate() {
   return {
     probe,
     right,
-    logical<L, R>(
-      id: string,
-      and: boolean,
-      value: L | ReturnType<typeof right<R>>,
-    ): L | R {
-      const evaluated =
-        typeof value === "object" && value !== null && boxes.has(value);
+    logical<L, R>(id: string, and: boolean, value: L | ReturnType<typeof right<R>>): L | R {
+      const evaluated = typeof value === "object" && value !== null && boxes.has(value);
       probe()?.branch(id, evaluated ? and : !and);
-      return evaluated
-        ? (value as ReturnType<typeof right<R>>).value
-        : (value as L);
+      return evaluated ? (value as ReturnType<typeof right<R>>).value : (value as L);
     },
     initial<T>(id: string, fallback: () => T): T {
       const inputs = probe()?.input;

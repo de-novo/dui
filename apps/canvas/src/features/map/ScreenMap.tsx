@@ -21,9 +21,7 @@ type CardNode = Node<
 >;
 
 function Card({ data }: NodeProps<CardNode>) {
-  const cell = (data.screen.entries ?? data.screen.cells).find(
-    (c) => c.width === data.width,
-  );
+  const cell = (data.screen.entries ?? data.screen.cells).find((c) => c.width === data.width);
   return (
     <>
       {Object.values(Position).map((position) => (
@@ -72,10 +70,7 @@ export function ScreenMap({
   imageUrl: (name: string) => string;
   select: (id: string) => void;
 }) {
-  const layout = useMemo(
-    () => layoutMap(archive, width, mode),
-    [archive, width, mode],
-  );
+  const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
   const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => ({
     id: screen.id,
     type: "screen",

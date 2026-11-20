@@ -9,21 +9,13 @@ const column = 355;
 const row = 225;
 
 function neighborhood(screens: Screen[], links: Link[], focus: Screen): Layout {
-  const incident = links.filter(
-    (e) => e.source === focus.id || e.target === focus.id,
-  );
-  const incoming = new Set(
-    incident.filter((e) => e.target === focus.id).map((e) => e.source),
-  );
-  const outgoing = new Set(
-    incident.filter((e) => e.source === focus.id).map((e) => e.target),
-  );
+  const incident = links.filter((e) => e.source === focus.id || e.target === focus.id);
+  const incoming = new Set(incident.filter((e) => e.target === focus.id).map((e) => e.source));
+  const outgoing = new Set(incident.filter((e) => e.source === focus.id).map((e) => e.target));
   const nodes = [{ screen: focus, position: { x: 0, y: 0 } }];
   // A bidirectional neighbor appears once, with two independently directed arrows.
   const otherScreens = screens.filter((screen) => screen.id !== focus.id);
-  const left = otherScreens.filter(
-    (s) => incoming.has(s.id) && !outgoing.has(s.id),
-  );
+  const left = otherScreens.filter((s) => incoming.has(s.id) && !outgoing.has(s.id));
   const right = otherScreens.filter((s) => outgoing.has(s.id));
   for (const [group, x] of [
     [left, -column],
@@ -44,28 +36,19 @@ export function layoutMap(
   width: number,
   mode: string,
 ): Layout & { total: number } {
-  const screens = [...archive.screens].sort((a, b) =>
-    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-  );
-  const links = archive.links.filter(
-    (e) => !e.observedWidths || e.observedWidths.includes(width),
-  );
+  const screens = [...archive.screens].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const links = archive.links.filter((e) => !e.observedWidths || e.observedWidths.includes(width));
   const focus = screens.find((s) => mode === "focus:" + s.id);
-  if (focus)
-    return { ...neighborhood(screens, links, focus), total: links.length };
+  if (focus) return { ...neighborhood(screens, links, focus), total: links.length };
 
-  const neighbors = new Map(
-    screens.map((s) => [s.id, new Map<string, Link>()]),
-  );
+  const neighbors = new Map(screens.map((s) => [s.id, new Map<string, Link>()]));
   // Prefer the observed forward edge when either direction can join the same pair.
   for (const e of links) neighbors.get(e.source)!.set(e.target, e);
   for (const e of links) {
     const opposite = neighbors.get(e.target)!;
     if (!opposite.has(e.source)) opposite.set(e.source, e);
   }
-  const roots = [...screens].sort(
-    (a, b) => neighbors.get(b.id)!.size - neighbors.get(a.id)!.size,
-  );
+  const roots = [...screens].sort((a, b) => neighbors.get(b.id)!.size - neighbors.get(a.id)!.size);
   const byId = new Map(screens.map((s) => [s.id, s]));
   const seen = new Set<string>();
   const forest: Link[] = [];
@@ -88,10 +71,7 @@ export function layoutMap(
       }
     }
     // Pack wide sibling groups into short columns instead of one long strip.
-    const frames = new Map<
-      string,
-      { width: number; height: number; center: number }
-    >();
+    const frames = new Map<string, { width: number; height: number; center: number }>();
     const offsets = new Map<string, Point>();
     for (const { id } of [...queue].reverse()) {
       const branches = children.get(id)!;
@@ -100,11 +80,7 @@ export function layoutMap(
           ? Infinity
           : Math.ceil(
               Math.sqrt(
-                (branches.reduce(
-                  (sum, child) => sum + frames.get(child)!.height,
-                  0,
-                ) *
-                  column) /
+                (branches.reduce((sum, child) => sum + frames.get(child)!.height, 0) * column) /
                   row,
               ),
             );
@@ -152,9 +128,7 @@ export function layoutMap(
       height: frame.height * row,
     });
   }
-  const targetWidth = Math.sqrt(
-    blocks.reduce((a, b) => a + b.width * b.height, 0) * 1.6,
-  );
+  const targetWidth = Math.sqrt(blocks.reduce((a, b) => a + b.width * b.height, 0) * 1.6);
   const nodes: Placed[] = [];
   let x = 0,
     y = 0,

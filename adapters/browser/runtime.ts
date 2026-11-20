@@ -64,10 +64,8 @@ declare var __duiProbe: {
   function check(check: Check) {
     const probe = globalThis.__duiProbe;
     if (check.hit && !probe.hits.has(check.hit)) return false;
-    if (check.shown && !document.body.innerText.includes(check.shown))
-      return false;
-    if (check.hidden && document.body.innerText.includes(check.hidden))
-      return false;
+    if (check.shown && !document.body.innerText.includes(check.shown)) return false;
+    if (check.hidden && document.body.innerText.includes(check.hidden)) return false;
     if (!check.selector) return true;
     let present = check.present;
     const mask = check.absentWhen;
@@ -95,11 +93,7 @@ declare var __duiProbe: {
       )
         return;
       const style = getComputedStyle(node);
-      if (
-        style.display === "none" ||
-        style.visibility === "hidden" ||
-        style.opacity === "0"
-      )
+      if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0")
         return;
       const tag = node.localName;
       const role = node.getAttribute("role");
@@ -125,18 +119,14 @@ declare var __duiProbe: {
               .getAttribute(attr)!
               .trim()
               .split(/\s+/)
-              .map(
-                (id) => document.getElementById(id)?.textContent?.trim() ?? "",
-              ),
+              .map((id) => document.getElementById(id)?.textContent?.trim() ?? ""),
           ]);
       }
       if (
         node.checkVisibility() &&
         (role ||
           attrs.length ||
-          /^(button|input|select|textarea|a|img|h[1-6]|dialog|option)$/.test(
-            tag,
-          ))
+          /^(button|input|select|textarea|a|img|h[1-6]|dialog|option)$/.test(tag))
       ) {
         features.push([
           tag,
@@ -164,9 +154,7 @@ declare var __duiProbe: {
     );
     return {
       count: features.length,
-      hash: Array.from(new Uint8Array(digest), (b) =>
-        b.toString(16).padStart(2, "0"),
-      ).join(""),
+      hash: Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join(""),
     };
   }
   async function reference(
@@ -176,43 +164,33 @@ declare var __duiProbe: {
     checks: Check[],
   ) {
     const probe = globalThis.__duiProbe;
-    const same = (a: unknown, b: unknown) =>
-      JSON.stringify(a) === JSON.stringify(b);
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const keys = Object.keys(inputs);
     const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
     const valuesMatch = (values: SlotValues) =>
       Object.entries(values).every(
-        ([id, value]) =>
-          Object.hasOwn(probe.slots, id) && same(probe.slots[id], value),
+        ([id, value]) => Object.hasOwn(probe.slots, id) && same(probe.slots[id], value),
       );
     async function settle(values: SlotValues) {
       let previous;
       for (let poll = 0; poll < 12; poll++) {
         await wait(45);
         const snapshot = await semantic();
-        if (
-          snapshot.count > 0 &&
-          previous === snapshot.hash &&
-          valuesMatch(values)
-        )
+        if (snapshot.count > 0 && previous === snapshot.hash && valuesMatch(values))
           return snapshot;
         previous = snapshot.hash;
       }
       return null;
     }
     // Restore all observable baseline slots, even when an effect updated a dependent field.
-    if (
-      !valuesMatch(baseline.slots) ||
-      (await semantic()).hash !== baseline.semantic.hash
-    )
+    if (!valuesMatch(baseline.slots) || (await semantic()).hash !== baseline.semantic.hash)
       return { restore: false, reason: "dirty-control" };
     if (!keys.every((k) => Object.hasOwn(baseline.slots, k)))
       return { restore: true, reason: "not-mounted" };
     const changed = Object.fromEntries(
       Object.entries(inputs).filter(([k, v]) => !same(probe.slots[k], v)),
     );
-    if (!probe.apply(changed))
-      return { restore: true, reason: "no-unique-setter" };
+    if (!probe.apply(changed)) return { restore: true, reason: "no-unique-setter" };
     const observed = await settle(inputs);
     const evidence = {
       semantic: observed,
@@ -225,9 +203,7 @@ declare var __duiProbe: {
       restore: false,
     };
     const resets = Object.fromEntries(
-      Object.entries(baseline.slots).filter(
-        ([k, v]) => !same(v, probe.slots[k]),
-      ),
+      Object.entries(baseline.slots).filter(([k, v]) => !same(v, probe.slots[k])),
     );
     const reset = probe.apply(resets) && (await settle(baseline.slots));
     evidence.restore = !!reset && reset.hash === baseline.semantic.hash;
@@ -235,8 +211,7 @@ declare var __duiProbe: {
   }
   async function restore(baseline: Baseline) {
     const p = globalThis.__duiProbe;
-    const equal = (a: unknown, b: unknown) =>
-      JSON.stringify(a) === JSON.stringify(b);
+    const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const changes = Object.fromEntries(
       Object.entries(baseline.slots).filter(([k, v]) => !equal(p.slots[k], v)),
     );
@@ -256,8 +231,7 @@ declare var __duiProbe: {
 
   async function apply(input: SlotValues, baseline: Baseline) {
     const p = globalThis.__duiProbe;
-    const equal = (a: unknown, b: unknown) =>
-      JSON.stringify(a) === JSON.stringify(b);
+    const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     if (
       (await semantic()).hash !== baseline.semantic.hash ||
       !Object.entries(baseline.slots).every(
@@ -276,9 +250,7 @@ declare var __duiProbe: {
   }
   async function observe(selector: string, delayed: boolean) {
     const p = globalThis.__duiProbe;
-    if (delayed)
-      await (p?.waitForSample() ??
-        new Promise((resolve) => setTimeout(resolve, 100)));
+    if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 100)));
     if (!p) return null;
     return {
       ready: !!document.querySelector(selector),
@@ -304,7 +276,8 @@ declare var __duiProbe: {
             !(link instanceof HTMLAnchorElement) ||
             !link.hasAttribute("href") ||
             link.hasAttribute("download")
-          ) continue;
+          )
+            continue;
           const url = URL.parse(link.href);
           if (
             url &&

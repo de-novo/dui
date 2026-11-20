@@ -7,9 +7,7 @@ import type { Rule } from "../typescript/contracts.mjs";
 
 const [root, builtin] = process.argv.slice(2);
 const configPath = join(root, "dui.json");
-const profile = existsSync(configPath)
-  ? JSON.parse(readFileSync(configPath, "utf8"))
-  : {};
+const profile = existsSync(configPath) ? JSON.parse(readFileSync(configPath, "utf8")) : {};
 const app = resolve(root, profile.appRoot ?? ".");
 const packs = [
   JSON.parse(builtin),
@@ -64,8 +62,7 @@ function isLocalPath(path: string): boolean {
 }
 function segment(key: string): string | undefined {
   const value = params[key];
-  if (typeof value !== "string" || !value || [".", ".."].includes(value))
-    return undefined;
+  if (typeof value !== "string" || !value || [".", ".."].includes(value)) return undefined;
   return encodeURIComponent(value);
 }
 const excluded = new Set([
@@ -81,17 +78,12 @@ const excluded = new Set([
 ]);
 const files = globSync("**/*.{ts,tsx,mts}", {
   cwd: app,
-  exclude: (p) =>
-    p.split(/[\\/]/).some((s) => excluded.has(s) || s.startsWith(".")),
+  exclude: (p) => p.split(/[\\/]/).some((s) => excluded.has(s) || s.startsWith(".")),
 }).sort();
 for (const file of files) {
   if (/\.(test|spec|stories)\.[^.]+$/.test(file)) continue;
   const source = readFileSync(join(app, file), "utf8");
-  if (
-    !source.includes("${") &&
-    !routeRules.some((r) => source.includes(r.package))
-  )
-    continue;
+  if (!source.includes("${") && !routeRules.some((r) => source.includes(r.package))) continue;
   const ast = vite.parseSync(file, source);
   if (ast.errors.length) {
     parseFailures.push(relative(root, join(app, file)));
@@ -105,17 +97,14 @@ for (const file of files) {
         if (
           s.imported &&
           routeRules.some(
-            (r) =>
-              r.package === statement.source.value &&
-              r.symbol === s.imported?.name,
+            (r) => r.package === statement.source.value && r.symbol === s.imported?.name,
           )
         )
           factories.add(s.local.name);
     const n = statement.declaration ?? statement;
     if (n.kind === "const")
       for (const d of n.declarations)
-        if (d.init && d.id.type === "Identifier")
-          declarations.set(d.id.name, d.init);
+        if (d.init && d.id.type === "Identifier") declarations.set(d.id.name, d.init);
   }
   function literalTable(node: Node): string[] {
     const seen = new Set<Node>();
@@ -128,11 +117,7 @@ for (const file of files) {
         continue;
       }
       if (
-        [
-          "TSAsExpression",
-          "TSSatisfiesExpression",
-          "ParenthesizedExpression",
-        ].includes(node.type)
+        ["TSAsExpression", "TSSatisfiesExpression", "ParenthesizedExpression"].includes(node.type)
       ) {
         node = node.expression;
         continue;
@@ -155,11 +140,7 @@ for (const file of files) {
   new vite.Visitor({
     CallExpression(n: Node) {
       const factory = n.callee;
-      if (
-        factory.type !== "CallExpression" ||
-        !factories.has(factory.callee.name)
-      )
-        return;
+      if (factory.type !== "CallExpression" || !factories.has(factory.callee.name)) return;
       const pattern = factory.arguments[0]?.value;
       if (
         typeof pattern === "string" &&
@@ -168,8 +149,7 @@ for (const file of files) {
         routes.push({ pattern, source: relative(root, join(app, file)) });
     },
     TemplateLiteral(n: Node) {
-      if (!n.quasis[0].value.cooked.startsWith("/") || !n.expressions.length)
-        return;
+      if (!n.quasis[0].value.cooked.startsWith("/") || !n.expressions.length) return;
       const last = n.expressions.at(-1)!;
       if (
         last.type !== "MemberExpression" ||
@@ -228,18 +208,14 @@ const paths = [...screens.keys()].sort();
 const entry = paths[0] ?? profile.path ?? "/";
 if (typeof entry !== "string" || !isLocalPath(entry.split(/[?#]/)[0]))
   throw Error("entry path must be a same-origin absolute path");
-const defaultReady =
-  "main *, [role=main] *, h1, nav a[href], form input, canvas, article";
+const defaultReady = "main *, [role=main] *, h1, nav a[href], form input, canvas, article";
 function screen(path: string) {
   const override = profile.routeOptions?.[path];
   return {
     path,
     cookies: override?.cookies ?? profile.cookies ?? {},
-    readySelector:
-      override?.readySelector ?? profile.readySelector ?? defaultReady,
-    hasScreenAssertion: Boolean(
-      override?.readySelector || profile.readySelector,
-    ),
+    readySelector: override?.readySelector ?? profile.readySelector ?? defaultReady,
+    hasScreenAssertion: Boolean(override?.readySelector || profile.readySelector),
   };
 }
 const config = {
@@ -250,12 +226,7 @@ const config = {
     profile.tsconfig ??
     relative(
       root,
-      join(
-        app,
-        existsSync(join(app, "tsconfig.app.json"))
-          ? "tsconfig.app.json"
-          : "tsconfig.json",
-      ),
+      join(app, existsSync(join(app, "tsconfig.app.json")) ? "tsconfig.app.json" : "tsconfig.json"),
     ),
   sources: [],
   sourceDirs: [],
@@ -264,9 +235,7 @@ const config = {
   ...screen(entry),
   scenarios: paths.slice(1).map(screen),
   screenDiscovery: {
-    sources: paths.length
-      ? Object.fromEntries(screens)
-      : { [entry]: { kind: "entry" } },
+    sources: paths.length ? Object.fromEntries(screens) : { [entry]: { kind: "entry" } },
     unresolved: [...unresolved].sort(),
     parseFailures,
     mode: paths.length ? "router" : "links",
@@ -278,10 +247,8 @@ if (!paths.length) {
     readySelector: profile.readySelector ?? defaultReady,
     hasScreenAssertion: Boolean(profile.readySelector),
   };
-  config.routeSelector =
-    profile.routeSelector ?? "main a[href], nav a[href], header a[href]";
+  config.routeSelector = profile.routeSelector ?? "main a[href], nav a[href], header a[href]";
 } else delete config.routeSelector;
 if (config.mockPreload) config.mockPreload = resolve(root, config.mockPreload);
-if (config.rulePacks)
-  config.rulePacks = config.rulePacks.map((p: string) => resolve(root, p));
+if (config.rulePacks) config.rulePacks = config.rulePacks.map((p: string) => resolve(root, p));
 console.log(JSON.stringify(config));

@@ -34,12 +34,12 @@
   const width = document.querySelector<HTMLSelectElement>("#width")!;
   const gallery = document.querySelector<HTMLElement>("#gallery")!;
   const labels = { verified: "검증됨", unverified: "미검증", unrenderable: "렌더 불가" };
-  for (const size of [...new Set(graph.overview.map(cell => cell.width))].sort((a,b) => b-a)) {
+  for (const size of [...new Set(graph.overview.map((cell) => cell.width))].sort((a, b) => b - a)) {
     width.add(new Option(size + " px", String(size)));
   }
   function showScreens() {
     gallery.replaceChildren();
-    for (const cell of graph.overview.filter(cell => cell.width === Number(width.value))) {
+    for (const cell of graph.overview.filter((cell) => cell.width === Number(width.value))) {
       const figure = document.createElement("figure");
       const title = document.createElement("figcaption");
       title.textContent = [cell.path, labels[cell.status], cell.reason].filter(Boolean).join(" · ");
@@ -93,12 +93,7 @@
     detail.textContent =
       node.reason ??
       (links.length > 12
-        ? page * 12 +
-          1 +
-          "–" +
-          Math.min(links.length, (page + 1) * 12) +
-          " / " +
-          links.length
+        ? page * 12 + 1 + "–" + Math.min(links.length, (page + 1) * 12) + " / " + links.length
         : "");
     summary.textContent =
       graph.nodes.length +
@@ -115,12 +110,7 @@
     svg.setAttribute("viewBox", "0 0 980 " + height);
     function box(n: GraphNode, x: number, y: number) {
       const g = element("g", { tabindex: 0, role: "button" });
-      const color =
-        n.observed === false
-          ? "#f3f1eb"
-          : n.kind === "cell"
-            ? "#f4e5cd"
-            : "#d8eeeb";
+      const color = n.observed === false ? "#f3f1eb" : n.kind === "cell" ? "#f4e5cd" : "#d8eeeb";
       g.append(
         element("rect", {
           x,
@@ -162,6 +152,5 @@
     box(node, 365, mid);
   }
   choose.onchange = () => show(choose.value);
-  if (nodes.size)
-    show(graph.nodes.find((n) => n.kind === "screen")?.id ?? graph.nodes[0].id);
+  if (nodes.size) show(graph.nodes.find((n) => n.kind === "screen")?.id ?? graph.nodes[0].id);
 })();

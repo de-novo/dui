@@ -26,23 +26,17 @@ export function ScreenNeighborhood({
   );
   const adjacent = new Set(links.flatMap((e) => [e.source, e.target]));
   const outgoing = new Set(
-    links
-      .filter((link) => link.source === screen.id)
-      .map((link) => link.target),
+    links.filter((link) => link.source === screen.id).map((link) => link.target),
   );
   const neighbors = archive.screens
     .filter((s) => s.id !== screen.id && adjacent.has(s.id))
     .sort(
       (a, b) =>
-        Number(outgoing.has(b.id)) - Number(outgoing.has(a.id)) ||
-        a.path.localeCompare(b.path),
+        Number(outgoing.has(b.id)) - Number(outgoing.has(a.id)) || a.path.localeCompare(b.path),
     );
   const shown = neighbors.slice(page * 2, page * 2 + 2);
   return (
-    <section
-      className="neighborhood"
-      aria-label="Selected screen and its connections"
-    >
+    <section className="neighborhood" aria-label="Selected screen and its connections">
       <div className={"relation-stage" + (!shown.length ? " isolated" : "")}>
         <div className="relation-focus">
           <CaptureCard screen={screen} cell={cell} imageUrl={imageUrl} />
@@ -74,25 +68,17 @@ export function ScreenNeighborhood({
                   className="connector"
                   d={`M0 50 H50 V${shown.length === 1 ? 50 : i === 0 ? 25 : 75} H100`}
                   markerStart={
-                    links.some((e) => e.source === n.id)
-                      ? "url(#neighbor-arrow)"
-                      : undefined
+                    links.some((e) => e.source === n.id) ? "url(#neighbor-arrow)" : undefined
                   }
                   markerEnd={
-                    links.some((e) => e.target === n.id)
-                      ? "url(#neighbor-arrow)"
-                      : undefined
+                    links.some((e) => e.target === n.id) ? "url(#neighbor-arrow)" : undefined
                   }
                 />
               ))}
             </svg>
             <div className="relation-neighbors">
               {shown.map((n) => (
-                <button
-                  key={n.id}
-                  aria-label={"Inspect " + n.path}
-                  onClick={() => select(n.id)}
-                >
+                <button key={n.id} aria-label={"Inspect " + n.path} onClick={() => select(n.id)}>
                   <CaptureCard
                     screen={n}
                     cell={(n.entries ?? n.cells).find((c) => c.width === width)}

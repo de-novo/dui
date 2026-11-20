@@ -41,11 +41,8 @@ export function decodeOverview(raw: unknown): ScreenMap {
     screens.push(screen);
   }
   const detailed = raw.cells !== undefined;
-  if (detailed && !Array.isArray(raw.cells))
-    throw Error("Invalid archive cells");
-  const sources = detailed
-    ? [raw.overview, raw.cells as unknown[]]
-    : [raw.overview];
+  if (detailed && !Array.isArray(raw.cells)) throw Error("Invalid archive cells");
+  const sources = detailed ? [raw.overview, raw.cells as unknown[]] : [raw.overview];
   for (const [index, source] of sources.entries()) {
     for (const cell of source) {
       if (
@@ -61,8 +58,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
         throw Error("Invalid capture in archive overview");
       const screen = byPath.get(cell.path);
       if (!screen) throw Error("Capture references a missing screen");
-      const values =
-        detailed && index === 0 ? (screen.entries ??= []) : screen.cells;
+      const values = detailed && index === 0 ? (screen.entries ??= []) : screen.cells;
       values.push({
         state: typeof cell.state === "string" ? cell.state : undefined,
         scenario: typeof cell.scenario === "string" ? cell.scenario : undefined,
@@ -89,9 +85,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
     if (
       widths !== undefined &&
       (!Array.isArray(widths) ||
-        !widths.every(
-          (w) => typeof w === "number" && Number.isInteger(w) && w > 0,
-        ))
+        !widths.every((w) => typeof w === "number" && Number.isInteger(w) && w > 0))
     )
       throw Error("Invalid discovery link widths");
     links.push({

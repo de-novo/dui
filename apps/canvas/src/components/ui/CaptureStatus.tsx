@@ -7,8 +7,7 @@ const labels = {
 } satisfies Record<Cell["status"], string>;
 
 export function CaptureStatus({ cell }: { cell?: Cell }) {
-  if (!cell)
-    return <span className="capture-reason">No capture at this width</span>;
+  if (!cell) return <span className="capture-reason">No capture at this width</span>;
   return (
     <>
       <span className="capture-status" data-status={cell.status}>

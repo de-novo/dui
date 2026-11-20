@@ -1,10 +1,5 @@
 // Build and serve an instrumented Vite SPA in temporary storage.
-import {
-  readFileSync,
-  writeFileSync,
-  statSync,
-  createReadStream,
-} from "node:fs";
+import { readFileSync, writeFileSync, statSync, createReadStream } from "node:fs";
 import { resolve, join, sep, extname } from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
@@ -16,20 +11,16 @@ const [root, manifest, work] = process.argv.slice(2);
 const spec = JSON.parse(readFileSync(manifest, "utf8"));
 const app = resolve(root, spec.appRoot ?? ".");
 const require = createRequire(join(app, "package.json"));
-if (require("vite/package.json").version.split(".")[0] !== "8")
-  throw Error("Vite 8 required");
+if (require("vite/package.json").version.split(".")[0] !== "8") throw Error("Vite 8 required");
 const vite = await import(pathToFileURL(require.resolve("vite")).href);
-const facts: InstrumentFact[] = JSON.parse(
-  readFileSync(join(work, "facts.json"), "utf8"),
-).facts;
+const facts: InstrumentFact[] = JSON.parse(readFileSync(join(work, "facts.json"), "utf8")).facts;
 const byFile = new Map<string, InstrumentFact[]>();
 for (const f of facts) {
   const path = resolve(root, f.file);
   if (!byFile.has(path)) byFile.set(path, []);
   byFile.get(path)!.push(f);
 }
-if (app !== root && !app.startsWith(root + sep))
-  throw Error("appRoot must be inside project");
+if (app !== root && !app.startsWith(root + sep)) throw Error("appRoot must be inside project");
 function plugins(stage: string) {
   return [
     {
@@ -37,16 +28,11 @@ function plugins(stage: string) {
       enforce: "pre",
       load(id: string) {
         if (id.includes("?") || id.startsWith("\0")) return;
-        const original = id.startsWith(stage + sep)
-          ? resolve(app, id.slice(stage.length + 1))
-          : id;
+        const original = id.startsWith(stage + sep) ? resolve(app, id.slice(stage.length + 1)) : id;
         const facts = byFile.get(original);
         if (facts) return instrument(readFileSync(id, "utf8"), facts, vite);
         if (id.endsWith(".css") && spec.offlineFonts)
-          return readFileSync(id, "utf8").replace(
-            /^@import url\("https:[^\n]+$/gm,
-            "",
-          );
+          return readFileSync(id, "utf8").replace(/^@import url\("https:[^\n]+$/gm, "");
       },
     },
   ];
@@ -54,8 +40,7 @@ function plugins(stage: string) {
 if (spec.host === "nitro") {
   await serveNitro({ vite, root, app, spec, manifest, work, plugins });
 } else {
-  if (spec.host && spec.host !== "vite")
-    throw Error("unsupported host: " + spec.host);
+  if (spec.host && spec.host !== "vite") throw Error("unsupported host: " + spec.host);
   const dist = join(work, "dist");
   let base = "/";
   await vite.build({
@@ -84,9 +69,7 @@ if (spec.host === "nitro") {
   };
   const server = createServer((req, res) => {
     try {
-      const path = decodeURIComponent(
-        new URL(req.url ?? "/", "http://localhost").pathname,
-      );
+      const path = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
       if (!path.startsWith(base)) {
         res.writeHead(404).end();
         return;
@@ -105,10 +88,7 @@ if (spec.host === "nitro") {
         res.writeHead(404).end();
         return;
       }
-      res.setHeader(
-        "content-type",
-        types[extname(file)] ?? "application/octet-stream",
-      );
+      res.setHeader("content-type", types[extname(file)] ?? "application/octet-stream");
       createReadStream(file)
         .on("error", () => res.destroy())
         .pipe(res);
@@ -118,8 +98,7 @@ if (spec.host === "nitro") {
   });
   server.listen(0, "127.0.0.1", () => {
     const address = server.address();
-    if (!address || typeof address === "string")
-      throw Error("missing TCP port");
+    if (!address || typeof address === "string") throw Error("missing TCP port");
     writeFileSync(join(work, "port"), String(address.port));
   });
   process.stdin.resume();

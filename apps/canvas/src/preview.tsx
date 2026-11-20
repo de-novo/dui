@@ -13,12 +13,7 @@ import { WorkPicker } from "./features/workspace/WorkPicker";
 import "./preview.css";
 
 function archiveUrl(name: string, run: Run) {
-  return (
-    "/archive/" +
-    encodeURIComponent(name) +
-    "?run=" +
-    encodeURIComponent(run.key)
-  );
+  return "/archive/" + encodeURIComponent(name) + "?run=" + encodeURIComponent(run.key);
 }
 
 function MapView({ archive, run }: { archive: Archive; run: Run }) {
@@ -38,9 +33,9 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
   }, []);
   const [search, setSearch] = useState(location.search);
   const params = new URLSearchParams(search);
-  const widths = [
-    ...new Set(archive.screens.flatMap((s) => s.cells.map((c) => c.width))),
-  ].sort((a, b) => b - a);
+  const widths = [...new Set(archive.screens.flatMap((s) => s.cells.map((c) => c.width)))].sort(
+    (a, b) => b - a,
+  );
   const width = Number(params.get("width") ?? widths[0] ?? 0);
   const selectedId = params.get("screen");
   const screen = archive.screens.find((s) => s.id === selectedId);
@@ -67,32 +62,25 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
     history.pushState(null, "", next);
     setSearch(next.search);
   }
+  function inspectKey(event: React.KeyboardEvent) {
+    if (event.key === "Escape") update({ screen: null, state: null });
+  }
   function select(id: string, active: Element | null = document.activeElement) {
-    if (
-      selectedId === null &&
-      (active instanceof HTMLElement || active instanceof SVGElement)
-    )
+    if (selectedId === null && (active instanceof HTMLElement || active instanceof SVGElement))
       origin.current = active;
     update({ screen: id, state: null });
   }
   const cells = screen?.cells.filter((c) => c.width === width) ?? [];
   const state = params.get("state");
   const stateKey = (i: number) =>
-    cells[i].state &&
-    cells.filter((c) => c.state === cells[i].state).length === 1
+    cells[i].state && cells.filter((c) => c.state === cells[i].state).length === 1
       ? cells[i].state!
       : "cell:" + i;
-  const cell =
-    state === null ? cells[0] : cells.find((_, i) => stateKey(i) === state);
+  const cell = state === null ? cells[0] : cells.find((_, i) => stateKey(i) === state);
   return (
     <section className="workspace" aria-label="Screen map">
       <div className="map" ref={mapArea}>
-        <div
-          ref={overviewLayer}
-          className="overview-layer"
-          aria-hidden={!!screen}
-          inert={!!screen}
-        >
+        <div ref={overviewLayer} className="overview-layer" aria-hidden={!!screen} inert={!!screen}>
           {railInset !== undefined && (
             <ScreenMap
               railInset={railInset}
@@ -139,9 +127,7 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
       </div>
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
         <DialogContent
-          finalFocus={() =>
-            selectedId === null ? optionsButton.current : dismiss.current
-          }
+          finalFocus={() => (selectedId === null ? optionsButton.current : dismiss.current)}
         >
           <DialogTitle>Map options</DialogTitle>
           <label>
@@ -186,10 +172,7 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
           </label>
           <label>
             Capture width
-            <select
-              value={width}
-              onChange={(e) => update({ width: e.target.value, state: null })}
-            >
+            <select value={width} onChange={(e) => update({ width: e.target.value, state: null })}>
               {widths.map((w) => (
                 <option key={w} value={w}>
                   {w} px
@@ -200,13 +183,7 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
         </DialogContent>
       </Dialog>
       {selectedId !== null && (
-        <aside
-          className="inspector"
-          aria-label="Screen details"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") update({ screen: null, state: null });
-          }}
-        >
+        <aside className="inspector" aria-label="Screen details">
           <div className="panel-title">
             <div>
               <h2>{screen ? routeName(screen.path) : "Screen unavailable"}</h2>
@@ -217,6 +194,7 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
               variant="ghost"
               size="icon"
               ref={dismiss}
+              onKeyDown={inspectKey}
               onClick={() => update({ screen: null, state: null })}
             >
               ×
@@ -225,6 +203,7 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
           <label>
             Width
             <select
+              onKeyDown={inspectKey}
               value={width}
               onChange={(e) => update({ width: e.target.value, state: null })}
             >
@@ -239,10 +218,9 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
             <label>
               State
               <select
+                onKeyDown={inspectKey}
                 value={cell ? cells.indexOf(cell) : -1}
-                onChange={(e) =>
-                  update({ state: stateKey(Number(e.target.value)) })
-                }
+                onChange={(e) => update({ state: stateKey(Number(e.target.value)) })}
               >
                 {!cell && <option value={-1}>State unavailable</option>}
                 {cells.map((c, i) => (
@@ -256,18 +234,11 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
           <div className="inspection-result">
             <h3>Verification</h3>
             <p className="capture-meta">
-              {state !== null && !cell ? (
-                "State unavailable"
-              ) : (
-                <CaptureStatus cell={cell} />
-              )}
+              {state !== null && !cell ? "State unavailable" : <CaptureStatus cell={cell} />}
             </p>
           </div>
           {cell?.image && (
-            <img
-              alt={"Archived screen at " + width + " px"}
-              src={archiveUrl(cell.image, run)}
-            />
+            <img alt={"Archived screen at " + width + " px"} src={archiveUrl(cell.image, run)} />
           )}
         </aside>
       )}
@@ -298,7 +269,7 @@ function Viewer({
       {archive && run ? (
         <MapView archive={archive} run={run} />
       ) : (
-        <p role="status">{error ?? "No saved screen maps."}</p>
+        <output>{error ?? "No saved screen maps."}</output>
       )}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
@@ -317,9 +288,7 @@ try {
   const key = new URLSearchParams(location.search).get("run");
   run = key === null ? runs[0] : runs.find((r) => r.key === key);
   if (key !== null && !run) throw Error("This workspace is unavailable.");
-  const archive = run
-    ? decodeOverview(await json(archiveUrl("graph.json", run)))
-    : undefined;
+  const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
   root.render(<Viewer runs={runs} run={run} archive={archive} />);
 } catch (error) {
   root.render(<Viewer runs={runs} run={run} error={String(error)} />);

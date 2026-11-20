@@ -41,8 +41,7 @@ export async function serveNitro({
   ]);
   cpSync(app, stage, {
     recursive: true,
-    filter: (path) =>
-      !skip.has(basename(path)) && !basename(path).startsWith(".env"),
+    filter: (path) => !skip.has(basename(path)) && !basename(path).startsWith(".env"),
   });
   for (let dir = app; ; dir = dirname(dir)) {
     const copy = join(tree, relative(root, dir));
@@ -70,9 +69,7 @@ export async function serveNitro({
     })
   ).buildApp();
   if (spec.mockPreload)
-    await import(
-      pathToFileURL(resolve(dirname(manifest), spec.mockPreload)).href
-    );
+    await import(pathToFileURL(resolve(dirname(manifest), spec.mockPreload)).href);
   process.env.NITRO_HOST = "127.0.0.1";
   process.env.NITRO_PORT = "0";
   await import(pathToFileURL(join(stage, ".output/server/index.mjs")).href);

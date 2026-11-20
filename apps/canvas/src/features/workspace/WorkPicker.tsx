@@ -16,9 +16,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
         Project
         <select
           value={run.projectId}
-          onChange={(e) =>
-            setKey(runs.find((r) => r.projectId === e.target.value)!.key)
-          }
+          onChange={(e) => setKey(runs.find((r) => r.projectId === e.target.value)!.key)}
         >
           {Array.from(projects, ([id, name]) => (
             <option key={id} value={id}>
@@ -32,11 +30,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
         <select
           value={branches.indexOf(run.branch)}
           onChange={(e) =>
-            setKey(
-              projectRuns.find(
-                (r) => r.branch === branches[Number(e.target.value)],
-              )!.key,
-            )
+            setKey(projectRuns.find((r) => r.branch === branches[Number(e.target.value)])!.key)
           }
         >
           {branches.map((branch, i) => (

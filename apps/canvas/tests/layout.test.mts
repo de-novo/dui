@@ -24,10 +24,7 @@ test("overview spans each connected group using recorded directions and stable p
   assert.equal(overview.links.length, 3);
   assert.equal(overview.total, 5);
   assert.ok(overview.links.includes(archive.links[4]));
-  assert.equal(
-    new Set(overview.nodes.map((n) => JSON.stringify(n.position))).size,
-    5,
-  );
+  assert.equal(new Set(overview.nodes.map((n) => JSON.stringify(n.position))).size, 5);
   for (const edge of overview.links) assert.ok(archive.links.includes(edge));
   assert.deepEqual(
     overview,
@@ -68,10 +65,7 @@ test("wide groups share columns without overlapping or inventing links", () => {
   const links = screens.slice(1).map((s) => ({ source: "0", target: s.id }));
   const plan = layoutMap({ screens, links }, 1280, "overview");
   const positions = plan.nodes.map((n) => n.position);
-  assert.equal(
-    new Set(positions.map((p) => JSON.stringify(p))).size,
-    screens.length,
-  );
+  assert.equal(new Set(positions.map((p) => JSON.stringify(p))).size, screens.length);
   assert.ok(new Set(positions.map((p) => p.x)).size > 2);
   assert.ok(new Set(positions.map((p) => p.y)).size < screens.length / 2);
   assert.deepEqual(new Set(plan.links), new Set(links));

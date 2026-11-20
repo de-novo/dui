@@ -103,11 +103,14 @@ Keep application routes, data samples, and selectors in the capture manifest or 
 Run from the repository root after installing dependencies with `npm ci`.
 
 ```sh
+npm run check:style
 cargo fmt --all --check
 npm exec -- tsc --noEmit
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 ```
+
+Oxlint checks TypeScript in `adapters`, `apps`, `fixtures` and `scripts`. Warnings fail the check. Oxfmt formats those TypeScript and CSS sources with two spaces, double quotes, semicolons and a 100-column print width. Use `npm run format` to apply the format. The Source style workflow runs the same `npm run check:style` command on pull requests and pushes to main. Type checking uses the official TypeScript compiler. Rust uses Clippy and rustfmt.
 
 For a host, mock, or browser change, also run the [first capture](README.md#first-capture). Check the generated response in `facts.json`, the recorded request in `report.json`, and the screenshot in `graph.html`. Include those observations when describing the change.
 

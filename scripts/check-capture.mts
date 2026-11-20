@@ -14,10 +14,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import {
-  instrument,
-  type InstrumentFact,
-} from "../adapters/vite/instrument.mts";
+import { instrument, type InstrumentFact } from "../adapters/vite/instrument.mts";
 
 const root = resolve(import.meta.dirname, "..");
 const fixture = join(root, "fixtures/toggle");
@@ -29,15 +26,8 @@ try {
     recursive: true,
     filter: (p) => !["node_modules", "dist"].includes(basename(p)),
   });
-  symlinkSync(
-    join(fixture, "node_modules"),
-    join(stage, "node_modules"),
-    "dir",
-  );
-  cpSync(
-    join(import.meta.dirname, "fixtures/guards.tsx"),
-    join(stage, "guards.tsx"),
-  );
+  symlinkSync(join(fixture, "node_modules"), join(stage, "node_modules"), "dir");
+  cpSync(join(import.meta.dirname, "fixtures/guards.tsx"), join(stage, "guards.tsx"));
   function tool(name: string, ...args: string[]) {
     execFileSync(join(stage, "node_modules/.bin", name), args, {
       cwd: stage,
@@ -60,10 +50,8 @@ try {
   const scan = execFileSync(binary, ["scan", stage, join(stage, "dui.json")], {
     encoding: "utf8",
   });
-  const {
-    facts,
-    diagnostics,
-  }: { facts: InstrumentFact[]; diagnostics: unknown[] } = JSON.parse(scan);
+  const { facts, diagnostics }: { facts: InstrumentFact[]; diagnostics: unknown[] } =
+    JSON.parse(scan);
   assert.deepEqual(diagnostics, []);
   assert(
     facts.some((f) => f.kind === "slot") &&
@@ -121,10 +109,7 @@ try {
     ].join("\n"),
   );
   const open = discover({});
-  assert.deepEqual(open.screenDiscovery.unresolved, [
-    "/_layout/books/$id",
-    "/library/$",
-  ]);
+  assert.deepEqual(open.screenDiscovery.unresolved, ["/_layout/books/$id", "/library/$"]);
   assert.deepEqual(Object.keys(open.screenDiscovery.sources).sort(), [
     "/library/all",
     "/library/new",

@@ -248,6 +248,7 @@ flowchart BT
 4. **许可证**（`cargo xtask check-licenses`，加上 Rust 的 `cargo-deny` 和 pnpm 工作区的同等检查）：直接和传递依赖必须是 MIT、Apache-2.0、BSD-2-Clause / BSD-3-Clause、ISC 或 Zlib。 仅限构建的例外：允许 Vite 和 Tailwind 为处理 CSS 而间接安装未经修改的 `lightningcss`（MPL-2.0）及其官方平台二进制包。浏览器资源、Rust 可执行文件和发布归档中不得包含其代码或二进制文件。其他依赖仍须遵守允许列表。
 5. **生成文件是最新的**：`cargo xtask gen` 的输出（三语言框架表、CI 矩阵）必须与提交的文件一致。
 6. **Fixture**：`stacks.toml` 的每个条目都有 fixture 和经过审查的快照。
+7. **Web 和工具源码**：Oxlint 检查 TypeScript、React 钩子与 JSX 无障碍规则。Oxfmt 检查 TypeScript 和 CSS 格式。本地和 PR 均运行 `npm run check:style`，使用 `npm run format` 应用格式。
 
 ## 7. M0 和 M1 验收标准
 

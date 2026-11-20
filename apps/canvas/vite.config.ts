@@ -11,19 +11,13 @@ export default defineConfig({
       generateBundle(_, bundle) {
         for (const output of Object.values(bundle)) {
           const sources =
-            output.type === "chunk"
-              ? Object.keys(output.modules)
-              : output.originalFileNames;
+            output.type === "chunk" ? Object.keys(output.modules) : output.originalFileNames;
           if (
             sources.some((id) =>
-              /(?:^|\/)node_modules\/lightningcss(?:-[^/]+)?\//.test(
-                id.replaceAll("\\", "/"),
-              ),
+              /(?:^|\/)node_modules\/lightningcss(?:-[^/]+)?\//.test(id.replaceAll("\\", "/")),
             )
           ) {
-            this.error(
-              `Build-only lightningcss entered the browser asset ${output.fileName}`,
-            );
+            this.error(`Build-only lightningcss entered the browser asset ${output.fileName}`);
           }
         }
       },

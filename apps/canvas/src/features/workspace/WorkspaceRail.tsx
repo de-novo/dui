@@ -16,8 +16,7 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
   const [collapsed, setCollapsed] = useState(
     () =>
       localStorage.getItem("dui.rail") === "collapsed" ||
-      (localStorage.getItem("dui.rail") === null &&
-        matchMedia("(max-width: 600px)").matches),
+      (localStorage.getItem("dui.rail") === null && matchMedia("(max-width: 600px)").matches),
   );
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("dui.theme");
@@ -41,10 +40,7 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
   const ThemeIcon = { system: Monitor, light: Sun, dark: Moon }[theme];
   const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
   return (
-    <nav
-      className={"rail" + (collapsed ? " collapsed" : "")}
-      aria-label="Workspace"
-    >
+    <nav className={"rail" + (collapsed ? " collapsed" : "")} aria-label="Workspace">
       <strong className="wordmark" aria-label="dui">
         dui
         <span className="brand-period" aria-hidden="true">
@@ -66,11 +62,7 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
         <span className="rail-text">
           <strong>{run?.project ?? "Select workspace"}</strong>
           {run && (
-            <small>
-              {[run.branch, run.version.split("-").at(-1)]
-                .filter(Boolean)
-                .join(" · ")}
-            </small>
+            <small>{[run.branch, run.version.split("-").at(-1)].filter(Boolean).join(" · ")}</small>
           )}
         </span>
         <ChevronsUpDown className="rail-disclosure" aria-hidden="true" />
