@@ -290,6 +290,8 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 
 A selection identifies the project, run, screen, state and capture width. Preserve it across the overview, inspector, browser Back and reload using validated route parameters. Offer keyboard navigation through both the map and a screen list. Display the report’s verification status and reason next to the capture. [Router search parameters](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [Viewer implementation and review skill](../../.agents/skills/dui-web-viewer/SKILL.md)
 
+**Maintenance boundaries.** Rust owns capture evidence, verification and coverage. The viewer decodes saved report and graph data at one boundary into typed values shared by the map, list and inspector. Handle older optional fields there. An unknown status or invalid required field produces a readable data error. The router owns the selected cell. React Flow owns map layout and pan/zoom. Components own temporary interaction state such as an open menu.
+
 | Candidate | License (checked 2026-11-19) | Decision |
 |---|---|---|
 | React Flow (`xyflow/xyflow`) | MIT, ★39,087 | **First choice**. Image or iframe inside nodes (live DOM for web) |
