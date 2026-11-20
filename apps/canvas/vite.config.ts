@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     {
-      name: "dui-build-only-css-tool",
+      name: "dui-build-only-dependencies",
       apply: "build",
       generateBundle(_, bundle) {
         for (const output of Object.values(bundle)) {
@@ -14,10 +14,12 @@ export default defineConfig({
             output.type === "chunk" ? Object.keys(output.modules) : output.originalFileNames;
           if (
             sources.some((id) =>
-              /(?:^|\/)node_modules\/lightningcss(?:-[^/]+)?\//.test(id.replaceAll("\\", "/")),
+              /(?:^|\/)node_modules\/(?:lightningcss(?:-[^/]+)?|tslib)\//.test(
+                id.replaceAll("\\", "/"),
+              ),
             )
           ) {
-            this.error(`Build-only lightningcss entered the browser asset ${output.fileName}`);
+            this.error(`A build-only dependency entered the browser asset ${output.fileName}`);
           }
         }
       },

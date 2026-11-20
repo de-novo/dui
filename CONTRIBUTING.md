@@ -46,7 +46,7 @@ commercial key" licenses are not accepted. CI checks dependency licenses
 (for example `license-checker` for npm and `cargo-deny` for Rust). If you are
 unsure about a license, ask in the PR before adding the dependency.
 
-The build-only exception for unmodified `lightningcss` and its official platform binaries is defined in [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation). It applies only to transitive CSS tooling excluded from distribution.
+Build tooling may use unmodified `lightningcss` and its official platform binaries transitively. It may also install `tslib` (0BSD) as an optional transitive development dependency. Both exceptions require exclusion from distributed artifacts. See [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation).
 
 Do not use other projects' names or trademarks (Storybook, Figma, Graphify,
 ...) in dui product or package names. Using them to describe compatibility is

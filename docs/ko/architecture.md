@@ -248,7 +248,7 @@ flowchart BT
    - 각 어댑터는 workspace 안에서 `dui-ports` / `dui-core`에만 의존;
    - `dui-app`은 어떤 어댑터에도 의존하지 않음;
    - 바이너리를 만드는 건 `dui-cli`뿐.
-4. **라이선스**(`cargo xtask check-licenses`, Rust는 `cargo-deny`, pnpm workspace는 같은 수준의 검사): 직접·전이 의존성은 MIT, Apache-2.0, BSD-2-Clause / BSD-3-Clause, ISC, Zlib이어야 한다. 빌드 전용 예외로, Vite와 Tailwind가 CSS 처리를 위해 간접 설치하는 원본 `lightningcss`(MPL-2.0)와 공식 플랫폼 바이너리를 허용한다. 해당 코드와 바이너리는 브라우저 자산, Rust 실행 파일, 릴리스 압축 파일에 포함할 수 없다. 다른 의존성에는 기존 허용 목록을 적용한다.
+4. **라이선스**(`cargo xtask check-licenses`, Rust는 `cargo-deny`, pnpm workspace는 같은 수준의 검사): 직접·전이 의존성은 MIT, Apache-2.0, BSD-2-Clause / BSD-3-Clause, ISC, Zlib이어야 한다. 빌드 전용 예외로, Vite와 Tailwind가 CSS 처리를 위해 간접 설치하는 원본 `lightningcss`(MPL-2.0)와 공식 플랫폼 바이너리를 허용한다. 빌드 도구가 선택적으로 가져오는 개발 전용 간접 의존성 `tslib`(0BSD)도 원본에 한해 허용한다. 해당 코드와 바이너리는 브라우저 자산, Rust 실행 파일, 릴리스 압축 파일에 포함할 수 없다. 다른 의존성에는 기존 허용 목록을 적용한다.
 5. **생성 파일이 최신**: `cargo xtask gen` 출력(세 언어 프레임워크 표, CI 행렬)이 커밋된 파일과 같아야 한다.
 6. **픽스처**: `stacks.toml`의 모든 항목에 픽스처와 검토된 스냅샷이 있다.
 7. **웹과 개발 도구 소스**: Oxlint로 TypeScript, React 훅, JSX 접근성을 검사하고 Oxfmt로 TypeScript와 CSS 서식을 검사한다. 로컬과 PR 모두 `npm run check:style`을 실행한다. 서식은 `npm run format`으로 적용한다.
