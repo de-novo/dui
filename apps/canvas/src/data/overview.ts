@@ -8,7 +8,7 @@ export type Cell = {
 export type Screen = { id: string; path: string; cells: Cell[] };
 export type ScreenMap = {
   screens: Screen[];
-  links: { source: string; target: string }[];
+  links: { source: string; target: string; observedWidths?: number[] }[];
 };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -66,7 +66,20 @@ export function decodeOverview(raw: unknown): ScreenMap {
       !ids.has(edge.target)
     )
       throw Error("Invalid discovery link");
-    links.push({ source: edge.source, target: edge.target });
+    const widths = edge.observedWidths;
+    if (
+      widths !== undefined &&
+      (!Array.isArray(widths) ||
+        !widths.every(
+          (w) => typeof w === "number" && Number.isInteger(w) && w > 0,
+        ))
+    )
+      throw Error("Invalid discovery link widths");
+    links.push({
+      source: edge.source,
+      target: edge.target,
+      observedWidths: widths,
+    });
   }
   return { screens, links };
 }

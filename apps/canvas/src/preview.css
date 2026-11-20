@@ -49,6 +49,17 @@ nav button {
   height: calc(100dvh - 5rem);
   min-height: 20rem;
 }
+.map-summary {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 5;
+  pointer-events: none;
+  padding: 0.3rem 0.55rem;
+  background: white;
+  border: 1px solid #cbd6d0;
+  border-radius: 4px;
+}
 .screen-card {
   width: 280px;
   background: white;
@@ -93,6 +104,10 @@ dialog::backdrop {
   outline-offset: 2px;
 }
 @media (max-width: 600px) {
+  nav {
+    max-height: 24dvh;
+    overflow-y: auto;
+  }
   .workspace {
     display: block;
   }

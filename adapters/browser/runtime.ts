@@ -305,8 +305,9 @@ declare var __duiProbe: {
             !link.hasAttribute("href") ||
             link.hasAttribute("download")
           ) continue;
-          const url = new URL(link.href);
+          const url = URL.parse(link.href);
           if (
+            url &&
             url.protocol === location.protocol &&
             url.origin === location.origin &&
             !url.pathname.startsWith("//")

@@ -21,6 +21,8 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 Verified with the npmgraph archive: two screen nodes, one discovered link and four images at 375 and 1280 px. Chrome checks covered keyboard selection, focus return, reload, Back and visible attribution. This preview exercises the map component independently of the planned Start shell and live inspector. The installed CLI still opens the standalone gallery.
 
+For new maps, a directed link joins two captured screens when the source DOM contains a same-origin anchor to the target URL. Repeated anchors produce one edge. The viewer shows the edge at the widths where the anchor was observed. This records a navigation option; confirming that it works requires replay.
+
 ## 2. Modules and dependencies
 
 ```text

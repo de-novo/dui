@@ -57,12 +57,17 @@ export function ScreenMap({
     data: { screen, width },
     ariaLabel: screen.path,
   }));
-  const edges = archive.links.map(({ source, target }) => ({
+  const visibleLinks = archive.links.filter(
+    (link) => !link.observedWidths || link.observedWidths.includes(width),
+  );
+  const edges = visibleLinks.map(({ source, target }) => ({
     id: JSON.stringify([source, target]),
     source,
     target,
-    label: "Discovered link",
-    markerEnd: { type: MarkerType.ArrowClosed },
+    label: visibleLinks.length === 1 ? "Discovered link" : undefined,
+    ariaLabel: `Discovered link from ${source} to ${target}`,
+    style: { stroke: "#39735e", strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "#39735e" },
   }));
   return (
     <ReactFlow
@@ -70,10 +75,15 @@ export function ScreenMap({
       edges={edges}
       nodeTypes={nodeTypes}
       fitView
+      minZoom={0.08}
+      fitViewOptions={{ padding: 0.12, minZoom: 0.08 }}
       nodesDraggable={false}
       nodesConnectable={false}
       onNodeClick={(_, node) => select(node.id)}
     >
+      <div className="map-summary" role="status">
+        {nodes.length} screens · {edges.length} discovered links
+      </div>
       <Background />
       <Controls showInteractive={false} />
     </ReactFlow>
