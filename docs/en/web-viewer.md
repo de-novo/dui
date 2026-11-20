@@ -25,6 +25,21 @@ Routes compose features and validate URL parameters. Features import the shared 
 
 Rust owns verification, coverage and archive writes. CLI and MCP invoke the same application operations. The local HTTP adapter delivers viewer data. Keep these shell responsibilities in `crates/dui` until the workspace split described in the core architecture. Preserve the three existing ports. Implement a feature module when its first caller lands.
 
+### 2.1 Clean Architecture boundaries
+
+Organize each change around the policy it affects. Source dependencies point inward. Execution can call outward through a port owned by the inner contract.
+
+| Boundary | Owns | Permitted dependencies |
+|---|---|---|
+| Domain | Typed observations, cell verdicts and session decisions. The same inputs produce the same result. | Pure values and functions in `dui-core`. |
+| Application | The inspect, edit and save use cases. Order commands, invoke ports, feed observations back to the domain and return a typed outcome. | Domain and the `TypeOracle`, `Host` and `Renderer` contracts. |
+| Adapters and wiring | CLI/MCP/HTTP translate inputs and errors. Compiler and Chromium adapters collect facts. The binary entry point supplies concrete implementations. | Application or port contracts, domain values and the adapter's own tools. |
+| Browser presentation | URL selection, view models and controls. Route loaders read through `data/`; components receive model values and callbacks. | `data/` decodes wire types into `model/`; `features/` renders the model. The model imports neither layer. |
+
+**Trace one edit.** CLI or MCP decodes a request into the same edit command. The use case asks the domain to decide. A stale revision produces a conflict and zero renderer calls. An accepted edit yields an effect. The application runs it through the renderer port, converts its observation into domain values and returns the verdict. Only the transport adapter maps the conflict to its protocol. Test the refusal with an in-memory renderer and the verdict with plain observations.
+
+**Migration seam.** Today `ports.rs` passes JSON values, and `analysis.rs` adds `missing-screen-assertion` after the core verifier runs. When implementing live verification, move that decision into the shared verifier and convert the relevant JSON fields at the adapter boundary. Keep CLI and MCP results compatible. A React Flow node, CDP response or HTTP status must never become a domain input. Keep ordinary functions for pure work; introduce a trait only at an established port.
+
 ## 3. Data and navigation
 
 Use the public JSON Schemas in `packages/schemas` as the wire contract. Validate Rust output against them and derive TypeScript wire types from them. Decode external JSON once into the viewer model. Accept additive fields. Read today's unversioned archives through a legacy decoder. Record a schema version on new archives. An unsupported version or invalid required field produces a data error for that run and leaves other runs available.
