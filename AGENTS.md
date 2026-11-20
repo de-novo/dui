@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Entry point for AI coding agents (and humans) working on `de-novo/dui`. Read this first, then follow the links.
-Updated: 2026-11-20 · Stage: idea / docs only, no code yet · Next goal: M0 spike (`v0.1.0`, see [Workflow §5](docs/en/workflow.md#5-milestones-and-versions))
+Updated: 2026-11-20 · Stage: web capture and history · Next goal: [v0.2.0 live web state editing](docs/en/roadmap.md#v020)
 
 ## Mission
 
@@ -26,7 +26,7 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 |---|---|
 | Languages | Docs in en (source of truth), zh-CN, ko. Code identifiers, comments, issues, and PRs in English |
 | area labels | `area:core`, `area:ports`, `area:adapters`, `area:app`, `area:rules`, `area:canvas`, `area:docs`, `area:tooling` |
-| Checks | [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation) plus the touched crates' tests and `insta` snapshots. None run yet: there is no code |
+| Checks | [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation) plus the touched crates' tests and `insta` snapshots. |
 | PR evidence | Rendered images or CLI / MCP output for behavior changes |
 | Milestone due dates | Only when the maintainer sets one |
 | Merge | Checks pass + no conflicts + no review blockers → the lead may merge. Merge commit, not squash |

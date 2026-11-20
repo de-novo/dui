@@ -4,6 +4,8 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 dui captures a running web app across UI states and viewport widths. It reads the app’s TypeScript types, generates mock responses, and checks what Chromium actually rendered. Browse the screenshots in a local HTML gallery or consume the same results as JSON through the CLI or MCP.
 
+[Product roadmap](docs/en/roadmap.md)
+
 ## Install
 
 On macOS or Linux, run this command to install or update dui from the current `main` branch.

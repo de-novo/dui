@@ -4,6 +4,8 @@
 
 > ⚠️ 本译文可能已过时，请以[英文原文](README.md)为准。
 
+[产品路线图](docs/zh-CN/roadmap.md)
+
 ## 安装
 
 在 macOS 或 Linux 上运行以下命令即可安装 dui。再次运行即可更新到当前的 `main` 分支版本。
