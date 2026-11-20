@@ -115,6 +115,20 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 
 초기화하면 선택한 조작 요소를 세션 시작 시의 값으로 되돌린다. 저장 시 최근 관측한 변경 번호와 검증 판정을 함께 기록한다. 요청 ID를 예상 변경 번호보다 먼저 검사하므로 응답 유실 후 재시도해도 첫 결과를 받을 수 있다. 요청 결과는 세션을 닫을 때까지 유지한다. 소유 프로세스 재시작 시 기존 세션은 만료된다. 대상 앱의 리비전이 기록과 다르면 라이브 실행의 출처를 별도로 표시한다.
 
+### CLI·MCP에서 라이브 세션 사용
+
+`dui live '{…}'`에 JSON 객체를 전달한다. MCP에서는 도구 `live`의 인자로 같은 객체를 전달한다. 저장된 실행 디렉터리와 보고서의 칸을 선택한 뒤 아래 예시에 응답으로 받은 세션·인스턴스·슬롯 ID를 넣는다. `dui map`으로 만든 실행은 `manifest`를 생략하면 프로젝트를 다시 분석한다.
+
+```jsonl
+{"op":"open","project":"PROJECT","manifest":"MANIFEST","run":"RUN_DIRECTORY","cell":{"state":"STATE_ID","width":768},"requestId":"open-1"}
+{"op":"inspect","session":"SESSION","cell":{"state":"STATE_ID","width":768}}
+{"op":"set","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","value":true,"expectedRevision":0,"requestId":"edit-1","expect":{"selector":"#menu-toggle","text":"Close"}}
+{"op":"reset","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","expectedRevision":1,"requestId":"reset-1","expect":{"selector":"#menu-toggle","text":"Open"}}
+{"op":"close","session":"SESSION"}
+```
+
+편집마다 고유한 요청 ID를 쓰고 응답을 잃으면 같은 요청을 재전송한다. set과 reset에서 `expect.selector`는 표시된 HTML 요소 하나와 일치해야 하며, 양끝 공백을 뺀 텍스트가 `expect.text`와 같아야 한다. 쓰기 후 검증에 실패해도 리비전은 증가하고 관찰값·텍스트와 함께 `unverified`를 반환한다. reset은 세션을 열었을 때의 값으로 복원한다. close는 브라우저와 호스트를 종료한다. 유휴 세션은 30분 후 만료된다. 변경한 리비전 저장은 #3에서 다룬다.
+
 ## 5. 패턴과 완료 조건
 
 | 패턴 | 확인할 결과 |

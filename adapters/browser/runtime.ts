@@ -12,12 +12,13 @@ type Check = {
 
 declare var __duiProbe: {
   instances: Record<string, Record<string, { value?: unknown; setter: boolean }>>;
-  commit(id: string, instance: string, value: unknown, setter: boolean): () => void;
+  commit(id: string, instance: string, value: unknown, setter: unknown): () => void;
   input: SlotValues;
   slots: SlotValues;
   hits: Set<string>;
   waitForSample(): Promise<void>;
   branch(id: string, value: unknown): unknown;
+  edit(id: string, instance: string, value: unknown): boolean;
   apply(values: SlotValues): boolean;
   slot(id: string, value: unknown, set?: Setter): void;
 };
@@ -25,6 +26,7 @@ declare var __duiProbe: {
 (() => {
   function install(input: SlotValues) {
     const slots = Object.create(null);
+    const targets = new Map<string, Setter>();
     const hits = new Set<string>();
     const setters = new Map<string, Set<Setter>>();
     function recordable(value: unknown): boolean {
@@ -39,7 +41,9 @@ declare var __duiProbe: {
       instances: Object.create(null),
       commit(id, instance, value, setter) {
         const entries = (this.instances[id] ??= Object.create(null));
-        entries[instance] = { setter };
+        const key = JSON.stringify([id, instance]);
+        entries[instance] = { setter: typeof setter === "function" };
+        if (typeof setter === "function") targets.set(key, setter as Setter);
         if (
           value === null ||
           typeof value === "string" ||
@@ -48,8 +52,15 @@ declare var __duiProbe: {
         )
           entries[instance].value = value;
         return () => {
+          targets.delete(key);
           delete entries[instance];
         };
+      },
+      edit(id, instance, value) {
+        const setter = targets.get(JSON.stringify([id, instance]));
+        if (!setter) return false;
+        setter(() => value);
+        return true;
       },
       waitForSample: () => new Promise((resolve) => timer(resolve, 100)),
       input,
@@ -282,6 +293,45 @@ declare var __duiProbe: {
   Object.assign(globalThis, {
     __duiRuntime: {
       install,
+      async liveEdit(
+        slot: string,
+        instance: string,
+        value: unknown,
+        selector: string,
+        text: string,
+      ) {
+        const probe = globalThis.__duiProbe;
+        function visibleText() {
+          const nodes = document.querySelectorAll(selector);
+          const node = nodes.length === 1 ? nodes[0] : undefined;
+          return node instanceof HTMLElement &&
+            node.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+            ? node.innerText.trim()
+            : null;
+        }
+        try {
+          visibleText();
+        } catch {
+          return { error: "invalid-selector" };
+        }
+        if (!probe.edit(slot, instance, value)) return { error: "instance-not-found" };
+        let observed: unknown;
+        let visible: string | null = null;
+        for (let sample = 0; sample < 10; sample++) {
+          await probe.waitForSample();
+          observed = probe.instances[slot]?.[instance]?.value;
+          visible = visibleText();
+          if (observed === value && visible === text) break;
+        }
+        const reason =
+          observed !== value ? "value-mismatch" : visible !== text ? "semantic-mismatch" : null;
+        return {
+          status: reason ? "unverified" : "verified",
+          reason,
+          observedValue: observed,
+          evidence: { selector, expectedText: text, visibleText: visible },
+        };
+      },
       semantic,
       observe,
       apply,

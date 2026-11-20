@@ -36,6 +36,8 @@ Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도�
 
 dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구체적인 경로를 찾지 못하면 `/`에서 시작해 같은 출처의 링크를 한 단계 따라간다. 각 주소를 375px와 1280px로 캡처한다. 출력의 `output` 폴더에서 `graph.html`을 열면 된다. MCP에서는 `map(project)`를 호출한다.
 
+캡처한 칸을 열어 같은 Chromium 세션에서 불리언·열거형 상태를 변경하고 복원할 수 있다. [CLI·MCP 사용 예](docs/ko/web-viewer.md#climcp에서-라이브-세션-사용)
+
 프로젝트의 `dui.json`에는 필요할 때만 `appRoot`, 목 응답, 링크 탐색용 시작 `path`, 동적 경로의 예시 값(예: `"routeParams": {"id": "demo"}`)을 넣는다. 화면 내용을 검증하려면 전역 또는 `routeOptions["/path"]`에 해당 콘텐츠의 `readySelector`를 지정한다. 기준이 없으면 이미지를 미검증으로 저장하고 종료 코드 5를 반환한다. 보고서에는 주소를 찾은 근거와 아직 풀지 못한 경로 패턴이 남는다.
 
 ## 내 앱 캡처하기

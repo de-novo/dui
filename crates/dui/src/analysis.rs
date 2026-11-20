@@ -241,23 +241,7 @@ fn execute_with(
                 .filter(|path| !configured_paths.contains(*path))
                 .collect();
             for path in paths {
-                let mut next = spec.clone();
-                next["path"] = json!(path);
-                if let Some(defaults) = spec.get("linkDefaults") {
-                    let options = spec["routeOptions"].get(path);
-                    for key in ["cookies", "readySelector"] {
-                        next[key] = options
-                            .and_then(|o| o.get(key))
-                            .unwrap_or(&defaults[key])
-                            .clone();
-                    }
-                    next["hasScreenAssertion"] = json!(
-                        defaults["hasScreenAssertion"] == true
-                            || options
-                                .and_then(|o| o["readySelector"].as_str())
-                                .is_some_and(|s| !s.is_empty())
-                    );
-                }
+                let next = linked_spec(&spec, path);
                 let index = discovered_routes.len();
                 discovered_routes.push(path.to_owned());
                 scenarios.push_back((format!("link-{index}"), next));
@@ -319,6 +303,26 @@ fn execute_with(
     }
 }
 
+pub(crate) fn linked_spec(spec: &Value, path: &str) -> Value {
+    let mut next = spec.clone();
+    next["path"] = json!(path);
+    if let Some(defaults) = spec.get("linkDefaults") {
+        let options = spec["routeOptions"].get(path);
+        for key in ["cookies", "readySelector"] {
+            next[key] = options
+                .and_then(|o| o.get(key))
+                .unwrap_or(&defaults[key])
+                .clone();
+        }
+        next["hasScreenAssertion"] = json!(
+            defaults["hasScreenAssertion"] == true
+                || options
+                    .and_then(|o| o["readySelector"].as_str())
+                    .is_some_and(|s| !s.is_empty())
+        );
+    }
+    next
+}
 pub(crate) fn apply_generated(spec: &mut Value, mocks: &Value) {
     spec.as_object_mut()
         .map(|o| o.remove("generatedGetResponses"));

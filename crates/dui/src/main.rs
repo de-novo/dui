@@ -5,6 +5,7 @@ mod chromium;
 mod graph_view;
 mod host;
 mod inspect;
+mod live;
 mod mcp;
 mod ports;
 mod reference;
@@ -111,6 +112,20 @@ fn is_supported_ts(version: &str) -> bool {
 
 fn run() -> Reply {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if let [cmd] = args.as_slice()
+        && cmd == "live-owner"
+    {
+        return live::owner();
+    }
+    if let [cmd, request] = args.as_slice()
+        && cmd == "live"
+    {
+        let request = request
+            .to_str()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .ok_or_else(|| failure(2, "expected live REQUEST_JSON"))?;
+        return live::command(&request);
+    }
     if let [cmd, root] = args.as_slice()
         && cmd == "map"
     {
@@ -235,7 +250,7 @@ fn run() -> Reply {
     let [command, path] = args.as_slice() else {
         return Err(failure(
             2,
-            "expected inspect RUN_DIRECTORY SELECTION_JSON, map PROJECT, scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
+            "expected live REQUEST_JSON, inspect RUN_DIRECTORY SELECTION_JSON, map PROJECT, scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
         ));
     };
     if command == "check-ts" {

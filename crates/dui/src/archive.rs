@@ -49,7 +49,7 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
     })
 }
 
-fn provenance(project: &Path) -> Result<Value, Error> {
+pub(crate) fn provenance(project: &Path) -> Result<Value, Error> {
     let app = project
         .canonicalize()
         .map_err(|_| failure(2, "project directory does not exist"))?;

@@ -93,4 +93,5 @@ pub mod mock;
 pub mod tabular;
 pub mod verification;
 
+pub mod edit;
 pub mod inspect;
