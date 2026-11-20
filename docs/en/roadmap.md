@@ -1,16 +1,25 @@
-# Product roadmap
+# dui roadmap · Reviewing an app as a UI map
 
 English · [한국어](../ko/roadmap.md) · [简体中文](../zh-CN/roadmap.md)
 
-The current CLI starts the target app in Chromium, captures real pixels, checks the observed state and saves the result under `~/.dui/`. The local viewer compares saved captures by project, branch and worktree. The next step is to keep the app running while an agent reads and updates the state of a particular element.
+dui maps the screens an app actually renders so a reviewer can follow a task from start to finish. Screens are the landmarks. Each screen opens into its states and viewport widths. A connection records the action that leads to another screen or state.
+
+**A review should answer a concrete question.** After cancelling an order on a phone, where does the user land? The reviewer follows the path from order details through confirmation, opens the result at mobile width and records what feels unclear. An agent fixes the code. The reviewer returns to the same point on the map and compares the two worktrees.
+
+## Available today
+
+Chromium renders the app with its project types and mock data. The local gallery shows captured states at each width, and the history viewer compares snapshots under `~/.dui/` by project, branch and worktree. The npmgraph example starts at one URL, discovers the search screen and produces four verified cells across two widths. [Reproduce the example](../../examples/npmgraph/README.md)
+
+A verified cell establishes that the observed state passed its checks. The reviewer judges whether the layout, wording and next action make sense. The roadmap below builds the map and the review workflow on that evidence.
 
 ## v0.2.0
 
-**First live web session.** On a screen with two instances of the same component, an agent selects one, reads a typed slot, changes its value, sees the screen update, then restores the original value. The other instance keeps its state. The first fixture covers a boolean and an enum.
+**Open the map, then inspect a live state.** Start with one node per discovered screen. Expand a node to see its states and widths, then open the one that needs attention. On a screen with two menus, an agent can open one, check its contents and close it while the other menu keeps its state.
 
 | Work | Acceptance evidence |
 | --- | --- |
-| [Typed element states](https://github.com/de-novo/dui/issues/1) | CLI and MCP return the owner, instance, source, type, current value and editability. An ambiguous element or invalid value returns a reason and leaves state intact. |
+| [Screen map](https://github.com/de-novo/dui/issues/7) | On npmgraph, show two screens with two widths each. Preserve the selection when moving between overview and live inspection. Mark the discovered home link with its source. |
+| [Typed element states](https://github.com/de-novo/dui/issues/1) | Test a boolean and an enum. CLI and MCP return the owner, instance, source, type, current value and editability. An ambiguous element or invalid value returns a reason and leaves state intact. |
 | [Live rendering](https://github.com/de-novo/dui/issues/2) | Start the host and browser once. Set and reset a value in the running app. Check both the value read back and the visible DOM or accessibility result. |
 | [Edit speed and capture](https://github.com/de-novo/dui/issues/3) | Measure 30 warm edits from request acceptance to a verified visible update. Report p50 and p95 in milliseconds, cold startup separately, and zero host rebuilds or browser restarts during the edits. Save a chosen state with its evidence under `~/.dui/`. |
 | [M1 coverage](https://github.com/de-novo/dui/issues/4) | Run the existing deterministic planning and coverage gates. Compare CLI and MCP results and report missing evidence for each unverified cell. [M1 gates](architecture.md#7-m0-and-m1-gates) |
@@ -19,7 +28,7 @@ The first benchmark establishes the latency baseline on a recorded machine and f
 
 ## v0.3.0
 
-**First live native render.** Render one real GPUI screen at a known width with two typed states. Reuse the same inspect, set, read-back and reset contract. Record the OS, renderer and toolchain with the images. A matching value and independent semantic evidence are required for verification. Missing semantic evidence leaves the cell unverified. A missing render environment produces an unrenderable cell with its reason.
+**Native screens on the map.** Render one real GPUI screen at a known width with two typed states. Reuse the same inspect, set, read-back and reset contract. Record the OS, renderer and toolchain with the images. A matching value and independent semantic evidence are required for verification. Missing semantic evidence leaves the cell unverified. A missing render environment produces an unrenderable cell with its reason.
 
 Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://github.com/de-novo/dui/issues/6)
 
@@ -27,8 +36,8 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 
 | Version | Outcome |
 | --- | --- |
-| v0.4.0 | Replay a sequence of events from the initial state and verify the resulting state and transition. |
-| v0.5.0 | Build the GPUI and gpui-kit desktop viewer. Open a project from `~/.dui/`, compare worktrees, inspect an element and send a comment to the agent. The viewer consumes the same records as the browser viewer. |
-| v0.6.0 | Measure the 99% coverage goal on the reference screens. Publish verified and renderable counts, missing branches and reasons for remaining cells. |
+| v0.4.0 | Follow an action from one screen or state to the next. Each edge shows whether it was extracted from code, inferred, or verified by replay. Replay from the initial state and check the destination before marking the edge verified. |
+| v0.5.0 | Open the project map in the GPUI and gpui-kit desktop viewer. Attach a comment to a screen, state, width or transition. An agent reads the location through MCP. The reviewer reopens it on the updated worktree and compares before and after. |
+| v0.6.0 | Audit the map on the reference screens against the 99% coverage goal. Publish verified and renderable cell counts, missing branches and reasons for gaps. Keep unresolved review comments visible alongside the evidence. |
 
 [GitHub milestones](https://github.com/de-novo/dui/milestones)
