@@ -59,7 +59,7 @@ Use the official [shadcn/ui skill](.agents/skills/shadcn/SKILL.md) for viewer de
    - Only `dui-cli` wires concrete adapters and produces a binary.
 5. Denied lints: `unwrap_used`, `wildcard_enum_match_arm`; `iter_over_hash_type` in the core. Do not loosen a lint or a check to make it pass; fix the code.
 6. New stacks: a language adds `dui-lang-<x>`, a dev server `dui-host-<x>`, a renderer `dui-render-<x>`; most frameworks add only a rule pack + fixture + `stacks.toml` entry.
-7. **Dependencies: permissive licenses only** (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib). dui is Apache-2.0.
+7. **Dependencies: permissive licenses only** (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib). See [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation) for the build-only `lightningcss` exception. dui is Apache-2.0.
 8. **Clean-room.** Ideas only from other projects; never copy or paraphrase their code. See [CONTRIBUTING §2](CONTRIBUTING.md#2-clean-room-rule).
 
 ## Workflow rules

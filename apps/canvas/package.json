@@ -5,7 +5,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --test tests/*.test.mts",
-    "preview:archive": "node preview.mts"
+    "preview:archive": "node preview.mts",
+    "build": "vite build"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -23,7 +24,7 @@
     "@types/react-dom": "19.2.7",
     "tailwindcss": "4.3.5",
     "typescript": "7.0.2",
-    "vite": "8.2.4"
+    "vite": "8.3.8"
   },
   "overrides": {
     "graceful-fs": "4.2.11"
