@@ -4,7 +4,7 @@
     status: string; image: string | null; reason: string | null;
   }
   interface Snapshot {
-    projectId: string; projectRoot: string; worktree: string | null; app: string;
+    projectId: string; projectName?: string; projectRoot: string; worktree: string | null; app: string;
     id: string; timestampMs: number; branch: string | null; commit: string | null;
     dirty: boolean | null; output: string; cells: Cell[];
   }
@@ -78,7 +78,7 @@
     if (scoped.length > 1) before.value = scoped[1].id;
     render();
   }
-  const projects = new Map(runs.map(r => [projectKey(r), r.projectRoot + (r.app ? "/" + r.app : "")]));
+  const projects = new Map(runs.map(r => [projectKey(r), (r.projectName ?? r.projectRoot) + (r.app ? "/" + r.app : "")]));
   for (const [id, label] of projects) project.add(new Option(label, id));
   project.onchange = choose; before.onchange = after.onchange = render;
   choose();

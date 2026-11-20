@@ -25,6 +25,8 @@ For new maps, a directed link joins two captured screens when the source DOM con
 
 The preview accepts one or more run directories. With no arguments it lists saved screen maps under `~/.dui/projects`. Use **Select workspace** to choose a project, recorded branch and version. The rail always contains workspace selection, theme and collapse in that order. **Map options** contains screen lookup, link mode and capture width. Selecting a card opens its details and shows its observed links. Cards count unverified and unrenderable cells across the available states and widths.
 
+Use one display name per project ID across branches, worktrees and versions. The first successful capture records the primary project’s `package.json` name, falling back to its root folder name. `dui history` registers names for older local archives.
+
 ### Viewer design system
 
 The preview uses Tailwind CSS 4.3.5 and the shadcn/ui Base UI preset (`base-nova`). The shared button and dialog were generated with shadcn CLI 4.23.0 and run on `@base-ui/react` 1.9.0. Tailwind reads the same theme tokens as the map.

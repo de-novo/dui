@@ -51,10 +51,21 @@ async function listArchives() {
       async (root) => {
         const meta = await optionalJson(root, "snapshot.json");
         const key = createHash("sha256").update(root).digest("hex");
+        const projectDir = dirname(dirname(root));
+        const localProject =
+          dirname(root) ===
+            join(homedir(), ".dui", "projects", basename(projectDir), "runs") &&
+          basename(projectDir) === meta?.projectId;
+        const record = localProject
+          ? await optionalJson(projectDir, "project.json")
+          : undefined;
         const run: Run = {
           key,
           projectId: meta?.projectId ?? key,
-          project: basename(meta?.projectRoot ?? root),
+          project:
+            record?.name ??
+            meta?.projectName ??
+            basename(meta?.projectRoot ?? root),
           branch: meta?.branch ?? null,
           version: meta?.id ?? basename(root),
         };

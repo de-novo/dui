@@ -25,6 +25,8 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 预览可接收一个或多个运行目录。省略参数时从 `~/.dui/projects` 查找已保存的界面地图。在 **Select workspace** 中选择项目、已记录的分支和版本。侧边栏依次提供工作区选择、主题和折叠。**Map options** 提供界面查找、连接模式和捕获宽度。选择卡片可查看详情及已观测到的连接。卡片统计已有状态和宽度中的未验证与无法渲染格子数。
 
+同一项目 ID 在所有分支、工作树和版本中共用一个显示名称。首次保存截图时记录主项目的 `package.json` 名称，缺失时使用根目录名。`dui history` 为已有本地归档登记名称。
+
 ### 查看器设计系统
 
 预览使用 Tailwind CSS 4.3.5 和 shadcn/ui 的 Base UI 预设（`base-nova`）。通用按钮与对话框由 shadcn CLI 4.23.0 生成，运行时使用 `@base-ui/react` 1.9.0。Tailwind 与屏幕地图共用主题变量。
