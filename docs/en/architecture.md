@@ -83,7 +83,7 @@ coverage(&[Verification]) -> Coverage
 
 - **Newtypes** for IDs and units: `CellId`, `SymbolId`, `StateId`, `Width(u32)`.
 - **Smart constructors**: outside input is parsed once with `TryFrom` / `Result` at the boundary (parse, don't validate). Private fields make invalid values impossible to build.
-- **Algebraic data types** for statuses: `Evidence = Extracted | Inferred`; `CellStatus = Verified | Unverified(reason) | Suspect(reason) | Unrenderable(reason)`; project-level `Support = Supported | Unsupported(reason)`. Every `match` on our own enums is exhaustive.
+- **Algebraic data types** for statuses: `Evidence = Extracted | Inferred`; `CellStatus = Verified | Unverified(reason) | Unrenderable(reason)`; project-level `Support = Supported | Unsupported(reason)`. Every `match` on our own enums is exhaustive.
 - **Workspace lints** (root `Cargo.toml`, `[workspace.lints.clippy]`): `unwrap_used = "deny"`, `wildcard_enum_match_arm = "deny"`. The wildcard lint protects our internal enums; a match on a foreign `#[non_exhaustive]` enum at a port boundary may use a local `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]`.
 
 ### 2.4 Deterministic transforms
@@ -262,7 +262,7 @@ Arrows point from the user to the provider. Adapters have no arrows between them
 3. For the review screen, JSON output gives **executed target branches / all target branches** and **verified cells / renderable cells** separately, plus branches found at runtime outside the denominator, the unverified list, and unrenderable reasons. The fill-in loop stops on no improvement or at the configured limit.
 4. CLI and MCP return the same plan and verdicts for the same input.
 
-Later milestones stay as in [design v0 §13](design-v0.md#13-mvp-scope-and-milestones): GPUI rendering in M2, sequence replay in M3, the human canvas in M4, the 99% attempt in M5.
+Use the [roadmap](roadmap.md) for release order and the [web viewer architecture](web-viewer.md) for the v0.0.2 implementation contract.
 
 ## 8. Remaining risks
 

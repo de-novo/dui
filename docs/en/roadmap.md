@@ -18,7 +18,7 @@ A verified cell establishes that the observed state passed its checks. The revie
 
 **Open the map, then inspect a live state.** Start with one node per discovered screen. Expand a node to see its states and widths, then open the one that needs attention. On a screen with two menus, an agent can open one, check its contents and close it while the other menu keeps its state.
 
-[Web viewer stack and interaction rules](design-v0.md#web-viewer)
+[Web viewer stack and interaction rules](design-v0.md#web-viewer) · [Web viewer architecture](web-viewer.md)
 
 | Work | Acceptance evidence |
 | --- | --- |

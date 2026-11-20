@@ -188,7 +188,6 @@ interface RenderCell {        // 画布上的一个格子 = 状态 × 宽度（�
 type VerificationStatus =
   | { kind: "verified" }                          // 通过验证
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
-  | { kind: "suspect"; reason: string };          // 仅视觉检查失败，需要人工确认
   | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // 在此环境中无法渲染；见“渲染限制”
 ```
 
@@ -220,7 +219,7 @@ type VerificationStatus =
 
 1. **值检查**（必需）：渲染后立即读回每个注入槽的实际值，与预期值比较。不同则说明注入失败。
 2. **语义检查**（必需）：用从状态自动生成的断言检查 DOM / 无障碍树（Web）或 GPUI 元素树（原生，可行性 `未确认`）。例："空列表状态 → 列表项 0 个 + 存在空状态提示文字"，"错误状态 → 存在 role=alert"。
-3. **视觉检查**（辅助）：AI 看图判断是否与状态描述一致。只有这一项失败时为 `suspect`。
+3. **视觉检查** 视觉差异作为审查证据记录。验证器返回三种格子状态之一。
 
 另外还有**覆盖率检查**：通过覆盖率确认该状态想覆盖的分支（`targets`）确实被执行。如果没有，则为 `unverified: assert-failed`。
 
@@ -293,6 +292,8 @@ pippip 使用 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`，HTTP 使用 `reqwest`（�
 选择项由项目、运行、界面、状态和捕获宽度标识。使用经过验证的路由参数，在总览和详情之间切换、浏览器后退或刷新后保留选择。地图和界面列表均支持键盘导航。在捕获图像旁显示报告中的验证状态及原因。[路由搜索参数](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [查看器开发与审查技能](../../.agents/skills/dui-web-viewer/SKILL.md)
 
 **维护边界。** Rust 负责捕获证据、验证结果和覆盖率计算。查看器在统一入口读取归档报告和图数据，将其转换为地图、列表和详情视图共用的类型。旧记录中缺少的可选字段也在此处理。遇到未知状态或无效的必填字段时显示明确的数据错误。路由管理当前选中的格子，React Flow 管理地图布局、平移和缩放，组件管理菜单开合等临时状态。
+
+[Web 查看器架构](web-viewer.md)
 
 | 候选 | 许可证（2026-11-19 确认） | 判断 |
 |---|---|---|

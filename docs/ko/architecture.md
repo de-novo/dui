@@ -85,7 +85,7 @@ coverage(&[Verification]) -> Coverage
 
 - ID와 단위는 **newtype**: `CellId`, `SymbolId`, `StateId`, `Width(u32)`.
 - **스마트 생성자**: 바깥 입력은 경계에서 `TryFrom` / `Result`로 한 번만 파싱한다(검증 말고 파싱). private 필드로 잘못된 값은 만들 수 없게 한다.
-- 상태는 **대수적 데이터 타입**: `Evidence = Extracted | Inferred`, `CellStatus = Verified | Unverified(reason) | Suspect(reason) | Unrenderable(reason)`, 프로젝트 수준 `Support = Supported | Unsupported(reason)`. 우리 enum에 대한 모든 `match`는 빠짐없이 쓴다.
+- 상태는 **대수적 데이터 타입**: `Evidence = Extracted | Inferred`, `CellStatus = Verified | Unverified(reason) | Unrenderable(reason)`, 프로젝트 수준 `Support = Supported | Unsupported(reason)`. 우리 enum에 대한 모든 `match`는 빠짐없이 쓴다.
 - **workspace lint**(루트 `Cargo.toml`의 `[workspace.lints.clippy]`): `unwrap_used = "deny"`, `wildcard_enum_match_arm = "deny"`. 와일드카드 lint는 우리 내부 enum을 지킨다. 포트 경계에서 외부 `#[non_exhaustive]` enum을 매칭할 때만 그 자리에 `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]`를 쓸 수 있다.
 
 ### 2.4 결정적 변환
@@ -264,7 +264,7 @@ flowchart BT
 3. 검수 화면에 대해 JSON 출력이 **실행된 목표 분기 / 전체 목표 분기**와 **검증된 칸 / 렌더 가능 칸**을 따로 내고, 런타임에서 찾은 분모 밖 분기, 미검증 목록, 렌더 불가 이유도 함께 낸다. 보충 반복은 개선이 없거나 설정 한도에 닿으면 멈춘다.
 4. 같은 입력에 CLI와 MCP가 같은 계획과 판정을 돌려준다.
 
-이후 단계는 [설계 v0 §13](design-v0.md#13-mvp-범위와-단계) 그대로다: M2 GPUI 렌더, M3 순서 재생, M4 사람용 캔버스, M5 99% 시도.
+릴리스 순서는 [로드맵](roadmap.md)을 따르고 v0.0.2 구현은 [웹 뷰어 아키텍처](web-viewer.md)를 따른다.
 
 ## 8. 남은 위험
 

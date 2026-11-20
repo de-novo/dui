@@ -188,7 +188,6 @@ interface RenderCell {        // 캔버스의 칸 하나 = 상태 × 폭(× 축)
 type VerificationStatus =
   | { kind: "verified" }                          // 검증 통과
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
-  | { kind: "suspect"; reason: string };          // 시각 검사만 실패, 사람 확인 필요
   | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // 이 환경에서 렌더 불가; "렌더링 한계" 참고
 ```
 
@@ -220,7 +219,7 @@ type VerificationStatus =
 
 1. **값 확인**(필수): 렌더 직후 주입한 슬롯의 실제 값을 다시 읽어 의도한 값과 같은지. 다르면 주입 실패.
 2. **의미 확인**(필수): 상태에서 자동 생성한 단언을 DOM·접근성 트리(웹) 또는 GPUI 요소 트리(네이티브, 가능 여부 `미확인`)에 대해 검사. 예: "빈 목록 상태 → 목록 항목 0개 + 빈 안내 문구 존재", "오류 상태 → role=alert 존재".
-3. **시각 확인**(보조): AI가 이미지를 보고 상태 설명과 맞는지 판정. 이것만 실패하면 `suspect`.
+3. **시각 확인** 시각적 차이는 리뷰 근거로 기록한다. 검증기는 세 가지 칸 상태 중 하나를 반환한다.
 
 추가로 **커버리지 확인**: 그 상태가 덮으려던 분기(`targets`)가 실제로 실행됐는지 커버리지로 확인. 안 됐으면 `unverified: assert-failed`.
 
@@ -293,6 +292,8 @@ pippip은 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, HTTP는 `reqwest` 사용(Cargo.
 선택 항목은 프로젝트·실행·화면·상태·캡처 폭으로 식별한다. 검증된 라우트 매개변수를 사용해 지도와 상세 보기 사이의 이동, 브라우저 뒤로 가기, 새로고침 후에도 선택을 유지한다. 지도와 화면 목록 양쪽에서 키보드로 이동할 수 있게 한다. 캡처 옆에는 보고서의 검증 상태와 이유를 표시한다. [라우터 검색 매개변수](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [뷰어 구현·리뷰 스킬](../../.agents/skills/dui-web-viewer/SKILL.md)
 
 **유지보수 경계.** 캡처 근거, 검증 판정, 커버리지 계산은 Rust가 맡는다. 뷰어는 저장된 보고서와 그래프를 한 곳에서 읽어 지도·목록·상세 보기가 함께 쓰는 타입으로 변환한다. 이전 기록에 없는 선택 필드도 그곳에서 처리한다. 알 수 없는 상태나 잘못된 필수 필드는 읽을 수 있는 오류로 표시한다. 선택한 칸은 라우터, 지도 배치·이동·확대는 React Flow, 메뉴 열림 같은 임시 상태는 해당 컴포넌트가 관리한다.
+
+[웹 뷰어 아키텍처](web-viewer.md)
 
 | 후보 | 라이선스(2026-11-19 확인) | 판단 |
 |---|---|---|

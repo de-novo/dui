@@ -5,7 +5,7 @@ description: Build or review the dui web viewer's screen map, capture gallery, a
 
 # Work on the web viewer
 
-Read the [viewer decision](../../../docs/en/design-v0.md#web-viewer) and use a saved report and graph as the starting point. Archive fixtures should exercise the same components as real projects.
+Read the [viewer architecture](../../../docs/en/web-viewer.md) and use a saved report and graph as the starting point. Archive fixtures should exercise the same components as real projects.
 
 ## Implement
 

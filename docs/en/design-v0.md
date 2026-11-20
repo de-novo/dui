@@ -186,7 +186,6 @@ interface RenderCell {        // one canvas cell = state × width (× axes)
 type VerificationStatus =
   | { kind: "verified" }                          // passed verification
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
-  | { kind: "suspect"; reason: string };          // only the visual check failed; needs a human
   | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // cannot be rendered in this environment; see "Rendering limits"
 ```
 
@@ -218,7 +217,7 @@ type VerificationStatus =
 
 1. **Value check** (required): right after rendering, read back the actual value of each injected slot and compare with the intended value. A mismatch means injection failed.
 2. **Semantic check** (required): run assertions generated from the state against the DOM / accessibility tree (web) or the GPUI element tree (native; feasibility `unconfirmed`). E.g. "empty-list state → 0 list items + an empty-state message", "error state → role=alert exists".
-3. **Visual check** (auxiliary): AI looks at the image and judges whether it matches the state description. If only this fails, the result is `suspect`.
+3. **Visual check** A visual discrepancy is recorded as review evidence. The verifier returns one of the three cell statuses.
 
 Also a **coverage check**: confirm via coverage that the branches the state aimed at (`targets`) actually executed. If not, `unverified: assert-failed`.
 
@@ -291,6 +290,8 @@ Layout: **rows = screen×state, columns = widths (and theme / locale axes), edge
 A selection identifies the project, run, screen, state and capture width. Preserve it across the overview, inspector, browser Back and reload using validated route parameters. Offer keyboard navigation through both the map and a screen list. Display the report’s verification status and reason next to the capture. [Router search parameters](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [Viewer implementation and review skill](../../.agents/skills/dui-web-viewer/SKILL.md)
 
 **Maintenance boundaries.** Rust owns capture evidence, verification and coverage. The viewer decodes saved report and graph data at one boundary into typed values shared by the map, list and inspector. Handle older optional fields there. An unknown status or invalid required field produces a readable data error. The router owns the selected cell. React Flow owns map layout and pan/zoom. Components own temporary interaction state such as an open menu.
+
+[Web viewer architecture](web-viewer.md)
 
 | Candidate | License (checked 2026-11-19) | Decision |
 |---|---|---|

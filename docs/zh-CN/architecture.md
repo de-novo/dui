@@ -85,7 +85,7 @@ coverage(&[Verification]) -> Coverage
 
 - ID 和单位用 **newtype**：`CellId`、`SymbolId`、`StateId`、`Width(u32)`。
 - **智能构造器**：外部输入在边界处用 `TryFrom` / `Result` 解析一次（解析，而不是校验）。私有字段让无效值无法被构造。
-- 状态用**代数数据类型**：`Evidence = Extracted | Inferred`；`CellStatus = Verified | Unverified(reason) | Suspect(reason) | Unrenderable(reason)`；项目级 `Support = Supported | Unsupported(reason)`。对我们自己枚举的每个 `match` 都是穷尽的。
+- 状态用**代数数据类型**：`Evidence = Extracted | Inferred`；`CellStatus = Verified | Unverified(reason) | Unrenderable(reason)`；项目级 `Support = Supported | Unsupported(reason)`。对我们自己枚举的每个 `match` 都是穷尽的。
 - **工作区 lint**（根 `Cargo.toml` 的 `[workspace.lints.clippy]`）：`unwrap_used = "deny"`，`wildcard_enum_match_arm = "deny"`。通配 lint 保护我们的内部枚举；在端口边界匹配外部 `#[non_exhaustive]` 枚举时，可以局部使用 `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]`。
 
 ### 2.4 确定性变换
@@ -264,7 +264,7 @@ flowchart BT
 3. 对审阅界面，JSON 输出分别给出**已执行目标分支 / 全部目标分支**和**已验证格子 / 可渲染格子**，并附上运行时在分母之外发现的分支、未验证列表和无法渲染的原因。补全循环在没有改进或达到配置上限时停止。
 4. 对相同输入，CLI 和 MCP 返回相同的计划和判定。
 
-后续里程碑保持[设计 v0 §13](design-v0.md#13-mvp-范围与里程碑)中的安排：M2 GPUI 渲染，M3 序列重放，M4 人用画布，M5 99% 尝试。
+发行顺序见[路线图](roadmap.md)，v0.0.2 的实现遵循 [Web 查看器架构](web-viewer.md)。
 
 ## 8. 剩余风险
 
