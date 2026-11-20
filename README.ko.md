@@ -62,6 +62,12 @@ npm ci
 
 예제 폴더에서 `.dui/shelf/graph.html`을 열면 책 세 권이 보이는 768px 화면 한 칸이 **검증됨**으로 표시된다. 책 목록은 dui가 `fetchShelf()`의 반환 타입을 읽어 `GET /api/shelf`에 돌려준 목데이터다. Chrome이나 Chromium을 별도 경로에 설치했다면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다. [예제 소스](fixtures/typed-api/main.tsx)
 
+### 실제 오픈소스 앱 캡처하기
+
+MIT 라이선스의 npm 의존성 뷰어 **npmgraph**를 시작 주소 하나로 캡처한다. 설정 파일에 패키지 두 개의 목 응답이 들어 있다. dui는 의존성 그래프를 그린 뒤 홈 링크를 따라 검색 화면을 찾는다. 두 화면을 375px와 1280px에서 확인하면 총 4칸이다. [예제 실행 명령](examples/npmgraph/README.md#run) · [캡처 설정](examples/npmgraph/dui.json)
+
+AI에 이렇게 요청하면 된다. “dui 저장소에서 npmgraph 예제를 실행해. 갤러리 경로를 알려주고, 보고서에서 자동으로 찾은 경로와 검증된 칸 수를 확인해 줘.”
+
 - [캡처 레퍼런스](docs/ko/reference.md) — 경로와 목데이터를 설정하고, 검증률을 해석하고, CLI·MCP로 실행을 자동화한다.
 - [기여 가이드 · English](CONTRIBUTING.md) — 변경할 크레이트와 규칙 팩의 위치, 검증 명령을 확인한다.
 - [설계](docs/ko/design-v0.md) · [아키텍처](docs/ko/architecture.md) · [지원 예정 스택](docs/ko/supported-frameworks.md)

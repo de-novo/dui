@@ -1,0 +1,27 @@
+{
+  "path": "/?q=demo-package&registry=/registry",
+  "widths": [375, 1280],
+  "sources": ["components/AppHeader.tsx", "components/InputHelp.tsx"],
+  "readySelector": "svg g.node[data-module^='demo-leaf@'], main:has(> h1) input[type=search]",
+  "routeSelector": "header a[href]:has(svg[aria-label='npmgraph'])",
+  "mockResponses": {
+    "/registry/demo-package": {
+      "name": "demo-package",
+      "dist-tags": { "latest": "1.0.0" },
+      "versions": {
+        "1.0.0": {
+          "name": "demo-package",
+          "version": "1.0.0",
+          "dependencies": { "demo-leaf": "1.0.0" }
+        }
+      }
+    },
+    "/registry/demo-leaf": {
+      "name": "demo-leaf",
+      "dist-tags": { "latest": "1.0.0" },
+      "versions": {
+        "1.0.0": { "name": "demo-leaf", "version": "1.0.0" }
+      }
+    }
+  }
+}
