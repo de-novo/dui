@@ -61,8 +61,11 @@ try {
   });
   const digest = createHash("sha256").update(readFileSync(archive)).digest("hex");
   writeFileSync(archive + ".sha256", digest + "  " + filename + "\n");
+  const installer = readFileSync("scripts/install.sh.in", "utf8").replace("@VERSION@", cli.version);
+  writeFileSync(join(stage, "install.sh"), installer, { mode: 0o755 });
   renameSync(archive, join(out, filename));
   renameSync(archive + ".sha256", join(out, filename + ".sha256"));
+  renameSync(join(stage, "install.sh"), join(out, "install.sh"));
   console.log(join(out, filename));
 } finally {
   rmSync(stage, { recursive: true, force: true });

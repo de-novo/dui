@@ -6,7 +6,13 @@ dui captures a running web app across UI states and viewport widths. It reads th
 
 ## Install
 
-Install the native binary from the archive for your OS and CPU. Each archive includes the executable and license notices and comes with a SHA-256 checksum. [Binary installation](docs/binary-install.md)
+Place the release’s `install.sh`, archive, and checksum in one directory and run the following command.
+
+```sh
+sh install.sh
+```
+
+The installer selects the native binary, checks its SHA-256 digest, and installs it in `~/.local/bin`. [HTTPS and custom-directory installation](docs/binary-install.md)
 
 ## First capture
 

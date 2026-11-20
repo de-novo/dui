@@ -1,5 +1,17 @@
 # Install the dui binary
 
+## Shell installer
+
+From a release directory containing `install.sh`, the archive for your target, and its checksum, run `sh install.sh`. The default destination is `$HOME/.local/bin/dui`. To choose another directory, run `DUI_INSTALL_DIR="$PWD/bin" sh install.sh`.
+
+For a hosted release, set `DUI_RELEASE_URL` to its trusted HTTPS asset directory. All three files must belong to the same release.
+
+```sh
+curl --proto '=https' --proto-redir '=https' -fsSL "$DUI_RELEASE_URL/install.sh" | sh -s -- "$DUI_RELEASE_URL"
+```
+
+## Manual installation
+
 Choose the archive for your operating system and CPU. For example, `aarch64-apple-darwin` is macOS on Apple silicon. Place the archive and its matching `.sha256` file in the same directory. Set `archive` to the downloaded filename.
 
 ```sh

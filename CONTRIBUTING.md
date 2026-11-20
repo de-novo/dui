@@ -43,4 +43,4 @@ npm ci
 npm run package:release
 ```
 
-The script builds for the Rust host target. It writes `dui-<version>-<target>.tar.gz` and its `.sha256` file to the Cargo target directory under `dist/`. Build on each supported target and test the extracted executable there before distributing it. Both Cargo packages are private to the workspace. [Installation from an archive](docs/binary-install.md)
+The script builds for the Rust host target. It writes `dui-<version>-<target>.tar.gz` with its `.sha256` file and the versioned release’s `install.sh` to the Cargo target directory under `dist/`. Build on each supported target and test the extracted executable there before distributing it. Both Cargo packages are private to the workspace. [Installation from an archive](docs/binary-install.md)
