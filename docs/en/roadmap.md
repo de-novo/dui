@@ -6,9 +6,11 @@ dui maps the screens an app actually renders so a reviewer can follow a task fro
 
 **A review should answer a concrete question.** After cancelling an order on a phone, where does the user land? The reviewer follows the path from order details through confirmation, opens the result at mobile width and records what feels unclear. An agent fixes the code. The reviewer returns to the same point on the map and compares the two worktrees.
 
-## v0.0.1 · Current development baseline
+## v0.0.1 · Capture baseline complete
 
 Chromium renders the app with its project types and mock data. The local gallery shows captured states at each width, and the history viewer compares snapshots under `~/.dui/` by project, branch and worktree. The npmgraph example starts at one URL, discovers the search screen and produces four verified cells across two widths. [Reproduce the example](../../examples/npmgraph/README.md)
+
+The M0 review screen passed at 375, 768 and 1280 px. Five states produced 15 verified cells and 15 distinct PNGs. The checks covered a local dialog state, the intercepted response body and the production client and server bundles. All 15 cell IDs remained in the report when Chromium disconnected.
 
 A verified cell establishes that the observed state passed its checks. The reviewer judges whether the layout, wording and next action make sense. The roadmap below builds the map and the review workflow on that evidence.
 

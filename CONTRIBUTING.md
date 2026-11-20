@@ -111,6 +111,8 @@ For a host, mock, or browser change, also run the [first capture](README.md#firs
 
 Use dependencies under permissive licenses such as MIT, Apache-2.0, BSD, or ISC. Keep capture output, installed dependencies, and third-party project checkouts out of the patch.
 
+For changes to capture instrumentation, install the public fixture dependencies with `npm ci --prefix fixtures/toggle` and run `npm run check:capture` with Node 26. This checks the transformed TSX with the fixture’s TypeScript compiler, builds it with Vite, and scans the clean production artifacts for probe markers.
+
 ## Package a release
 
 From a clean checkout with Node.js 26, npm, Rust, and tar installed, run the following commands.

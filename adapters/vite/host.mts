@@ -41,7 +41,7 @@ function plugins(stage: string) {
           ? resolve(app, id.slice(stage.length + 1))
           : id;
         const facts = byFile.get(original);
-        if (facts) return instrument(readFileSync(id, "utf8"), facts);
+        if (facts) return instrument(readFileSync(id, "utf8"), facts, vite);
         if (id.endsWith(".css") && spec.offlineFonts)
           return readFileSync(id, "utf8").replace(
             /^@import url\("https:[^\n]+$/gm,

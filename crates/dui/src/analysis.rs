@@ -385,6 +385,83 @@ mod tests {
     }
 
     #[test]
+    fn capture_error_preserves_every_planned_cell_in_report_and_graph() {
+        struct FailingWidth;
+        impl Renderer for FailingWidth {
+            fn capture(
+                &mut self,
+                spec: &Value,
+                inputs: &Value,
+                width: u32,
+                image: &Path,
+            ) -> Result<Value, Box<dyn std::error::Error>> {
+                if width == 768 {
+                    return Err("capture interrupted".into());
+                }
+                StaticPage.capture(spec, inputs, width, image)
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let facts = json!({"facts":[],"diagnostics":[]});
+        let spec = json!({"path":"/","scenarios":[{"name":"two"},{"name":"three"},{"name":"four"},{"name":"five"}]});
+        let widths = BTreeSet::from([375, 768, 1280]);
+        let run = |renderer: &mut dyn Renderer| {
+            execute_with(Some(renderer), &facts, &spec, dir.path(), &widths, 5, None)
+        };
+        let ids = |report: &Value| -> BTreeSet<(String, u32)> {
+            report["cells"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|cell| {
+                    (
+                        cell["state"].as_str().unwrap().to_owned(),
+                        cell["width"].as_u64().unwrap() as u32,
+                    )
+                })
+                .collect()
+        };
+        let graph_ids = || -> BTreeSet<String> {
+            let graph: Value =
+                serde_json::from_reader(fs::File::open(dir.path().join("graph.json")).unwrap())
+                    .unwrap();
+            graph["nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|node| node["kind"] == "cell")
+                .map(|node| node["id"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let expected = ids(&run(&mut StaticPage).unwrap());
+        let expected_graph = graph_ids();
+        assert_eq!(expected.len(), 15);
+        assert_eq!(expected_graph.len(), 15);
+
+        let (code, report) = run(&mut FailingWidth).unwrap_err();
+        assert_eq!(code, 5);
+        let saved: Value =
+            serde_json::from_reader(fs::File::open(dir.path().join("report.json")).unwrap())
+                .unwrap();
+        assert_eq!(saved, report);
+        assert_eq!(ids(&saved), expected);
+        assert_eq!(graph_ids(), expected_graph);
+        assert_eq!(saved["coverage"]["verified"], 10);
+        assert_eq!(saved["coverage"]["renderable"], 15);
+        for cell in saved["cells"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["width"] == 768)
+        {
+            assert_eq!(cell["status"], "unverified");
+            assert_eq!(cell["reason"], "capture interrupted");
+            assert!(cell.get("image").is_none());
+        }
+    }
+
+    #[test]
     fn missing_environment_is_counted_separately() {
         let dir = tempfile::tempdir().unwrap();
         let (_, report) = execute_with(

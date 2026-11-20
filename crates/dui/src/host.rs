@@ -50,6 +50,17 @@ impl Host for ViteHost {
             })
             .map_err(|e| failure(3, &e.to_string()))?;
         fs::write(
+            file("probe-helpers.ts"),
+            include_str!("../../../adapters/vite/probe-helpers.ts"),
+        )
+        .and_then(|_| {
+            fs::write(
+                file("probe-helpers.js"),
+                include_str!(concat!(env!("OUT_DIR"), "/vite/probe-helpers.js")),
+            )
+        })
+        .map_err(|e| failure(3, &e.to_string()))?;
+        fs::write(
             file("nitro.mjs"),
             include_str!(concat!(env!("OUT_DIR"), "/vite/nitro.mjs")),
         )

@@ -235,15 +235,39 @@ pub fn run(project: &Path, manifest: &Path, plan: &Path, out: &Path, port: Optio
         .ok_or_else(|| failure(3, "missing host"))?;
 
     // Reference pages start from the untouched route in separate browser profiles.
-    std::thread::scope(|scope| -> Result<(), Error> {
+    let (captures, controls) = std::thread::scope(|scope| {
         let reference = scope.spawn(|| crate::reference::collect(&entries, out, port));
         let captures =
             collect(&entries, out, port).and_then(|()| crate::retry::run(&entries, out, port));
         let controls = reference
             .join()
-            .map_err(|_| io("reference collector panic"))?;
-        captures.and(controls)
-    })?;
+            .unwrap_or_else(|_| Err(io("reference collector panic")));
+        (captures, controls)
+    });
+    if captures.is_err() || controls.is_err() {
+        // Only a live run can attest that a worker failed. Offline verification
+        // still rejects missing or corrupt evidence from a previously saved run.
+        if let Err((_, detail)) = &captures {
+            let folder = out.join("captures");
+            fs::create_dir_all(&folder).map_err(io)?;
+            for (index, job) in entries.iter().enumerate() {
+                let path = folder.join(format!("{index}.json"));
+                if !path.try_exists().map_err(io)? {
+                    store(
+                        &path,
+                        &json!({"state":job.cell["state"],"width":job.width,"error":detail}),
+                    )?;
+                }
+            }
+        }
+        store(
+            &out.join("worker-errors.json"),
+            &json!({
+                "captures":captures.err().map(|(_, detail)| detail),
+                "references":controls.err().map(|(_, detail)| detail)
+            }),
+        )?;
+    }
     finish(&entries, &analysis, out)
 }
 
@@ -633,6 +657,9 @@ fn finish(jobs: &[Job], analysis: &Value, out: &Path) -> Reply {
     let mut report = json!({"evidenceSummary":summary,"versions":analysis["versions"],"sourceFiles":analysis["sourceFiles"],"os":std::env::consts::OS,"unverifiedReasons":reasons,"coverage":{"attempted":jobs.len(),"renderable":jobs.len(),"verified":verified,"unrenderable":0,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"remainingPlans":0,"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"cells":cells,"compiler":analysis["compiler"],"diagnostics":analysis["diagnostics"]});
     if let Some(environment) = crate::reference::load(&out.join("environment.json"))? {
         report["environment"] = environment;
+    }
+    if let Some(errors) = crate::reference::load(&out.join("worker-errors.json"))? {
+        report["workerErrors"] = errors;
     }
     let g = crate::graph_view::with_cells(graph(facts, &hits), &report)?;
     if let Some(cells) = report["cells"].as_array_mut() {

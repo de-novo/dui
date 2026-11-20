@@ -2,6 +2,7 @@
   "name": "dui-build",
   "private": true,
   "scripts": {
+    "check:capture": "tsc --project scripts && cargo build && node scripts/check-capture.mts",
     "package:release": "tsc --project scripts && node scripts/package-release.mts"
   },
   "devDependencies": {

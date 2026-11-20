@@ -14,6 +14,8 @@ export type Syntax = Node & {
   operatorToken: Syntax;
   left: Syntax;
   right: Syntax;
+  thenStatement: Syntax;
+  elseStatement?: Syntax;
   whenTrue: Syntax;
   whenFalse: Syntax;
   tagName: Syntax;

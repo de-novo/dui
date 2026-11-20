@@ -451,6 +451,7 @@ try {
           jsxGuard
         ) {
           const expr = jsxGuard ? n.left : (n.expression ?? n.condition);
+          const span = (node: Syntax) => [node.getStart(sf), node.end];
           const showRight =
             jsxGuard && n.operatorToken.kind === K.AmpersandAmpersandToken;
           facts.push({
@@ -462,7 +463,20 @@ try {
             textWhenFalse: renderedText(
               jsxGuard && !showRight ? n.right : n.whenFalse,
             ),
-            condition: [expr.getStart(sf), expr.end],
+            condition: span(expr),
+            arms: jsxGuard
+              ? { kind: "logical", right: span(n.right), and: showRight }
+              : n.kind === K.IfStatement
+                ? {
+                    kind: "if",
+                    yes: span(n.thenStatement),
+                    no: n.elseStatement ? span(n.elseStatement) : null,
+                  }
+                : {
+                    kind: "conditional",
+                    yes: span(n.whenTrue),
+                    no: span(n.whenFalse),
+                  },
           });
         }
         if (

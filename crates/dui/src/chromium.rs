@@ -145,6 +145,7 @@ impl Browser {
                     let reply = json!({"requestId":p["requestId"],"responseCode":200,"responseHeaders":[{"name":"Content-Type","value":"application/json"}],"body":body});
                     self.requests.insert(url.to_owned());
                     self.send(session, "Fetch.fulfillRequest", reply)?;
+                    self.fulfilled.insert(url.to_owned());
                     continue;
                 }
 
@@ -477,7 +478,9 @@ impl Browser {
             .filter_map(Value::as_str)
         {
             let url = format!("{origin}{path}");
-            if self.generated_get.contains_key(&url) && !self.fulfilled.contains(&url) {
+            if (self.generated_get.contains_key(&url) || self.mock_responses.contains_key(&url))
+                && !self.fulfilled.contains(&url)
+            {
                 checked.insert(path, false);
             }
         }
