@@ -195,7 +195,11 @@ fn execute_with(
                                 .is_some_and(Vec::is_empty),
                             expects_probe: facts.iter().any(|f| f["kind"] == "branch"),
                         };
-                        let reason = intent.failure(&obs);
+                        let reason = intent.failure(&obs).or_else(|| {
+                            (spec.get("screenDiscovery").is_some()
+                                && spec["hasScreenAssertion"] == false)
+                                .then_some(dui_core::verification::Failure::MissingScreenAssertion)
+                        });
                         if reason.is_none() {
                             verified += 1;
                         }
@@ -239,6 +243,21 @@ fn execute_with(
             for path in paths {
                 let mut next = spec.clone();
                 next["path"] = json!(path);
+                if let Some(defaults) = spec.get("linkDefaults") {
+                    let options = spec["routeOptions"].get(path);
+                    for key in ["cookies", "readySelector"] {
+                        next[key] = options
+                            .and_then(|o| o.get(key))
+                            .unwrap_or(&defaults[key])
+                            .clone();
+                    }
+                    next["hasScreenAssertion"] = json!(
+                        defaults["hasScreenAssertion"] == true
+                            || options
+                                .and_then(|o| o["readySelector"].as_str())
+                                .is_some_and(|s| !s.is_empty())
+                    );
+                }
                 let index = discovered_routes.len();
                 discovered_routes.push(path.to_owned());
                 scenarios.push_back((format!("link-{index}"), next));
@@ -274,7 +293,20 @@ fn execute_with(
         .filter(|c| c["reason"] != "not-rendered" && c["status"] != "unrenderable")
         .count();
     let renderable = cells.len() - unrenderable;
-    let report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"budget":budget,"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
+    let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"budget":budget,"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
+    if let Some(discovery) = spec.get("screenDiscovery") {
+        let mut discovered = discovery.clone();
+        if let Some(paths) = report["discoveredRoutes"].as_array() {
+            for path in paths.iter().filter_map(Value::as_str) {
+                discovered["sources"][path] = json!({"kind":"anchor","from":spec["path"]});
+            }
+        }
+        if let Some(cells) = report["cells"].as_array() {
+            discovered["capturedCells"] =
+                json!(cells.iter().filter(|c| c["image"].is_string()).count());
+        }
+        report["screenDiscovery"] = discovered;
+    }
     let graph = crate::graph_view::with_cells(graph, &report)?;
     crate::graph_view::write(out, &graph)?;
     store(&out.join("report.json"), &report)?;
@@ -342,6 +374,24 @@ mod tests {
                 json!({"ready":true,"path":"/","width":width,"assertions":[],"responseChecks":{},"slots":{"file#1:2:slot":false},"hits":[]}),
             )
         }
+    }
+
+    #[test]
+    fn captured_map_without_content_assertion_remains_unverified() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_, report) = execute_with(
+            Some(&mut StaticPage),
+            &json!({"facts": [], "diagnostics": []}),
+            &json!({"path": "/", "screenDiscovery": {"sources": {}}, "hasScreenAssertion": false}),
+            dir.path(),
+            &BTreeSet::from([375]),
+            1,
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(report["screenDiscovery"]["capturedCells"], 1);
+        assert_eq!(report["coverage"]["verified"], 0);
+        assert_eq!(report["cells"][0]["reason"], "missing-screen-assertion");
     }
 
     #[test]

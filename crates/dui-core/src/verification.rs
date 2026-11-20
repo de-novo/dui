@@ -16,6 +16,7 @@ pub struct Intent<'a> {
 #[serde(rename_all = "kebab-case")]
 pub enum Failure {
     MissingStateAssertion,
+    MissingScreenAssertion,
     AssertFailed,
 }
 

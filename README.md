@@ -26,6 +26,18 @@ Check the installed version with the full path. To run `dui` by name, add `~/.lo
 
 Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/binary-install.md)
 
+## Discover screens
+
+From an installed Vite app, run:
+
+```sh
+~/.local/bin/dui map .
+```
+
+dui finds TanStack file routes with a screen component. If it finds no concrete routes, it starts at `/` and follows same-origin links from the entry page once. It captures each URL at 375 and 1280 px. Open `graph.html` in the returned `output` directory. MCP exposes the same operation as `map(project)`.
+
+An optional project-local `dui.json` can supply `appRoot`, mock responses, a starting `path` for link discovery, or sample dynamic values such as `"routeParams": {"id": "demo"}`. Supply a content-specific `readySelector` globally or in `routeOptions["/path"]` to verify a screen. Without one, dui saves the image as unverified and returns exit code 5. The report lists each URL’s source and unresolved route patterns.
+
 ## Use your own app
 
 1. Open a terminal in the app directory containing `package.json` and `tsconfig.json`. Install the app’s dependencies with its usual package manager. Web capture supports Vite 8 and the project’s official TypeScript 6.x or 7.x compiler. React apps use React 19.

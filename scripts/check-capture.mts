@@ -88,6 +88,58 @@ try {
     artifacts().some((file) => file.includes("__duiProbe")),
     "development bundle lost its probes",
   );
+
+  function discover(profile: object) {
+    writeFileSync(join(stage, "dui.json"), JSON.stringify(profile));
+    return JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          join(root, "adapters/vite/discover.mts"),
+          stage,
+          readFileSync(join(root, "rules/web.json"), "utf8"),
+        ],
+        { encoding: "utf8" },
+      ),
+    );
+  }
+  const entry = discover({});
+  assert.equal(entry.path, "/");
+  assert.equal(entry.screenDiscovery.mode, "links");
+  assert.equal(entry.hasScreenAssertion, false);
+  assert.deepEqual(entry.widths, [375, 1280]);
+  writeFileSync(
+    join(stage, "routes.tsx"),
+    [
+      'import { createFileRoute as route } from "@tanstack/react-router";',
+      'route("/_layout/books/$id")({component: Book});',
+      'route("/library/$")({component: Library});',
+      'const tabs = { new: "new", all: "all" } as const;',
+      "const link = `/library/${tabs[tab]}`;",
+      'route("/api")({server: {handlers: {}}});',
+      'route("/redirect")({beforeLoad: redirect});',
+    ].join("\n"),
+  );
+  const open = discover({});
+  assert.deepEqual(open.screenDiscovery.unresolved, [
+    "/_layout/books/$id",
+    "/library/$",
+  ]);
+  assert.deepEqual(Object.keys(open.screenDiscovery.sources).sort(), [
+    "/library/all",
+    "/library/new",
+  ]);
+  const mapped = discover({
+    routeParams: { id: "space here" },
+    routeOptions: {
+      "/books/space%20here": { readySelector: "article h1" },
+    },
+  });
+  assert.equal(mapped.path, "/books/space%20here");
+  assert.equal(mapped.screenDiscovery.sources[mapped.path], "routes.tsx");
+  assert.equal(mapped.hasScreenAssertion, true);
+  assert.equal(mapped.scenarios[0].hasScreenAssertion, false);
+  assert.deepEqual(mapped.screenDiscovery.parseFailures, []);
 } finally {
   rmSync(stage, { recursive: true, force: true });
 }

@@ -12,6 +12,11 @@
       "kind": "route"
     },
     {
+      "package": "@tanstack/react-router",
+      "symbol": "createLazyFileRoute",
+      "kind": "route"
+    },
+    {
       "package": "@tanstack/react-query",
       "symbol": "useQuery",
       "kind": "query"

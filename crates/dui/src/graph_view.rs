@@ -20,7 +20,16 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         let path = cell["path"].as_str().unwrap_or("/");
         let route = format!("route:{path}");
         if known.insert(route.clone()) {
-            extra.push(json!({"id":route,"kind":"screen","label":path}));
+            let mut screen = json!({"id":route,"kind":"screen","label":path});
+            if let Some(source) = report["screenDiscovery"]["sources"].get(path) {
+                screen["discoveredFrom"] = source.clone();
+                if let Some(from) = source.get("from").and_then(Value::as_str) {
+                    links.push(
+                        json!({"source":format!("route:{from}"),"target":route,"kind":"linksTo"}),
+                    );
+                }
+            }
+            extra.push(screen);
         }
         if known.insert(state.clone()) {
             extra.push(json!({"id":state,"kind":"state","label":format!("{} · {}",cell["scenario"].as_str().unwrap_or(""),cell["planIndex"]),"input":cell["input"]}));

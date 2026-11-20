@@ -24,6 +24,18 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 
 **捕获网页时**需要 Node.js 26、Chromium 或 Google Chrome，以及目标应用的依赖。
 
+## 自动发现页面
+
+在已安装依赖的 Vite 应用目录中运行：
+
+```sh
+~/.local/bin/dui map .
+```
+
+dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，则从 `/` 开始，跟随入口页面的同源链接一层。每个地址按 375 和 1280 像素两种宽度捕获。在输出的 `output` 目录打开 `graph.html`。MCP 提供相同的 `map(project)` 操作。
+
+可在项目的 `dui.json` 中提供 `appRoot`、模拟响应、链接发现的起始 `path` 或动态路径示例值（如 `"routeParams": {"id": "demo"}`）。在全局或 `routeOptions["/path"]` 中设置与页面内容对应的 `readySelector` 即可检查页面。没有此条件时，dui 将图像标为未验证并返回退出码 5。报告列出每个地址的来源和未解析的路由模式。
+
 ## 捕获自己的应用
 
 1. 在应用的 `package.json` 和 `tsconfig.json` 所在目录打开终端，用项目的包管理器安装依赖。网页捕获支持 Vite 8 和项目中安装的官方 TypeScript 6.x 或 7.x 编译器。React 项目使用 React 19。

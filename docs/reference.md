@@ -78,6 +78,7 @@ The commands assume `dui` is on your `PATH`. With the default installation you c
 | CLI | MCP | Operation |
 | --- | --- | --- |
 | `dui scan PROJECT MANIFEST` | `scan(project, manifest)` | Print compiler facts and generated mocks. |
+| `dui map PROJECT` | `map(project)` | Discover routes, capture their entry states, and write the screen map. |
 | `dui run PROJECT MANIFEST [OUTPUT]` | `run(project, manifest, output?)` | Build the app, capture cells, and write the gallery. |
 | `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | Attempt every cell in a saved plan, including pending states. |
 | `dui replay-report MANIFEST PLAN OUTPUT` | `replay_report(manifest, plan, output)` | Recompute the report from saved evidence. |
