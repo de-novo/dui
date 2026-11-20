@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpus, release, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -23,12 +24,37 @@ try {
   copyFileSync(join(import.meta.dirname, "fixtures/inspect.tsx"), join(project, "main.tsx"));
   symlinkSync(join(fixture, "node_modules"), join(project, "node_modules"), "dir");
   const env = { ...process.env, HOME: temp };
+  const git = (args: string[]) =>
+    execFileSync("git", args, { cwd: project, env, encoding: "utf8" }).trim();
+  git(["init", "--quiet"]);
+  git([
+    "add",
+    "main.tsx",
+    "package.json",
+    "package-lock.json",
+    "dui.json",
+    "index.html",
+    "tsconfig.json",
+  ]);
+  git([
+    "-c",
+    "user.name=dui fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-qm",
+    "fixture",
+  ]);
+  const commit = git(["rev-parse", "HEAD"]);
   const run = spawnSync(binary, ["run", project, join(project, "dui.json"), directory], {
     env,
     encoding: "utf8",
   });
   assert.ok(run.status === 0 || run.status === 5, run.stderr + run.stdout);
-  const [cell] = JSON.parse(readFileSync(join(directory, "report.json"), "utf8")).cells;
+  const originalReport = readFileSync(join(directory, "report.json"), "utf8");
+  const [cell] = JSON.parse(originalReport).cells;
   assert.ok(
     cell.observation?.instances,
     JSON.stringify({
@@ -183,6 +209,12 @@ try {
     assert.equal(two.status, "unverified");
     assert.equal(two.reason, "semantic-mismatch");
     assert.equal(two.observedValue, "edit");
+    const mismatchSave = live(
+      { ...target, op: "save", expectedRevision: 2, requestId: "save-mismatch" },
+      "mcp",
+    );
+    assert.equal(mismatchSave.status, "unverified");
+    assert.equal(mismatchSave.reason, "semantic-mismatch");
     const modeReset = live({
       ...target,
       op: "reset",
@@ -210,12 +242,52 @@ try {
     assert.equal(reset.observedValue, false);
     assert.deepEqual(current(), before);
     assert.equal(live({ ...change, requestId: "last", expectedRevision: 4 }).status, "verified");
+    const save = { ...target, op: "save", expectedRevision: 5, requestId: "save-verified" };
+    const saved = live(save);
+    assert.equal(saved.status, "verified");
+    assert.notEqual(mismatchSave.imageSha256, saved.imageSha256);
+    assert.equal(readFileSync(join(directory, "report.json"), "utf8"), originalReport);
+    assert.deepEqual(live(save, "mcp"), saved);
+    live({ ...save, requestId: "stale-save", expectedRevision: 4 }, "cli", "stale-revision");
+    const archived = JSON.parse(readFileSync(join(saved.output, "report.json"), "utf8"));
+    const snapshot = JSON.parse(readFileSync(join(saved.output, "snapshot.json"), "utf8"));
+    assert.equal(snapshot.commit, commit);
+    assert.equal(snapshot.id, saved.run);
+    const history = JSON.parse(execFileSync(binary, ["history"], { env, encoding: "utf8" }));
+    assert.ok(
+      history.snapshots.some(
+        (s: { id: string; output: string }) => s.id === saved.run && s.output === saved.output,
+      ),
+    );
+    assert.ok(snapshot.worktree);
+    const [savedCell] = archived.cells;
+    assert.equal(savedCell.assertion.visibleText, "Close");
+    assert.equal(savedCell.assertion.observedValue, true);
+    const png = readFileSync(join(saved.output, saved.image));
+    assert.deepEqual(png.subarray(0, 8), Buffer.from("89504e470d0a1a0a", "hex"));
+    assert.equal(png.readUInt32BE(16), base.width);
+    assert.equal(createHash("sha256").update(png).digest("hex"), saved.imageSha256);
+    assert.ok(readFileSync(join(saved.output, "graph.html"), "utf8").includes(saved.image));
+    const inspected = JSON.parse(
+      execFileSync(binary, ["inspect", saved.output, JSON.stringify(saved.cell)], {
+        env,
+        encoding: "utf8",
+      }),
+    );
+    assert.ok(
+      inspected.controls.some(
+        (c: typeof first) =>
+          c.slot === first.slot && c.instance === first.instance && c.value === true,
+      ),
+    );
   } finally {
     live({ ...target, op: "close" });
   }
   live({ ...target, op: "inspect" }, "cli", "session-expired");
+  const start = performance.now();
   const next = live({ ...opening, requestId: "second-open" }, "mcp");
   try {
+    const coldOpenMs = performance.now() - start;
     assert.notEqual(next.session, target.session);
     assert.equal(next.revision, 0);
     const items = live({ op: "inspect", session: next.session, cell: base })
@@ -226,6 +298,58 @@ try {
         .map((c) => c.value)
         .sort(),
       [false, true],
+    );
+    const menu = items.find((c) => c.label === "open" && c.value === false)!;
+    const samples: number[] = [];
+    assert.deepEqual(next.launches, { hostBuilds: 1, browserLaunches: 1 });
+    let counts = next.launches;
+    for (let i = 0; i < 30; i++) {
+      const value = i % 2 === 0;
+      const result = live({
+        op: "set",
+        session: next.session,
+        cell: base,
+        slot: menu.slot,
+        instance: menu.instance,
+        value,
+        expectedRevision: i,
+        requestId: "benchmark-" + i,
+        expect: {
+          selector: "section:first-of-type button:first-child",
+          text: value ? "Close" : "Open",
+        },
+      });
+      assert.equal(result.status, "verified");
+      assert.equal(result.observedValue, value);
+      assert.ok(Number.isFinite(result.elapsedMs) && result.elapsedMs > 0);
+      samples.push(result.elapsedMs);
+      counts = result.launches;
+    }
+    assert.deepEqual(counts, next.launches);
+    const sorted = samples.sort((a, b) => a - b);
+    console.log(
+      JSON.stringify({
+        fixture: "replay/inspect",
+        sourceSha256: createHash("sha256")
+          .update(readFileSync(join(project, "main.tsx")))
+          .digest("hex"),
+        lockSha256: createHash("sha256")
+          .update(readFileSync(join(project, "package-lock.json")))
+          .digest("hex"),
+        node: process.version,
+        osRelease: release(),
+        cpu: cpus()[0]?.model,
+        ...next.environment,
+        coldOpenMs,
+        samples: samples.length,
+        p50Ms: sorted[Math.ceil(samples.length * 0.5) - 1],
+        p95Ms: sorted[Math.ceil(samples.length * 0.95) - 1],
+        cold: next.launches,
+        warm: {
+          hostBuilds: counts.hostBuilds - next.launches.hostBuilds,
+          browserLaunches: counts.browserLaunches - next.launches.browserLaunches,
+        },
+      }),
     );
   } finally {
     live({ op: "close", session: next.session }, "mcp");

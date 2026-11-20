@@ -124,10 +124,15 @@ Pass a JSON object to `dui live '{…}'` or pass that object as arguments to the
 {"op":"inspect","session":"SESSION","cell":{"state":"STATE_ID","width":768}}
 {"op":"set","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","value":true,"expectedRevision":0,"requestId":"edit-1","expect":{"selector":"#menu-toggle","text":"Close"}}
 {"op":"reset","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","expectedRevision":1,"requestId":"reset-1","expect":{"selector":"#menu-toggle","text":"Open"}}
+{"op":"save","session":"SESSION","cell":{"state":"STATE_ID","width":768},"expectedRevision":2,"requestId":"save-1"}
 {"op":"close","session":"SESSION"}
 ```
 
-Use a unique request ID per edit. Retry the same payload after a lost reply. For set and reset, `expect.selector` must match one visible HTML element whose trimmed inner text equals `expect.text`. A failed assertion after a write advances the revision and returns `unverified` with the observed value and text. Reset uses the value at open. Close releases the browser and host. An idle session expires after 30 minutes. Saving an edited revision is tracked in #3.
+Use a unique request ID per edit. Retry the same payload after a lost reply. For set and reset, `expect.selector` must match one visible HTML element whose trimmed inner text equals `expect.text`. A failed assertion after a write advances the revision and returns `unverified` with the observed value and text. Reset uses the value at open. Close releases the browser and host. An idle session expires after 30 minutes. Save returns the path of a new run under `~/.dui`. Open its `graph.html` or pass the saved directory and cell to `dui inspect`. The archive contains the PNG, its SHA-256 digest, the observed control values and text assertion, the edit sequence and Git provenance. To edit again, open the original source cell.
+
+### Warm edit baseline
+
+On the pinned React inspect fixture, 30 alternating edits took **111.4 ms p50** and **112.9 ms p95** from owner acceptance to verified value and visible text. Opening a fresh session took **1.72 s** on an Apple M1 Pro, Darwin 25.5.0, Node 26.13.0, TypeScript 7.0.2 and Chrome 157.0.8103.79. Cold startup built one host and launched one browser. Both warm counts were zero. Reproduce with `npm ci`, `npm ci --prefix fixtures/replay` and `npm run check:inspect`. Each run prints its environment and fixture hashes.
 
 ## 5. Patterns and acceptance
 

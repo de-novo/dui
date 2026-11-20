@@ -124,10 +124,15 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 {"op":"inspect","session":"SESSION","cell":{"state":"STATE_ID","width":768}}
 {"op":"set","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","value":true,"expectedRevision":0,"requestId":"edit-1","expect":{"selector":"#menu-toggle","text":"Close"}}
 {"op":"reset","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","expectedRevision":1,"requestId":"reset-1","expect":{"selector":"#menu-toggle","text":"Open"}}
+{"op":"save","session":"SESSION","cell":{"state":"STATE_ID","width":768},"expectedRevision":2,"requestId":"save-1"}
 {"op":"close","session":"SESSION"}
 ```
 
-편집마다 고유한 요청 ID를 쓰고 응답을 잃으면 같은 요청을 재전송한다. set과 reset에서 `expect.selector`는 표시된 HTML 요소 하나와 일치해야 하며, 양끝 공백을 뺀 텍스트가 `expect.text`와 같아야 한다. 쓰기 후 검증에 실패해도 리비전은 증가하고 관찰값·텍스트와 함께 `unverified`를 반환한다. reset은 세션을 열었을 때의 값으로 복원한다. close는 브라우저와 호스트를 종료한다. 유휴 세션은 30분 후 만료된다. 변경한 리비전 저장은 #3에서 다룬다.
+편집마다 고유한 요청 ID를 쓰고 응답을 잃으면 같은 요청을 재전송한다. set과 reset에서 `expect.selector`는 표시된 HTML 요소 하나와 일치해야 하며, 양끝 공백을 뺀 텍스트가 `expect.text`와 같아야 한다. 쓰기 후 검증에 실패해도 리비전은 증가하고 관찰값·텍스트와 함께 `unverified`를 반환한다. reset은 세션을 열었을 때의 값으로 복원한다. close는 브라우저와 호스트를 종료한다. 유휴 세션은 30분 후 만료된다. save는 `~/.dui` 아래 새 실행 경로를 반환한다. 그 안의 `graph.html`을 열거나, 저장된 디렉터리와 칸을 `dui inspect`에 전달한다. PNG와 SHA-256 해시, 관찰된 상태값과 텍스트 단언, 편집 순서와 Git 출처가 함께 저장된다. 다시 라이브로 편집할 때는 원본 칸을 연다.
+
+### 편집 지연 시간 기준값
+
+고정된 React inspect 픽스처에서 메뉴를 30번 번갈아 열고 닫았다. 소유 프로세스가 요청을 받은 때부터 값과 화면 문구를 검증할 때까지 **p50 111.4 ms**, **p95 112.9 ms**였다. Apple M1 Pro, Darwin 25.5.0, Node 26.13.0, TypeScript 7.0.2, Chrome 157.0.8103.79에서 새 세션을 여는 데 **1.72 s**가 걸렸다. 최초 호스트 빌드와 브라우저 실행은 각각 1회, 편집 중에는 모두 0회였다. `npm ci`, `npm ci --prefix fixtures/replay`, `npm run check:inspect` 순서로 재현한다. 실행마다 측정 환경과 픽스처 해시를 출력한다.
 
 ## 5. 패턴과 완료 조건
 

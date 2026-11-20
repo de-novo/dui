@@ -149,7 +149,7 @@ pub(crate) fn capture(
     alias: Option<&Path>,
     action: Capture<'_>,
 ) -> Reply {
-    let mut metadata = provenance(project)?;
+    let metadata = provenance(project)?;
     let home = root()?;
     let archive = home.join("projects");
     let alias = alias.map(std::path::absolute).transpose().map_err(io)?;
@@ -179,6 +179,28 @@ pub(crate) fn capture(
             return Err(failure(2, "output must be a directory"));
         }
     }
+    let result = publish(metadata, |staged| match action {
+        Capture::Run => host::run(project, manifest, staged),
+        Capture::Replay(plan, port) => replay::run(project, manifest, plan, staged, port),
+        Capture::Exercise(port) => analysis::exercise(project, manifest, staged, port),
+    });
+    let report = match &result {
+        Ok(body) | Err((5, body)) => body,
+        Err(_) => return result,
+    };
+    if let Some(dest) = alias {
+        let out = Path::new(
+            report["output"]
+                .as_str()
+                .ok_or_else(|| failure(3, "missing archive path"))?,
+        );
+        expose(out, &dest, &archive).map_err(|(_, err)| (3, json!({"error":err,"output":out})))?;
+    }
+    result
+}
+
+pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -> Reply {
+    let archive = root()?.join("projects");
     let id = metadata["projectId"]
         .as_str()
         .ok_or_else(|| failure(3, "missing project id"))?;
@@ -202,11 +224,7 @@ pub(crate) fn capture(
     let snapshot = format!("{stamp:016}-{suffix}");
     let out = runs.join(&snapshot);
     let staged = stage.path().join("artifacts");
-    let result = match action {
-        Capture::Run => host::run(project, manifest, &staged),
-        Capture::Replay(plan, port) => replay::run(project, manifest, plan, &staged, port),
-        Capture::Exercise(port) => analysis::exercise(project, manifest, &staged, port),
-    };
+    let result = write(&staged);
     let (mut report, partial) = match result {
         Ok(report) => (report, false),
         Err((5, report)) => (report, true),
@@ -222,9 +240,6 @@ pub(crate) fn capture(
     metadata["timestampMs"] = json!(stamp as u64);
     analysis::store(&staged.join("snapshot.json"), &metadata)?;
     fs::rename(&staged, &out).map_err(io)?;
-    if let Some(dest) = alias {
-        expose(&out, &dest, &archive).map_err(|(_, err)| (3, json!({"error":err,"output":out})))?;
-    }
     report["snapshot"] = metadata;
     report["output"] = json!(out);
     if partial {

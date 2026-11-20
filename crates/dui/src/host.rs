@@ -116,6 +116,7 @@ impl Host for ViteHost {
             }
             std::thread::sleep(Duration::from_millis(100));
         };
+        HOST_BUILDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(RunningHost {
             _server: server,
             _work: work,
@@ -123,3 +124,5 @@ impl Host for ViteHost {
         })
     }
 }
+
+pub(crate) static HOST_BUILDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);

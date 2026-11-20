@@ -19,6 +19,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn launches() -> Value {
+    use std::sync::atomic::Ordering::Relaxed;
+    json!({"hostBuilds":crate::host::HOST_BUILDS.load(Relaxed),"browserLaunches":crate::chromium::BROWSER_LAUNCHES.load(Relaxed)})
+}
 fn invalid(s: &str) -> (u8, Value) {
     failure(2, s)
 }
@@ -190,8 +194,7 @@ fn serve() -> Result<(), (u8, Value)> {
     )?;
     let lease = File::open(&file.0).map_err(io)?;
     lease.lock().map_err(io)?;
-    let opened =
-        json!({"session":id,"revision":0,"cell":session.cell,"provenance":session.provenance});
+    let opened = json!({"session":id,"revision":0,"cell":session.cell,"provenance":session.provenance,"environment":session.environment,"launches":launches()});
     let (tx, connections) = std::sync::mpsc::sync_channel(1);
     thread::spawn(move || {
         for connection in listener.incoming() {
@@ -243,7 +246,8 @@ fn serve() -> Result<(), (u8, Value)> {
         } else {
             session.handle(r)
         };
-        let terminate = close || matches!(result, Err((3, _)));
+        let terminate = close
+            || (matches!(result, Err((3, _))) && (r["op"] != "save" || session.tick().is_err()));
         let response = encode(result);
         if terminate {
             drop(session);

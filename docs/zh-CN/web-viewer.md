@@ -124,10 +124,15 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 {"op":"inspect","session":"SESSION","cell":{"state":"STATE_ID","width":768}}
 {"op":"set","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","value":true,"expectedRevision":0,"requestId":"edit-1","expect":{"selector":"#menu-toggle","text":"Close"}}
 {"op":"reset","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","expectedRevision":1,"requestId":"reset-1","expect":{"selector":"#menu-toggle","text":"Open"}}
+{"op":"save","session":"SESSION","cell":{"state":"STATE_ID","width":768},"expectedRevision":2,"requestId":"save-1"}
 {"op":"close","session":"SESSION"}
 ```
 
-每次编辑使用唯一请求 ID，丢失响应后可重发相同请求。对于 set 和 reset，`expect.selector` 必须匹配一个可见的 HTML 元素，去除首尾空白后的文本必须等于 `expect.text`。写入后断言失败仍会推进修订号，并返回 `unverified`、观测值和文本。reset 恢复打开时的值，close 释放浏览器和主机。空闲会话在 30 分钟后过期。保存修订由 #3 跟踪。
+每次编辑使用唯一请求 ID，丢失响应后可重发相同请求。对于 set 和 reset，`expect.selector` 必须匹配一个可见的 HTML 元素，去除首尾空白后的文本必须等于 `expect.text`。写入后断言失败仍会推进修订号，并返回 `unverified`、观测值和文本。reset 恢复打开时的值，close 释放浏览器和主机。空闲会话在 30 分钟后过期。save 返回 `~/.dui` 下新归档的路径。打开其中的 `graph.html`，或向 `dui inspect` 传入保存的目录和单元格。归档包含 PNG、SHA-256 摘要、观测值和文本断言、编辑序列及 Git 来源。再次实时编辑时打开原始单元格。
+
+### 热编辑延迟基线
+
+在固定版本的 React inspect 夹具上交替编辑 30 次，从所有者进程接受请求到验证状态值及可见文本，**p50 为 111.4 ms**，**p95 为 112.9 ms**。在 Apple M1 Pro、Darwin 25.5.0、Node 26.13.0、TypeScript 7.0.2 和 Chrome 157.0.8103.79 上，打开新会话耗时 **1.72 s**。冷启动构建一次主机并启动一次浏览器，热编辑期间两项均为零。依次运行 `npm ci`、`npm ci --prefix fixtures/replay` 和 `npm run check:inspect` 可复现。每次运行均输出环境和夹具哈希。
 
 ## 5. 模式与验收
 

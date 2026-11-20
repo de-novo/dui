@@ -78,6 +78,7 @@ impl Browser {
             .stdout(Stdio::from(OwnedFd::from(chrome)))
             .stderr(Stdio::null())
             .spawn()?;
+        BROWSER_LAUNCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(Self {
             child,
             stream,
@@ -523,3 +524,6 @@ impl Browser {
         self.call(None, "Browser.getVersion", json!({}))
     }
 }
+
+pub(crate) static BROWSER_LAUNCHES: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
