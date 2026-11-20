@@ -28,6 +28,8 @@ export type InstrumentFact = {
   arms?: Arms;
   init?: Span;
   after?: number;
+  ownerBlock?: number;
+  statementStart?: number;
   shape: { kind: string };
   setter?: string;
 };
@@ -109,6 +111,17 @@ export function instrument(text: string, facts: InstrumentFact[], oxc: Oxc) {
       insert(f.after, false, `;${probe}?.slot(${key},${f.label},${f.setter ?? "null"});`);
     }
   }
+  const owners = new Set<number>();
+  for (const f of [...facts].sort((a, b) => a.start - b.start)) {
+    if (f.kind !== "slot" || !f.after || f.ownerBlock == null || f.statementStart == null) continue;
+    const instance = name + "Instance" + f.ownerBlock;
+    if (!owners.has(f.ownerBlock)) {
+      insert(f.statementStart, true, `;const ${instance} = ${name}Id();`);
+      owners.add(f.ownerBlock);
+    }
+    const key = JSON.stringify([f.file + "#" + f.start, f.end, f.kind].join(":"));
+    insert(f.after, false, `;${name}Inspect(${key},${instance},${f.label},${f.setter ?? "null"});`);
+  }
   if (!edits.length) return text;
   for (const edit of edits.sort(
     (a, b) =>
@@ -117,5 +130,12 @@ export function instrument(text: string, facts: InstrumentFact[], oxc: Oxc) {
       (a.open ? b.order - a.order : a.order - b.order),
   ))
     text = text.slice(0, edit.at) + edit.value + text.slice(edit.at);
-  return text + "\n" + helperSource(/\.[cm]?tsx?$/.test(file)).replaceAll("__duiTools", name);
+  const typed = /\.[cm]?tsx?$/.test(file);
+  if (owners.size) {
+    text += `\nimport {useId as ${name}Id,useLayoutEffect as ${name}Effect} from "react";
+function ${name}Inspect(id${typed ? ": string" : ""}, instance${typed ? ": string" : ""}, value${typed ? ": unknown" : ""}, setter${typed ? ": unknown" : ""}) {
+  ${name}Effect(() => ${probe}?.commit(id, instance, value, typeof setter === "function"));
+}`;
+  }
+  return text + "\n" + helperSource(typed).replaceAll("__duiTools", name);
 }

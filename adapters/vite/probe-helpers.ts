@@ -9,6 +9,7 @@ function __duiToolsCreate() {
       globalThis as {
         __duiProbe?: {
           input: Record<string, unknown>;
+          commit(id: string, instance: string, value: unknown, setter: boolean): () => void;
           branch(id: string, truth: boolean): void;
           slot(id: string, value: unknown, setter: unknown): void;
         };

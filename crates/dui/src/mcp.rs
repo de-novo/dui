@@ -23,7 +23,7 @@ fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
         ),
         Some("ping") => Ok(json!({})),
         Some("tools/list") => Ok(
-            json!({"tools":[{"name":"map","description":"Discover and capture project screens","inputSchema":schema(&["project"])},{"name":"history","description":"List archived captures across local projects, branches and worktrees","inputSchema":schema(&[])},{"name":"scan","description":"Extract facts from an installed project compiler","inputSchema":schema(&["project","manifest"])},{"name":"run","description":"Build and exercise a Vite application on loopback","inputSchema":capture_schema(&["project","manifest"])},{"name":"replay","description":"Render every cell of a saved plan and compare unbound states against independent setter replays","inputSchema":capture_schema(&["project","manifest","plan"])},{"name":"replay_report","description":"Verify and summarize saved replay evidence","inputSchema":schema(&["manifest","plan","output"])}]}),
+            json!({"tools":[{"name":"inspect","description":"Inspect committed state observations in one archived cell; optionally validate a proposed value","inputSchema":{"type":"object","additionalProperties":false,"required":["directory","selection"],"properties":{"directory":{"type":"string"},"selection":{"type":"object","required":["state","width"],"additionalProperties":false,"properties":{"state":{"type":"string"},"width":{"type":"integer","minimum":1},"slot":{"type":"string"},"instance":{"type":"string"},"value":{}}}}}},{"name":"map","description":"Discover and capture project screens","inputSchema":schema(&["project"])},{"name":"history","description":"List archived captures across local projects, branches and worktrees","inputSchema":schema(&[])},{"name":"scan","description":"Extract facts from an installed project compiler","inputSchema":schema(&["project","manifest"])},{"name":"run","description":"Build and exercise a Vite application on loopback","inputSchema":capture_schema(&["project","manifest"])},{"name":"replay","description":"Render every cell of a saved plan and compare unbound states against independent setter replays","inputSchema":capture_schema(&["project","manifest","plan"])},{"name":"replay_report","description":"Verify and summarize saved replay evidence","inputSchema":schema(&["manifest","plan","output"])}]}),
         ),
         Some("tools/call") => {
             let args = &r["params"]["arguments"];
@@ -34,6 +34,9 @@ fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
                     .ok_or((-32602, format!("missing {k}")))
             };
             let result = match r["params"]["name"].as_str() {
+                Some("inspect") => {
+                    crate::inspect::archive(path("directory")?, args["selection"].clone())
+                }
                 Some("map") => crate::screen_map::capture(path("project")?),
                 Some("scan") => analysis::analyze(path("project")?, path("manifest")?),
                 Some("replay_report") => {

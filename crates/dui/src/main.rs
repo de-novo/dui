@@ -4,6 +4,7 @@ use archive::Capture;
 mod chromium;
 mod graph_view;
 mod host;
+mod inspect;
 mod mcp;
 mod ports;
 mod reference;
@@ -193,6 +194,15 @@ fn run() -> Reply {
         };
         return archive::capture(Path::new(root), Path::new(spec), output, Capture::Run);
     }
+    if let [cmd, directory, selection] = args.as_slice()
+        && cmd == "inspect"
+    {
+        let selection = selection
+            .to_str()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .ok_or_else(|| failure(2, "expected inspect RUN_DIRECTORY SELECTION_JSON"))?;
+        return inspect::archive(Path::new(directory), selection);
+    }
     if let [cmd, root, spec] = args.as_slice()
         && cmd == "scan"
     {
@@ -225,7 +235,7 @@ fn run() -> Reply {
     let [command, path] = args.as_slice() else {
         return Err(failure(
             2,
-            "expected map PROJECT, scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
+            "expected inspect RUN_DIRECTORY SELECTION_JSON, map PROJECT, scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
         ));
     };
     if command == "check-ts" {
