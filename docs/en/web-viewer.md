@@ -23,6 +23,8 @@ Verified with the npmgraph archive: two screen nodes, one discovered link and fo
 
 For new maps, a directed link joins two captured screens when the source DOM contains a same-origin anchor to the target URL. Repeated anchors produce one edge. The viewer shows the edge at the widths where the anchor was observed. This records a navigation option; confirming that it works requires replay.
 
+The default **Connections → Overview** keeps every screen and shows a tree of observed links within each connected group. Arrows retain the recorded direction. Select **All links** to include cycles and return paths, or select a route under **Connections** to see its incoming and outgoing links. The count shows displayed links out of all links at the selected width.
+
 ## 2. Modules and dependencies
 
 ```text

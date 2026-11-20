@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
+    "test": "node --test tests/*.test.mts",
     "preview:archive": "node preview.mts"
   },
   "dependencies": {

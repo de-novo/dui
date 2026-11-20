@@ -12,6 +12,7 @@ function Preview({ archive }: { archive: Archive }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const params = new URLSearchParams(search);
   const width = Number(params.get("width") ?? widths[0]);
+  const mode = params.get("links") ?? "overview";
   const selectedId = params.get("screen");
   const selected = archive.screens.find((s) => s.id === selectedId);
   const cell = selected?.cells.find((c) => c.width === width);
@@ -25,9 +26,11 @@ function Preview({ archive }: { archive: Archive }) {
       dialog.current?.showModal();
     if (selectedId === null && dialog.current?.open) dialog.current.close();
   }, [selectedId]);
-  function navigate(id: string | null, size: number) {
+  function navigate(id: string | null, size: number, links = mode) {
     const next = new URL(location.href);
     next.searchParams.set("width", String(size));
+    if (links === "overview") next.searchParams.delete("links");
+    else next.searchParams.set("links", links);
     if (id === null) next.searchParams.delete("screen");
     else next.searchParams.set("screen", id);
     history.pushState(null, "", next);
@@ -42,6 +45,23 @@ function Preview({ archive }: { archive: Archive }) {
     <main>
       <header>
         <h1>Screen map</h1>
+        <label>
+          Connections{" "}
+          <select
+            value={mode}
+            onChange={(e) => navigate(null, width, e.target.value)}
+          >
+            <option value="overview">Overview</option>
+            <option value="all">All links</option>
+            <optgroup label="Links to and from a screen">
+              {archive.screens.map((s) => (
+                <option key={s.id} value={"focus:" + s.id}>
+                  {s.path}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
         <label>
           Capture width{" "}
           <select
@@ -64,6 +84,7 @@ function Preview({ archive }: { archive: Archive }) {
           <ScreenMap
             archive={archive}
             width={width}
+            mode={mode}
             select={(id) => navigate(id, width)}
           />
         </section>

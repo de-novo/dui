@@ -1,3 +1,5 @@
+import { Fragment, useMemo } from "react";
+import { layoutMap } from "./layout";
 import {
   Background,
   Controls,
@@ -17,7 +19,30 @@ function Card({ data }: NodeProps<CardNode>) {
   const cell = data.screen.cells.find((c) => c.width === data.width);
   return (
     <article className="screen-card">
-      <Handle type="target" position={Position.Left} />
+      {Object.values(Position).map((position) => (
+        <Fragment key={position}>
+          <Handle
+            type="source"
+            id={position}
+            position={position}
+            style={
+              position === Position.Left || position === Position.Right
+                ? { top: "46%" }
+                : { left: "46%" }
+            }
+          />
+          <Handle
+            type="target"
+            id={position}
+            position={position}
+            style={
+              position === Position.Left || position === Position.Right
+                ? { top: "54%" }
+                : { left: "54%" }
+            }
+          />
+        </Fragment>
+      ))}
       <strong title={data.screen.path}>{data.screen.path}</strong>
       {cell?.image && (
         <img
@@ -33,7 +58,6 @@ function Card({ data }: NodeProps<CardNode>) {
               .join(" · ")
           : "No capture at this width"}
       </small>
-      <Handle type="source" position={Position.Right} />
     </article>
   );
 }
@@ -43,46 +67,69 @@ const nodeTypes = { screen: Card };
 export function ScreenMap({
   archive,
   width,
+  mode,
   select,
 }: {
   archive: Archive;
   width: number;
+  mode: string;
   select: (id: string) => void;
 }) {
-  const columns = Math.ceil(Math.sqrt(archive.screens.length));
-  const nodes: CardNode[] = archive.screens.map((screen, i) => ({
+  const layout = useMemo(
+    () => layoutMap(archive, width, mode),
+    [archive, width, mode],
+  );
+  const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => ({
     id: screen.id,
     type: "screen",
-    position: { x: (i % columns) * 440, y: Math.floor(i / columns) * 260 },
+    position,
     data: { screen, width },
     ariaLabel: screen.path,
+    className: mode === "focus:" + screen.id ? "focus-screen" : undefined,
   }));
-  const visibleLinks = archive.links.filter(
-    (link) => !link.observedWidths || link.observedWidths.includes(width),
-  );
-  const edges = visibleLinks.map(({ source, target }) => ({
-    id: JSON.stringify([source, target]),
-    source,
-    target,
-    label: visibleLinks.length === 1 ? "Discovered link" : undefined,
-    ariaLabel: `Discovered link from ${source} to ${target}`,
-    style: { stroke: "#39735e", strokeWidth: 2 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "#39735e" },
-  }));
+  const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
+  const edges = layout.links.map(({ source, target }) => {
+    const a = positions.get(source)!,
+      b = positions.get(target)!;
+    const [out, into] =
+      a.x === b.x
+        ? a.y < b.y
+          ? [Position.Bottom, Position.Top]
+          : [Position.Top, Position.Bottom]
+        : a.x < b.x
+          ? [Position.Right, Position.Left]
+          : [Position.Left, Position.Right];
+    return {
+      id: JSON.stringify([source, target]),
+      source,
+      target,
+      type: "smoothstep",
+      sourceHandle: out,
+      targetHandle: into,
+      label: layout.total === 1 ? "Discovered link" : undefined,
+      ariaLabel: `Discovered link from ${source} to ${target}`,
+      style: { stroke: "#39735e" },
+      markerEnd: { type: MarkerType.ArrowClosed, color: "#39735e" },
+    };
+  });
   return (
     <ReactFlow
+      key={JSON.stringify([mode, width])}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
       fitView
-      minZoom={0.08}
-      fitViewOptions={{ padding: 0.12, minZoom: 0.08 }}
+      minZoom={0.04}
+      fitViewOptions={{
+        padding: { x: "18px", top: "48px", bottom: "18px" },
+        minZoom: 0.04,
+      }}
       nodesDraggable={false}
       nodesConnectable={false}
       onNodeClick={(_, node) => select(node.id)}
     >
       <div className="map-summary" role="status">
-        {nodes.length} screens · {edges.length} discovered links
+        {nodes.length} screens · {edges.length} of {layout.total} links
       </div>
       <Background />
       <Controls showInteractive={false} />

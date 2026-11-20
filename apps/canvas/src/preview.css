@@ -115,3 +115,24 @@ dialog::backdrop {
     height: 60dvh;
   }
 }
+main > header {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+main > header h1 {
+  margin-right: auto;
+}
+main > header select {
+  max-width: min(50vw, 24rem);
+}
+.screen-card .react-flow__handle {
+  opacity: 0;
+}
+.focus-screen .screen-card {
+  border: 2px solid #236951;
+}
+
+.map .react-flow__edge-path {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.15;
+}
