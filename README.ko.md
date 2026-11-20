@@ -15,6 +15,7 @@
 > 아이디어 단계 레포. 아직 코드 없음.
 
 설계 문서: [docs/ko/design-v0.md](docs/ko/design-v0.md) (개발자 도구 설계 v0)
+아키텍처: [docs/ko/architecture.md](docs/ko/architecture.md) (함수형 코어, 포트와 어댑터, 모노레포와 crate 경계)
 언어 조사: [docs/ko/language-survey.md](docs/ko/language-survey.md) (대상 언어·UI 스택 전수조사, 추천 순서)
 분석 방식 조사: [docs/ko/analysis-approaches.md](docs/ko/analysis-approaches.md) (코드 분석 AI 도구들의 접근법, dui 분석기 스택 추천)
 
@@ -58,7 +59,7 @@
 ## 계열별 렌더 방법
 | 계열 | 예 | 렌더 방식 | 난이도 |
 |---|---|---|---|
-| 웹 | React, Vite, Next.js, Solid, Preact | 브라우저에서 목(MSW·모듈 목)으로 렌더 | 쉬움 |
+| 웹 | React, Vite, Next.js, Solid, Preact | CDP로 Chromium에서 렌더, 상태 주입과 요청 가로채기 | 쉬움 |
 | 웹 기반 데스크톱 | Electron, Tauri | 웹과 동일 (Tauri는 invoke 목) | 쉬움 |
 | 네이티브 | GPUI (pippip) | 앱 안의 갤러리 모드로 상태별 렌더 | 손 많이 감 |
 

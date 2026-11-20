@@ -6,6 +6,7 @@
 
 > 상태: 초안 · 작성 2026-11-19 · 대상 독자: dui를 만들 개발자
 > 이 문서의 외부 사실(라이선스·스타 수·버전)은 2026-11-19에 GitHub API로 확인했다. 확인 못 한 것은 `미확인`으로 적는다.
+> 코드 구조, 패턴, 포트, crate 경계: [아키텍처](architecture.md)(2026-11-20 결정). 둘이 겹치면 코드 구조는 아키텍처 문서를 따른다.
 
 > **위치**: 디자인 생성 도구는 *이렇게 만들 것이다*를 보여준다: 아직 없는 화면을 AI가 상상해서 그린다. dui는 *실제로 이렇게 만들어져 있다*를 보여준다: 공식 컴파일러로 지금 있는 코드를 읽고, 실제로 존재하는 모든 상태를 진짜로 렌더한다. 아무것도 지어내지 않는다. 보여줄 수 없는 것은 `미검증` 또는 `렌더 불가`로 표시한다.
 
@@ -67,6 +68,8 @@
 타입이 핵심인 이유: 타입이 있어야 (a) 상태의 모양을 빠짐없이 나열하고 (b) 유효한 목 값을 자동으로 만들고 (c) 주입 코드가 컴파일러 검사를 통과했는지로 1차 검증이 된다.
 
 ## 4. 아키텍처
+
+이 절은 구성 요소 관점이다. 코드를 순수 코어, 포트 3개(`TypeOracle`, `Host`, `Renderer`), 어댑터, crate로 어떻게 나누는지는 [아키텍처](architecture.md)에서 정한다.
 
 ```mermaid
 flowchart LR
@@ -275,7 +278,7 @@ pippip은 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, HTTP는 `reqwest` 사용(Cargo.
 - **2026-11-19 변경**: 본체가 Rust라서 코드 그래프는 dui 바이너리 안에서 **tree-sitter + oxc로 직접 만든다**. Graphify는 Python이라 내장 엔진이 될 수 없다.
 - **Graphify** (Apache-2.0, ★150,430, 2026-11-19 확인)는 이제 **참고만(아이디어)** 한다: tree-sitter로 약 40개 언어, 선마다 `EXTRACTED`/`INFERRED` 태그(README에서 확인). dui는 이 아이디어를 가져와 태그를 `추출됨`/`추정됨`/`검증됨`으로 확장한다.
 - **CodeGraph** (MIT, ★78,082, 2026-11-19 확인): 프레임워크별 라우트 인식 방식만 참고(README에서 확인).
-- 그래프 엔진은 바꿀 수 있게 dui 내부에는 `CodeGraphPort`(노드·선 읽기) 한 가지 인터페이스만 둔다.
+- 코드 그래프는 `dui-core` 안의 순수 데이터 구조이고, 파서가 낸 사실로만 만든다. 포트가 아니다: 포트는 I/O 경계에만 있다([아키텍처 §2.2](architecture.md#22-포트와-어댑터)).
 
 ## 11. 캔버스
 
@@ -326,13 +329,13 @@ dui는 Whiteboard를 **내장하지 않는다**: Code-OSS를 통째로 포함(ve
 
 | 단계 | 내용 | 완료 기준 |
 |---|---|---|
-| **M0 스파이크** | obora-web 검수 화면 1개(obora는 먼저 TS 7로 옮긴다. TS 7 미만은 `미지원`). 손으로 고른 상태 5개를 oxc 변환 주입 + CDP Fetch 가로채기 + CDP로 구동한 Chromium으로 3폭 렌더. 모두 Rust 바이너리가 구동 | 로컬 상태 1개 이상을 밖에서 주입해 렌더 성공, 이미지 15장 |
-| **M1 자동 상태** | 분석기 + 목 생성기 + 계획기. 데이터 모양·코드 분기 자동 나열, 커버리지 측정, 보충 반복 | 검수 화면 분기 커버리지 숫자 출력, 미검증 목록 |
+| **M0 스파이크** | obora-web 검수 화면 1개(obora는 먼저 TS 7로 옮긴다. TS 7 미만은 `미지원`). 손으로 고른 상태 5개를 oxc 변환 주입 + CDP Fetch 가로채기 + CDP로 구동한 Chromium으로 3폭 렌더. 모두 Rust 바이너리가 구동 | [아키텍처 §7](architecture.md#7-m0와-m1-완료-조건)의 M0 조건(칸 ID 15개와 이미지 15장, 다시 읽은 값 일치, 프로덕션 `__dui` 0건) |
+| **M1 자동 상태** | 분석기 + 목 생성기 + 계획기. 데이터 모양·코드 분기 자동 나열, 커버리지 측정, 보충 반복 | [아키텍처 §7](architecture.md#7-m0와-m1-완료-조건)의 M1 조건(분기·칸 커버리지 JSON, 미검증 목록, CLI와 MCP 결과 동일) |
 | **M2 GPUI 스파이크** | pippip 화면 1개. 오프스크린 렌더 가능 여부 확인, `#[dui::state]` 매크로 시제품 | 상태 파일 → 이미지 1장 |
 | **M3 순서 상태** | 이벤트→상태 변경 규칙 추출, 펼치기, CDP 재생 검증, 선 `검증됨` 표시 | 검수 화면 "마지막 장 승인 후" 같은 순서 상태 자동 생성·검증 |
 | **M4 캔버스** | React Flow 캔버스(행=상태, 열=폭, 선=전환, 미검증·렌더 불가 표시). AI 에이전트가 CLI / MCP로 연다(`dui open`), 사람은 보기만 | obora 화면 3개 전체 배치 |
 | **M5 obora 99% 시도** | 3개 화면 99% 목표, 상태 명시 규칙 적용, Figma 내보내기 | 화면별 커버리지 보고 |
-| M6 이후 | pippip 전체, Electron(obora-desktop), Vue·Svelte | — |
+| M6 이후 | pippip 전체, Electron(obora-desktop), 이어서 [지원 프레임워크](supported-frameworks.md) 우선순위대로 나머지 스택 | — |
 
 ## 14. 위험과 열린 질문
 
@@ -389,7 +392,7 @@ AI는 상태가 **어디 있고 무슨 타입인지 찾는 데만** 쓴다. 어�
 | MCP 서버 | `rmcp` 3.11.0 (공식 SDK, [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)) | Apache-2.0 (workspace `Cargo.toml`, GitHub 표기는 NOASSERTION) | CLI와 같은 작업 + 캔버스 코멘트 읽기 |
 | 빠른 훑기 | `tree-sitter` 0.27.2 | MIT | 화면·파일 목록, 모든 언어 |
 | TS/JS 파싱 + 주입 변환 | `oxc` 0.159.0 (`oxc_parser`, `oxc_semantic`, `oxc_transformer`) | MIT | Babel / SWC / Vite 플러그인 대체 |
-| 코드 그래프 | tree-sitter + oxc로 자체 구현, `CodeGraphPort` 뒤 | — | Graphify(Python)와 CodeGraph는 참고만 |
+| 코드 그래프 | tree-sitter + oxc로 자체 구현, `dui-core` 안의 순수 데이터 구조(포트 아님) | — | Graphify(Python)와 CodeGraph는 참고만 |
 | TS 타입 | `TypeOracle` → TypeScript 어댑터 → 프로젝트의 공식 컴파일러 | Apache-2.0 ([microsoft/TypeScript](https://github.com/microsoft/TypeScript)) | 아래 "TypeScript 컴파일러 현황" 참고. 타입을 못 구하면 결과는 `추정됨` |
 | Rust 타입 | `ra_ap_*`(버전 고정, `ra_ap_hir` 0.0.363) + `syn` 3.0.10 | MIT OR Apache-2.0 | `ra_ap_*`는 호환성 보장이 없다 → 버전 고정 |
 | 웹 렌더 | `chromiumoxide` 0.9.1 (2026-02-25 출시), CDP로 Chromium 구동, 폭마다 뷰포트 하나 | MIT OR Apache-2.0 | 마지막 출시 2026-02-25 → 유지보수 지켜보기 |
@@ -404,7 +407,7 @@ AI는 상태가 **어디 있고 무슨 타입인지 찾는 데만** 쓴다. 어�
 
 ### 언어 어댑터: 본체는 언어를 모른다
 
-- Rust 본체는 어떤 언어도 모른다. 언어마다 **언어 어댑터** 하나로 붙는다 = `TypeOracle`(공식 컴파일러에서 받은 타입 정보) + 주입기 + **렌더러 플러그인**.
+- Rust 본체는 어떤 언어도 모른다. 언어마다 **언어 어댑터** 하나로 붙는다 = `TypeOracle`(공식 컴파일러에서 받은 타입 정보) + 개발 전용 주입 변환. dev 서버는 `Host` 어댑터로, 렌더 환경은 `Renderer` 어댑터로 붙는다([아키텍처](architecture.md)).
 - **언어 추가 = 어댑터 하나 추가.** 본체는 그대로다.
 - **컴파일러 선택 규칙**:
   1. 사용자 프로젝트에 이미 있는 공식 컴파일러를 프로젝트와 **똑같은 버전**으로 쓴다.

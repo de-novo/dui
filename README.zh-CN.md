@@ -15,6 +15,7 @@
 > 处于构想阶段的仓库，尚无代码。
 
 设计文档：[docs/zh-CN/design-v0.md](docs/zh-CN/design-v0.md)（开发者工具设计 v0）
+架构：[docs/zh-CN/architecture.md](docs/zh-CN/architecture.md)（函数式核心、端口与适配器、monorepo 和 crate 边界）
 语言调研：[docs/zh-CN/language-survey.md](docs/zh-CN/language-survey.md)（目标语言与 UI 技术栈全面调研，推荐顺序）
 分析方式调研：[docs/zh-CN/analysis-approaches.md](docs/zh-CN/analysis-approaches.md)（代码分析 AI 工具的做法，dui 分析器技术栈推荐）
 翻译规则与术语表：[docs/i18n.md](docs/i18n.md)
@@ -59,7 +60,7 @@
 ## 各类别的渲染方式
 | 类别 | 例子 | 渲染方式 | 难度 |
 |---|---|---|---|
-| Web | React、Vite、Next.js、Solid、Preact | 在浏览器中用模拟（MSW、模块模拟）渲染 | 容易 |
+| Web | React、Vite、Next.js、Solid、Preact | 通过 CDP 在 Chromium 中渲染，注入状态并拦截请求 | 容易 |
 | 基于 Web 的桌面 | Electron、Tauri | 与 Web 相同（Tauri 模拟 invoke） | 容易 |
 | 原生 | GPUI（pippip） | 在应用内的画廊模式中按状态渲染 | 费工夫 |
 

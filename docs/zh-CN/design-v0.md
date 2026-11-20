@@ -6,6 +6,7 @@
 
 > 状态：草案 · 编写于 2026-11-19 · 读者：构建 dui 的开发者
 > 本文中的外部事实（许可证、star 数、版本）已于 2026-11-19 通过 GitHub API 核实。无法确认的标记为 `未确认`。
+> 代码结构、模式、端口和 crate 边界：见[架构](architecture.md)（2026-11-20 决定）。两者重叠时，代码结构以架构文档为准。
 
 > **定位**：设计生成类工具展示的是*将会怎样构建*：由 AI 想象尚不存在的界面。dui 展示的是*实际上是怎样构建的*：它通过官方编译器读取现有代码，把真实存在的每个状态都真正渲染出来。不编造任何东西；无法展示的部分标为 `未验证` 或 `无法渲染`。
 
@@ -67,6 +68,8 @@
 类型之所以关键：有了类型才能 (a) 完整列举状态形态，(b) 自动生成有效的模拟值，(c) 以注入代码能否通过编译器检查作为第一道验证。
 
 ## 4. 架构
+
+本节是组件视图。代码如何划分为纯核心、三个端口（`TypeOracle`、`Host`、`Renderer`）、适配器和 crate，由[架构](architecture.md)定义。
 
 ```mermaid
 flowchart LR
@@ -275,7 +278,7 @@ pippip 使用 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`，HTTP 使用 `reqwest`（�
 - **2026-11-19 变更**：核心是 Rust，因此代码图在 dui 二进制内部**基于 tree-sitter + oxc 自研**。Graphify 是 Python，不能作为内嵌引擎。
 - **Graphify**（Apache-2.0，★150,430，2026-11-19 确认）现在**仅参考（思路）**：通过 tree-sitter 支持约 40 种语言，每条边带 `EXTRACTED` / `INFERRED` 标签（已在 README 中确认）。dui 沿用这一思路，并把标签扩展为 `已提取` / `已推断` / `已验证`。
 - **CodeGraph**（MIT，★78,082，2026-11-19 确认）：仅参考其识别框架路由的方式（已在 README 中确认）。
-- 为保证图引擎可替换，dui 内部只保留一个接口 `CodeGraphPort`（读取节点和边）。
+- 代码图是 `dui-core` 中的纯数据结构，只由解析器事实构建。它不是端口：端口只存在于 I/O 边界（[架构 §2.2](architecture.md#22-端口与适配器)）。
 
 ## 11. 画布
 
@@ -326,13 +329,13 @@ dui **不**内嵌 Whiteboard：它内置（vendor）了 Code-OSS（打包很重�
 
 | 阶段 | 内容 | 完成标准 |
 |---|---|---|
-| **M0 spike** | obora-web 审核界面 1 个（obora 先迁移到 TS 7；TS < 7 为 `不支持`）。用 oxc 转换注入 + CDP Fetch 拦截 + 通过 CDP 驱动的 Chromium 把手选的 5 个状态按 3 种宽度渲染，全部由 Rust 二进制驱动 | 至少 1 个本地状态从外部注入并渲染成功，图像 15 张 |
-| **M1 自动状态** | 分析器 + 模拟生成器 + 规划器。自动列举数据形态和代码分支，测量覆盖率，补充循环 | 输出审核界面的分支覆盖率数字和未验证列表 |
+| **M0 spike** | obora-web 审核界面 1 个（obora 先迁移到 TS 7；TS < 7 为 `不支持`）。用 oxc 转换注入 + CDP Fetch 拦截 + 通过 CDP 驱动的 Chromium 把手选的 5 个状态按 3 种宽度渲染，全部由 Rust 二进制驱动 | [架构 §7](architecture.md#7-m0-和-m1-验收标准) 的 M0 标准（15 个格子 ID 和 15 张图像、读回值一致、生产构建中 `__dui` 为 0） |
+| **M1 自动状态** | 分析器 + 模拟生成器 + 规划器。自动列举数据形态和代码分支，测量覆盖率，补充循环 | [架构 §7](architecture.md#7-m0-和-m1-验收标准) 的 M1 标准（JSON 输出分支和格子覆盖率、未验证列表、CLI 与 MCP 结果相同） |
 | **M2 GPUI spike** | pippip 界面 1 个。确认离屏渲染是否可行，做 `#[dui::state]` 宏原型 | 状态文件 → 图像 1 张 |
 | **M3 顺序状态** | 提取事件 → 状态变更规则，展开，用 CDP 回放验证，把边标记为 `已验证` | 自动生成并验证审核界面"批准最后一页之后"这类顺序状态 |
 | **M4 画布** | React Flow 画布（行 = 状态，列 = 宽度，边 = 转换，未验证和无法渲染标记）；由 AI 代理通过 CLI / MCP 打开（`dui open`），人只查看 | 排布 obora 全部 3 个界面 |
 | **M5 obora 99% 尝试** | 3 个界面以 99% 为目标，应用状态显式化规则，Figma 导出 | 每个界面的覆盖率报告 |
-| M6 以后 | pippip 全部、Electron（obora-desktop）、Vue、Svelte | — |
+| M6 以后 | pippip 全部、Electron（obora-desktop），然后按[支持的框架](supported-frameworks.md)的优先级处理其余技术栈 | — |
 
 ## 14. 风险与待定问题
 
@@ -389,7 +392,7 @@ AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确�
 | MCP 服务器 | `rmcp` 3.11.0（官方 SDK，[modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)） | Apache-2.0（workspace `Cargo.toml`；GitHub 显示 NOASSERTION） | 与 CLI 相同的操作 + 读取画布留言 |
 | 快速扫描 | `tree-sitter` 0.27.2 | MIT | 界面和文件列表，任何语言 |
 | TS/JS 解析 + 注入转换 | `oxc` 0.159.0（`oxc_parser`、`oxc_semantic`、`oxc_transformer`） | MIT | 取代 Babel / SWC / Vite 插件 |
-| 代码图 | 基于 tree-sitter + oxc 自研，放在 `CodeGraphPort` 之后 | — | Graphify（Python）和 CodeGraph 仅参考 |
+| 代码图 | 基于 tree-sitter + oxc 自研，是 `dui-core` 中的纯数据结构（不是端口） | — | Graphify（Python）和 CodeGraph 仅参考 |
 | TS 类型 | `TypeOracle` → TypeScript 适配器 → 项目中的官方编译器 | Apache-2.0（[microsoft/TypeScript](https://github.com/microsoft/TypeScript)） | 见下方“TypeScript 编译器现状”。拿不到类型时结果为 `已推断` |
 | Rust 类型 | `ra_ap_*`（固定版本；`ra_ap_hir` 0.0.363）+ `syn` 3.0.10 | MIT OR Apache-2.0 | `ra_ap_*` 没有兼容性保证 → 固定版本 |
 | Web 渲染 | `chromiumoxide` 0.9.1（2026-02-25 发布），通过 CDP 驱动 Chromium，每种宽度一个视口 | MIT OR Apache-2.0 | 最近一次发布为 2026-02-25 → 关注维护情况 |
@@ -404,7 +407,7 @@ AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确�
 
 ### 语言适配器：核心与语言无关
 
-- Rust 核心不认识任何语言。每种语言通过一个**语言适配器**接入 = `TypeOracle`（来自官方编译器的类型信息）+ 注入器 + **渲染器插件**。
+- Rust 核心不认识任何语言。每种语言通过一个**语言适配器**接入 = `TypeOracle`（来自官方编译器的类型信息）+ 仅开发用的注入变换。开发服务器作为 `Host` 适配器接入，渲染环境作为 `Renderer` 适配器接入（[架构](architecture.md)）。
 - **增加一种语言 = 增加一个适配器。**核心不变。
 - **编译器选择策略**：
   1. 使用用户项目中已有的官方编译器，版本与项目**完全一致**。

@@ -13,6 +13,7 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 > Idea-stage repository. No code yet.
 
 Design: [docs/en/design-v0.md](docs/en/design-v0.md) (developer tool design v0)
+Architecture: [docs/en/architecture.md](docs/en/architecture.md) (functional core, ports and adapters, monorepo and crate boundaries)
 Language survey: [docs/en/language-survey.md](docs/en/language-survey.md) (survey of target languages and UI stacks, recommended order)
 Analysis approaches: [docs/en/analysis-approaches.md](docs/en/analysis-approaches.md) (how code-analysis AI tools work, recommended analyzer stack for dui)
 Translations and glossary: [docs/i18n.md](docs/i18n.md)
@@ -57,7 +58,7 @@ All 38 stacks in priorities 1–3 are official support targets; the priority is 
 ## How each family is rendered
 | Family | Examples | How to render | Difficulty |
 |---|---|---|---|
-| Web | React, Vite, Next.js, Solid, Preact | Render in a browser with mocks (MSW, module mocks) | Easy |
+| Web | React, Vite, Next.js, Solid, Preact | Render in Chromium over CDP with injected state and intercepted requests | Easy |
 | Web-based desktop | Electron, Tauri | Same as web (Tauri: mock `invoke`) | Easy |
 | Native | GPUI (pippip) | Render per state in an in-app gallery mode | Labor-intensive |
 

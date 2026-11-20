@@ -4,6 +4,7 @@ English | [简体中文](../zh-CN/design-v0.md) | [한국어](../ko/design-v0.md
 
 > Status: draft · written 2026-11-19 · audience: developers building dui
 > External facts in this document (licenses, star counts, versions) were checked with the GitHub API on 2026-11-19. Anything not confirmed is marked `unconfirmed`.
+> Code structure, patterns, ports, and crate boundaries: [Architecture](architecture.md) (decided 2026-11-20). Where the two overlap, the architecture document wins for code structure.
 
 > **Positioning**: design-generation tools show *how it will be built*: AI imagines screens that do not exist yet. dui shows *how it is actually built*: it reads existing code through the official compilers and really renders every state that exists. Nothing is invented; what cannot be shown is marked `unverified` or `unrenderable`.
 
@@ -65,6 +66,8 @@ Every component below is designed for this split: anything a person would "run" 
 Why types are the key: with types we can (a) enumerate state shapes completely, (b) generate valid mock values automatically, and (c) get a first-pass check from whether the injection code passes the compiler.
 
 ## 4. Architecture
+
+This section is the component view. How the code is split into a pure core, three ports (`TypeOracle`, `Host`, `Renderer`), adapters, and crates is defined in [Architecture](architecture.md).
 
 ```mermaid
 flowchart LR
@@ -273,7 +276,7 @@ Precondition rule: screen state lives in Entities / models. State scattered insi
 - **Changed 2026-11-19**: the core is Rust, so the code graph is **built in-house on tree-sitter + oxc** inside the dui binary. Graphify is Python and cannot be the embedded engine.
 - **Graphify** (Apache-2.0, ★150,430, checked 2026-11-19) is now **reference only (ideas)**: ~40 languages via tree-sitter and `EXTRACTED` / `INFERRED` tags on every edge (confirmed in the README). dui keeps the idea and extends the tags to `extracted` / `inferred` / `verified`.
 - **CodeGraph** (MIT, ★78,082, checked 2026-11-19): reference only for framework-aware routes (confirmed in the README).
-- To keep the graph engine replaceable, dui has only one internal interface, `CodeGraphPort` (read nodes and edges).
+- The code graph is a pure data structure in `dui-core`, built only from parser facts. It is not a port: ports exist only at I/O boundaries ([Architecture §2.2](architecture.md#22-ports--adapters)).
 
 ## 11. Canvas
 
@@ -324,13 +327,13 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 
 | Milestone | Content | Done when |
 |---|---|---|
-| **M0 spike** | One obora-web screen: review (obora will move to TS 7 first; TS < 7 is `unsupported`). Render 5 hand-picked states at 3 widths with oxc-transform injection + CDP Fetch interception + Chromium via CDP, all driven by the Rust binary | At least one local state injected from outside and rendered; 15 images |
-| **M1 automatic states** | Analyzer + mock generator + planner. Auto-enumerate data shapes and code branches, measure coverage, fill-in loop | Branch coverage number for the review screen, list of unverified cells |
+| **M0 spike** | One obora-web screen: review (obora will move to TS 7 first; TS < 7 is `unsupported`). Render 5 hand-picked states at 3 widths with oxc-transform injection + CDP Fetch interception + Chromium via CDP, all driven by the Rust binary | [Architecture §7](architecture.md#7-m0-and-m1-gates) M0 gates (15 cell IDs and 15 images, read-back value match, 0 `__dui` in production) |
+| **M1 automatic states** | Analyzer + mock generator + planner. Auto-enumerate data shapes and code branches, measure coverage, fill-in loop | [Architecture §7](architecture.md#7-m0-and-m1-gates) M1 gates (branch and cell coverage in JSON, unverified list, same results from CLI and MCP) |
 | **M2 GPUI spike** | One pippip screen. Check offscreen rendering, prototype the `#[dui::state]` macro | State file → one image |
 | **M3 sequence states** | Extract event → state-change rules, expand, verify by CDP replay, mark edges `verified` | Sequence states such as "after approving the last page" on the review screen generated and verified automatically |
 | **M4 canvas** | React Flow canvas (rows = states, columns = widths, edges = transitions, unverified and unrenderable marks); the AI agent opens it via CLI / MCP (`dui open`), humans only view it | All 3 obora screens laid out |
 | **M5 obora 99% attempt** | 99% target for the 3 screens, apply the explicit-state rule, Figma export | Coverage report per screen |
-| M6 and later | All of pippip, Electron (obora-desktop), Vue, Svelte | — |
+| M6 and later | All of pippip, Electron (obora-desktop), then the remaining stacks in [Supported frameworks](supported-frameworks.md) priority order | — |
 
 ## 14. Risks and open questions
 
@@ -387,7 +390,7 @@ Principle:
 | MCP server | `rmcp` 3.11.0 (official SDK, [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk)) | Apache-2.0 (workspace `Cargo.toml`; GitHub shows NOASSERTION) | Same operations as the CLI + reading canvas comments |
 | Fast scan | `tree-sitter` 0.27.2 | MIT | Screen and file lists, any language |
 | TS/JS parsing + injection transform | `oxc` 0.159.0 (`oxc_parser`, `oxc_semantic`, `oxc_transformer`) | MIT | Replaces Babel / SWC / Vite plugins |
-| Code graph | In-house on tree-sitter + oxc, behind `CodeGraphPort` | — | Graphify (Python) and CodeGraph are reference only |
+| Code graph | In-house on tree-sitter + oxc, a pure data structure in `dui-core` (no port) | — | Graphify (Python) and CodeGraph are reference only |
 | TS types | `TypeOracle` → TypeScript adapter → the project's official compiler | Apache-2.0 ([microsoft/TypeScript](https://github.com/microsoft/TypeScript)) | See "TypeScript compiler status" below. If types are unavailable, the result is `inferred` |
 | Rust types | `ra_ap_*` (pinned; `ra_ap_hir` 0.0.363) + `syn` 3.0.10 | MIT OR Apache-2.0 | `ra_ap_*` has no compatibility guarantee → pin |
 | Web rendering | `chromiumoxide` 0.9.1 (released 2026-02-25), Chromium over CDP, one viewport per width | MIT OR Apache-2.0 | Last release 2026-02-25 → watch maintenance |
@@ -402,7 +405,7 @@ Principle:
 
 ### Language adapters: the core is language-agnostic
 
-- The Rust core knows no language. Each language plugs in through one **language adapter** = `TypeOracle` (type info from the official compiler) + injector + **renderer plugin**.
+- The Rust core knows no language. Each language plugs in through one **language adapter** = a `TypeOracle` (type info from the official compiler) + the dev-only injection transform. Dev servers plug in as `Host` adapters and render environments as `Renderer` adapters ([Architecture](architecture.md)).
 - **Adding a language = adding one adapter.** The core does not change.
 - **Compiler resolution policy**:
   1. Use the official compiler already in the user's project, with the **exact version** the project uses.
