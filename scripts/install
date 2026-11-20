@@ -1,0 +1,40 @@
+#!/bin/sh
+# Build the current main branch for the installing machine.
+set -eu
+
+fail() { printf 'dui: %s\n' "$*" >&2; exit 1; }
+
+main() {
+    case $(uname -s) in Darwin|Linux) ;; *) fail "source installation supports macOS and Linux" ;; esac
+    for tool in git rustc cargo node npm; do
+        command -v "$tool" >/dev/null 2>&1 || fail "install $tool before running the installer"
+    done
+    [ "$(node -p 'process.versions.node.split(".")[0]')" = 26 ] || fail "Node.js 26 is required"
+    dest=${DUI_INSTALL_DIR:-"$HOME/.local/bin"}
+    case $dest in /*) ;; *) dest=$PWD/$dest ;; esac
+    [ ! -d "$dest/dui" ] || fail "installation path is a directory: $dest/dui"
+
+    work=$(mktemp -d "${TMPDIR:-/tmp}/dui-source.XXXXXXXX")
+    case $work in /*) ;; *) work=$PWD/$work ;; esac
+    pending=''
+    trap 'rm -rf "$work"; if [ -n "$pending" ]; then rm -f "$pending"; fi' EXIT
+    trap 'exit 1' HUP INT TERM
+
+    git clone --depth 1 --branch main https://github.com/de-novo/dui.git "$work/src"
+    cd "$work/src"
+    npm ci --include=dev
+    host=$(rustc -vV | sed -n 's/^host: //p')
+    [ -n "$host" ] || fail "could not determine the Rust host target"
+    cargo build --locked --release --bin dui --target "$host" --target-dir "$work/build"
+    binary="$work/build/$host/release/dui"
+    "$binary" --version
+
+    mkdir -p "$dest"
+    pending=$(mktemp "$dest/.dui.XXXXXXXX")
+    install -m 755 "$binary" "$pending"
+    mv -f "$pending" "$dest/dui"
+    pending=''
+    printf 'Installed %s/dui\n' "$dest"
+}
+
+main "$@" </dev/null

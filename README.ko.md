@@ -1,119 +1,44 @@
-# dui (de-novo-ui)
+# dui
 
 [English](README.md) | [简体中文](README.zh-CN.md) | 한국어
 
-> 이 문서는 [영어 원문](README.md)의 한국어 번역이다. 내용이 다르면 영어가 기준이다.
+dui는 웹 앱에 목데이터를 넣고, 상태와 화면 폭을 바꿔 가며 Chromium에 실제로 그려진 화면을 검증한다. 사람은 로컬 HTML 갤러리에서 캡처를 보고, 에이전트는 CLI와 MCP로 같은 결과를 JSON으로 읽는다.
 
-> **비전 (2026-11-19)**: dui는 *잘 만든 프로덕트*만 지원한다. 상태가 타입으로, API가 DTO로 명확하면 모든 화면·상태·폭이 한 캔버스에 그려진다. 다 그려지면 좋은 코드, `미검증`이 많으면 상태 관리가 흐트러졌다는 신호다. 목표는 UI 코드 품질의 업계 표준: ① 지원 기준을 공개 규칙(+lint)으로, ② "UI 상태 커버리지 %" 한 숫자로, ③ 상태 그래프·스냅샷은 오픈 포맷으로.
+## 설치
 
-> **위치**: 디자인 생성 도구는 *이렇게 만들 것이다*를 보여준다: 아직 없는 화면을 AI가 상상해서 그린다. dui는 *실제로 이렇게 만들어져 있다*를 보여준다: 공식 컴파일러로 지금 있는 코드를 읽고, 실제로 존재하는 모든 상태를 진짜로 렌더한다. 아무것도 지어내지 않는다. 보여줄 수 없는 것은 `미검증` 또는 `렌더 불가`로 표시한다.
+macOS와 Linux에서 아래 명령으로 설치한다. Git, Rust/Cargo, Node.js 26, npm이 필요하다.
 
-> **원칙 #1 — AI 네이티브 (2026-11-19)**: dui는 AI 네이티브다. **모든 건 AI가 쓰고, 사람은 캔버스만 본다.** AI 에이전트가 `dui` CLI와 MCP 서버로 dui를 돌린다(분석·주입·렌더·검증, `미검증` 칸 수정까지). 사람은 캔버스(화면 × 상태 × 폭 × 전환)만 보고 칸에 코멘트를 남긴다. AI가 코멘트를 읽고 코드를 고치면 캔버스가 다시 그려진다. [설계 §0](docs/ko/design-v0.md#0-핵심-원칙-ai-네이티브) 참고.
+```sh
+curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
+```
 
-> **원칙 #2 — 공식 컴파일러 의존 (2026-11-19)**: dui는 각 언어의 **공식 컴파일러·툴체인**에 기댄다(TypeScript: Microsoft `typescript` 패키지의 `tsc`, 7.0 이상만, Rust: `rustc` + rust-analyzer, 나중에 Swift: `swiftc` + SourceKit-LSP, Kotlin: `kotlinc`). 프로젝트에 이미 있는 공식 컴파일러를 그대로 쓰고, 타입 검사를 다시 만들지 않는다. 비공식·대체 컴파일러와 툴체인은 `미지원`이다. 스택마다 현재 최신 안정 메이저만 지원한다. [설계: 기술 스택](docs/ko/design-v0.md#기술-스택-2026-11-19-결정) 참고.
+설치기는 `main` 소스를 설치하는 기기의 Rust 호스트 타깃으로 빌드해 `~/.local/bin/dui`에 설치한다. 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. [미리 빌드된 바이너리 설치](docs/binary-install.md)
 
-> 아이디어 단계 레포. 아직 코드 없음.
+## 첫 캡처
 
-설계 문서: [docs/ko/design-v0.md](docs/ko/design-v0.md) (개발자 도구 설계 v0)
-아키텍처: [docs/ko/architecture.md](docs/ko/architecture.md) (함수형 코어, 포트와 어댑터, 모노레포와 crate 경계)
-언어 조사: [docs/ko/language-survey.md](docs/ko/language-survey.md) (대상 언어·UI 스택 전수조사, 추천 순서)
-분석 방식 조사: [docs/ko/analysis-approaches.md](docs/ko/analysis-approaches.md) (코드 분석 AI 도구들의 접근법, dui 분석기 스택 추천)
-작업 흐름: [docs/ko/workflow.md](docs/ko/workflow.md) (Discussions, 이슈, 라벨, 마일스톤, 프로젝트 보드, PR)
+소스에서 빌드해 예제를 실행하려면 Unix 환경, Rust edition 2024를 지원하는 도구 체인, Node.js 26과 npm, Chromium 또는 Google Chrome이 필요하다. 브라우저를 자동으로 찾지 못하면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다.
 
-## 한 줄
-코드베이스를 읽어서 앱의 **모든 화면 × 모든 상태 × 반응형 폭**을 Figma처럼 무한 캔버스에 한눈에 펼쳐 보여주는 도구. 웹과 데스크톱 앱(네이티브 포함)을 같이 다룬다.
+저장소 루트에서 실행한다.
 
-## 왜 (욕구)
-- 피그마에서 디자인 보듯, **실제 코드가 그린 화면**을 상태값별로 한 번에 보고 싶다.
-- QA·리뷰 때 "이 화면의 빈 상태/로딩/오류/권한 없음은 어떻게 생겼지?"를 일일이 띄워보지 않고 바로 확인.
-- 빠진 상태(아직 그려본 적 없는 상태)가 눈에 보여야 한다.
+```sh
+npm ci
+cargo build --release --locked
+npm ci --prefix fixtures/typed-api
+target/release/dui run fixtures/typed-api fixtures/typed-api/dui.json .dui/shelf
+```
 
-## 핵심 개념
-- **노드 = 화면 + 그 화면의 상태** (예: 검수 화면 / 마지막 장 승인 후).
-- **선 = 상태 전환** (어떤 조건·동작으로 다음 상태로 가는지). 조건부 이동도 상태로 표현 → 앱 전체가 하나의 상태 그래프.
-- 노드마다 **목 데이터**를 넣어 그 상태를 렌더링. 상호작용(내부 핸들링)은 필요 없음, 정지 화면이면 충분.
-- 노드 하나를 가로로 펼치면 **반응형 폭**(모바일·태블릿·데스크톱), 필요하면 라이트/다크·언어 축 추가.
-- 확인 못 한 칸은 `미검증`으로 표시.
+브라우저에서 `.dui/shelf/graph.html`을 열면 책 세 권이 담긴 768px 화면 한 칸이 **검증됨**으로 표시된다. dui는 앱의 `fetchShelf()` 반환 타입을 읽어 `GET /api/shelf` 응답을 생성한다. 세 번째 책이 화면에 나타나야 검증을 통과한다. [앱 소스](fixtures/typed-api/main.tsx) · [캡처 설정](fixtures/typed-api/dui.json)
 
-## 목표: 99% 커버리지 (감이 아니라 측정)
-1. 화면 코드 분기(if, 로딩·오류·빈 상태, 권한별)를 **코드 커버리지로 측정** → "화면 분기 중 몇 %를 실제로 그려봤나".
-2. 목 데이터는 **타입/API 스키마(OpenAPI, zod 등)에서 자동 생성** → 빈 값, 긴 값, 오류 응답 같은 경계값 포함.
-3. 안 그려진 분기가 나오면 AI가 그 분기로 들어가는 목을 만들어 다시 렌더 → 99%까지 반복.
-4. 우리 코드는 화면 상태를 타입·상태 기계로 **명시**하게 규칙화 → 상태 목록 자체를 100% 정확하게.
+## 내 프로젝트에 적용하기
 
-## 그래프 추출
-- 정적 분석: 라우터, 링크, `navigate()`/`router.push()`, 메뉴 항목 → 뼈대.
-- AI 추론: 조건부 이동, 동적 주소 → `추정` 표시.
-- 실행 기록: 실제로 돌아다닌 기록과 겹쳐 검증.
+현재 웹 캡처는 Vite 8과 Chromium을 사용한다. 먼저 대상 프로젝트의 의존성을 설치한다. dui는 프로젝트에 설치된 공식 TypeScript 6.x 또는 7.x 컴파일러로 타입을 조회한다. React 앱은 19.x를 지원하며, dui 자체 어댑터는 TypeScript 7로 빌드한다.
 
-## 지원 프레임워크
+캡처 설정에는 시작 경로, 화면 폭, 콘텐츠가 준비됐음을 확인할 CSS 선택자를 지정한다. 화면이 여러 개면 시작 화면의 탐색 링크에서 경로를 수집할 수 있다. 보고서에서 **한 칸**은 경로 하나의 상태 하나를 특정 폭으로 캡처할 자리다.
 
-우선순위 1–3의 38개 스택은 모두 공식 지원 대상이고, 우선순위는 구현 순서일 뿐이다. 아직 미지원인 11개 스택은 막힌 점이 풀리는 즉시 추가한다(대부분: 공식 도구가 TypeScript 7을 받아들일 때). 버전, 이유, 열린 질문: [docs/ko/supported-frameworks.md](docs/ko/supported-frameworks.md).
+- [캡처 레퍼런스](docs/ko/reference.md) — 경로와 목데이터를 설정하고, 검증률을 해석하고, CLI·MCP로 실행을 자동화한다.
+- [기여 가이드 · English](CONTRIBUTING.md) — 변경할 크레이트와 규칙 팩의 위치, 검증 명령을 확인한다.
+- [설계](docs/ko/design-v0.md) · [아키텍처](docs/ko/architecture.md) · [지원 예정 스택](docs/ko/supported-frameworks.md)
 
-| 우선순위 | 개수 | 스택 |
-|---|---:|---|
-| 우선순위 1 (MVP) | 8 | TypeScript, Node.js, React, Vite, TanStack Router, TanStack Query, zod, Chromium (Chrome stable) |
-| 우선순위 2 | 15 | Rust, GPUI (`gpui-pre`), gpui-component / gpui-kit, Zustand, Redux Toolkit, Jotai, XState, React Hook Form, valibot, Next.js, React Router, TanStack Start, Electron, Radix UI, shadcn/ui |
-| 우선순위 3 | 15 | Solid, SolidStart, Preact, Rspack / Rsbuild, Tauri, Dioxus, Leptos, egui, Iced, React Native, Expo, Flutter / Dart, SwiftUI / Swift, Jetpack Compose / Kotlin, Compose Multiplatform |
-| 아직 미지원 | 11 | Vue, Nuxt, Svelte, SvelteKit, Astro, Angular, Qwik, Remix, Turbopack, Slint, Playwright |
+## 라이선스
 
-## 계열별 렌더 방법
-| 계열 | 예 | 렌더 방식 | 난이도 |
-|---|---|---|---|
-| 웹 | React, Vite, Next.js, Solid, Preact | CDP로 Chromium에서 렌더, 상태 주입과 요청 가로채기 | 쉬움 |
-| 웹 기반 데스크톱 | Electron, Tauri | 웹과 동일 (Tauri는 invoke 목) | 쉬움 |
-| 네이티브 | GPUI (pippip) | 앱 안의 갤러리 모드로 상태별 렌더 | 손 많이 감 |
-
-웹 계열은 공통 엔진 하나 + 프레임워크별 화면 목록 읽기만 얇게. 네이티브는 프레임워크 안에 갤러리 모드를 붙인다.
-
-## 보는 곳 (캔버스)
-- 1안: **Figma**에 자동 배치 (화면별 한 줄, 상태는 가로, 폭은 옆). Figma 커넥터로 바로 시제품 가능.
-- 2안: React Flow(MIT)로 자체 무한 캔버스. 코드 바뀌면 자동 갱신. tldraw는 프로덕션 사용에 별도 상업 라이선스가 필요해 보류([설계 문서](docs/ko/design-v0.md) §11).
-
-## 비슷한 것들 (조사 2026-11-19)
-- Storybook (+AI 워크플로·MCP): 상태별 스토리, 실제 코드. 단 목록 형태, 웹만.
-- Figma: 캔버스지만 디자인 파일이지 실제 코드가 아님.
-- Selfloop: 코드 읽고 화면 그래프·흐름 테스트. 웹·모바일만, 데스크톱 언급 없음.
-- UI Verify, Chromatic, Percy: 화면 비교(시각 회귀). 캔버스·상태 그래프 아님.
-- XState: 상태 기계 시각화. 사람이 직접 작성, 실제 화면 없음.
-- AgentController, Peekaboo: macOS 앱을 AI가 조작·캡처하는 MCP.
-
-**빈자리**: 실제 코드가 그린 화면을, 웹·데스크톱 가리지 않고, 상태 그래프 + 반응형까지 무한 캔버스에 펼쳐주는 도구는 아직 못 찾음.
-
-## 첫 시제품 후보
-obora 웹 화면 몇 개(검수, 내보내기, 설정)를 상태별·폭별로 렌더해 Figma 파일 하나에 자동 배치. 이후 obora 데스크톱(기존 상태 갤러리), 그다음 pippip(GPUI).
-
-## 바닥 엔진 후보: 코드 지식 그래프 오픈소스 (2026-11-19)
-함수 호출·의존 그래프는 이미 잘 만드는 오픈소스가 있다. dui는 이걸 바닥으로 쓰고 **상태 전환 층**만 얹는다.
-- [Graphify](https://github.com/Graphify-Labs/graphify/) (★ 약 15만, Apache-2.0): tree-sitter로 ~40개 언어, `graph.html` 시각화, 선마다 `EXTRACTED`/`INFERRED` 표시. **1순위 후보**.
-- [CodeGraph](https://github.com/colbymchenry/codegraph/) (★ 약 7.8만, MIT): 자동 갱신, 웹 라우트↔핸들러 연결, Tauri 웹↔Rust 호출 추적.
-- ~~[GitNexus](https://github.com/abhigyanpatwari/GitNexus/)~~ (★ 약 4.9만): PolyForm Noncommercial 라이선스라 **제외**.
-
-### 상태 전환 층 (dui가 만드는 것)
-호출 그래프 = "함수 A가 B를 부른다"(코드 구조). dui가 원하는 것 = "이 상태에서 이 동작을 하면 이 상태/화면이 된다"(화면 동작).
-1. 화면의 이벤트(onClick, 단축키 등)를 시작점으로 잡는다.
-2. 호출 그래프를 따라 상태 변경 지점(setState, store action, reducer, GPUI `cx.notify()`)까지 간다.
-3. `상태 + 이벤트 → 다음 상태` 규칙으로 바꾼다.
-4. 처음 상태부터 규칙을 자동으로 펼쳐 도달 가능한 상태·순서를 모두 만든다(모델 검사 방식). 무한 펼침은 대표값(0, 1, 마지막, 마지막 다음)으로 자른다.
-5. 경로를 재생해 실제로 그 상태가 렌더되는지 검증한다.
-
-선마다 Graphify처럼 `추출됨`(코드에 명시) / `추정됨`(AI 추론) / `검증됨`(재생 확인)을 표시한다.
-
-## 상태 추출 가능성 정리
-| 종류 | 예 | 방법 | 정확도 |
-|---|---|---|---|
-| 데이터 모양 | 빈 목록, 1개, 아주 많음, 긴 텍스트, 값 없음 | 타입·API 스키마에서 목 자동 생성 | 높음 |
-| 코드 분기 | loading, error, 권한, `length === 0` | 정적 분석 + 커버리지 측정 | 높음 (99% 목표 가능) |
-| 순서로 생기는 상태 | 업로드 중, 마지막 장 승인 후, 입력하다 만 모달 | 이벤트→상태 변경 추적 + 펼치기 + 재생 | 중간 → 상태를 한 타입/reducer에 모으는 규칙으로 높임 |
-
-## 라이선스·참고 정책 (2026-11-19, 오픈소스 전제로 갱신)
-dui는 **오픈소스**로 공개할 예정이다(공개 시점은 준혁 승인 후, 지금은 비공개). 참고한 프로젝트 때문에 문제가 생기지 않도록 아래를 지킨다.
-
-1. **코드 복사 금지가 기본.** 다른 프로젝트는 설계·아이디어만 참고하고, 코드는 직접 쓴다. 문서에 "참고"라고 적힌 항목(React Compiler, GATOR, CodeGraph, react-docgen-typescript, eslint-plugin-react-hooks, XState 등)은 모두 아이디어 참고이고 코드 복사가 아니다.
-2. **가져다 쓰는 건 의존성으로만.** MIT·Apache-2.0·BSD·ISC만 의존성으로 허용한다. 소스를 잘라 붙여야 할 일이 생기면 같은 허용 라이선스일 때만, 원본 경로·커밋·라이선스를 `THIRD_PARTY_NOTICES`에 남긴다.
-3. **금지 라이선스는 열어보고 베끼지도 않는다.** GPL·AGPL·LGPL·PolyForm Noncommercial·SSPL·BSL·tldraw 라이선스처럼 제약이 있는 코드(GitNexus, Serena, Semgrep 엔진, FlowDroid, CodeQL 등)는 구현할 때 소스를 보지 않는다(클린룸). 공개 문서·논문 수준의 개념만 쓴다.
-4. **AI가 쓴 코드도 같은 기준.** AI 에이전트에게 "특정 프로젝트 코드를 가져오지 말 것, 의존성은 허용 라이선스만"을 작업 규칙으로 준다. 의존성 라이선스는 CI에서 자동 검사한다(예: `license-checker`, `cargo-deny`).
-5. **이름·상표.** Storybook, Figma, Graphify 같은 남의 이름을 제품명·패키지명에 쓰지 않는다. "~와 호환" 같은 설명에만 쓴다.
-6. **dui 자체 라이선스: Apache-2.0 (확정, 2026-11-19).** 특허 허여 조항이 있어 기업이 쓰기 편하고, 업계 표준을 노리기에 유리하다. 기여자에게는 DCO(커밋 서명, `git commit -s`)를 받는다. 전문은 [LICENSE](LICENSE), 고지는 [NOTICE](NOTICE), 기여 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md).
-7. **다국어 (2026-11-19 결정).** 프로젝트 문서는 영어·중국어(간체)·한국어 세 언어로 둔다. **영어가 기준**이고, 바꿀 때는 영어를 먼저 고치고 같은 PR에서 중국어·한국어를 맞추거나 "outdated" 배너를 단다. 규칙과 용어집: [docs/i18n.md](docs/i18n.md).
-8. **공개 전 점검:** 저장소 전체에서 외부 코드 조각·비밀값·내부 경로(obora/pippip 내부 정보) 검사.
+[Apache License 2.0](LICENSE)

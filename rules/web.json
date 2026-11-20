@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "package": "react",
+      "symbol": "useState",
+      "kind": "slot"
+    },
+    {
+      "package": "@tanstack/react-router",
+      "symbol": "createFileRoute",
+      "kind": "route"
+    },
+    {
+      "package": "@tanstack/react-query",
+      "symbol": "useQuery",
+      "kind": "query"
+    },
+    {
+      "package": "zod",
+      "symbol": "_enum",
+      "kind": "schema"
+    }
+  ]
+}

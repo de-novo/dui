@@ -1,0 +1,581 @@
+import type {
+  Syntax,
+  Type,
+  Shape,
+  Manifest,
+  Rule,
+  Fact,
+} from "./contracts.mjs";
+import type {
+  NodeHandle,
+  UnionType,
+  LiteralType,
+} from "typescript/unstable/sync";
+import type { SourceFile } from "typescript/unstable/ast";
+type Declaration = Syntax | NodeHandle;
+type Diagnostic = { code: number };
+
+// The installed project compiler owns resolution, alias chasing and all type queries.
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { resolve, relative, join, sep, dirname } from "node:path";
+import { pathToFileURL } from "node:url";
+
+const [root, specPath, rulesPath] = process.argv.slice(2);
+const spec: Manifest = JSON.parse(readFileSync(specPath, "utf8"));
+const rules: Rule[] = [
+  rulesPath,
+  ...(spec.rulePacks ?? []).map((p) => resolve(dirname(specPath), p)),
+].flatMap((path) => {
+  const pack = JSON.parse(readFileSync(path, "utf8"));
+  if (
+    pack.schemaVersion !== 1 ||
+    !Array.isArray(pack.rules) ||
+    Object.keys(pack).some((k) => !["schemaVersion", "rules"].includes(k))
+  )
+    throw Error("unsupported rule pack: " + path);
+  return pack.rules;
+});
+const kinds = new Set(["slot", "route", "query", "schema"]);
+const entries = new Set();
+for (const rule of rules) {
+  const id = JSON.stringify([rule.package, rule.symbol]);
+  if (
+    typeof rule.package !== "string" ||
+    !rule.package ||
+    typeof rule.symbol !== "string" ||
+    !rule.symbol ||
+    !kinds.has(rule.kind) ||
+    entries.has(id) ||
+    Object.keys(rule).some((k) => !["package", "symbol", "kind"].includes(k))
+  )
+    throw Error("invalid rule: " + id);
+  entries.add(id);
+}
+const require = createRequire(join(root, "package.json"));
+const appRequire = createRequire(
+  join(resolve(root, spec.appRoot ?? "."), "package.json"),
+);
+const versions: Record<string, string> = {};
+function unsupported(reason: string): never {
+  process.stderr.write(JSON.stringify({ status: "unsupported", reason }));
+  process.exit(4);
+}
+for (const [name, major] of Object.entries({
+  react: 19,
+  "react-dom": 19,
+  vite: 8,
+  "@tanstack/react-router": 1,
+  "@tanstack/react-query": 5,
+  zod: 4,
+})) {
+  let actual;
+  try {
+    actual = appRequire(name + "/package.json").version;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") continue;
+    throw error;
+  }
+  if (!/^\d+\.\d+\.\d+$/.test(actual) || Number(actual.split(".")[0]) !== major)
+    unsupported(name + " requires stable " + major + ".x; found " + actual);
+  versions[name] = actual;
+}
+async function loadOfficial(part: string) {
+  for (const prefix of ["typescript/", "typescript/unstable/"]) {
+    let path;
+    try {
+      path = require.resolve(prefix + part);
+    } catch (error) {
+      if (
+        ["ERR_PACKAGE_PATH_NOT_EXPORTED", "MODULE_NOT_FOUND"].includes(
+          (error as NodeJS.ErrnoException).code ?? "",
+        )
+      )
+        continue;
+      throw error;
+    }
+    return import(pathToFileURL(path).href);
+  }
+  throw Error(
+    "installed TypeScript does not expose the required official " +
+      part +
+      " API",
+  );
+}
+// Only the compiler API boundary differs. Both versions use the same fact extractor.
+async function openCompiler() {
+  if (require("typescript/package.json").version.startsWith("6.")) {
+    const ts = require("typescript");
+    return {
+      version: ts.version,
+      enums: ts,
+      ast: ts,
+      project(config: string) {
+        const parsed = ts.getParsedCommandLineOfConfigFile(
+          config,
+          {},
+          {
+            ...ts.sys,
+            onUnRecoverableConfigFileDiagnostic(diagnostic: {
+              messageText: unknown;
+            }) {
+              throw Error(
+                ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+              );
+            },
+          },
+        );
+        if (!parsed) throw Error("compiler did not open " + config);
+        const program = ts.createProgram({
+          rootNames: parsed.fileNames,
+          options: parsed.options,
+          projectReferences: parsed.projectReferences,
+        });
+        return {
+          program,
+          checker: program.getTypeChecker(),
+          rootFiles: parsed.fileNames as string[],
+          configDiagnostics: parsed.errors as Diagnostic[],
+          diagnostics: (sf: SourceFile) => [
+            ...program.getSyntacticDiagnostics(sf),
+            ...program.getSemanticDiagnostics(sf),
+          ],
+        };
+      },
+      declaration: (node?: Declaration) => node as Syntax | undefined,
+      declarationPath: (node?: Declaration) =>
+        (node as Syntax | undefined)?.getSourceFile().fileName,
+      unionMembers: (type: Type) => (type as Type & { types: Type[] }).types,
+    };
+  }
+  const enums = await loadOfficial("sync");
+  const ast = await loadOfficial("ast");
+  const api = new enums.API({ cwd: root });
+  return {
+    version: require("typescript/package.json").version,
+    enums,
+    ast,
+    project(config: string) {
+      const project = api
+        .updateSnapshot({ openProjects: [config] })
+        .getProject(config);
+      if (!project) throw Error("compiler did not open " + config);
+      const { program, checker, rootFiles } = project;
+      return {
+        program,
+        checker,
+        rootFiles: rootFiles as string[],
+        configDiagnostics: [],
+        diagnostics: (sf: SourceFile) => [
+          ...program.getSyntacticDiagnostics(sf.fileName),
+          ...program.getSemanticDiagnostics(sf.fileName),
+        ],
+      };
+    },
+    declaration: (handle?: Declaration) =>
+      (handle as NodeHandle | undefined)?.resolve() as Syntax | undefined,
+    declarationPath: (handle?: Declaration) =>
+      (handle as NodeHandle | undefined)?.path,
+    unionMembers: (type: Type) => (type as UnionType).getTypes(),
+    close: () => api.close(),
+  };
+}
+const compiler = await openCompiler();
+const { SymbolFlags, TypeFlags, SignatureKind } = compiler.enums;
+const { SyntaxKind: K, NodeFlags } = compiler.ast;
+try {
+  const sourceFiles = new Set();
+  const allFacts: Fact[] = [],
+    allDiagnostics = [];
+  for (const scope of [spec, ...(spec.additionalScopes ?? [])]) {
+    const config = resolve(root, scope.tsconfig ?? "tsconfig.json");
+    const project = compiler.project(config);
+    const { program, checker } = project;
+    const localFiles = project.rootFiles
+      .filter((f) => !f.includes("/node_modules/") && !f.endsWith(".d.ts"))
+      .map((f) => relative(root, f));
+    const dirs = scope.sourceDirs ?? [];
+    const files = [
+      ...new Set([
+        ...(scope.sources ?? (dirs.length ? [] : localFiles)),
+        ...localFiles.filter((file) =>
+          dirs.some((dir) => file.startsWith(dir + "/")),
+        ),
+      ]),
+    ].sort();
+    const facts: Fact[] = [];
+    const diagnostics = project.configDiagnostics.map((d) => ({
+      file: relative(root, config),
+      code: d.code,
+    }));
+    function renderedText(node: Syntax | undefined) {
+      if (
+        !node ||
+        node.kind !== K.JsxElement ||
+        node.children.length !== 1 ||
+        node.children[0].kind !== K.JsxText
+      )
+        return null;
+      return node.children[0].getText().trim() || null;
+    }
+    function binding(node: Syntax) {
+      const decl = compiler.declaration(
+        checker.getSymbolAtLocation(node)?.valueDeclaration,
+      );
+      return decl &&
+        decl.getSourceFile().fileName === node.getSourceFile().fileName
+        ? decl.getStart()
+        : null;
+    }
+    function predicate(expr: Syntax) {
+      if (expr.kind === K.Identifier)
+        return { binding: binding(expr), operator: "truthy" };
+      if (
+        expr.kind === K.BinaryExpression &&
+        expr.left.kind === K.Identifier &&
+        expr.operatorToken.kind === K.EqualsEqualsEqualsToken &&
+        [
+          K.StringLiteral,
+          K.NumericLiteral,
+          K.TrueKeyword,
+          K.FalseKeyword,
+        ].includes(expr.right.kind)
+      ) {
+        const literal = checker.getTypeAtLocation(expr.right);
+        const rep = shape(literal);
+        if (rep.kind === "literal")
+          return {
+            binding: binding(expr.left),
+            operator: "equals",
+            value: rep.value,
+          };
+      }
+      return null;
+    }
+    const shape = (t: Type | undefined, depth = 0): Shape => {
+      if (!t || depth > 3) return { kind: "unknown" };
+      if (t.flags & TypeFlags.Union)
+        return {
+          kind: "union",
+          members: compiler.unionMembers(t).map((v) => shape(v, depth + 1)),
+        };
+      if (t.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral))
+        return { kind: "literal", value: (t as LiteralType).value };
+      if (t.flags & TypeFlags.BooleanLiteral)
+        return { kind: "literal", value: checker.typeToString(t) === "true" };
+      if (t.flags & TypeFlags.Null) return { kind: "literal", value: null };
+      if (t.flags & TypeFlags.Boolean) return { kind: "boolean" };
+      if (t.flags & TypeFlags.String) return { kind: "string" };
+      if (t.flags & TypeFlags.Number) return { kind: "number" };
+      if (checker.isArrayType(t))
+        return {
+          kind: "array",
+          item: shape(checker.getTypeArguments(t)[0], depth + 1),
+        };
+      return { kind: "unknown" };
+    };
+    function symbol(node: Syntax) {
+      let sym = checker.getSymbolAtLocation(node);
+      if (sym && sym.flags & SymbolFlags.Alias)
+        sym = checker.getAliasedSymbol(sym);
+      return sym;
+    }
+    // Bind the JSON decoder to the fetch that produced its Response.
+    function unwrap(node: Syntax | undefined): Syntax | undefined {
+      while (
+        node &&
+        [K.ParenthesizedExpression, K.AwaitExpression].includes(node.kind)
+      )
+        node = node.expression;
+      return node;
+    }
+    function responseContract(call: Syntax) {
+      const access = call.expression;
+      if (access.name?.text !== "json" || call.arguments.length) return;
+      let request = unwrap(access.expression);
+      if (request && request.kind === K.Identifier) {
+        const decl = compiler.declaration(symbol(request)?.valueDeclaration);
+        if (
+          !decl ||
+          decl.kind !== K.VariableDeclaration ||
+          !(decl.parent.flags & NodeFlags.Const)
+        )
+          return;
+        request = unwrap(decl.initializer);
+      }
+      if (
+        !request ||
+        request.kind !== K.CallExpression ||
+        request.arguments.length !== 1
+      )
+        return;
+      const fetchSymbol = symbol(request.expression.name ?? request.expression);
+      if (
+        fetchSymbol?.name !== "fetch" ||
+        !fetchSymbol.declarations?.some((d: Declaration) =>
+          /\/lib\.dom\.d\.ts$/.test(compiler.declarationPath(d) ?? ""),
+        )
+      )
+        return;
+      const url = request.arguments[0];
+      if (
+        url.kind !== K.StringLiteral ||
+        !/^\/(?!\/)/.test(url.text) ||
+        /[\\#]/.test(url.text)
+      )
+        return;
+      let result = call;
+      while (
+        [K.AwaitExpression, K.ParenthesizedExpression].includes(
+          result.parent.kind,
+        )
+      )
+        result = result.parent;
+      let annotation;
+      if (
+        [
+          K.AsExpression,
+          K.TypeAssertionExpression,
+          K.VariableDeclaration,
+        ].includes(result.parent.kind)
+      )
+        annotation = result.parent.type;
+      let type = annotation && checker.getTypeFromTypeNode(annotation);
+      if (!annotation && result.parent.kind === K.ReturnStatement) {
+        let fn = result.parent.parent;
+        while (
+          fn &&
+          ![
+            K.FunctionDeclaration,
+            K.ArrowFunction,
+            K.MethodDeclaration,
+            K.FunctionExpression,
+          ].includes(fn.kind)
+        )
+          fn = fn.parent;
+        const ret = fn?.type && checker.getTypeFromTypeNode(fn.type);
+        if (ret?.getSymbol()?.name === "Promise")
+          type = checker.getTypeArguments(ret)[0];
+      }
+      let budget = 180;
+      function describe(t: Type | undefined, depth: number): Shape {
+        if (!t || --budget < 0 || depth > 9) return { kind: "unknown" };
+        if (t.flags & TypeFlags.Union)
+          return {
+            kind: "union",
+            members: compiler
+              .unionMembers(t)
+              .map((x) => describe(x, depth + 1)),
+          };
+        if (checker.isArrayType(t))
+          return {
+            kind: "array",
+            item: describe(checker.getTypeArguments(t)[0], depth + 1),
+          };
+        if (t.flags & TypeFlags.Object) {
+          const props = checker.getPropertiesOfType(t);
+          if (
+            checker.isTupleType(t) ||
+            checker.getIndexInfosOfType(t).length ||
+            !props.length ||
+            props.length > 48 ||
+            checker.getSignaturesOfType(t, SignatureKind.Call).length ||
+            checker.getSignaturesOfType(t, SignatureKind.Construct).length
+          )
+            return { kind: "unknown" };
+          const fields = [];
+          for (const p of props) {
+            if (p.flags & SymbolFlags.Optional) continue;
+            const decl = compiler.declaration(p.declarations?.[0]);
+            if (
+              !decl ||
+              ![
+                K.PropertySignature,
+                K.PropertyDeclaration,
+                K.PropertyAssignment,
+              ].includes(decl.kind)
+            )
+              return { kind: "unknown" };
+            fields.push({
+              name: p.name,
+              shape: describe(
+                checker.getTypeOfSymbolAtLocation(p, call),
+                depth + 1,
+              ),
+            });
+          }
+          fields.sort((a, b) =>
+            a.name < b.name ? -1 : Number(a.name > b.name),
+          );
+          return { kind: "object", fields };
+        }
+        return shape(t);
+      }
+      return { path: url.text, shape: describe(type, 0) };
+    }
+    for (const filename of files) {
+      sourceFiles.add(filename);
+      const sf = program.getSourceFile(resolve(root, filename));
+      if (!sf) throw Error("not in compiler project: " + filename);
+      for (const d of project.diagnostics(sf))
+        diagnostics.push({ file: filename, code: d.code });
+      function walk(n: Syntax, owner: string) {
+        if (
+          (n.kind === K.FunctionDeclaration ||
+            n.kind === K.MethodDeclaration) &&
+          n.name
+        )
+          owner = n.name.getText();
+        if (
+          n.kind === K.ArrowFunction &&
+          n.parent.kind === K.VariableDeclaration
+        )
+          owner = n.parent.name.getText();
+        const start = n.getStart(sf);
+        const base = {
+          file: filename,
+          owner,
+          start,
+          end: n.end,
+          line: sf.getLineAndCharacterOfPosition(start).line + 1,
+        };
+        const jsxGuard =
+          n.kind === K.BinaryExpression &&
+          n.parent.kind === K.JsxExpression &&
+          [K.AmpersandAmpersandToken, K.BarBarToken].includes(
+            n.operatorToken.kind,
+          );
+        if (
+          n.kind === K.IfStatement ||
+          n.kind === K.ConditionalExpression ||
+          jsxGuard
+        ) {
+          const expr = jsxGuard ? n.left : (n.expression ?? n.condition);
+          const showRight =
+            jsxGuard && n.operatorToken.kind === K.AmpersandAmpersandToken;
+          facts.push({
+            ...base,
+            kind: "branch",
+            label: expr.getText(),
+            predicate: predicate(expr),
+            textWhenTrue: renderedText(showRight ? n.right : n.whenTrue),
+            textWhenFalse: renderedText(
+              jsxGuard && !showRight ? n.right : n.whenFalse,
+            ),
+            condition: [expr.getStart(sf), expr.end],
+          });
+        }
+        if (
+          n.kind === K.JsxOpeningElement ||
+          n.kind === K.JsxSelfClosingElement
+        ) {
+          const sym = symbol(n.tagName);
+          const decl = sym?.valueDeclaration;
+          const declPath = compiler.declarationPath(decl);
+          if (declPath && !declPath.includes("/node_modules/"))
+            facts.push({
+              ...base,
+              kind: "renders",
+              label: sym.name,
+              target: relative(root, declPath).split(sep).join("/"),
+            });
+        }
+        if (n.kind === K.CallExpression) {
+          const contract = responseContract(n);
+          if (contract)
+            facts.push({
+              ...base,
+              kind: "httpResponse",
+              label: contract.path,
+              ...contract,
+            });
+          const fn = n.expression;
+          const sym = symbol(fn.name ?? fn);
+          const path = compiler.declarationPath(sym?.declarations?.[0]) ?? "";
+          const rule = rules.find(
+            (r) =>
+              sym?.name === r.symbol &&
+              (path.includes("/node_modules/" + r.package + "/") ||
+                path.includes("/node_modules/@types/" + r.package + "/")),
+          );
+          if (
+            rule?.kind === "slot" &&
+            n.parent.kind === K.VariableDeclaration &&
+            n.parent.name.elements?.[0]?.name
+          ) {
+            const name = n.parent.name.elements[0].name;
+            const t = checker.getTypeAtLocation(name);
+            const stmt = n.parent.parent.parent;
+            facts.push({
+              ...base,
+              kind: "slot",
+              binding: binding(name),
+              setter:
+                n.parent.name.elements[1]?.name?.kind === K.Identifier
+                  ? n.parent.name.elements[1].name.getText()
+                  : null,
+              label: name.getText(),
+              type: t ? checker.typeToString(t) : "unknown",
+              shape: shape(t),
+              init:
+                n.arguments.length === 1
+                  ? [n.arguments[0].getStart(sf), n.arguments[0].end]
+                  : null,
+              after:
+                stmt.kind === K.VariableStatement &&
+                stmt.parent.kind === K.Block
+                  ? stmt.end
+                  : null,
+            });
+          } else if (rule?.kind === "query") {
+            const t = checker.getTypeAtLocation(n);
+            const prop = t && checker.getPropertyOfType(t, "data");
+            facts.push({
+              ...base,
+              kind: rule.kind,
+              label: sym.name,
+              shape: prop
+                ? shape(checker.getTypeOfSymbolAtLocation(prop, n))
+                : { kind: "unknown" },
+            });
+          } else if (rule)
+            facts.push({
+              ...base,
+              kind: rule.kind,
+              label:
+                rule.kind === "route" &&
+                n.arguments[0]?.kind === K.StringLiteral
+                  ? n.arguments[0].text
+                  : sym.name,
+            });
+        }
+        n.forEachChild((child) => {
+          walk(child as Syntax, owner);
+        });
+      }
+      walk(sf, "(module)");
+    }
+    allFacts.push(...facts);
+    allDiagnostics.push(...diagnostics);
+  }
+  const unique = new Map(
+    allFacts.map((f) => [JSON.stringify([f.file, f.start, f.end, f.kind]), f]),
+  );
+  console.log(
+    JSON.stringify({
+      sourceFiles: [...sourceFiles].sort(),
+      versions,
+      compiler: compiler.version,
+      diagnostics: allDiagnostics,
+      facts: [...unique.values()].sort(
+        (a, b) =>
+          (a.file < b.file ? -1 : a.file > b.file ? 1 : 0) ||
+          a.start - b.start ||
+          b.end - a.end ||
+          (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0),
+      ),
+    }),
+  );
+} finally {
+  compiler.close?.();
+}

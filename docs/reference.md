@@ -1,0 +1,89 @@
+# Capture reference
+
+[Quickstart](../README.md) · [한국어](ko/reference.md)
+
+## Capture manifest
+
+Pass a JSON manifest to `dui run PROJECT MANIFEST OUTPUT`. `PROJECT` is the target app’s directory. The paths supplied on the command line are relative to the current working directory or absolute.
+
+```json
+{
+  "path": "/",
+  "widths": [375, 768, 1280],
+  "readySelector": "main article",
+  "routeSelector": "nav a[href]",
+  "stateBudget": 12
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `path` | Required. Same-origin entry path starting with `/`. Include the query string or hash for routes that use them. |
+| `widths` | Required. One or more positive viewport widths in CSS pixels. |
+| `readySelector` | Required for capture. Choose an element that appears when the intended content has loaded. An app shell can appear before its data. |
+| `routeSelector` | Collect matching same-origin anchors from the entry page’s default state across the requested widths. Discovery follows one level. |
+| `scenarios` | Array of overrides for extra cases. For example, `[{"path":"/settings","readySelector":"form"}]` adds a screen with its own readiness check. |
+| `stateBudget` | Maximum states to attempt per scenario, each at every width. Defaults to 32, clamped to 1–512. |
+| `requiredRequests` | Paths that must return a 2xx response. A required request with a generated mock must receive that mock. |
+| `responseChecks` | Compare named fields in a JSON response, for example `{"/api/status":{"ready":true}}`. |
+| `tsconfig` · `appRoot` | Paths relative to `PROJECT`. Defaults are `tsconfig.json` for analysis and `.` for Vite. |
+| `rulePacks` | Additional rule files, resolved relative to the manifest. See the [rule pack schema](../rules/schema.json). |
+
+## Mock responses
+
+**Typed JSON.** dui recognizes same-origin GET requests with a static path and a typed `response.json()` result. It generates representative values for supported shapes, including three entries for arrays. Inspect `facts.json → autoMocks.generated` for payloads and `autoMocks.unresolved` for detected contracts it could not synthesize. Dynamic URLs, custom API clients, and server-side requests fall outside automatic JSON synthesis.
+
+**Explicit JSON.** Set `mockResponses` to a map from request path to JSON value. An entry takes precedence over a generated response at that path. For example, `{"mockResponses":{"/api/shelf":{"books":[]}}}` exercises an empty shelf. Give that scenario a readiness selector for its empty state.
+
+**CSV.** The request path, a sample inside the project, and column roles determine the generated feed. Column indices start at zero. This fragment preserves the header, assigns a stable name to each distinct nonempty label, and rotates pairs of values together by one row. Other columns retain their sample values.
+
+```json
+{
+  "csvMocks": {
+    "/usage.csv": {
+      "sample": "public/usage.csv",
+      "headers": true,
+      "labelColumns": [0],
+      "valueColumns": [1, 2]
+    }
+  }
+}
+```
+
+## Read a run
+
+| File in `OUTPUT` | What to inspect |
+| --- | --- |
+| `graph.html` | Default captures by route and width, with a graph for exploring individual states and their evidence. Open locally alongside the PNG files. |
+| `report.json` | Cell status and reason, screenshot path, compiler diagnostics, and coverage counts. `cells[].observation.fulfilledMocks` lists generated mocks actually served. |
+| `facts.json` | Compiler facts, state candidates’ source locations, and generated responses. |
+| `graph.json` | Nodes and edges for tools that consume the graph. |
+
+A **cell** represents one scenario, state, and width. `verified` means the observed route, width, readiness, required requests, and applicable state checks passed. `unverified` includes failed checks and queued states left beyond the budget (`not-rendered`). `unrenderable` records an environment limitation. An unsupported project is rejected before capture.
+
+**Cell coverage** is `coverage.verified / coverage.renderable`. If all six routes are captured at three widths, that accounts for 18 baseline cells. Additional planned states still count in the denominator. Use `observedBranchOutcomes` and `branchOutcomes` to inspect branch coverage separately.
+
+## CLI and MCP
+
+The table uses `dui` for the built binary at `target/release/dui`. `PLAN` is the original run’s `report.json`. Give `replay` a new output directory, then use that same directory with `replay-report`.
+
+| CLI | MCP | Operation |
+| --- | --- | --- |
+| `dui scan PROJECT MANIFEST` | `scan(project, manifest)` | Print compiler facts and generated mocks. |
+| `dui run PROJECT MANIFEST OUTPUT` | `run(project, manifest, output)` | Build the app, capture cells, and write the gallery. |
+| `dui replay PROJECT MANIFEST PLAN OUTPUT` | `replay(project, manifest, plan, output)` | Attempt every cell in a saved plan, including pending states. |
+| `dui replay-report MANIFEST PLAN OUTPUT` | `replay_report(manifest, plan, output)` | Recompute the report from saved evidence. |
+
+The CLI also provides `check-ts PROJECT` to check the installed compiler, `plan FIXTURE` to expand explicit states and widths into jobs, and `exercise PROJECT MANIFEST OUTPUT PORT` to capture against an already running local host.
+
+For MCP, configure a stdio server with the binary’s absolute path as the command and `["mcp"]` as its arguments. Tool paths are strings. A call returns a JSON-encoded result in `content[].text` and sets `isError` when the operation reports failure or incomplete verification.
+
+The CLI writes JSON to standard output. A capture can write a usable report and exit with code 5.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Command completed successfully. |
+| 2 | Invalid input, manifest, or replay plan. |
+| 3 | Execution or I/O failure. |
+| 4 | Unsupported project or toolchain. |
+| 5 | Some cells are unverified or unrenderable. Inspect `report.json` for reasons. |

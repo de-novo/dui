@@ -1,0 +1,86 @@
+#!/bin/sh
+# Generated for one dui release. Pin asset downloads even when fetched via latest.
+set -eu
+
+fail() { printf 'dui: %s\n' "$*" >&2; exit 1; }
+
+target() {
+    case $(uname -m) in
+        arm64|aarch64) cpu=aarch64 ;;
+        x86_64|amd64) cpu=x86_64 ;;
+        *) fail "unsupported CPU: $(uname -m)" ;;
+    esac
+    case $(uname -s) in
+        Darwin) printf '%s-apple-darwin\n' "$cpu" ;;
+        Linux)
+            if getconf GNU_LIBC_VERSION >/dev/null 2>&1; then
+                libc=gnu
+            elif ldd --version 2>&1 | grep -qi musl; then
+                libc=musl
+            else
+                fail "could not identify the Linux C library"
+            fi
+            printf '%s-unknown-linux-%s\n' "$cpu" "$libc"
+            ;;
+        *) fail "unsupported OS: $(uname -s)" ;;
+    esac
+}
+
+fetch() {
+    case $source_dir in
+        https://*)
+            curl --proto '=https' --proto-redir '=https' -fsSL \
+                -o "$work/$1" "${source_dir%/}/$1" ;;
+        *) cp "$source_dir/$1" "$work/$1" ;;
+    esac
+}
+
+main() {
+    [ "$#" -le 1 ] || fail "usage: sh install.sh [DIRECTORY | HTTPS_URL]"
+    version='@VERSION@'
+    if [ "$#" -eq 1 ]; then
+        source_dir=$1
+    else
+        case ${0##*/} in
+            bash|sh|dash|-bash|-sh)
+                source_dir="https://github.com/de-novo/dui/releases/download/v$version" ;;
+            *) source_dir=$(dirname "$0") ;;
+        esac
+    fi
+    case $source_dir in
+        https://*) ;;
+        *://*) fail "remote releases require HTTPS" ;;
+        /*) ;;
+        *) source_dir=$PWD/$source_dir ;;
+    esac
+    platform=$(target)
+    name=dui-$version-$platform
+    archive=$name.tar.gz
+    dest=${DUI_INSTALL_DIR:-"$HOME/.local/bin"}
+    case $dest in /*) ;; *) dest=$PWD/$dest ;; esac
+
+    work=$(mktemp -d "${TMPDIR:-/tmp}/dui-install.XXXXXXXX")
+    pending=''
+    trap 'rm -rf "$work"; if [ -n "$pending" ]; then rm -f "$pending"; fi' EXIT
+    trap 'exit 1' HUP INT TERM
+    fetch "$archive.sha256"
+    fetch "$archive"
+    if command -v sha256sum >/dev/null 2>&1; then
+        checksum=$(cd "$work" && sha256sum "$archive")
+    else
+        checksum=$(cd "$work" && shasum -a 256 "$archive")
+    fi
+    [ "$checksum" = "$(cat "$work/$archive.sha256")" ] || fail "checksum mismatch for $archive"
+
+    mkdir -p "$dest"
+    [ ! -d "$dest/dui" ] || fail "installation path is a directory: $dest/dui"
+    pending=$(mktemp "$dest/.dui.XXXXXXXX")
+    tar -xzOf "$work/$archive" "$name/dui" > "$pending"
+    [ -s "$pending" ] || fail "empty executable in $archive"
+    chmod 755 "$pending"
+    mv -f "$pending" "$dest/dui"
+    pending=''
+    printf 'Installed %s at %s/dui\n' "$name" "$dest"
+}
+
+main "$@"
