@@ -85,7 +85,7 @@ coverage(&[Verification]) -> Coverage
 
 - ID 和单位用 **newtype**：`CellId`、`SymbolId`、`StateId`、`Width(u32)`。
 - **智能构造器**：外部输入在边界处用 `TryFrom` / `Result` 解析一次（解析，而不是校验）。私有字段让无效值无法被构造。
-- 状态用**代数数据类型**：`Evidence = Extracted | Inferred`；`CellStatus = Verified | Unverified(reason) | Suspect(reason) | Unrenderable(reason)`；项目级 `Support = Supported | Unsupported(reason)`。对我们自己枚举的每个 `match` 都是穷尽的。
+- 状态用**代数数据类型**：`Evidence = Extracted | Inferred`；`CellStatus = Verified | Unverified(reason) | Unrenderable(reason)`；项目级 `Support = Supported | Unsupported(reason)`。对我们自己枚举的每个 `match` 都是穷尽的。
 - **工作区 lint**（根 `Cargo.toml` 的 `[workspace.lints.clippy]`）：`unwrap_used = "deny"`，`wildcard_enum_match_arm = "deny"`。通配 lint 保护我们的内部枚举；在端口边界匹配外部 `#[non_exhaustive]` 枚举时，可以局部使用 `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]`。
 
 ### 2.4 确定性变换
@@ -157,21 +157,24 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 |---|---|---|
 | 规则包 | 带版本的小型 JSON schema。没有 ast-grep YAML 语法层 | 匹配基于编译器解析出的符号和类型，而不是语法形状 |
 | WASM 插件 | 推迟到 M0 / M1 之后。先用进程内 Rust crate + 有类型 JSON 编译器 sidecar。只有当外部贡献者必须发布规则包数据无法表达的代码时才重新考虑 | 当前边界由内置适配器和数据规则包满足；编译器和浏览器本来就是进程 |
-| 版本跟踪机器人 | Renovate，**仅作为外部服务**。它在同一个 PR 中更新 `stacks.toml`（fixture 的精确版本）和 lockfile。绝不打包进 dui。提高支持基线仍只在 dui 主版本发布时进行 | 它能跟踪 `stacks.toml` 这类自定义文件。Renovate 是 AGPL-3.0，因此其代码绝不随 dui 发布 |
+| 版本跟踪机器人 | Renovate，**仅作为外部服务**。它在同一个 PR 中更新 依赖目录（npm fixture 的精确版本）和 lockfile。绝不打包进 dui。提高支持基线仍只在 dui 主版本发布时进行 | 它能跟踪 `stacks.toml` 这类自定义文件。Renovate 是 AGPL-3.0，因此其代码绝不随 dui 发布 |
 | 黄金渲染用 Chromium | 黄金 CI 固定一个**精确的稳定版构建**。普通运行记录所用的 Chromium 版本 | 区分浏览器变化和应用变化。黄金运行还固定 OS、字体、时钟、随机数和动画；更新 PR 审查差异 |
 | salsa | 推迟到性能分析表明与变更无关的重复计算是主要瓶颈时（例如在 MCP 编辑循环中）。先用内容哈希缓存，键为阶段输入加工具和规则包版本 | 核心是纯的，所以以后可以加入增量查询而无需重写 |
 
 ## 5. Monorepo 布局
 
-dui 是一个**多语言 monorepo**：Rust 用 Cargo 工作区，TypeScript 部分用 pnpm 工作区，另有数据、fixture、文档和工具。`stacks.toml` 是受支持技术栈的唯一事实来源。
+目标布局是一个**多语言 monorepo**：Rust 用 Cargo 工作区，TypeScript 部分用 pnpm 工作区，另有数据、fixture、文档和工具。`stacks.toml` 是受支持技术栈的唯一事实来源。
+
+当前 npm 包的版本在 [dependency-catalog.json](../../dependency-catalog.json) 中修改，然后运行 `npm run deps:sync`。CI 运行 `npm run deps:check` 检查清单和锁文件。Rust crate 从根目录的 `[workspace.dependencies]` 继承版本要求。该目录管理 dui 自身及测试项目的依赖。支持基线在发布时单独确定。
 
 ```text
 dui/
 ├── Cargo.toml                 # Cargo workspace root: members, [workspace.lints], shared versions
 ├── clippy.toml                # disallowed methods / types for the core (§6.2)
+├── dependency-catalog.json    # exact npm versions for tooling, apps and fixtures
 ├── pnpm-workspace.yaml        # JS workspace: packages/*, apps/*
 ├── package.json
-├── stacks.toml                # single source of truth: supported stacks, baselines, exact fixture versions, adapter + pack mapping
+├── stacks.toml                # single source of truth: supported stacks, baselines, adapter + pack mapping
 ├── renovate.json              # config for the external Renovate service
 ├── crates/
 │   ├── dui-core/              # pure functional core
@@ -245,9 +248,10 @@ flowchart BT
    - 每个适配器在工作区内只依赖 `dui-ports` / `dui-core`；
    - `dui-app` 不依赖任何适配器；
    - 只有 `dui-cli` 产出二进制文件。
-4. **许可证**（`cargo xtask check-licenses`，加上 Rust 的 `cargo-deny` 和 pnpm 工作区的同等检查）：直接和传递依赖必须是 MIT、Apache-2.0、BSD-2-Clause / BSD-3-Clause、ISC 或 Zlib。
+4. **许可证**（`cargo xtask check-licenses`，加上 Rust 的 `cargo-deny` 和 pnpm 工作区的同等检查）：直接和传递依赖必须是 MIT、Apache-2.0、BSD-2-Clause / BSD-3-Clause、ISC 或 Zlib。 仅限构建的例外：允许 Vite 和 Tailwind 为处理 CSS 而间接安装未经修改的 `lightningcss`（MPL-2.0）及其官方平台二进制包。构建工具还可将未经修改的 `tslib`（0BSD）作为可选的间接开发依赖安装。浏览器资源、Rust 可执行文件和发布归档中不得包含其代码或二进制文件。其他依赖仍须遵守允许列表。
 5. **生成文件是最新的**：`cargo xtask gen` 的输出（三语言框架表、CI 矩阵）必须与提交的文件一致。
 6. **Fixture**：`stacks.toml` 的每个条目都有 fixture 和经过审查的快照。
+7. **Web 和工具源码**：Oxlint 检查 TypeScript、React 钩子与 JSX 无障碍规则。Oxfmt 检查 TypeScript 和 CSS 格式。本地和 PR 均运行 `npm run check:style`，使用 `npm run format` 应用格式。
 
 ## 7. M0 和 M1 验收标准
 
@@ -264,7 +268,7 @@ flowchart BT
 3. 对审阅界面，JSON 输出分别给出**已执行目标分支 / 全部目标分支**和**已验证格子 / 可渲染格子**，并附上运行时在分母之外发现的分支、未验证列表和无法渲染的原因。补全循环在没有改进或达到配置上限时停止。
 4. 对相同输入，CLI 和 MCP 返回相同的计划和判定。
 
-后续里程碑保持[设计 v0 §13](design-v0.md#13-mvp-范围与里程碑)中的安排：M2 GPUI 渲染，M3 序列重放，M4 人用画布，M5 99% 尝试。
+发行顺序见[路线图](roadmap.md)，v0.0.2 的实现遵循 [Web 查看器架构](web-viewer.md)。
 
 ## 8. 剩余风险
 

@@ -83,7 +83,7 @@ coverage(&[Verification]) -> Coverage
 
 - **Newtypes** for IDs and units: `CellId`, `SymbolId`, `StateId`, `Width(u32)`.
 - **Smart constructors**: outside input is parsed once with `TryFrom` / `Result` at the boundary (parse, don't validate). Private fields make invalid values impossible to build.
-- **Algebraic data types** for statuses: `Evidence = Extracted | Inferred`; `CellStatus = Verified | Unverified(reason) | Suspect(reason) | Unrenderable(reason)`; project-level `Support = Supported | Unsupported(reason)`. Every `match` on our own enums is exhaustive.
+- **Algebraic data types** for statuses: `Evidence = Extracted | Inferred`; `CellStatus = Verified | Unverified(reason) | Unrenderable(reason)`; project-level `Support = Supported | Unsupported(reason)`. Every `match` on our own enums is exhaustive.
 - **Workspace lints** (root `Cargo.toml`, `[workspace.lints.clippy]`): `unwrap_used = "deny"`, `wildcard_enum_match_arm = "deny"`. The wildcard lint protects our internal enums; a match on a foreign `#[non_exhaustive]` enum at a port boundary may use a local `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]`.
 
 ### 2.4 Deterministic transforms
@@ -155,21 +155,24 @@ Order mistakes are compile errors:
 |---|---|---|
 | Rule packs | Versioned small JSON schema. No ast-grep YAML syntax layer | Matching is on compiler-resolved symbols and types, not syntax shapes |
 | WASM plugins | Deferred past M0 / M1. In-process Rust crates + typed JSON compiler sidecars first. Revisit only when outside contributors must ship code that rule-pack data cannot express | The current boundaries are met by built-in adapters and data packs; compilers and browsers are processes anyway |
-| Version tracking bot | Renovate, **as an external service only**. It updates `stacks.toml` (exact fixture versions) and the lockfiles in the same PR. Never bundled in dui. Raising a support baseline still happens only in a dui major release | It can track custom files such as `stacks.toml`. Renovate is AGPL-3.0, so its code never ships with dui |
+| Version tracking bot | Renovate, **as an external service only**. It updates the dependency catalog (exact npm fixture versions) and the lockfiles in the same PR. Never bundled in dui. Raising a support baseline still happens only in a dui major release | It can track custom files such as `stacks.toml`. Renovate is AGPL-3.0, so its code never ships with dui |
 | Chromium for golden renders | Golden CI pins an **exact stable build**. Normal runs record the Chromium version used | Separates browser changes from app changes. Golden runs also fix OS, fonts, clock, randomness, and animations; update PRs review the diffs |
 | salsa | Deferred until profiling shows recomputation unrelated to the change is the main bottleneck (e.g. in the MCP edit loop). Content-hash cache first, keyed by stage inputs plus tool and pack versions | The core is pure, so incremental queries can be added later without a rewrite |
 
 ## 5. Monorepo layout
 
-dui is a **polyglot monorepo**: a Cargo workspace for Rust, a pnpm workspace for the TypeScript parts, plus data, fixtures, docs, and tooling. `stacks.toml` is the single source of truth for supported stacks.
+The target layout is a **polyglot monorepo**: a Cargo workspace for Rust, a pnpm workspace for the TypeScript parts, plus data, fixtures, docs, and tooling. `stacks.toml` is the single source of truth for supported stacks.
+
+For the current npm packages, edit [dependency-catalog.json](../../dependency-catalog.json) and run `npm run deps:sync`. CI runs `npm run deps:check` to check manifests and lockfiles. Rust crates inherit dependency requirements from the root `[workspace.dependencies]`. The catalog controls dui’s own dependencies and fixtures. Support baselines are a separate release decision.
 
 ```text
 dui/
 ├── Cargo.toml                 # Cargo workspace root: members, [workspace.lints], shared versions
 ├── clippy.toml                # disallowed methods / types for the core (§6.2)
+├── dependency-catalog.json    # exact npm versions for tooling, apps and fixtures
 ├── pnpm-workspace.yaml        # JS workspace: packages/*, apps/*
 ├── package.json
-├── stacks.toml                # single source of truth: supported stacks, baselines, exact fixture versions, adapter + pack mapping
+├── stacks.toml                # single source of truth: supported stacks, baselines, adapter + pack mapping
 ├── renovate.json              # config for the external Renovate service
 ├── crates/
 │   ├── dui-core/              # pure functional core
@@ -243,9 +246,10 @@ Arrows point from the user to the provider. Adapters have no arrows between them
    - each adapter depends only on `dui-ports` / `dui-core` inside the workspace;
    - `dui-app` depends on no adapter;
    - only `dui-cli` produces a binary.
-4. **Licenses** (`cargo xtask check-licenses`, plus `cargo-deny` for Rust and an equivalent check for the pnpm workspace): direct and transitive dependencies must be MIT, Apache-2.0, BSD-2-Clause / BSD-3-Clause, ISC, or Zlib.
+4. **Licenses** (`cargo xtask check-licenses`, plus `cargo-deny` for Rust and an equivalent check for the pnpm workspace): direct and transitive dependencies must be MIT, Apache-2.0, BSD-2-Clause / BSD-3-Clause, ISC, or Zlib. Build-only exception: unmodified `lightningcss` (MPL-2.0) and its official platform binaries may be installed transitively by Vite and Tailwind to process CSS. Build tooling may also install unmodified `tslib` (0BSD) as an optional transitive development dependency. Exclude their code and binaries from browser assets, the Rust executable, and release archives. All other dependencies follow the allowlist.
 5. **Generated files are current**: `cargo xtask gen` output (framework tables in 3 languages, CI matrix) must match the committed files.
 6. **Fixtures**: every `stacks.toml` entry has a fixture and reviewed snapshots.
+7. **Web and tooling sources**: Oxlint checks TypeScript, React hooks and JSX accessibility. Oxfmt checks TypeScript and CSS formatting. Local and PR checks use `npm run check:style`. Apply formatting with `npm run format`.
 
 ## 7. M0 and M1 gates
 
@@ -262,7 +266,7 @@ Arrows point from the user to the provider. Adapters have no arrows between them
 3. For the review screen, JSON output gives **executed target branches / all target branches** and **verified cells / renderable cells** separately, plus branches found at runtime outside the denominator, the unverified list, and unrenderable reasons. The fill-in loop stops on no improvement or at the configured limit.
 4. CLI and MCP return the same plan and verdicts for the same input.
 
-Later milestones stay as in [design v0 §13](design-v0.md#13-mvp-scope-and-milestones): GPUI rendering in M2, sequence replay in M3, the human canvas in M4, the 99% attempt in M5.
+Use the [roadmap](roadmap.md) for release order and the [web viewer architecture](web-viewer.md) for the v0.0.2 implementation contract.
 
 ## 8. Remaining risks
 

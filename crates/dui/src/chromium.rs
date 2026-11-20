@@ -419,7 +419,11 @@ impl Browser {
                 break;
             }
         }
-        if let Some(selector) = spec["routeSelector"].as_str() {
+        // Route discovery may stop at the entry page. Map evidence comes from every screen.
+        let link_selector = spec["routeSelector"]
+            .as_str()
+            .or_else(|| spec.get("screenDiscovery").map(|_| "a[href]"));
+        if let Some(selector) = link_selector {
             let selector = serde_json::to_string(selector)?;
             let links = self.call(s, "Runtime.evaluate", json!({"expression": format!("globalThis.__duiRuntime.links({selector})"), "returnByValue": true}))?;
             v["links"] = links["result"]["value"]

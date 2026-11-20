@@ -52,7 +52,7 @@
 - 결과는 측정 가능해야 한다(분모·분자가 있는 커버리지).
 
 **비목표**
-- 캔버스 안에서 클릭·입력 같은 상호작용. 정지 화면만 보여준다.
+- 저장된 캡처 이미지 안에 직접 입력하는 기능. v0.0.2의 라이브 상태 검사는 실행 중인 앱에서 수행한다.
 - 시각 회귀 테스트(픽셀 비교 승인 흐름). Chromatic·Percy 영역이다. 나중에 붙일 수는 있다.
 - 타입 없는 JavaScript, Python, Dart, Swift, Kotlin 등. (v0 범위 밖)
 - 프로덕션 빌드에 SDK를 남기는 것. 모든 주입 코드는 개발 빌드 전용이다.
@@ -188,7 +188,6 @@ interface RenderCell {        // 캔버스의 칸 하나 = 상태 × 폭(× 축)
 type VerificationStatus =
   | { kind: "verified" }                          // 검증 통과
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
-  | { kind: "suspect"; reason: string };          // 시각 검사만 실패, 사람 확인 필요
   | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // 이 환경에서 렌더 불가; "렌더링 한계" 참고
 ```
 
@@ -220,7 +219,7 @@ type VerificationStatus =
 
 1. **값 확인**(필수): 렌더 직후 주입한 슬롯의 실제 값을 다시 읽어 의도한 값과 같은지. 다르면 주입 실패.
 2. **의미 확인**(필수): 상태에서 자동 생성한 단언을 DOM·접근성 트리(웹) 또는 GPUI 요소 트리(네이티브, 가능 여부 `미확인`)에 대해 검사. 예: "빈 목록 상태 → 목록 항목 0개 + 빈 안내 문구 존재", "오류 상태 → role=alert 존재".
-3. **시각 확인**(보조): AI가 이미지를 보고 상태 설명과 맞는지 판정. 이것만 실패하면 `suspect`.
+3. **시각 확인** 시각적 차이는 리뷰 근거로 기록한다. 검증기는 세 가지 칸 상태 중 하나를 반환한다.
 
 추가로 **커버리지 확인**: 그 상태가 덮으려던 분기(`targets`)가 실제로 실행됐는지 커버리지로 확인. 안 됐으면 `unverified: assert-failed`.
 
@@ -283,6 +282,18 @@ pippip은 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, HTTP는 `reqwest` 사용(Cargo.
 ## 11. 캔버스
 
 배치: **행 = 화면×상태, 열 = 폭(및 테마·언어 축), 선 = 전환**. 미검증 칸은 회색 빗금 + 이유.
+
+<a id="web-viewer"></a>
+
+### 웹 뷰어
+
+**v0.0.2 웹 뷰어는 React 19와 TypeScript 7로 작성한다. 라우팅과 빌드는 TanStack Start, 조작 요소는 shadcn/ui, 레이아웃과 테마 토큰은 Tailwind CSS, 화면 지도는 React Flow를 사용한다.** Start의 SPA 모드로 정적 진입 페이지를 빌드한다. Rust 바이너리가 이 페이지와 리소스, 로컬 캡처 데이터를 제공한다. 뷰어 주소를 직접 열면 진입 페이지를 표시하고, 없는 캡처나 리소스를 요청하면 해당 오류를 반환한다. 기존 독립 HTML 갤러리도 계속 열 수 있게 한다. [SPA 모드](https://tanstack.com/start/latest/docs/framework/react/guide/spa-mode)
+
+선택 항목은 프로젝트·실행·화면·상태·캡처 폭으로 식별한다. 검증된 라우트 매개변수를 사용해 지도와 상세 보기 사이의 이동, 브라우저 뒤로 가기, 새로고침 후에도 선택을 유지한다. 지도와 화면 목록 양쪽에서 키보드로 이동할 수 있게 한다. 캡처 옆에는 보고서의 검증 상태와 이유를 표시한다. [라우터 검색 매개변수](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [shadcn/ui](../../.agents/skills/shadcn/SKILL.md)
+
+**유지보수 경계.** 캡처 근거, 검증 판정, 커버리지 계산은 Rust가 맡는다. 뷰어는 저장된 보고서와 그래프를 한 곳에서 읽어 지도·목록·상세 보기가 함께 쓰는 타입으로 변환한다. 이전 기록에 없는 선택 필드도 그곳에서 처리한다. 알 수 없는 상태나 잘못된 필수 필드는 읽을 수 있는 오류로 표시한다. 선택한 칸은 라우터, 지도 배치·이동·확대는 React Flow, 메뉴 열림 같은 임시 상태는 해당 컴포넌트가 관리한다.
+
+[웹 뷰어 아키텍처](web-viewer.md)
 
 | 후보 | 라이선스(2026-11-19 확인) | 판단 |
 |---|---|---|
@@ -353,8 +364,7 @@ dui는 Whiteboard를 **내장하지 않는다**: Code-OSS를 통째로 포함(ve
 2. 커버리지 분모에서 "화면에 영향 없는 분기"를 어떻게 자동으로 빼나. 이 규칙이 99%의 의미를 결정한다.
 3. 순서 상태의 펼침 한도(깊이, 대표값)를 얼마로 잡아야 실용적인 렌더 수 안에서 의미 있는 상태를 다 덮나.
 4. TS 어댑터가 Rust에서 TS 7.1 API를 어떻게 부를지(`typescript/sync`를 쓰는 작은 Node 사이드카, 또는 문서화된 통신 프로토콜. 후자는 `미확인`).
-5. 캔버스를 로컬 웹 앱으로 낼지(AI 에이전트가 `dui open` 실행, 사람은 보기만) 호스팅 서비스로 낼지. 호스팅이면 스냅샷 저장 비용·보안 검토 필요.
-6. Figma 내보내기의 요금·API 한도 (`미확인`).
+5. Figma 내보내기의 요금·API 한도 (`미확인`).
 
 ## 원칙: 조합은 AI가 아니라 시스템이 만든다 (2026-11-19 결정)
 AI는 상태가 **어디 있고 무슨 타입인지 찾는 데만** 쓴다. 어떤 조합을 그릴지는 결정적 알고리즘으로 정해서 매번 같은 결과가 나오게 한다.
@@ -398,7 +408,7 @@ AI는 상태가 **어디 있고 무슨 타입인지 찾는 데만** 쓴다. 어�
 | 웹 렌더 | `chromiumoxide` 0.9.1 (2026-02-25 출시), CDP로 Chromium 구동, 폭마다 뷰포트 하나 | MIT OR Apache-2.0 | 마지막 출시 2026-02-25 → 유지보수 지켜보기 |
 | 네트워크 가로채기 | CDP Fetch 도메인 (chromiumoxide의 `Fetch.pdl`, `examples/interception.rs`) | — | MSW 없음 |
 | GPUI 렌더 | 나중에 같은 Rust 프로세스 안에서 (`gpui-pre`) | Apache-2.0 | §9.2 참고 |
-| 캔버스 UI | React + React Flow, 정적 파일을 Rust 바이너리가 직접 띄움 | MIT | 사람은 이것만 본다(§0) |
+| 캔버스 UI | React 19, TanStack Start, shadcn/ui, Tailwind CSS, React Flow | 패키지별 검토(§12) | TypeScript 7 빌드, Rust가 정적 리소스 제공 |
 
 **TypeScript 컴파일러 현황** (공식 자료):
 - TS 7.0은 Go 네이티브 컴파일러다. npm 정식판 `typescript` 7.0.2가 2026-07-08에 나왔다. 7.0 RC부터 명령 이름은 `tsc`다(미리보기 이름 `tsgo`는 더 이상 안 씀) ([typescript-go README](https://github.com/microsoft/typescript-go), 지금은 보관 처리됐고 개발은 microsoft/TypeScript로 옮겨감). TS 7은 LSP 언어 서버를 제공한다([TS 7.0 발표](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)).

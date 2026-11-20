@@ -1,16 +1,5 @@
-import type {
-  Syntax,
-  Type,
-  Shape,
-  Manifest,
-  Rule,
-  Fact,
-} from "./contracts.mjs";
-import type {
-  NodeHandle,
-  UnionType,
-  LiteralType,
-} from "typescript/unstable/sync";
+import type { Syntax, Type, Shape, Manifest, Rule, Fact } from "./contracts.mjs";
+import type { NodeHandle, UnionType, LiteralType } from "typescript/unstable/sync";
 import type { SourceFile } from "typescript/unstable/ast";
 type Declaration = Syntax | NodeHandle;
 type Diagnostic = { code: number };
@@ -53,9 +42,7 @@ for (const rule of rules) {
   entries.add(id);
 }
 const require = createRequire(join(root, "package.json"));
-const appRequire = createRequire(
-  join(resolve(root, spec.appRoot ?? "."), "package.json"),
-);
+const appRequire = createRequire(join(resolve(root, spec.appRoot ?? "."), "package.json"));
 const versions: Record<string, string> = {};
 function unsupported(reason: string): never {
   process.stderr.write(JSON.stringify({ status: "unsupported", reason }));
@@ -96,11 +83,7 @@ async function loadOfficial(part: string) {
     }
     return import(pathToFileURL(path).href);
   }
-  throw Error(
-    "installed TypeScript does not expose the required official " +
-      part +
-      " API",
-  );
+  throw Error("installed TypeScript does not expose the required official " + part + " API");
 }
 // Only the compiler API boundary differs. Both versions use the same fact extractor.
 async function openCompiler() {
@@ -116,12 +99,8 @@ async function openCompiler() {
           {},
           {
             ...ts.sys,
-            onUnRecoverableConfigFileDiagnostic(diagnostic: {
-              messageText: unknown;
-            }) {
-              throw Error(
-                ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
-              );
+            onUnRecoverableConfigFileDiagnostic(diagnostic: { messageText: unknown }) {
+              throw Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
             },
           },
         );
@@ -156,9 +135,7 @@ async function openCompiler() {
     enums,
     ast,
     project(config: string) {
-      const project = api
-        .updateSnapshot({ openProjects: [config] })
-        .getProject(config);
+      const project = api.updateSnapshot({ openProjects: [config] }).getProject(config);
       if (!project) throw Error("compiler did not open " + config);
       const { program, checker, rootFiles } = project;
       return {
@@ -174,8 +151,7 @@ async function openCompiler() {
     },
     declaration: (handle?: Declaration) =>
       (handle as NodeHandle | undefined)?.resolve() as Syntax | undefined,
-    declarationPath: (handle?: Declaration) =>
-      (handle as NodeHandle | undefined)?.path,
+    declarationPath: (handle?: Declaration) => (handle as NodeHandle | undefined)?.path,
     unionMembers: (type: Type) => (type as UnionType).getTypes(),
     close: () => api.close(),
   };
@@ -198,9 +174,7 @@ try {
     const files = [
       ...new Set([
         ...(scope.sources ?? (dirs.length ? [] : localFiles)),
-        ...localFiles.filter((file) =>
-          dirs.some((dir) => file.startsWith(dir + "/")),
-        ),
+        ...localFiles.filter((file) => dirs.some((dir) => file.startsWith(dir + "/"))),
       ]),
     ].sort();
     const facts: Fact[] = [];
@@ -219,27 +193,18 @@ try {
       return node.children[0].getText().trim() || null;
     }
     function binding(node: Syntax) {
-      const decl = compiler.declaration(
-        checker.getSymbolAtLocation(node)?.valueDeclaration,
-      );
-      return decl &&
-        decl.getSourceFile().fileName === node.getSourceFile().fileName
+      const decl = compiler.declaration(checker.getSymbolAtLocation(node)?.valueDeclaration);
+      return decl && decl.getSourceFile().fileName === node.getSourceFile().fileName
         ? decl.getStart()
         : null;
     }
     function predicate(expr: Syntax) {
-      if (expr.kind === K.Identifier)
-        return { binding: binding(expr), operator: "truthy" };
+      if (expr.kind === K.Identifier) return { binding: binding(expr), operator: "truthy" };
       if (
         expr.kind === K.BinaryExpression &&
         expr.left.kind === K.Identifier &&
         expr.operatorToken.kind === K.EqualsEqualsEqualsToken &&
-        [
-          K.StringLiteral,
-          K.NumericLiteral,
-          K.TrueKeyword,
-          K.FalseKeyword,
-        ].includes(expr.right.kind)
+        [K.StringLiteral, K.NumericLiteral, K.TrueKeyword, K.FalseKeyword].includes(expr.right.kind)
       ) {
         const literal = checker.getTypeAtLocation(expr.right);
         const rep = shape(literal);
@@ -276,16 +241,12 @@ try {
     };
     function symbol(node: Syntax) {
       let sym = checker.getSymbolAtLocation(node);
-      if (sym && sym.flags & SymbolFlags.Alias)
-        sym = checker.getAliasedSymbol(sym);
+      if (sym && sym.flags & SymbolFlags.Alias) sym = checker.getAliasedSymbol(sym);
       return sym;
     }
     // Bind the JSON decoder to the fetch that produced its Response.
     function unwrap(node: Syntax | undefined): Syntax | undefined {
-      while (
-        node &&
-        [K.ParenthesizedExpression, K.AwaitExpression].includes(node.kind)
-      )
+      while (node && [K.ParenthesizedExpression, K.AwaitExpression].includes(node.kind))
         node = node.expression;
       return node;
     }
@@ -295,49 +256,30 @@ try {
       let request = unwrap(access.expression);
       if (request && request.kind === K.Identifier) {
         const decl = compiler.declaration(symbol(request)?.valueDeclaration);
-        if (
-          !decl ||
-          decl.kind !== K.VariableDeclaration ||
-          !(decl.parent.flags & NodeFlags.Const)
-        )
+        if (!decl || decl.kind !== K.VariableDeclaration || !(decl.parent.flags & NodeFlags.Const))
           return;
         request = unwrap(decl.initializer);
       }
-      if (
-        !request ||
-        request.kind !== K.CallExpression ||
-        request.arguments.length !== 1
-      )
-        return;
+      if (!request || request.kind !== K.CallExpression || request.arguments.length !== 1) return;
       const fetchSymbol = symbol(request.expression.name ?? request.expression);
       if (
         fetchSymbol?.name !== "fetch" ||
         !fetchSymbol.declarations?.some((d: Declaration) =>
-          /\/lib\.dom\.d\.ts$/.test(compiler.declarationPath(d) ?? ""),
+          compiler.declarationPath(d)?.endsWith("/lib.dom.d.ts"),
         )
       )
         return;
       const url = request.arguments[0];
-      if (
-        url.kind !== K.StringLiteral ||
-        !/^\/(?!\/)/.test(url.text) ||
-        /[\\#]/.test(url.text)
-      )
+      if (url.kind !== K.StringLiteral || !/^\/(?!\/)/.test(url.text) || /[\\#]/.test(url.text))
         return;
       let result = call;
-      while (
-        [K.AwaitExpression, K.ParenthesizedExpression].includes(
-          result.parent.kind,
-        )
-      )
+      while ([K.AwaitExpression, K.ParenthesizedExpression].includes(result.parent.kind))
         result = result.parent;
       let annotation;
       if (
-        [
-          K.AsExpression,
-          K.TypeAssertionExpression,
-          K.VariableDeclaration,
-        ].includes(result.parent.kind)
+        [K.AsExpression, K.TypeAssertionExpression, K.VariableDeclaration].includes(
+          result.parent.kind,
+        )
       )
         annotation = result.parent.type;
       let type = annotation && checker.getTypeFromTypeNode(annotation);
@@ -354,8 +296,7 @@ try {
         )
           fn = fn.parent;
         const ret = fn?.type && checker.getTypeFromTypeNode(fn.type);
-        if (ret?.getSymbol()?.name === "Promise")
-          type = checker.getTypeArguments(ret)[0];
+        if (ret?.getSymbol()?.name === "Promise") type = checker.getTypeArguments(ret)[0];
       }
       let budget = 180;
       function describe(t: Type | undefined, depth: number): Shape {
@@ -363,9 +304,7 @@ try {
         if (t.flags & TypeFlags.Union)
           return {
             kind: "union",
-            members: compiler
-              .unionMembers(t)
-              .map((x) => describe(x, depth + 1)),
+            members: compiler.unionMembers(t).map((x) => describe(x, depth + 1)),
           };
         if (checker.isArrayType(t))
           return {
@@ -389,24 +328,17 @@ try {
             const decl = compiler.declaration(p.declarations?.[0]);
             if (
               !decl ||
-              ![
-                K.PropertySignature,
-                K.PropertyDeclaration,
-                K.PropertyAssignment,
-              ].includes(decl.kind)
+              ![K.PropertySignature, K.PropertyDeclaration, K.PropertyAssignment].includes(
+                decl.kind,
+              )
             )
               return { kind: "unknown" };
             fields.push({
               name: p.name,
-              shape: describe(
-                checker.getTypeOfSymbolAtLocation(p, call),
-                depth + 1,
-              ),
+              shape: describe(checker.getTypeOfSymbolAtLocation(p, call), depth + 1),
             });
           }
-          fields.sort((a, b) =>
-            a.name < b.name ? -1 : Number(a.name > b.name),
-          );
+          fields.sort((a, b) => (a.name < b.name ? -1 : Number(a.name > b.name)));
           return { kind: "object", fields };
         }
         return shape(t);
@@ -417,19 +349,11 @@ try {
       sourceFiles.add(filename);
       const sf = program.getSourceFile(resolve(root, filename));
       if (!sf) throw Error("not in compiler project: " + filename);
-      for (const d of project.diagnostics(sf))
-        diagnostics.push({ file: filename, code: d.code });
+      for (const d of project.diagnostics(sf)) diagnostics.push({ file: filename, code: d.code });
       function walk(n: Syntax, owner: string) {
-        if (
-          (n.kind === K.FunctionDeclaration ||
-            n.kind === K.MethodDeclaration) &&
-          n.name
-        )
+        if ((n.kind === K.FunctionDeclaration || n.kind === K.MethodDeclaration) && n.name)
           owner = n.name.getText();
-        if (
-          n.kind === K.ArrowFunction &&
-          n.parent.kind === K.VariableDeclaration
-        )
+        if (n.kind === K.ArrowFunction && n.parent.kind === K.VariableDeclaration)
           owner = n.parent.name.getText();
         const start = n.getStart(sf);
         const base = {
@@ -442,27 +366,18 @@ try {
         const jsxGuard =
           n.kind === K.BinaryExpression &&
           n.parent.kind === K.JsxExpression &&
-          [K.AmpersandAmpersandToken, K.BarBarToken].includes(
-            n.operatorToken.kind,
-          );
-        if (
-          n.kind === K.IfStatement ||
-          n.kind === K.ConditionalExpression ||
-          jsxGuard
-        ) {
+          [K.AmpersandAmpersandToken, K.BarBarToken].includes(n.operatorToken.kind);
+        if (n.kind === K.IfStatement || n.kind === K.ConditionalExpression || jsxGuard) {
           const expr = jsxGuard ? n.left : (n.expression ?? n.condition);
           const span = (node: Syntax) => [node.getStart(sf), node.end];
-          const showRight =
-            jsxGuard && n.operatorToken.kind === K.AmpersandAmpersandToken;
+          const showRight = jsxGuard && n.operatorToken.kind === K.AmpersandAmpersandToken;
           facts.push({
             ...base,
             kind: "branch",
             label: expr.getText(),
             predicate: predicate(expr),
             textWhenTrue: renderedText(showRight ? n.right : n.whenTrue),
-            textWhenFalse: renderedText(
-              jsxGuard && !showRight ? n.right : n.whenFalse,
-            ),
+            textWhenFalse: renderedText(jsxGuard && !showRight ? n.right : n.whenFalse),
             condition: span(expr),
             arms: jsxGuard
               ? { kind: "logical", right: span(n.right), and: showRight }
@@ -479,10 +394,7 @@ try {
                   },
           });
         }
-        if (
-          n.kind === K.JsxOpeningElement ||
-          n.kind === K.JsxSelfClosingElement
-        ) {
+        if (n.kind === K.JsxOpeningElement || n.kind === K.JsxSelfClosingElement) {
           const sym = symbol(n.tagName);
           const decl = sym?.valueDeclaration;
           const declPath = compiler.declarationPath(decl);
@@ -532,14 +444,9 @@ try {
               type: t ? checker.typeToString(t) : "unknown",
               shape: shape(t),
               init:
-                n.arguments.length === 1
-                  ? [n.arguments[0].getStart(sf), n.arguments[0].end]
-                  : null,
+                n.arguments.length === 1 ? [n.arguments[0].getStart(sf), n.arguments[0].end] : null,
               after:
-                stmt.kind === K.VariableStatement &&
-                stmt.parent.kind === K.Block
-                  ? stmt.end
-                  : null,
+                stmt.kind === K.VariableStatement && stmt.parent.kind === K.Block ? stmt.end : null,
             });
           } else if (rule?.kind === "query") {
             const t = checker.getTypeAtLocation(n);
@@ -548,17 +455,14 @@ try {
               ...base,
               kind: rule.kind,
               label: sym.name,
-              shape: prop
-                ? shape(checker.getTypeOfSymbolAtLocation(prop, n))
-                : { kind: "unknown" },
+              shape: prop ? shape(checker.getTypeOfSymbolAtLocation(prop, n)) : { kind: "unknown" },
             });
           } else if (rule)
             facts.push({
               ...base,
               kind: rule.kind,
               label:
-                rule.kind === "route" &&
-                n.arguments[0]?.kind === K.StringLiteral
+                rule.kind === "route" && n.arguments[0]?.kind === K.StringLiteral
                   ? n.arguments[0].text
                   : sym.name,
             });

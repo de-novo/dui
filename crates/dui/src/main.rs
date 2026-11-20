@@ -9,6 +9,7 @@ mod ports;
 mod reference;
 mod replay;
 mod retry;
+mod screen_map;
 mod typescript;
 use serde_json::{Value, json};
 use std::{
@@ -109,6 +110,11 @@ fn is_supported_ts(version: &str) -> bool {
 
 fn run() -> Reply {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if let [cmd, root] = args.as_slice()
+        && cmd == "map"
+    {
+        return screen_map::capture(Path::new(root));
+    }
     if let [flag] = args.as_slice()
         && (flag == "--version" || flag == "-V")
     {
@@ -219,7 +225,7 @@ fn run() -> Reply {
     let [command, path] = args.as_slice() else {
         return Err(failure(
             2,
-            "expected scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
+            "expected map PROJECT, scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
         ));
     };
     if command == "check-ts" {

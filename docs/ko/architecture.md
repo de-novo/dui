@@ -85,7 +85,7 @@ coverage(&[Verification]) -> Coverage
 
 - ID와 단위는 **newtype**: `CellId`, `SymbolId`, `StateId`, `Width(u32)`.
 - **스마트 생성자**: 바깥 입력은 경계에서 `TryFrom` / `Result`로 한 번만 파싱한다(검증 말고 파싱). private 필드로 잘못된 값은 만들 수 없게 한다.
-- 상태는 **대수적 데이터 타입**: `Evidence = Extracted | Inferred`, `CellStatus = Verified | Unverified(reason) | Suspect(reason) | Unrenderable(reason)`, 프로젝트 수준 `Support = Supported | Unsupported(reason)`. 우리 enum에 대한 모든 `match`는 빠짐없이 쓴다.
+- 상태는 **대수적 데이터 타입**: `Evidence = Extracted | Inferred`, `CellStatus = Verified | Unverified(reason) | Unrenderable(reason)`, 프로젝트 수준 `Support = Supported | Unsupported(reason)`. 우리 enum에 대한 모든 `match`는 빠짐없이 쓴다.
 - **workspace lint**(루트 `Cargo.toml`의 `[workspace.lints.clippy]`): `unwrap_used = "deny"`, `wildcard_enum_match_arm = "deny"`. 와일드카드 lint는 우리 내부 enum을 지킨다. 포트 경계에서 외부 `#[non_exhaustive]` enum을 매칭할 때만 그 자리에 `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]`를 쓸 수 있다.
 
 ### 2.4 결정적 변환
@@ -157,21 +157,24 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 |---|---|---|
 | 규칙 팩 | 버전을 붙인 작은 JSON 스키마. ast-grep YAML 문법 층 없음 | 매칭 기준이 문법 모양이 아니라 컴파일러가 해석한 심볼·타입이다 |
 | WASM 플러그인 | M0 / M1 이후로 미룬다. 먼저 같은 프로세스 Rust crate + 타입 있는 JSON 컴파일러 사이드카. 외부 기여자가 규칙 팩 데이터로 표현 못 하는 코드를 내놓아야 할 때만 다시 본다 | 지금 경계는 내장 어댑터와 데이터 팩으로 충족된다. 컴파일러와 브라우저는 어차피 프로세스다 |
-| 버전 추적 봇 | Renovate를 **외부 서비스로만** 쓴다. `stacks.toml`(픽스처의 정확한 버전)과 lockfile을 같은 PR로 갱신한다. dui에 절대 포함하지 않는다. 지원 기준선 상향은 여전히 dui 메이저 릴리스에서만 한다 | `stacks.toml` 같은 사용자 정의 파일도 추적할 수 있다. Renovate는 AGPL-3.0이므로 그 코드는 dui와 함께 배포되지 않는다 |
+| 버전 추적 봇 | Renovate를 **외부 서비스로만** 쓴다. 의존성 카탈로그(npm 픽스처의 정확한 버전)과 lockfile을 같은 PR로 갱신한다. dui에 절대 포함하지 않는다. 지원 기준선 상향은 여전히 dui 메이저 릴리스에서만 한다 | `stacks.toml` 같은 사용자 정의 파일도 추적할 수 있다. Renovate는 AGPL-3.0이므로 그 코드는 dui와 함께 배포되지 않는다 |
 | 골든 렌더용 Chromium | 골든 CI는 **정확한 안정판 빌드**로 고정한다. 일반 실행은 쓴 Chromium 버전을 기록한다 | 브라우저 변화와 앱 변화를 구분한다. 골든 실행은 OS, 폰트, 시계, 난수, 애니메이션도 고정하고, 갱신 PR에서 차이를 검토한다 |
 | salsa | 변경과 무관한 재계산이 주 병목이라는 게 프로파일링으로 드러날 때까지(예: MCP 편집 반복) 미룬다. 먼저 단계 입력 + 도구·팩 버전을 키로 하는 내용 해시 캐시를 쓴다 | 코어가 순수하므로 나중에 다시 쓰지 않고 증분 질의를 붙일 수 있다 |
 
 ## 5. 모노레포 구조
 
-dui는 **여러 언어 모노레포**다: Rust는 Cargo workspace, TypeScript 부분은 pnpm workspace, 그리고 데이터·픽스처·문서·도구. 지원 스택의 단일 원천은 `stacks.toml`이다.
+목표 구조는 **여러 언어 모노레포**다: Rust는 Cargo workspace, TypeScript 부분은 pnpm workspace, 그리고 데이터·픽스처·문서·도구. 지원 스택의 단일 원천은 `stacks.toml`이다.
+
+현재 npm 패키지의 버전은 [dependency-catalog.json](../../dependency-catalog.json)에서 수정하고 `npm run deps:sync`로 반영한다. CI는 `npm run deps:check`로 매니페스트와 잠금 파일을 검사한다. Rust 크레이트는 루트의 `[workspace.dependencies]`에서 버전 조건을 상속한다. 카탈로그는 dui 자체와 픽스처의 의존성을 관리한다. 지원 기준선은 릴리스에서 별도로 결정한다.
 
 ```text
 dui/
 ├── Cargo.toml                 # Cargo workspace root: members, [workspace.lints], shared versions
 ├── clippy.toml                # disallowed methods / types for the core (§6.2)
+├── dependency-catalog.json    # exact npm versions for tooling, apps and fixtures
 ├── pnpm-workspace.yaml        # JS workspace: packages/*, apps/*
 ├── package.json
-├── stacks.toml                # single source of truth: supported stacks, baselines, exact fixture versions, adapter + pack mapping
+├── stacks.toml                # single source of truth: supported stacks, baselines, adapter + pack mapping
 ├── renovate.json              # config for the external Renovate service
 ├── crates/
 │   ├── dui-core/              # pure functional core
@@ -245,9 +248,10 @@ flowchart BT
    - 각 어댑터는 workspace 안에서 `dui-ports` / `dui-core`에만 의존;
    - `dui-app`은 어떤 어댑터에도 의존하지 않음;
    - 바이너리를 만드는 건 `dui-cli`뿐.
-4. **라이선스**(`cargo xtask check-licenses`, Rust는 `cargo-deny`, pnpm workspace는 같은 수준의 검사): 직접·전이 의존성은 MIT, Apache-2.0, BSD-2-Clause / BSD-3-Clause, ISC, Zlib이어야 한다.
+4. **라이선스**(`cargo xtask check-licenses`, Rust는 `cargo-deny`, pnpm workspace는 같은 수준의 검사): 직접·전이 의존성은 MIT, Apache-2.0, BSD-2-Clause / BSD-3-Clause, ISC, Zlib이어야 한다. 빌드 전용 예외로, Vite와 Tailwind가 CSS 처리를 위해 간접 설치하는 원본 `lightningcss`(MPL-2.0)와 공식 플랫폼 바이너리를 허용한다. 빌드 도구가 선택적으로 가져오는 개발 전용 간접 의존성 `tslib`(0BSD)도 원본에 한해 허용한다. 해당 코드와 바이너리는 브라우저 자산, Rust 실행 파일, 릴리스 압축 파일에 포함할 수 없다. 다른 의존성에는 기존 허용 목록을 적용한다.
 5. **생성 파일이 최신**: `cargo xtask gen` 출력(세 언어 프레임워크 표, CI 행렬)이 커밋된 파일과 같아야 한다.
 6. **픽스처**: `stacks.toml`의 모든 항목에 픽스처와 검토된 스냅샷이 있다.
+7. **웹과 개발 도구 소스**: Oxlint로 TypeScript, React 훅, JSX 접근성을 검사하고 Oxfmt로 TypeScript와 CSS 서식을 검사한다. 로컬과 PR 모두 `npm run check:style`을 실행한다. 서식은 `npm run format`으로 적용한다.
 
 ## 7. M0와 M1 완료 조건
 
@@ -264,7 +268,7 @@ flowchart BT
 3. 검수 화면에 대해 JSON 출력이 **실행된 목표 분기 / 전체 목표 분기**와 **검증된 칸 / 렌더 가능 칸**을 따로 내고, 런타임에서 찾은 분모 밖 분기, 미검증 목록, 렌더 불가 이유도 함께 낸다. 보충 반복은 개선이 없거나 설정 한도에 닿으면 멈춘다.
 4. 같은 입력에 CLI와 MCP가 같은 계획과 판정을 돌려준다.
 
-이후 단계는 [설계 v0 §13](design-v0.md#13-mvp-범위와-단계) 그대로다: M2 GPUI 렌더, M3 순서 재생, M4 사람용 캔버스, M5 99% 시도.
+릴리스 순서는 [로드맵](roadmap.md)을 따르고 v0.0.2 구현은 [웹 뷰어 아키텍처](web-viewer.md)를 따른다.
 
 ## 8. 남은 위험
 

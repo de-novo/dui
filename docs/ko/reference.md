@@ -78,6 +78,7 @@
 | CLI | MCP | 동작 |
 | --- | --- | --- |
 | `dui scan PROJECT MANIFEST` | `scan(project, manifest)` | 컴파일러에서 읽은 사실과 생성한 목 응답을 출력한다. |
+| `dui map PROJECT` | `map(project)` | 경로를 자동으로 찾고 각 진입 상태를 캡처해 화면 지도를 저장한다. |
 | `dui run PROJECT MANIFEST [OUTPUT]` | `run(project, manifest, output?)` | 앱을 빌드하고 캡처와 갤러리를 저장한다. |
 | `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | 저장한 계획의 모든 칸을 시도한다. 예산 때문에 남았던 칸도 포함한다. |
 | `dui replay-report MANIFEST PLAN OUTPUT` | `replay_report(manifest, plan, output)` | 저장한 증거로 보고서를 다시 계산한다. |

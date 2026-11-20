@@ -2,11 +2,19 @@
   "name": "dui-build",
   "private": true,
   "scripts": {
+    "lint": "oxlint --deny-warnings adapters apps fixtures scripts",
+    "format": "oxfmt --write \"{adapters,apps,fixtures,scripts}/**/*.{ts,tsx,mts,cts,css}\"",
+    "format:check": "oxfmt --check \"{adapters,apps,fixtures,scripts}/**/*.{ts,tsx,mts,cts,css}\"",
+    "check:style": "npm run lint && npm run format:check",
     "check:capture": "tsc --project scripts && cargo build && node scripts/check-capture.mts",
-    "package:release": "tsc --project scripts && node scripts/package-release.mts"
+    "package:release": "tsc --project scripts && node scripts/package-release.mts",
+    "deps:check": "node scripts/dependency-catalog.mts",
+    "deps:sync": "node scripts/dependency-catalog.mts --write"
   },
   "devDependencies": {
-    "typescript": "7.0.2",
-    "@types/node": "26.6.6"
+    "@types/node": "26.6.6",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "typescript": "7.0.2"
   }
 }

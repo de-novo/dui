@@ -46,6 +46,8 @@ commercial key" licenses are not accepted. CI checks dependency licenses
 (for example `license-checker` for npm and `cargo-deny` for Rust). If you are
 unsure about a license, ask in the PR before adding the dependency.
 
+Build tooling may use unmodified `lightningcss` and its official platform binaries transitively. It may also install `tslib` (0BSD) as an optional transitive development dependency. Both exceptions require exclusion from distributed artifacts. See [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation).
+
 Do not use other projects' names or trademarks (Storybook, Figma, Graphify,
 ...) in dui product or package names. Using them to describe compatibility is
 fine.
@@ -98,14 +100,28 @@ Keep application routes, data samples, and selectors in the capture manifest or 
 
 ## Local checks
 
+Edit [dependency-catalog.json](dependency-catalog.json) to update an npm library or tool.
+Run `npm run deps:sync` from the root with Node 26, then commit the changed manifests
+and lockfiles together. New direct dependencies need a catalog entry and a declaration
+in the consuming package. The root, canvas, and fixtures each support a standalone
+`npm ci`. To install updated versions locally, run `npm ci` in each affected package.
+
+Declare Rust dependencies in the root `Cargo.toml` under `[workspace.dependencies]`.
+Member crates inherit them with `workspace = true`. Commit resolved version changes in
+`Cargo.lock`.
+
 Run from the repository root after installing dependencies with `npm ci`.
 
 ```sh
+npm run deps:check
+npm run check:style
 cargo fmt --all --check
 npm exec -- tsc --noEmit
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 ```
+
+Oxlint checks TypeScript in `adapters`, `apps`, `fixtures` and `scripts`. Warnings fail the check. Oxfmt formats those TypeScript and CSS sources with two spaces, double quotes, semicolons and a 100-column print width. Use `npm run format` to apply the format. The Source style workflow runs the same `npm run check:style` command on pull requests and pushes to main. Type checking uses the official TypeScript compiler. Rust uses Clippy and rustfmt.
 
 For a host, mock, or browser change, also run the [first capture](README.md#first-capture). Check the generated response in `facts.json`, the recorded request in `report.json`, and the screenshot in `graph.html`. Include those observations when describing the change.
 

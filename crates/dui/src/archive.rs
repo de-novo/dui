@@ -85,6 +85,36 @@ fn provenance(project: &Path) -> Result<Value, Error> {
     )
 }
 
+// A project owns one display name. Concurrent first captures use the same winner.
+fn project_name(directory: &Path, repo: &Path) -> Result<String, Error> {
+    let record = directory.join("project.json");
+    let load = || -> Result<String, Error> {
+        read(&record)?["name"]
+            .as_str()
+            .filter(|s| !s.trim().is_empty())
+            .map(str::to_owned)
+            .ok_or_else(|| failure(3, "invalid archived project name"))
+    };
+    if record.try_exists().map_err(io)? {
+        return load();
+    }
+    let manifest = read(&repo.join("package.json")).ok();
+    let name = manifest
+        .as_ref()
+        .and_then(|m| m["name"].as_str())
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .or_else(|| repo.file_name().and_then(|n| n.to_str()))
+        .unwrap_or("Unnamed project");
+    let staged = tempfile::NamedTempFile::new_in(directory).map_err(io)?;
+    serde_json::to_writer(staged.as_file(), &json!({ "name": name })).map_err(io)?;
+    match staged.persist_noclobber(&record) {
+        Ok(_) => Ok(name.to_owned()),
+        Err(e) if e.error.kind() == std::io::ErrorKind::AlreadyExists => load(),
+        Err(e) => Err(io(e)),
+    }
+}
+
 // A legacy OUTPUT is a live pointer. Completed runs stay in the home archive.
 fn link_to(source: &Path, dest: &Path) -> Result<(), Error> {
     let parent = dest
@@ -152,7 +182,8 @@ pub(crate) fn capture(
     let id = metadata["projectId"]
         .as_str()
         .ok_or_else(|| failure(3, "missing project id"))?;
-    let runs = archive.join(id).join("runs");
+    let directory = archive.join(id);
+    let runs = directory.join("runs");
     fs::create_dir_all(&runs).map_err(io)?;
     let stage = tempfile::Builder::new()
         .prefix(".pending-")
@@ -181,6 +212,12 @@ pub(crate) fn capture(
         Err((5, report)) => (report, true),
         Err(e) => return Err(e),
     };
+    let repo = Path::new(
+        metadata["projectRoot"]
+            .as_str()
+            .ok_or_else(|| failure(3, "missing project root"))?,
+    );
+    metadata["projectName"] = json!(project_name(&directory, repo)?);
     metadata["id"] = json!(snapshot);
     metadata["timestampMs"] = json!(stamp as u64);
     analysis::store(&staged.join("snapshot.json"), &metadata)?;
@@ -203,7 +240,8 @@ pub(crate) fn history() -> Reply {
     fs::create_dir_all(&archive).map_err(io)?;
     let mut runs = Vec::new();
     for project in fs::read_dir(&archive).map_err(io)? {
-        let path = project.map_err(io)?.path().join("runs");
+        let directory = project.map_err(io)?.path();
+        let path = directory.join("runs");
         if !path.is_dir() {
             continue;
         }
@@ -216,6 +254,12 @@ pub(crate) fn history() -> Reply {
             }
             let out = entry.path();
             let mut meta = read(&out.join("snapshot.json"))?;
+            if let Some(root) = meta["projectRoot"].as_str() {
+                let id = format!("{:x}", Sha256::digest(root.as_bytes()));
+                if directory.file_name().and_then(|n| n.to_str()) == Some(id.as_str()) {
+                    meta["projectName"] = json!(project_name(&directory, Path::new(root))?);
+                }
+            }
             let report = read(&out.join("report.json"))?;
             let cells = report["cells"]
                 .as_array()
@@ -254,6 +298,23 @@ pub(crate) fn history() -> Reply {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn project_name_survives_manifest_and_branch_changes() {
+        let repo = tempfile::tempdir().unwrap();
+        let archive = tempfile::tempdir().unwrap();
+        let manifest = repo.path().join("package.json");
+        fs::write(&manifest, r#"{"name":"@team/editor"}"#).unwrap();
+        assert_eq!(
+            project_name(archive.path(), repo.path()).unwrap(),
+            "@team/editor"
+        );
+        fs::write(&manifest, r#"{"name":"another-branch"}"#).unwrap();
+        assert_eq!(
+            project_name(archive.path(), repo.path()).unwrap(),
+            "@team/editor"
+        );
+    }
 
     #[test]
     fn captures_share_project_identity_across_worktrees_and_branch_switches() {

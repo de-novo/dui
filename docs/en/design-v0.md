@@ -50,7 +50,7 @@ Every component below is designed for this split: anything a person would "run" 
 - Results must be measurable (coverage with a numerator and a denominator).
 
 **Non-goals**
-- Interaction inside the canvas such as clicking or typing. Only still screens are shown.
+- Direct input into an archived screenshot. Live state inspection uses a running app in v0.0.2.
 - Visual regression testing (pixel-diff approval flows). That is Chromatic's and Percy's area. It may be added later.
 - Untyped JavaScript, Python, Dart, Swift, Kotlin, etc. (out of scope for v0)
 - Leaving the SDK in production builds. All injection code is dev-build only.
@@ -186,7 +186,6 @@ interface RenderCell {        // one canvas cell = state × width (× axes)
 type VerificationStatus =
   | { kind: "verified" }                          // passed verification
   | { kind: "unverified"; reason: "render-failed" | "assert-failed" | "not-injectable" | "not-rendered" }
-  | { kind: "suspect"; reason: string };          // only the visual check failed; needs a human
   | { kind: "unrenderable"; reason: "no-render-env" | "system-ui" | string }; // cannot be rendered in this environment; see "Rendering limits"
 ```
 
@@ -218,7 +217,7 @@ type VerificationStatus =
 
 1. **Value check** (required): right after rendering, read back the actual value of each injected slot and compare with the intended value. A mismatch means injection failed.
 2. **Semantic check** (required): run assertions generated from the state against the DOM / accessibility tree (web) or the GPUI element tree (native; feasibility `unconfirmed`). E.g. "empty-list state → 0 list items + an empty-state message", "error state → role=alert exists".
-3. **Visual check** (auxiliary): AI looks at the image and judges whether it matches the state description. If only this fails, the result is `suspect`.
+3. **Visual check** A visual discrepancy is recorded as review evidence. The verifier returns one of the three cell statuses.
 
 Also a **coverage check**: confirm via coverage that the branches the state aimed at (`targets`) actually executed. If not, `unverified: assert-failed`.
 
@@ -281,6 +280,18 @@ Precondition rule: screen state lives in Entities / models. State scattered insi
 ## 11. Canvas
 
 Layout: **rows = screen×state, columns = widths (and theme / locale axes), edges = transitions**. Unverified cells are grey hatched + reason.
+
+<a id="web-viewer"></a>
+
+### Web viewer
+
+**v0.0.2 uses React 19 and TypeScript 7 for the viewer, TanStack Start for routing and the application build, shadcn/ui for controls, Tailwind CSS for layout and theme tokens, and React Flow for the screen map.** Use Start’s SPA mode to build the static shell. The Rust binary serves the shell, its assets and local capture data. Direct navigation to a viewer route must load the shell; a missing capture or asset must return its own error. The existing standalone HTML gallery remains readable. [SPA mode](https://tanstack.com/start/latest/docs/framework/react/guide/spa-mode)
+
+A selection identifies the project, run, screen, state and capture width. Preserve it across the overview, inspector, browser Back and reload using validated route parameters. Offer keyboard navigation through both the map and a screen list. Display the report’s verification status and reason next to the capture. [Router search parameters](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [shadcn/ui](../../.agents/skills/shadcn/SKILL.md)
+
+**Maintenance boundaries.** Rust owns capture evidence, verification and coverage. The viewer decodes saved report and graph data at one boundary into typed values shared by the map, list and inspector. Handle older optional fields there. An unknown status or invalid required field produces a readable data error. The router owns the selected cell. React Flow owns map layout and pan/zoom. Components own temporary interaction state such as an open menu.
+
+[Web viewer architecture](web-viewer.md)
 
 | Candidate | License (checked 2026-11-19) | Decision |
 |---|---|---|
@@ -351,8 +362,7 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 2. How to automatically remove "branches with no effect on the screen" from the coverage denominator. This rule defines what 99% means.
 3. What expansion limits (depth, representative values) for sequence states cover all meaningful states within a practical number of renders?
 4. How the TS adapter talks to TS 7.1's API from Rust (a small Node sidecar using `typescript/sync`, or a documented wire protocol, which is `unconfirmed`).
-5. Whether to ship the canvas as a local web app (the AI agent runs `dui open`; humans only view it) or a hosted service. Hosting needs a review of snapshot storage cost and security.
-6. Figma export pricing and API limits (`unconfirmed`).
+5. Figma export pricing and API limits (`unconfirmed`).
 
 ## Principle: combinations are produced by the system, not by AI (decided 2026-11-19)
 AI is used **only to find where state lives and what type it is**. Which combinations to draw is decided by deterministic algorithms so the result is the same every time.
@@ -396,7 +406,7 @@ Principle:
 | Web rendering | `chromiumoxide` 0.9.1 (released 2026-02-25), Chromium over CDP, one viewport per width | MIT OR Apache-2.0 | Last release 2026-02-25 → watch maintenance |
 | Network interception | CDP Fetch domain (`Fetch.pdl` and `examples/interception.rs` in chromiumoxide) | — | No MSW |
 | GPUI rendering | Later, in the same Rust process (`gpui-pre`) | Apache-2.0 | See §9.2 |
-| Canvas UI | React + React Flow, static assets served by the Rust binary | MIT | Humans only look at it (§0) |
+| Canvas UI | React 19, TanStack Start, shadcn/ui, Tailwind CSS, React Flow | Per-package review (§12) | TypeScript 7 build, static assets served by Rust |
 
 **TypeScript compiler status** (official sources):
 - TS 7.0 is the Go-native compiler. Stable `typescript` 7.0.2 on npm on 2026-07-08. From 7.0 RC on, the command is `tsc` (the preview name `tsgo` is gone) ([typescript-go README](https://github.com/microsoft/typescript-go), now archived; development moved to microsoft/TypeScript). TS 7 provides an LSP language server ([TS 7.0 announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)).

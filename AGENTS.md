@@ -12,6 +12,7 @@ dui reads existing UI code through each language's official compiler and really 
 | Topic | Doc |
 |---|---|
 | Product design, principles, milestones | [docs/en/design-v0.md](docs/en/design-v0.md) |
+| Web viewer structure, session protocol and acceptance gates | [Web viewer architecture](docs/en/web-viewer.md) |
 | Code structure, patterns, crate boundaries, M0/M1 gates | [docs/en/architecture.md](docs/en/architecture.md) |
 | Supported stacks and versions | [docs/en/supported-frameworks.md](docs/en/supported-frameworks.md) |
 | Discussions, issues, labels, milestones, board, PRs, approvals | [docs/en/workflow.md](docs/en/workflow.md) |
@@ -45,6 +46,8 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 
 ## Code rules
 
+Use the official [shadcn/ui skill](.agents/skills/shadcn/SKILL.md) for viewer design system and component work. Keep archive evidence, keyboard navigation and map behavior consistent with the [viewer contract](docs/en/web-viewer.md).
+
 1. Rust, edition 2024. One binary, `dui`.
 2. **Functional core, imperative shell.** `dui-core` has no I/O, no async, no clock, no randomness; same input, same output.
 3. **Exactly three ports**: `TypeOracle`, `Host`, `Renderer` in `dui-ports`. No `if framework == …` in the core.
@@ -56,7 +59,7 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
    - Only `dui-cli` wires concrete adapters and produces a binary.
 5. Denied lints: `unwrap_used`, `wildcard_enum_match_arm`; `iter_over_hash_type` in the core. Do not loosen a lint or a check to make it pass; fix the code.
 6. New stacks: a language adds `dui-lang-<x>`, a dev server `dui-host-<x>`, a renderer `dui-render-<x>`; most frameworks add only a rule pack + fixture + `stacks.toml` entry.
-7. **Dependencies: permissive licenses only** (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib). dui is Apache-2.0.
+7. **Dependencies: permissive licenses only** (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib). See [Architecture §6.2](docs/en/architecture.md#62-automated-checks-ci-fails-on-any-violation) for the build-only `lightningcss` exception. dui is Apache-2.0.
 8. **Clean-room.** Ideas only from other projects; never copy or paraphrase their code. See [CONTRIBUTING §2](CONTRIBUTING.md#2-clean-room-rule).
 
 ## Workflow rules
