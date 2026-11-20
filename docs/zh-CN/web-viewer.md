@@ -10,6 +10,17 @@
 
 **商业分发。** 地图使用 MIT 许可的 `@xyflow/react`，保留默认署名。dui 的付费版本可以使用该库，无需订阅 Pro。上游请求隐藏界面署名的项目订阅 Pro。分发内嵌查看器的二进制时，还须附上实际使用版本的版权声明和完整 MIT 许可证。更新锁文件时检查打包依赖。使用公开 API 实现地图功能，仓库不收录 Pro 示例或模板。 [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
 
+### React Flow 验证
+
+开发预览从已完成的运行中读取入口截图和发现的链接。在仓库根目录使用 Node 26 运行下列命令，打开输出的回环地址。将最后的路径替换为捕获结果的输出目录。
+
+```sh
+npm ci --prefix apps/canvas
+npm --prefix apps/canvas run preview:archive -- /path/to/run
+```
+
+使用 npmgraph 归档确认了两个界面节点、一条发现的链接，以及 375 和 1280 像素的四张截图。Chrome 检查覆盖键盘选择、焦点恢复、刷新、后退和默认署名。此预览仅验证地图组件，Start 应用和实时详情将在后续实现。已安装的 CLI 仍打开独立图库。
+
 ## 2. 模块与依赖
 
 ```text

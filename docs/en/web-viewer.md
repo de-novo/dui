@@ -10,6 +10,17 @@ Build the client during the dui build and embed the shell and hashed assets in t
 
 **Commercial distribution.** Use the MIT-licensed `@xyflow/react` package and retain the default attribution on the map. A paid dui edition can use the library without a Pro subscription. Upstream asks projects that hide the on-screen attribution to subscribe. Separately, when distributing a binary with the viewer embedded, ship the copyright notice and MIT license from the exact package version. Check bundled dependencies when updating the lockfile. Implement dui map features using the public API and keep Pro examples and templates out of the repository. [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
 
+### React Flow validation
+
+The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.
+
+```sh
+npm ci --prefix apps/canvas
+npm --prefix apps/canvas run preview:archive -- /path/to/run
+```
+
+Verified with the npmgraph archive: two screen nodes, one discovered link and four images at 375 and 1280 px. Chrome checks covered keyboard selection, focus return, reload, Back and visible attribution. This preview exercises the map component independently of the planned Start shell and live inspector. The installed CLI still opens the standalone gallery.
+
 ## 2. Modules and dependencies
 
 ```text

@@ -10,6 +10,17 @@ dui 빌드에서 클라이언트를 빌드하고 진입 페이지와 해시가 �
 
 **유료 배포.** 지도는 MIT 라이선스인 `@xyflow/react`를 사용하고 기본 출처 표시를 유지한다. dui 유료판에도 Pro 구독 없이 사용할 수 있다. 개발사는 화면 표시를 숨기는 프로젝트에 구독을 요청한다. 뷰어를 내장한 바이너리를 배포할 때에는 화면 표시와 별도로 실제 사용한 패키지 버전의 저작권 고지와 MIT 라이선스 전문을 동봉한다. 잠금 파일을 갱신할 때 번들에 포함되는 의존성도 확인한다. 지도 기능은 공개 API로 구현하고 Pro 예제와 템플릿은 저장소에서 제외한다. [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
 
+### React Flow 검증
+
+개발용 뷰어는 저장이 끝난 실행에서 진입 화면 캡처와 발견된 링크를 읽는다. 저장소 루트에서 Node 26으로 아래 명령을 실행하고 출력된 로컬 주소를 연다. 마지막 경로는 캡처 결과의 출력 디렉터리로 바꾼다.
+
+```sh
+npm ci --prefix apps/canvas
+npm --prefix apps/canvas run preview:archive -- /path/to/run
+```
+
+npmgraph 기록에서 화면 노드 2개, 발견된 링크 1개, 375px·1280px 캡처 총 4장을 확인했다. Chrome에서 키보드 선택, 포커스 복귀, 새로고침, 뒤로 가기와 기본 출처 표시를 검증했다. 이 미리보기는 지도 컴포넌트를 검증한다. Start 기반 앱과 라이브 상세 보기는 후속 구현이며 설치된 CLI는 기존 독립 갤러리를 연다.
+
 ## 2. 모듈과 의존 방향
 
 ```text

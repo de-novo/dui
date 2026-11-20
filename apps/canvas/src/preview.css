@@ -1,0 +1,102 @@
+:root {
+  font:
+    15px system-ui,
+    sans-serif;
+  color: #182621;
+  background: #f8faf9;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid #cbd6d0;
+}
+h1,
+h2 {
+  font-size: 1.2rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(12rem, 20%) 1fr;
+}
+nav {
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+button,
+select {
+  font: inherit;
+}
+nav button {
+  text-align: left;
+  overflow-wrap: anywhere;
+  padding: 0.65rem;
+}
+.map {
+  height: calc(100dvh - 5rem);
+  min-height: 20rem;
+}
+.screen-card {
+  width: 280px;
+  background: white;
+  border: 1px solid #799788;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.screen-card strong,
+.screen-card small {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  overflow-wrap: anywhere;
+}
+.screen-card img {
+  display: block;
+  width: 100%;
+  height: 140px;
+  background: #edf1ef;
+  object-fit: contain;
+}
+dialog {
+  width: min(90vw, 960px);
+  max-height: 94dvh;
+  border: 1px solid #799788;
+}
+dialog header {
+  padding: 0 0 0.75rem;
+  margin-bottom: 0.75rem;
+}
+dialog img {
+  display: block;
+  max-width: 100%;
+  max-height: 65dvh;
+  object-fit: contain;
+  margin: auto;
+}
+dialog::backdrop {
+  background: #14251cb3;
+}
+:focus-visible {
+  outline: 3px solid #076747;
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .workspace {
+    display: block;
+  }
+  .map {
+    height: 60dvh;
+  }
+}
