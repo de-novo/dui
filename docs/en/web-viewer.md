@@ -23,11 +23,11 @@ Verified with the npmgraph archive: two screen nodes, one discovered link and fo
 
 For new maps, a directed link joins two captured screens when the source DOM contains a same-origin anchor to the target URL. Repeated anchors produce one edge. The viewer shows the edge at the widths where the anchor was observed. This records a navigation option; confirming that it works requires replay.
 
-The default **Connections → Overview** keeps every screen and shows a tree of observed links within each connected group. Arrows retain the recorded direction. Select **All links** to include cycles and return paths, or select a route under **Connections** to see its incoming and outgoing links. The count shows displayed links out of all links at the selected width.
+The preview accepts one or more run directories. With no arguments it lists saved screen maps under `~/.dui/projects`. Use **Select workspace** to choose a project, recorded branch and version. The rail always contains workspace selection, theme and collapse in that order. **Map options** contains screen lookup, link mode and capture width. Selecting a card opens its details and shows its observed links. Cards count unverified and unrenderable cells across the available states and widths.
 
 ### Viewer design system
 
-Use the roles in [tokens.css](../../apps/canvas/src/styles/tokens.css) for surfaces, text, borders, spacing and focus. Use system sans for controls and monospace for route paths. Keep screenshots at their original aspect ratio. Reserve blue for focus and selection. The shared `CaptureStatus` component pairs every verdict with text and displays the recorded reason. Use green for verified, amber for unverified and slate for unrenderable. An absent capture has its own message. Discovered links use a neutral stroke. Review the map and inspector at 375 and 1280 px, including keyboard focus return.
+Use [tokens.css](../../apps/canvas/src/styles/tokens.css) for monochrome surfaces, text, borders and keyboard focus. Only the rail and screen cards use translucent surfaces. Preserve capture colors and aspect ratios in both themes. Show verdicts and reasons as text in the inspector.
 
 ## 2. Modules and dependencies
 

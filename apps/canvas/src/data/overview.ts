@@ -4,8 +4,15 @@ export type Cell = {
   status: "verified" | "unverified" | "unrenderable";
   reason?: string;
   image?: string;
+  state?: string;
+  scenario?: string;
 };
-export type Screen = { id: string; path: string; cells: Cell[] };
+export type Screen = {
+  id: string;
+  path: string;
+  cells: Cell[];
+  entries?: Cell[];
+};
 export type ScreenMap = {
   screens: Screen[];
   links: { source: string; target: string; observedWidths?: number[] }[];
@@ -33,27 +40,39 @@ export function decodeOverview(raw: unknown): ScreenMap {
     byPath.set(screen.path, screen);
     screens.push(screen);
   }
-  for (const cell of raw.overview) {
-    if (
-      !record(cell) ||
-      typeof cell.path !== "string" ||
-      typeof cell.width !== "number" ||
-      !Number.isInteger(cell.width) ||
-      cell.width <= 0 ||
-      (cell.status !== "verified" &&
-        cell.status !== "unverified" &&
-        cell.status !== "unrenderable")
-    )
-      throw Error("Invalid capture in archive overview");
-    const screen = byPath.get(cell.path);
-    if (!screen) throw Error("Capture references a missing screen");
-    screen.cells.push({
-      path: cell.path,
-      width: cell.width,
-      status: cell.status,
-      image: typeof cell.image === "string" ? cell.image : undefined,
-      reason: typeof cell.reason === "string" ? cell.reason : undefined,
-    });
+  const detailed = raw.cells !== undefined;
+  if (detailed && !Array.isArray(raw.cells))
+    throw Error("Invalid archive cells");
+  const sources = detailed
+    ? [raw.overview, raw.cells as unknown[]]
+    : [raw.overview];
+  for (const [index, source] of sources.entries()) {
+    for (const cell of source) {
+      if (
+        !record(cell) ||
+        typeof cell.path !== "string" ||
+        typeof cell.width !== "number" ||
+        !Number.isInteger(cell.width) ||
+        cell.width <= 0 ||
+        (cell.status !== "verified" &&
+          cell.status !== "unverified" &&
+          cell.status !== "unrenderable")
+      )
+        throw Error("Invalid capture in archive overview");
+      const screen = byPath.get(cell.path);
+      if (!screen) throw Error("Capture references a missing screen");
+      const values =
+        detailed && index === 0 ? (screen.entries ??= []) : screen.cells;
+      values.push({
+        state: typeof cell.state === "string" ? cell.state : undefined,
+        scenario: typeof cell.scenario === "string" ? cell.scenario : undefined,
+        path: cell.path,
+        width: cell.width,
+        status: cell.status,
+        image: typeof cell.image === "string" ? cell.image : undefined,
+        reason: typeof cell.reason === "string" ? cell.reason : undefined,
+      });
+    }
   }
   const ids = new Set(screens.map((s) => s.id));
   const links: ScreenMap["links"] = [];
