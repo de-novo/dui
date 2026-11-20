@@ -16,6 +16,7 @@ Design: [docs/en/design-v0.md](docs/en/design-v0.md) (developer tool design v0)
 Architecture: [docs/en/architecture.md](docs/en/architecture.md) (functional core, ports and adapters, monorepo and crate boundaries)
 Language survey: [docs/en/language-survey.md](docs/en/language-survey.md) (survey of target languages and UI stacks, recommended order)
 Analysis approaches: [docs/en/analysis-approaches.md](docs/en/analysis-approaches.md) (how code-analysis AI tools work, recommended analyzer stack for dui)
+Workflow: [docs/en/workflow.md](docs/en/workflow.md) (Discussions, issues, labels, milestones, project board, PRs)
 Translations and glossary: [docs/i18n.md](docs/i18n.md)
 
 ## In one line

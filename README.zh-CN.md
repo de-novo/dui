@@ -18,6 +18,7 @@
 架构：[docs/zh-CN/architecture.md](docs/zh-CN/architecture.md)（函数式核心、端口与适配器、monorepo 和 crate 边界）
 语言调研：[docs/zh-CN/language-survey.md](docs/zh-CN/language-survey.md)（目标语言与 UI 技术栈全面调研，推荐顺序）
 分析方式调研：[docs/zh-CN/analysis-approaches.md](docs/zh-CN/analysis-approaches.md)（代码分析 AI 工具的做法，dui 分析器技术栈推荐）
+工作流程：[docs/zh-CN/workflow.md](docs/zh-CN/workflow.md)（Discussions、issues、标签、milestones、项目看板、PR）
 翻译规则与术语表：[docs/i18n.md](docs/i18n.md)
 
 ## 一句话

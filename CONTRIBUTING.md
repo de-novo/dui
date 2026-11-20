@@ -61,8 +61,20 @@ dui is trilingual: English, Simplified Chinese (zh-CN), and Korean (ko).
 - Keep numbers, links, code, tables, and diagrams identical across languages.
   Use the glossary in `docs/i18n.md` for key terms.
 
-## 5. Pull requests
+## 5. Discussions, issues, and pull requests
 
-- Keep PRs focused, with a short description of what and why.
+How work moves through GitHub (Discussions, issues, labels, milestones, the
+project board, PRs, merge conditions, and approvals) is defined in
+[docs/en/workflow.md](docs/en/workflow.md). In short:
+
+- Proposals and open questions start in Discussions (`Ideas` or `RFC`).
+  Decisions are written into the English docs.
+- Work is tracked as an issue with done criteria, one type, priority, and
+  area label, a milestone, and a place on the project board.
+- One PR, one purpose. The PR body says `Closes #N` and includes the checks
+  run and evidence.
+- A PR is merged when checks pass, there are no conflicts, and no review
+  blockers remain.
+- AI coding agents start from [AGENTS.md](AGENTS.md).
 - Do not commit secrets, credentials, or internal information from other
   projects.

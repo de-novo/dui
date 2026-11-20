@@ -18,6 +18,7 @@
 아키텍처: [docs/ko/architecture.md](docs/ko/architecture.md) (함수형 코어, 포트와 어댑터, 모노레포와 crate 경계)
 언어 조사: [docs/ko/language-survey.md](docs/ko/language-survey.md) (대상 언어·UI 스택 전수조사, 추천 순서)
 분석 방식 조사: [docs/ko/analysis-approaches.md](docs/ko/analysis-approaches.md) (코드 분석 AI 도구들의 접근법, dui 분석기 스택 추천)
+작업 흐름: [docs/ko/workflow.md](docs/ko/workflow.md) (Discussions, 이슈, 라벨, 마일스톤, 프로젝트 보드, PR)
 
 ## 한 줄
 코드베이스를 읽어서 앱의 **모든 화면 × 모든 상태 × 반응형 폭**을 Figma처럼 무한 캔버스에 한눈에 펼쳐 보여주는 도구. 웹과 데스크톱 앱(네이티브 포함)을 같이 다룬다.
