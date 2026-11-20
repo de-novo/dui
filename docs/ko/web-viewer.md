@@ -8,6 +8,8 @@
 
 dui 빌드에서 클라이언트를 빌드하고 진입 페이지와 해시가 붙은 리소스를 Rust 바이너리에 내장한다. 소스 설치와 릴리스 빌드는 같은 리소스 빌드 경로를 사용한다. 저장된 기록은 dui와 브라우저만으로 열 수 있게 한다. 기존 독립 HTML 갤러리도 계속 열 수 있게 한다. 라이브 세션에는 대상 앱의 툴체인과 렌더러가 필요하다. [코어 아키텍처](architecture.md) · [마일스톤](roadmap.md#v002)
 
+**유료 배포.** 지도는 MIT 라이선스인 `@xyflow/react`를 사용하고 기본 출처 표시를 유지한다. dui 유료판에도 Pro 구독 없이 사용할 수 있다. 개발사는 화면 표시를 숨기는 프로젝트에 구독을 요청한다. 뷰어를 내장한 바이너리를 배포할 때에는 화면 표시와 별도로 실제 사용한 패키지 버전의 저작권 고지와 MIT 라이선스 전문을 동봉한다. 잠금 파일을 갱신할 때 번들에 포함되는 의존성도 확인한다. 지도 기능은 공개 API로 구현하고 Pro 예제와 템플릿은 저장소에서 제외한다. [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
+
 ## 2. 모듈과 의존 방향
 
 ```text

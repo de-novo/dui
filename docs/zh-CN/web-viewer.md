@@ -8,6 +8,8 @@
 
 构建 dui 时生成客户端，将入口页与带哈希的资源嵌入 Rust 二进制。源码安装与发行构建共用该构建过程。只需 dui 和浏览器即可打开归档。保留旧独立 HTML 图库。实时会话还需要目标工具链和渲染器。[核心架构](architecture.md) · [里程碑](roadmap.md#v002)
 
+**商业分发。** 地图使用 MIT 许可的 `@xyflow/react`，保留默认署名。dui 的付费版本可以使用该库，无需订阅 Pro。上游请求隐藏界面署名的项目订阅 Pro。分发内嵌查看器的二进制时，还须附上实际使用版本的版权声明和完整 MIT 许可证。更新锁文件时检查打包依赖。使用公开 API 实现地图功能，仓库不收录 Pro 示例或模板。 [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
+
 ## 2. 模块与依赖
 
 ```text

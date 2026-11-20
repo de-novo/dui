@@ -8,6 +8,8 @@ This is the implementation contract for v0.0.2. Today, `crates/dui` writes stand
 
 Build the client during the dui build and embed the shell and hashed assets in the Rust binary. Keep the existing source installer and release build on the same asset build path. Opening an archive requires only dui and a browser. Keep old standalone galleries accessible. Live sessions also need the target toolchain and renderer. [Core architecture](architecture.md) · [Milestone](roadmap.md#v002)
 
+**Commercial distribution.** Use the MIT-licensed `@xyflow/react` package and retain the default attribution on the map. A paid dui edition can use the library without a Pro subscription. Upstream asks projects that hide the on-screen attribution to subscribe. Separately, when distributing a binary with the viewer embedded, ship the copyright notice and MIT license from the exact package version. Check bundled dependencies when updating the lockfile. Implement dui map features using the public API and keep Pro examples and templates out of the repository. [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
+
 ## 2. Modules and dependencies
 
 ```text
