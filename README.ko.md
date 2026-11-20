@@ -24,26 +24,43 @@ Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도�
 
 설치 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. [바이너리 설치 안내](docs/binary-install.md)
 
-## 첫 캡처
+## 내 앱 캡처하기
 
-소스에서 빌드해 예제를 실행하려면 Unix 환경, Rust edition 2024를 지원하는 도구 체인, Node.js 26과 npm, Chromium 또는 Google Chrome이 필요하다. 브라우저를 자동으로 찾지 못하면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다.
+1. 앱의 `package.json`과 `tsconfig.json`이 있는 폴더에서 터미널을 연다. 평소 쓰는 패키지 매니저로 앱 의존성을 설치한다. 현재 웹 캡처는 Vite 8과 프로젝트에 설치된 공식 TypeScript 6.x 또는 7.x를 지원한다. React 앱은 19.x를 사용한다.
+2. 같은 폴더에 `dui.json`을 만든다. 아래 설정은 첫 화면(`/`)을 375px와 1280px로 캡처한다. `main article`은 **내 화면의 콘텐츠가 준비되면 나타나는 요소**의 CSS 선택자로 바꾼다. 예를 들어 설정 폼이 뜨면 준비된 화면은 `main form`을 쓴다.
 
-저장소 루트에서 실행한다.
-
-```sh
-npm ci
-cargo build --release --locked
-npm ci --prefix fixtures/typed-api
-target/release/dui run fixtures/typed-api fixtures/typed-api/dui.json .dui/shelf
+```json
+{
+  "path": "/",
+  "widths": [375, 1280],
+  "readySelector": "main article"
+}
 ```
 
-브라우저에서 `.dui/shelf/graph.html`을 열면 책 세 권이 담긴 768px 화면 한 칸이 **검증됨**으로 표시된다. dui는 앱의 `fetchShelf()` 반환 타입을 읽어 `GET /api/shelf` 응답을 생성한다. 세 번째 책이 화면에 나타나야 검증을 통과한다. [앱 소스](fixtures/typed-api/main.tsx) · [캡처 설정](fixtures/typed-api/dui.json)
+3. 아래 명령을 실행한다. 인자는 순서대로 프로젝트 폴더(`.`), 설정 파일, 결과를 저장할 폴더다. dui가 로컬 서버를 직접 띄우고 캡처가 끝나면 닫는다.
 
-## 내 프로젝트에 적용하기
+```sh
+~/.local/bin/dui run . dui.json .dui/capture
+```
 
-현재 웹 캡처는 Vite 8과 Chromium을 사용한다. 먼저 대상 프로젝트의 의존성을 설치한다. dui는 프로젝트에 설치된 공식 TypeScript 6.x 또는 7.x 컴파일러로 타입을 조회한다. React 앱은 19.x를 지원하며, dui 자체 어댑터는 TypeScript 7로 빌드한다.
+4. 브라우저에서 `.dui/capture/graph.html`을 연다. macOS에서는 `open .dui/capture/graph.html`, Linux 데스크톱에서는 `xdg-open .dui/capture/graph.html`로 연다. 한 칸은 한 화면의 상태 하나를 특정 폭에서 캡처한 결과다. 종료 코드가 5이면 같은 폴더의 `report.json`에서 각 칸이 미검증 또는 렌더 불가로 남은 이유를 확인한다.
 
-캡처 설정에는 시작 경로, 화면 폭, 콘텐츠가 준비됐음을 확인할 CSS 선택자를 지정한다. 화면이 여러 개면 시작 화면의 탐색 링크에서 경로를 수집할 수 있다. 보고서에서 **한 칸**은 경로 하나의 상태 하나를 특정 폭으로 캡처할 자리다.
+**여러 화면을 보려면** 설정에 `"routeSelector": "nav a[href]"`를 추가한다. 시작 화면에서 이 선택자에 맞는 같은 출처 링크를 한 단계 따라간다. 더 깊은 경로나 준비 조건이 다른 화면은 `scenarios`에 추가한다.
+
+**목데이터를 확인하려면** 결과 폴더의 `facts.json`을 연다. dui는 같은 출처의 고정 경로로 보내는 GET 요청에서 지원하는 응답 타입을 읽어 JSON을 만든다. 생성된 값은 `autoMocks.generated`, 발견했지만 생성하지 못한 항목은 `autoMocks.unresolved`에 있다. [경로와 목데이터 설정](docs/ko/reference.md)
+
+## 첫 캡처 예제
+
+내 앱에 적용하기 전에 동작을 확인하려면, dui를 설치한 뒤 예제를 내려받을 폴더에서 실행한다.
+
+```sh
+git clone --depth 1 https://github.com/de-novo/dui.git
+cd dui/fixtures/typed-api
+npm ci
+~/.local/bin/dui run . dui.json .dui/shelf
+```
+
+예제 폴더에서 `.dui/shelf/graph.html`을 열면 책 세 권이 보이는 768px 화면 한 칸이 **검증됨**으로 표시된다. 책 목록은 dui가 `fetchShelf()`의 반환 타입을 읽어 `GET /api/shelf`에 돌려준 목데이터다. Chrome이나 Chromium을 별도 경로에 설치했다면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다. [예제 소스](fixtures/typed-api/main.tsx)
 
 - [캡처 레퍼런스](docs/ko/reference.md) — 경로와 목데이터를 설정하고, 검증률을 해석하고, CLI·MCP로 실행을 자동화한다.
 - [기여 가이드 · English](CONTRIBUTING.md) — 변경할 크레이트와 규칙 팩의 위치, 검증 명령을 확인한다.

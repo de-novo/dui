@@ -22,6 +22,44 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 
 **捕获网页时**需要 Node.js 26、Chromium 或 Google Chrome，以及目标应用的依赖。
 
+## 捕获自己的应用
+
+1. 在应用的 `package.json` 和 `tsconfig.json` 所在目录打开终端，用项目的包管理器安装依赖。网页捕获支持 Vite 8 和项目中安装的官方 TypeScript 6.x 或 7.x 编译器。React 项目使用 React 19。
+2. 在此目录创建 `dui.json`。下面的配置以 375px 和 1280px 两种宽度捕获首页。将 `main article` 换成页面内容加载完成后才出现的元素的 CSS 选择器，例如设置页的 `main form`。
+
+```json
+{
+  "path": "/",
+  "widths": [375, 1280],
+  "readySelector": "main article"
+}
+```
+
+3. 运行捕获。三个参数依次为项目目录（`.`）、配置文件和输出目录。dui 会自行启动并关闭本地服务器。
+
+```sh
+~/.local/bin/dui run . dui.json .dui/capture
+```
+
+4. 在浏览器中打开 `.dui/capture/graph.html`。macOS 可运行 `open .dui/capture/graph.html`，Linux 桌面可运行 `xdg-open .dui/capture/graph.html`。每个格子对应一个页面的一种状态和一种宽度。退出码为 5 时，在同目录的 `report.json` 中查看未验证或无法渲染的原因。
+
+**更多页面。** 加入 `"routeSelector": "nav a[href]"` 可收集起始页上匹配的同源链接，深度为一层。用 `scenarios` 指定更深的路由或需要不同就绪条件的页面。
+
+**模拟数据。** 对于访问同源固定路径且响应类型受支持的 GET 请求，dui 会根据类型生成 JSON。打开 `facts.json`，在 `autoMocks.generated` 中查看生成的数据，在 `autoMocks.unresolved` 中查看无法生成的项。 [路由与模拟数据配置（英文）](docs/reference.md)
+
+## 首次捕获示例
+
+安装 dui 后，在要下载示例的目录运行以下命令。
+
+```sh
+git clone --depth 1 https://github.com/de-novo/dui.git
+cd dui/fixtures/typed-api
+npm ci
+~/.local/bin/dui run . dui.json .dui/shelf
+```
+
+在示例目录中打开 `.dui/shelf/graph.html`。应看到一个已验证的 768px 截图，内含三本书。dui 根据 `fetchShelf()` 的返回类型为 `GET /api/shelf` 生成响应。若 Chrome 或 Chromium 安装在自定义路径，可将 `DUI_CHROMIUM` 设为其可执行文件路径。 [示例源码](fixtures/typed-api/main.tsx)
+
 > **愿景（2026-11-19）**：dui 只支持*构建良好的产品*。当状态用类型表达、API 用 DTO 表达时，所有界面、状态和宽度都会画在同一张画布上。全部画出来代表代码良好；`未验证` 越多，说明状态管理越分散。目标是成为 UI 代码质量的行业标准：① 以公开规则（+ lint）给出支持标准，② 用一个数字表示——"UI 状态覆盖率 %"，③ 状态图和快照采用开放格式。
 
 > **定位**：设计生成类工具展示的是*将会怎样构建*：由 AI 想象尚不存在的界面。dui 展示的是*实际上是怎样构建的*：它通过官方编译器读取现有代码，把真实存在的每个状态都真正渲染出来。不编造任何东西；无法展示的部分标为 `未验证` 或 `无法渲染`。

@@ -65,7 +65,7 @@ A **cell** represents one scenario, state, and width. `verified` means the obser
 
 ## CLI and MCP
 
-The table uses `dui` for the built binary at `target/release/dui`. `PLAN` is the original run’s `report.json`. Give `replay` a new output directory, then use that same directory with `replay-report`.
+The commands assume `dui` is on your `PATH`. With the default installation you can also use `~/.local/bin/dui`. `PLAN` is the original run’s `report.json`. Give `replay` a new output directory, then use that same directory with `replay-report`.
 
 | CLI | MCP | Operation |
 | --- | --- | --- |

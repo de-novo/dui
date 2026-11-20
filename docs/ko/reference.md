@@ -65,7 +65,7 @@
 
 ## CLI와 MCP
 
-아래 표의 `dui`는 빌드한 `target/release/dui` 실행 파일이다. `PLAN`은 최초 실행의 `report.json`이다. `replay`에는 새 출력 디렉터리를 지정하고, `replay-report`에는 그 디렉터리를 다시 전달한다.
+아래 명령은 `dui`가 `PATH`에 있을 때 쓴다. 기본 경로에 설치했다면 `~/.local/bin/dui`로 실행해도 된다. `PLAN`은 최초 실행의 `report.json`이다. `replay`에는 새 출력 디렉터리를 지정하고, `replay-report`에는 그 디렉터리를 다시 전달한다.
 
 | CLI | MCP | 동작 |
 | --- | --- | --- |
