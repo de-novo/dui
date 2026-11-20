@@ -24,6 +24,8 @@ A verified cell establishes that the observed state passed its checks. The revie
 | [Typed element states](https://github.com/de-novo/dui/issues/1) | Test a boolean and an enum. CLI and MCP return the owner, instance, source, type, current value and editability. An ambiguous element or invalid value returns a reason and leaves state intact. |
 | [Live rendering](https://github.com/de-novo/dui/issues/2) | Start the host and browser once. Set and reset a value in the running app. Check both the value read back and the visible DOM or accessibility result. |
 | [Edit speed and capture](https://github.com/de-novo/dui/issues/3) | Measure 30 warm edits from request acceptance to a verified visible update. Report p50 and p95 in milliseconds, cold startup separately, and zero host rebuilds or browser restarts during the edits. Save a chosen state with its evidence under `~/.dui/`. |
+| [Domain model](https://github.com/de-novo/dui/issues/9) | Document each entity's ID, fields and mutability with a diagram. Core types live in `dui-core` with no storage dependency and cover the map, saved captures, cache and comments. |
+| [PGlite storage](https://github.com/de-novo/dui/issues/10) | Store metadata in PGlite through Drizzle migrations, keep images as content-addressed files and import existing `~/.dui/` history without loss. |
 | [M1 coverage](https://github.com/de-novo/dui/issues/4) | Run the existing deterministic planning and coverage gates. Compare CLI and MCP results and report missing evidence for each unverified cell. [M1 gates](architecture.md#7-m0-and-m1-gates) |
 
 The first benchmark establishes the latency baseline on a recorded machine and fixture. A cross-project latency target remains open.
@@ -34,6 +36,8 @@ The first benchmark establishes the latency baseline on a recorded machine and f
 
 Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://github.com/de-novo/dui/issues/6)
 
+**Render only what changed.** Reuse cells whose inputs are unchanged and store each image once ([cache](https://github.com/de-novo/dui/issues/8)). Compare two captures by listing only the changed cells ([diff](https://github.com/de-novo/dui/issues/11)).
+
 ## Later milestones
 
 | Version | Outcome |
@@ -41,5 +45,6 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 | v0.0.4 | Follow an action from one screen or state to the next. Each edge shows whether it was extracted from code, inferred, or verified by replay. Replay from the initial state and check the destination before marking the edge verified. |
 | v0.0.5 | Open the project map in the GPUI and gpui-kit desktop viewer. Attach a comment to a screen, state, width or transition. An agent reads the location through MCP. The reviewer reopens it on the updated worktree and compares before and after. |
 | v0.0.6 | Audit the map on the reference screens against the 99% coverage goal. Publish verified and renderable cell counts, missing branches and reasons for gaps. Keep unresolved review comments visible alongside the evidence. |
+| v0.0.7 | Capture each screen in every supported language and flag missing translations and overflowing text ([#12](https://github.com/de-novo/dui/issues/12)). |
 
 [GitHub milestones](https://github.com/de-novo/dui/milestones)
