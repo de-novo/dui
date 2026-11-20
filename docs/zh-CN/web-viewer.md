@@ -19,7 +19,7 @@ npm ci --prefix apps/canvas
 npm --prefix apps/canvas run preview:archive -- /path/to/run
 ```
 
-查看器使用 Vite 8.3.8 和官方 Tailwind Vite 插件构建。`npm --prefix apps/canvas run build` 将浏览器资源写入 `apps/canvas/dist`。CSS 构建工具适用范围有限的[许可证例外](../en/architecture.md#62-automated-checks-ci-fails-on-any-violation)。
+查看器使用 [Vite](../../dependency-catalog.json) 和官方 Tailwind Vite 插件构建。`npm --prefix apps/canvas run build` 将浏览器资源写入 `apps/canvas/dist`。CSS 构建工具适用范围有限的[许可证例外](../en/architecture.md#62-automated-checks-ci-fails-on-any-violation)。
 
 使用 npmgraph 归档确认了两个界面节点、一条发现的链接，以及 375 和 1280 像素的四张截图。Chrome 检查覆盖键盘选择、焦点恢复、刷新、后退和默认署名。此预览仅验证地图组件，Start 应用和实时详情将在后续实现。已安装的 CLI 仍打开独立图库。
 

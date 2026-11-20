@@ -6,6 +6,6 @@ license.workspace = true
 publish = false
 
 [dependencies]
-csv = "1"
+csv.workspace = true
 serde.workspace = true
 serde_json.workspace = true

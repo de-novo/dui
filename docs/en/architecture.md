@@ -155,21 +155,24 @@ Order mistakes are compile errors:
 |---|---|---|
 | Rule packs | Versioned small JSON schema. No ast-grep YAML syntax layer | Matching is on compiler-resolved symbols and types, not syntax shapes |
 | WASM plugins | Deferred past M0 / M1. In-process Rust crates + typed JSON compiler sidecars first. Revisit only when outside contributors must ship code that rule-pack data cannot express | The current boundaries are met by built-in adapters and data packs; compilers and browsers are processes anyway |
-| Version tracking bot | Renovate, **as an external service only**. It updates `stacks.toml` (exact fixture versions) and the lockfiles in the same PR. Never bundled in dui. Raising a support baseline still happens only in a dui major release | It can track custom files such as `stacks.toml`. Renovate is AGPL-3.0, so its code never ships with dui |
+| Version tracking bot | Renovate, **as an external service only**. It updates the dependency catalog (exact npm fixture versions) and the lockfiles in the same PR. Never bundled in dui. Raising a support baseline still happens only in a dui major release | It can track custom files such as `stacks.toml`. Renovate is AGPL-3.0, so its code never ships with dui |
 | Chromium for golden renders | Golden CI pins an **exact stable build**. Normal runs record the Chromium version used | Separates browser changes from app changes. Golden runs also fix OS, fonts, clock, randomness, and animations; update PRs review the diffs |
 | salsa | Deferred until profiling shows recomputation unrelated to the change is the main bottleneck (e.g. in the MCP edit loop). Content-hash cache first, keyed by stage inputs plus tool and pack versions | The core is pure, so incremental queries can be added later without a rewrite |
 
 ## 5. Monorepo layout
 
-dui is a **polyglot monorepo**: a Cargo workspace for Rust, a pnpm workspace for the TypeScript parts, plus data, fixtures, docs, and tooling. `stacks.toml` is the single source of truth for supported stacks.
+The target layout is a **polyglot monorepo**: a Cargo workspace for Rust, a pnpm workspace for the TypeScript parts, plus data, fixtures, docs, and tooling. `stacks.toml` is the single source of truth for supported stacks.
+
+For the current npm packages, edit [dependency-catalog.json](../../dependency-catalog.json) and run `npm run deps:sync`. CI runs `npm run deps:check` to check manifests and lockfiles. Rust crates inherit dependency requirements from the root `[workspace.dependencies]`. The catalog controls dui’s own dependencies and fixtures. Support baselines are a separate release decision.
 
 ```text
 dui/
 ├── Cargo.toml                 # Cargo workspace root: members, [workspace.lints], shared versions
 ├── clippy.toml                # disallowed methods / types for the core (§6.2)
+├── dependency-catalog.json    # exact npm versions for tooling, apps and fixtures
 ├── pnpm-workspace.yaml        # JS workspace: packages/*, apps/*
 ├── package.json
-├── stacks.toml                # single source of truth: supported stacks, baselines, exact fixture versions, adapter + pack mapping
+├── stacks.toml                # single source of truth: supported stacks, baselines, adapter + pack mapping
 ├── renovate.json              # config for the external Renovate service
 ├── crates/
 │   ├── dui-core/              # pure functional core

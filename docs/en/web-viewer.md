@@ -19,7 +19,7 @@ npm ci --prefix apps/canvas
 npm --prefix apps/canvas run preview:archive -- /path/to/run
 ```
 
-Build the viewer with Vite 8.3.8 and the official Tailwind Vite plugin. `npm --prefix apps/canvas run build` writes browser assets to `apps/canvas/dist`. The build-only CSS tool has a narrow [license exception](architecture.md#62-automated-checks-ci-fails-on-any-violation).
+Build the viewer with [Vite](../../dependency-catalog.json) and the official Tailwind Vite plugin. `npm --prefix apps/canvas run build` writes browser assets to `apps/canvas/dist`. The build-only CSS tool has a narrow [license exception](architecture.md#62-automated-checks-ci-fails-on-any-violation).
 
 Verified with the npmgraph archive: two screen nodes, one discovered link and four images at 375 and 1280 px. Chrome checks covered keyboard selection, focus return, reload, Back and visible attribution. This preview exercises the map component independently of the planned Start shell and live inspector. The installed CLI still opens the standalone gallery.
 

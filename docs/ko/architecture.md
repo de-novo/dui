@@ -157,21 +157,24 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 |---|---|---|
 | 규칙 팩 | 버전을 붙인 작은 JSON 스키마. ast-grep YAML 문법 층 없음 | 매칭 기준이 문법 모양이 아니라 컴파일러가 해석한 심볼·타입이다 |
 | WASM 플러그인 | M0 / M1 이후로 미룬다. 먼저 같은 프로세스 Rust crate + 타입 있는 JSON 컴파일러 사이드카. 외부 기여자가 규칙 팩 데이터로 표현 못 하는 코드를 내놓아야 할 때만 다시 본다 | 지금 경계는 내장 어댑터와 데이터 팩으로 충족된다. 컴파일러와 브라우저는 어차피 프로세스다 |
-| 버전 추적 봇 | Renovate를 **외부 서비스로만** 쓴다. `stacks.toml`(픽스처의 정확한 버전)과 lockfile을 같은 PR로 갱신한다. dui에 절대 포함하지 않는다. 지원 기준선 상향은 여전히 dui 메이저 릴리스에서만 한다 | `stacks.toml` 같은 사용자 정의 파일도 추적할 수 있다. Renovate는 AGPL-3.0이므로 그 코드는 dui와 함께 배포되지 않는다 |
+| 버전 추적 봇 | Renovate를 **외부 서비스로만** 쓴다. 의존성 카탈로그(npm 픽스처의 정확한 버전)과 lockfile을 같은 PR로 갱신한다. dui에 절대 포함하지 않는다. 지원 기준선 상향은 여전히 dui 메이저 릴리스에서만 한다 | `stacks.toml` 같은 사용자 정의 파일도 추적할 수 있다. Renovate는 AGPL-3.0이므로 그 코드는 dui와 함께 배포되지 않는다 |
 | 골든 렌더용 Chromium | 골든 CI는 **정확한 안정판 빌드**로 고정한다. 일반 실행은 쓴 Chromium 버전을 기록한다 | 브라우저 변화와 앱 변화를 구분한다. 골든 실행은 OS, 폰트, 시계, 난수, 애니메이션도 고정하고, 갱신 PR에서 차이를 검토한다 |
 | salsa | 변경과 무관한 재계산이 주 병목이라는 게 프로파일링으로 드러날 때까지(예: MCP 편집 반복) 미룬다. 먼저 단계 입력 + 도구·팩 버전을 키로 하는 내용 해시 캐시를 쓴다 | 코어가 순수하므로 나중에 다시 쓰지 않고 증분 질의를 붙일 수 있다 |
 
 ## 5. 모노레포 구조
 
-dui는 **여러 언어 모노레포**다: Rust는 Cargo workspace, TypeScript 부분은 pnpm workspace, 그리고 데이터·픽스처·문서·도구. 지원 스택의 단일 원천은 `stacks.toml`이다.
+목표 구조는 **여러 언어 모노레포**다: Rust는 Cargo workspace, TypeScript 부분은 pnpm workspace, 그리고 데이터·픽스처·문서·도구. 지원 스택의 단일 원천은 `stacks.toml`이다.
+
+현재 npm 패키지의 버전은 [dependency-catalog.json](../../dependency-catalog.json)에서 수정하고 `npm run deps:sync`로 반영한다. CI는 `npm run deps:check`로 매니페스트와 잠금 파일을 검사한다. Rust 크레이트는 루트의 `[workspace.dependencies]`에서 버전 조건을 상속한다. 카탈로그는 dui 자체와 픽스처의 의존성을 관리한다. 지원 기준선은 릴리스에서 별도로 결정한다.
 
 ```text
 dui/
 ├── Cargo.toml                 # Cargo workspace root: members, [workspace.lints], shared versions
 ├── clippy.toml                # disallowed methods / types for the core (§6.2)
+├── dependency-catalog.json    # exact npm versions for tooling, apps and fixtures
 ├── pnpm-workspace.yaml        # JS workspace: packages/*, apps/*
 ├── package.json
-├── stacks.toml                # single source of truth: supported stacks, baselines, exact fixture versions, adapter + pack mapping
+├── stacks.toml                # single source of truth: supported stacks, baselines, adapter + pack mapping
 ├── renovate.json              # config for the external Renovate service
 ├── crates/
 │   ├── dui-core/              # pure functional core

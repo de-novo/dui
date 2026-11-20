@@ -100,9 +100,20 @@ Keep application routes, data samples, and selectors in the capture manifest or 
 
 ## Local checks
 
+Edit [dependency-catalog.json](dependency-catalog.json) to update an npm library or tool.
+Run `npm run deps:sync` from the root with Node 26, then commit the changed manifests
+and lockfiles together. New direct dependencies need a catalog entry and a declaration
+in the consuming package. The root, canvas, and fixtures each support a standalone
+`npm ci`. To install updated versions locally, run `npm ci` in each affected package.
+
+Declare Rust dependencies in the root `Cargo.toml` under `[workspace.dependencies]`.
+Member crates inherit them with `workspace = true`. Commit resolved version changes in
+`Cargo.lock`.
+
 Run from the repository root after installing dependencies with `npm ci`.
 
 ```sh
+npm run deps:check
 npm run check:style
 cargo fmt --all --check
 npm exec -- tsc --noEmit

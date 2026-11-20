@@ -19,7 +19,7 @@ npm ci --prefix apps/canvas
 npm --prefix apps/canvas run preview:archive -- /path/to/run
 ```
 
-뷰어는 Vite 8.3.8과 공식 Tailwind Vite 플러그인으로 빌드한다. `npm --prefix apps/canvas run build`는 브라우저 자산을 `apps/canvas/dist`에 저장한다. CSS 빌드 도구에는 [라이선스 예외](../en/architecture.md#62-automated-checks-ci-fails-on-any-violation)를 적용한다.
+뷰어는 [Vite](../../dependency-catalog.json)과 공식 Tailwind Vite 플러그인으로 빌드한다. `npm --prefix apps/canvas run build`는 브라우저 자산을 `apps/canvas/dist`에 저장한다. CSS 빌드 도구에는 [라이선스 예외](../en/architecture.md#62-automated-checks-ci-fails-on-any-violation)를 적용한다.
 
 npmgraph 기록에서 화면 노드 2개, 발견된 링크 1개, 375px·1280px 캡처 총 4장을 확인했다. Chrome에서 키보드 선택, 포커스 복귀, 새로고침, 뒤로 가기와 기본 출처 표시를 검증했다. 이 미리보기는 지도 컴포넌트를 검증한다. Start 기반 앱과 라이브 상세 보기는 후속 구현이며 설치된 CLI는 기존 독립 갤러리를 연다.
 
