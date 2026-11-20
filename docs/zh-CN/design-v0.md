@@ -52,7 +52,7 @@
 - 结果必须可测量（有分子和分母的覆盖率）。
 
 **非目标**
-- 在画布内点击、输入等交互。只展示静态画面。
+- 在已归档的截图中直接输入。v0.0.2 在运行中的应用内检查实时状态。
 - 视觉回归测试（像素对比审批流程）。那是 Chromatic、Percy 的领域。以后可以接入。
 - 无类型的 JavaScript、Python、Dart、Swift、Kotlin 等。（v0 范围之外）
 - 在生产构建中保留 SDK。所有注入代码仅用于开发构建。
@@ -284,6 +284,14 @@ pippip 使用 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`，HTTP 使用 `reqwest`（�
 
 布局：**行 = 界面×状态，列 = 宽度（以及主题、语言维度），边 = 转换**。未验证格子显示为灰色斜线 + 原因。
 
+<a id="web-viewer"></a>
+
+### Web 查看器
+
+**v0.0.2 查看器使用 React 19 和 TypeScript 7。TanStack Start 负责路由和构建，shadcn/ui 提供控件，Tailwind CSS 管理布局与主题变量，React Flow 显示界面地图。** 使用 Start 的 SPA 模式构建静态入口页。Rust 二进制提供入口页、静态资源和本地捕获数据。直接打开查看器路由时应加载入口页；找不到捕获或资源时返回相应错误。保留对已有独立 HTML 图库的访问。[SPA 模式](https://tanstack.com/start/latest/docs/framework/react/guide/spa-mode)
+
+选择项由项目、运行、界面、状态和捕获宽度标识。使用经过验证的路由参数，在总览和详情之间切换、浏览器后退或刷新后保留选择。地图和界面列表均支持键盘导航。在捕获图像旁显示报告中的验证状态及原因。[路由搜索参数](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [查看器开发与审查技能](../../.agents/skills/dui-web-viewer/SKILL.md)
+
 | 候选 | 许可证（2026-11-19 确认） | 判断 |
 |---|---|---|
 | React Flow（`xyflow/xyflow`） | MIT，★39,087 | **第一选择**。节点内放图像或 iframe（Web 为实时 DOM） |
@@ -353,8 +361,7 @@ dui **不**内嵌 Whiteboard：它内置（vendor）了 Code-OSS（打包很重�
 2. 如何自动从覆盖率分母中去掉"对画面无影响的分支"？这条规则决定了 99% 的含义。
 3. 顺序状态的展开上限（深度、代表值）定为多少，才能在可接受的渲染数量内覆盖所有有意义的状态？
 4. TS 适配器如何从 Rust 调用 TS 7.1 的 API（用 `typescript/sync` 的小型 Node 边车进程，或有文档的通信协议，后者 `未确认`）。
-5. 画布是做成本地 Web 应用（由 AI 代理运行 `dui open`，人只查看）还是托管服务。若托管，需要评估快照存储成本和安全性。
-6. Figma 导出的费用和 API 限额（`未确认`）。
+5. Figma 导出的费用和 API 限额（`未确认`）。
 
 ## 原则：组合由系统生成，而不是 AI（2026-11-19 决定）
 AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确定性算法决定，保证每次结果相同。
@@ -398,7 +405,7 @@ AI **只用于找出状态在哪里、是什么类型**。画哪些组合由确�
 | Web 渲染 | `chromiumoxide` 0.9.1（2026-02-25 发布），通过 CDP 驱动 Chromium，每种宽度一个视口 | MIT OR Apache-2.0 | 最近一次发布为 2026-02-25 → 关注维护情况 |
 | 网络拦截 | CDP Fetch 域（chromiumoxide 中的 `Fetch.pdl` 和 `examples/interception.rs`） | — | 不用 MSW |
 | GPUI 渲染 | 以后在同一个 Rust 进程中（`gpui-pre`） | Apache-2.0 | 见 §9.2 |
-| 画布 UI | React + React Flow，静态资源由 Rust 二进制提供 | MIT | 人只看它（§0） |
+| 画布 UI | React 19, TanStack Start, shadcn/ui, Tailwind CSS, React Flow | 按包审查（§12） | TypeScript 7 构建，Rust 提供静态资源 |
 
 **TypeScript 编译器现状**（官方来源）：
 - TS 7.0 是 Go 原生编译器。npm 上的稳定版 `typescript` 7.0.2 发布于 2026-07-08。从 7.0 RC 起命令是 `tsc`（预览名 `tsgo` 已不再使用）（[typescript-go README](https://github.com/microsoft/typescript-go)，该仓库已归档，开发转回 microsoft/TypeScript）。TS 7 提供 LSP 语言服务器（[TS 7.0 发布公告](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)）。

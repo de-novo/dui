@@ -12,6 +12,7 @@ dui reads existing UI code through each language's official compiler and really 
 | Topic | Doc |
 |---|---|
 | Product design, principles, milestones | [docs/en/design-v0.md](docs/en/design-v0.md) |
+| Web viewer stack and interaction rules | [Web viewer](docs/en/design-v0.md#web-viewer) |
 | Code structure, patterns, crate boundaries, M0/M1 gates | [docs/en/architecture.md](docs/en/architecture.md) |
 | Supported stacks and versions | [docs/en/supported-frameworks.md](docs/en/supported-frameworks.md) |
 | Discussions, issues, labels, milestones, board, PRs, approvals | [docs/en/workflow.md](docs/en/workflow.md) |
@@ -44,6 +45,8 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 6. **No other products' names or trademarks** in dui product or package names, and none in the positioning line.
 
 ## Code rules
+
+When implementing or reviewing the web map, gallery, or live inspector, use the repository skill [dui-web-viewer](.agents/skills/dui-web-viewer/SKILL.md). Its rules apply to dui's interface, independent of the stack of the app being captured.
 
 1. Rust, edition 2024. One binary, `dui`.
 2. **Functional core, imperative shell.** `dui-core` has no I/O, no async, no clock, no randomness; same input, same output.
