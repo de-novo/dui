@@ -1,0 +1,10 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>dui 상태 그래프</title>
+<style>body{font:16px system-ui;color:#172323;margin:24px}select{max-width:90vw;padding:.4em}svg{display:block;width:100%;min-width:640px}#canvas{overflow:auto;border:1px solid #abc;margin-top:16px;height:75vh}text{font:14px system-ui}g[role=button]{cursor:pointer}g:focus rect{stroke:black;stroke-width:3}a{color:#265e60}#gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px;margin:16px 0 32px}
+figure{min-width:0;margin:0}figcaption{margin-bottom:6px;font-size:14px;overflow-wrap:anywhere}
+figure img{border:1px solid #cad3d4;border-radius:4px;object-fit:contain;width:100%;max-height:400px;background:#f5f7f7}
+</style>
+<h1>화면 캡처</h1>
+<label>화면 폭 <select id="width"></select></label>
+<section id="gallery" aria-label="경로별 기본 상태"></section>
+<h2>상태 그래프</h2><label>시작 노드 <select id="choose"></select></label> <a id="image"></a><p id="summary"></p><button id="prev" type="button" hidden>이전 연결</button> <button id="nextPage" type="button" hidden>다음 연결</button> <span id="detail"></span><div id="canvas"><svg id="svg" aria-label="선택한 노드의 이웃"></svg></div>
+<script id="graph-data" type="application/json">/*GRAPH*/</script><script>/*VIEW*/</script></html>
