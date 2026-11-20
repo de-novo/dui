@@ -19,6 +19,10 @@ pub struct Session {
     page: String,
     facts: Vec<Value>,
     baseline: Value,
+    pub environment: Value,
+    source_run: Value,
+    path: Value,
+    edits: Vec<Value>,
     pub cell: Value,
     id: String,
     revision: u64,
@@ -62,6 +66,9 @@ impl Session {
             crate::screen_map::discover(project, &generated)?;
             &generated
         };
+        if row["scenario"] == "live" {
+            return Err(invalid("open-source-cell-for-live-editing"));
+        }
         let analysis = analysis::analyze(project, manifest)?;
         let host = ViteHost.start(project, manifest, &analysis)?;
         let mut spec = read(manifest)?;
@@ -110,6 +117,7 @@ impl Session {
         {
             return Err(invalid("cell-not-ready"));
         }
+        let environment = json!({"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"compiler":analysis["compiler"],"versions":analysis["versions"],"renderer":browser.version().map_err(io)?["product"]});
         let mut session = Self {
             browser,
             _host: host,
@@ -120,6 +128,10 @@ impl Session {
                 .cloned()
                 .ok_or_else(|| invalid("invalid-facts"))?,
             baseline,
+            environment,
+            source_run: archived["id"].clone(),
+            path: row["path"].clone(),
+            edits: vec![],
             cell: cell.clone(),
             id: id.into(),
             revision: 0,
@@ -181,6 +193,7 @@ impl Session {
         Ok(inspect(&self.facts, &[row], &q).map_err(invalid)?["controls"].take())
     }
     pub fn handle(&mut self, r: &Value) -> Reply {
+        let accepted = std::time::Instant::now();
         let op = field(r, "op")?;
         if r["cell"] != self.cell {
             return Err(invalid("cell-mismatch"));
@@ -191,7 +204,7 @@ impl Session {
                 json!({"session":self.id,"cell":self.cell,"revision":self.revision,"controls":self.controls(instances,None,None,None)?,"observation":"live"}),
             );
         }
-        if !matches!(op, "set" | "reset") {
+        if !matches!(op, "set" | "reset" | "save") {
             return Err(invalid("unknown-operation"));
         }
         let key = field(r, "requestId")?;
@@ -199,8 +212,19 @@ impl Session {
             Decision::Replay(result) => return result.clone(),
             Decision::Reject("request-id-reused") => return Err(invalid("request-id-reused")),
             Decision::Reject(reason) => Err(invalid(reason)),
-            Decision::Write { revision } => self.edit(op, r, revision),
+            Decision::Write { .. } if op == "save" => self.save(),
+            Decision::Write { revision } => self.edit(op, r, revision).map(|mut body| {
+                body["launches"] = super::launches();
+                body["elapsedMs"] = json!(accepted.elapsed().as_secs_f64() * 1000.0);
+                body["op"] = op.into();
+                self.edits.push(body.clone());
+                body
+            }),
         };
+        // A failed archive write publishes nothing. The same request may be retried.
+        if op == "save" && matches!(result, Err((3, _))) {
+            return result;
+        }
         self.receipts
             .insert(key.into(), (r.clone(), result.clone()));
         result
@@ -243,11 +267,89 @@ impl Session {
         if let Some(reason) = result["error"].as_str() {
             return Err(invalid(reason));
         }
+        result["expectedValue"] = value;
         self.revision = revision;
         for k in ["session", "cell", "slot", "instance", "requestId"] {
             result[k] = r[k].clone();
         }
         result["revision"] = self.revision.into();
         Ok(result)
+    }
+}
+
+impl Session {
+    fn save(&mut self) -> Reply {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        use sha2::{Digest, Sha256};
+        let result = self
+            .edits
+            .last()
+            .cloned()
+            .ok_or_else(|| invalid("no-edited-revision"))?;
+        let selector = &result["evidence"]["selector"];
+        let sample = format!(
+            "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,visibleText:globalThis.__duiRuntime.visibleText({selector}),path:location.pathname+location.search+location.hash,width:innerWidth}}) : null",
+            json!(self.id)
+        );
+        let before = self.eval(&sample)?;
+        let image = self
+            .browser
+            .call(
+                Some(&self.page),
+                "Page.captureScreenshot",
+                json!({"format":"png"}),
+            )
+            .map_err(io)?;
+        let bytes = STANDARD.decode(field(&image, "data")?).map_err(io)?;
+        let observation = self.eval(&sample)?;
+        if !observation.is_object() {
+            return Err(io("live-page-expired"));
+        }
+        let slot = field(&result, "slot")?;
+        let instance = field(&result, "instance")?;
+        let value = observation["instances"][slot][instance].get("value");
+        let reason = if before != observation {
+            Some("changed-during-capture")
+        } else if observation["path"] != self.path || observation["width"] != self.cell["width"] {
+            Some("cell-mismatch")
+        } else if result["status"] != "verified" {
+            result["reason"].as_str().or(Some("unverified-edit"))
+        } else if value != result.get("expectedValue") {
+            Some("value-mismatch")
+        } else if observation["visibleText"] != result["evidence"]["expectedText"] {
+            Some("semantic-mismatch")
+        } else {
+            None
+        };
+        let digest = format!("{:x}", Sha256::digest(&bytes));
+        let filename = format!("{digest}.png");
+        let state = format!(
+            "live-{:x}",
+            Sha256::digest(
+                json!([self.source_run, self.cell, self.revision, observation]).to_string()
+            )
+        );
+        let cell = json!({"path":self.path,"scenario":"live","state":state,"width":self.cell["width"],"planIndex":0,
+            "status":if reason.is_some(){"unverified"}else{"verified"},"reason":reason,"image":filename,"imageSha256":digest,"observation":observation,
+            "assertion":{"selector":selector,"expectedText":result["evidence"]["expectedText"],"visibleText":observation["visibleText"],"expectedValue":result["expectedValue"],"observedValue":value,"slot":slot,"instance":instance}});
+        let report = json!({"path":self.path,"live":{"sourceRun":self.source_run,"sourceCell":self.cell,"revision":self.revision,"edits":self.edits,"environment":self.environment},
+            "coverage":{"verified":u8::from(reason.is_none()),"renderable":1,"attempted":1,"unrenderable":0},"cells":[cell]});
+        let published = crate::archive::publish(self.provenance["live"].clone(), |dir| {
+            std::fs::create_dir(dir).map_err(io)?;
+            std::fs::write(dir.join(filename), bytes).map_err(io)?;
+            analysis::store(
+                &dir.join("facts.json"),
+                &json!({"facts":self.facts,"compiler":self.environment["compiler"],"versions":self.environment["versions"]}),
+            )?;
+            analysis::store(&dir.join("report.json"), &report)?;
+            let graph = crate::graph_view::with_cells(json!({"nodes":[],"edges":[]}), &report)?;
+            crate::graph_view::write(dir, &graph)?;
+            analysis::store(&dir.join("graph.json"), &graph)?;
+            Ok(report)
+        })?;
+        Ok(
+            json!({"project":published["snapshot"]["projectId"],"run":published["snapshot"]["id"],"output":published["output"],
+            "cell":{"state":state,"width":self.cell["width"]},"revision":self.revision,"status":cell["status"],"reason":reason,"image":cell["image"],"imageSha256":digest}),
+        )
     }
 }

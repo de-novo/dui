@@ -290,9 +290,18 @@ declare var __duiProbe: {
       width: innerWidth,
     };
   }
+  function visibleText(selector: string) {
+    const nodes = document.querySelectorAll(selector);
+    const node = nodes.length === 1 ? nodes[0] : undefined;
+    return node instanceof HTMLElement &&
+      node.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+      ? node.innerText.trim()
+      : null;
+  }
   Object.assign(globalThis, {
     __duiRuntime: {
       install,
+      visibleText,
       async liveEdit(
         slot: string,
         instance: string,
@@ -301,16 +310,8 @@ declare var __duiProbe: {
         text: string,
       ) {
         const probe = globalThis.__duiProbe;
-        function visibleText() {
-          const nodes = document.querySelectorAll(selector);
-          const node = nodes.length === 1 ? nodes[0] : undefined;
-          return node instanceof HTMLElement &&
-            node.checkVisibility({ visibilityProperty: true, opacityProperty: true })
-            ? node.innerText.trim()
-            : null;
-        }
         try {
-          visibleText();
+          visibleText(selector);
         } catch {
           return { error: "invalid-selector" };
         }
@@ -320,7 +321,7 @@ declare var __duiProbe: {
         for (let sample = 0; sample < 10; sample++) {
           await probe.waitForSample();
           observed = probe.instances[slot]?.[instance]?.value;
-          visible = visibleText();
+          visible = visibleText(selector);
           if (observed === value && visible === text) break;
         }
         const reason =
