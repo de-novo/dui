@@ -107,6 +107,11 @@ fn is_supported_ts(version: &str) -> bool {
 
 fn run() -> Reply {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if let [flag] = args.as_slice()
+        && (flag == "--version" || flag == "-V")
+    {
+        return Ok(json!({"name": "dui", "version": env!("CARGO_PKG_VERSION")}));
+    }
     if let [cmd, manifest, plan, out] = args.as_slice()
         && cmd == "replay-report"
     {

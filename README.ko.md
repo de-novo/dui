@@ -4,9 +4,13 @@
 
 dui는 웹 앱에 목데이터를 넣고, 상태와 화면 폭을 바꿔 가며 Chromium에 실제로 그려진 화면을 검증한다. 사람은 로컬 HTML 갤러리에서 캡처를 보고, 에이전트는 CLI와 MCP로 같은 결과를 JSON으로 읽는다.
 
+## 설치
+
+운영체제와 CPU에 맞는 압축 파일에서 실행 파일을 설치한다. 설치에는 Cargo가 필요 없다. 압축 파일과 함께 제공하는 SHA-256 값으로 파일을 확인할 수 있다. [바이너리 설치 방법](docs/binary-install.md)
+
 ## 첫 캡처
 
-Unix 환경, Rust edition 2024를 지원하는 도구 체인, Node.js 26과 npm, Chromium 또는 Google Chrome이 필요하다. 브라우저를 자동으로 찾지 못하면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다.
+소스에서 빌드해 예제를 실행하려면 Unix 환경, Rust edition 2024를 지원하는 도구 체인, Node.js 26과 npm, Chromium 또는 Google Chrome이 필요하다. 브라우저를 자동으로 찾지 못하면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다.
 
 저장소 루트에서 실행한다.
 

@@ -1,6 +1,9 @@
 {
   "name": "dui-build",
   "private": true,
+  "scripts": {
+    "package:release": "tsc --project scripts && node scripts/package-release.mts"
+  },
   "devDependencies": {
     "typescript": "7.0.2",
     "@types/node": "26.6.6"

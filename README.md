@@ -4,9 +4,13 @@
 
 dui captures a running web app across UI states and viewport widths. It reads the app’s TypeScript types, generates mock responses, and checks what Chromium actually rendered. Browse the screenshots in a local HTML gallery or consume the same results as JSON through the CLI or MCP.
 
+## Install
+
+Install the native binary from the archive for your OS and CPU. Each archive includes the executable and license notices and comes with a SHA-256 checksum. [Binary installation](docs/binary-install.md)
+
 ## First capture
 
-You need a Unix environment, Rust with edition 2024 support, Node.js 26 with npm, and a locally installed Chromium or Google Chrome. If dui cannot find the browser, set `DUI_CHROMIUM` to its executable path.
+To build the example from source, you need a Unix environment, Rust with edition 2024 support, Node.js 26 with npm, and a locally installed Chromium or Google Chrome. If dui cannot find the browser, set `DUI_CHROMIUM` to its executable path.
 
 Run the following commands from the repository root.
 

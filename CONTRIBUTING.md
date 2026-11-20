@@ -33,3 +33,14 @@ cargo clippy --locked --all-targets -- -D warnings
 For a host, mock, or browser change, also run the [first capture](README.md#first-capture). Check the generated response in `facts.json`, the recorded request in `report.json`, and the screenshot in `graph.html`. Include those observations when describing the change.
 
 Use dependencies under permissive licenses such as MIT, Apache-2.0, BSD, or ISC. Keep capture output, installed dependencies, and third-party project checkouts out of the patch.
+
+## Package a release
+
+From a clean checkout with Node.js 26, npm, Rust, and tar installed, run the following commands.
+
+```sh
+npm ci
+npm run package:release
+```
+
+The script builds for the Rust host target. It writes `dui-<version>-<target>.tar.gz` and its `.sha256` file to the Cargo target directory under `dist/`. Build on each supported target and test the extracted executable there before distributing it. Both Cargo packages are private to the workspace. [Installation from an archive](docs/binary-install.md)
