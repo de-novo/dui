@@ -58,12 +58,14 @@ function Card({ data }: NodeProps<CardNode>) {
 const nodeTypes = { screen: Card };
 
 export function ScreenMap({
+  railInset,
   archive,
   width,
   mode,
   imageUrl,
   select,
 }: {
+  railInset: number;
   archive: Archive;
   width: number;
   mode: string;
@@ -116,7 +118,12 @@ export function ScreenMap({
       fitView
       minZoom={0.04}
       fitViewOptions={{
-        padding: { x: "18px", top: "48px", bottom: "18px" },
+        padding: {
+          left: `${railInset + 18}px`,
+          right: "18px",
+          top: "48px",
+          bottom: "18px",
+        },
         minZoom: 0.04,
       }}
       nodesDraggable={false}

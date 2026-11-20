@@ -1,3 +1,13 @@
+import {
+  ChevronDown,
+  ChevronsUpDown,
+  FolderClosed,
+  Monitor,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Run } from "../../data/run";
 
@@ -28,14 +38,18 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
     localStorage.setItem("dui.rail", collapsed ? "expanded" : "collapsed");
     setCollapsed(!collapsed);
   }
+  const ThemeIcon = { system: Monitor, light: Sun, dark: Moon }[theme];
+  const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
   return (
     <nav
       className={"rail" + (collapsed ? " collapsed" : "")}
       aria-label="Workspace"
     >
       <strong className="wordmark" aria-label="dui">
-        <i aria-hidden="true">d</i>
-        {!collapsed && <span>dui</span>}
+        dui
+        <span className="brand-period" aria-hidden="true">
+          .
+        </span>
       </strong>
       <button
         type="button"
@@ -48,35 +62,31 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
         }
         onClick={open}
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M3 6h6l2 2h10v11H3z" />
-        </svg>
-        <span>
+        <FolderClosed aria-hidden="true" />
+        <span className="rail-text">
           <strong>{run?.project ?? "Select workspace"}</strong>
           {run && (
             <small>
-              {run.branch ?? "Branch not recorded"}
-              <br />
-              <code>{run.version.split("-").at(-1)}</code>
+              {[run.branch, run.version.split("-").at(-1)]
+                .filter(Boolean)
+                .join(" · ")}
             </small>
           )}
         </span>
+        <ChevronsUpDown className="rail-disclosure" aria-hidden="true" />
       </button>
-      <label className="rail-theme" title="Theme">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="8" />
-          <path d="M12 4v16a8 8 0 0 0 0-16" fill="currentColor" />
-        </svg>
-        <span>Theme</span>
+      <label className="rail-theme" title={`Theme: ${theme}`}>
+        <ThemeIcon aria-hidden="true" />
         <select
           aria-label="Theme"
           value={theme}
           onChange={(e) => setTheme(e.target.value as Theme)}
         >
-          <option value="system">System</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
+          <option value="system">System theme</option>
+          <option value="light">Light theme</option>
+          <option value="dark">Dark theme</option>
         </select>
+        <ChevronDown className="rail-disclosure" aria-hidden="true" />
       </label>
       <button
         type="button"
@@ -85,11 +95,8 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
         aria-expanded={!collapsed}
         onClick={toggle}
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M9 4v16" />
-        </svg>
-        <span>Collapse rail</span>
+        <CollapseIcon aria-hidden="true" />
+        <span className="rail-text">Collapse rail</span>
       </button>
     </nav>
   );

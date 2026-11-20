@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { createRoot } from "react-dom/client";
@@ -22,6 +22,20 @@ function archiveUrl(name: string, run: Run) {
 }
 
 function MapView({ archive, run }: { archive: Archive; run: Run }) {
+  const mapArea = useRef<HTMLDivElement>(null);
+  const overviewLayer = useRef<HTMLDivElement>(null);
+  const [railInset, setRailInset] = useState<number>();
+  useLayoutEffect(() => {
+    const area = mapArea.current;
+    const layer = overviewLayer.current;
+    if (!area || !layer) return;
+    const measure = () => setRailInset(layer.clientWidth - area.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    observer.observe(layer);
+    return () => observer.disconnect();
+  }, []);
   const [search, setSearch] = useState(location.search);
   const params = new URLSearchParams(search);
   const widths = [
@@ -72,15 +86,23 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
     state === null ? cells[0] : cells.find((_, i) => stateKey(i) === state);
   return (
     <section className="workspace" aria-label="Screen map">
-      <div className="map">
-        <div className="overview-layer" aria-hidden={!!screen} inert={!!screen}>
-          <ScreenMap
-            archive={archive}
-            width={width}
-            mode={mode}
-            imageUrl={(name) => archiveUrl(name, run)}
-            select={select}
-          />
+      <div className="map" ref={mapArea}>
+        <div
+          ref={overviewLayer}
+          className="overview-layer"
+          aria-hidden={!!screen}
+          inert={!!screen}
+        >
+          {railInset !== undefined && (
+            <ScreenMap
+              railInset={railInset}
+              archive={archive}
+              width={width}
+              mode={mode}
+              imageUrl={(name) => archiveUrl(name, run)}
+              select={select}
+            />
+          )}
         </div>
         {screen && (
           <ScreenNeighborhood

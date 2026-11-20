@@ -31,7 +31,7 @@ The preview uses Tailwind CSS 4.3.5 and the shadcn/ui Base UI preset (`base-nova
 
 [tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
 
-- **Color and material** — Use solid monochrome canvas and panel surfaces in both themes. Use orange `--primary` (#EF803F) for the dui mark and the primary action. Only the fixed rail and the capture card use `--blur` (10 px).
+- **Color and material** — Use solid monochrome canvas and panel surfaces in both themes. Use orange `--primary` (#EF803F) for the dui mark and the primary action. Float the rail over the map with a frosted white surface in light mode and a smoked charcoal surface in dark mode. Only the fixed rail and the capture card use `--blur` (10 px).
 - **Type and spacing** — System sans for controls, system monospace for routes. At the default text size use 12 / 14 / 20 px for metadata, body and panel titles; space elements on a 4 / 8 / 12 / 16 / 24 px scale. Controls use a 6 px radius and panels use 12 px.
 - **Controls** — Use `Button` for panel actions (default, primary or icon). Give icon-only controls accessible names. Reserve the focus outline for keyboard navigation. Selection uses placement and weight.
 - **Evidence** — Use `CaptureCard` in both map views. Fit the original image inside the frame and name the route beneath it. Count reviewable issues on the card; read the recorded verdict and reason in the inspector.

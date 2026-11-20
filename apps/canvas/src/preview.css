@@ -30,6 +30,10 @@ body {
   background: var(--background);
 }
 .viewer {
+  --rail-width: clamp(10rem, 14vw, 13rem);
+  --rail-space: calc(var(--rail-width) + var(--space-2));
+  background-image: radial-gradient(var(--map-grid) 0.8px, transparent 0.8px);
+  background-size: 20px 20px;
   display: flex;
   height: 100dvh;
   min-height: 16rem;
@@ -71,135 +75,132 @@ h2 {
 .screen-card {
   backdrop-filter: blur(var(--blur));
 }
+.viewer:has(.rail.collapsed) {
+  --rail-width: 3rem;
+}
 .rail {
-  width: clamp(9rem, 14vw, 12rem);
+  z-index: 5;
+  position: relative;
+  width: var(--rail-width);
   flex: none;
-  align-self: stretch;
   display: flex;
   flex-direction: column;
+  align-self: stretch;
+  gap: var(--space-1);
   margin: var(--space-2) 0 var(--space-2) var(--space-2);
-  gap: var(--space-2);
   padding: var(--space-2);
-  background: var(--sidebar);
   color: var(--sidebar-foreground);
+  background: var(--sidebar);
   border: 1px solid var(--sidebar-line);
   border-radius: var(--radius-panel);
-  box-shadow: inset 0 1px var(--sidebar-line);
-}
-.rail.collapsed {
-  width: 3rem;
-  padding: var(--space-1);
+  box-shadow:
+    inset 0 1px var(--sidebar-rim),
+    0 4px 16px var(--sidebar-shadow);
 }
 .wordmark {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 var(--space-4);
-  padding-inline: var(--space-1);
-  font-size: var(--text-title);
-  letter-spacing: -0.06em;
+  align-items: baseline;
+  margin: var(--space-2) var(--space-2) var(--space-4);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: -0.075em;
 }
-.wordmark i {
-  display: grid;
-  place-items: center;
-  width: 1.65rem;
-  height: 1.65rem;
-  border-radius: var(--radius-control);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font:
-    italic 700 1.5rem/1 Georgia,
-    serif;
-}
-.rail.collapsed .wordmark {
-  justify-content: center;
+.brand-period {
+  color: var(--primary);
 }
 .rail button,
 .rail-theme {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 2.4rem;
-  padding: 0.4rem;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: var(--space-2);
+  color: var(--sidebar-muted);
+  background: transparent;
   border: 0;
   border-radius: var(--radius-control);
-  background: transparent;
   text-align: left;
+  font-size: var(--text-meta);
 }
-.rail button:hover,
+.rail button:not([data-slot]):hover:not(:disabled),
 .rail-theme:hover {
+  color: var(--sidebar-foreground);
   background: var(--sidebar-accent);
 }
 .rail svg {
-  width: 1.2rem;
-  height: 1.2rem;
   flex: none;
-  stroke: currentColor;
-  fill: none;
+  width: 1rem;
+  height: 1rem;
   stroke-width: 1.6;
-  stroke-linejoin: round;
 }
-.rail button span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.rail button strong {
-  display: block;
-  font-size: var(--text-body);
+.rail .rail-disclosure {
+  margin-inline-start: auto;
+  width: 0.8rem;
+  height: 0.8rem;
 }
 .rail .workspace-switch {
-  background: var(--sidebar-accent);
-  align-items: flex-start;
-  padding: var(--space-2);
+  color: var(--sidebar-foreground);
 }
-.rail small {
+.rail-text {
+  min-width: 0;
+}
+.rail-text strong,
+.rail-text small {
   display: block;
-  font-size: var(--text-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-text strong {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+.rail-text small {
+  font: var(--text-meta)/1.5 var(--font-mono);
   color: var(--sidebar-muted);
 }
 .rail-theme {
   margin-top: auto;
-  position: relative;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
 }
 .rail-theme select {
-  background: transparent;
-  color: var(--sidebar-foreground);
-  border: 0;
-  font-size: var(--text-meta);
-  padding: 0.15rem;
-
+  flex: 1;
   min-width: 0;
-  max-width: 100%;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 .rail-theme option {
   color: var(--foreground);
   background: var(--card);
 }
-.rail :focus-visible,
-.rail-theme:focus-within {
-  outline-color: var(--sidebar-foreground);
+.rail-theme select:focus-visible {
+  outline: none;
 }
-.rail.collapsed span {
+.rail.collapsed {
+  padding: var(--space-1);
+}
+.rail.collapsed .wordmark {
+  justify-content: center;
+  margin-inline: 0;
+  font-size: 1.12rem;
+}
+.rail.collapsed .rail-text,
+.rail.collapsed .rail-disclosure {
   display: none;
 }
 .rail.collapsed button,
 .rail.collapsed label {
   justify-content: center;
 }
-.rail.collapsed .rail-theme select {
-  background: transparent;
-  color: var(--sidebar-foreground);
-  border: 0;
-  font-size: var(--text-meta);
-  padding: 0.15rem;
-
+.rail.collapsed select {
+  position: absolute;
   inset: 0;
   width: 100%;
   opacity: 0;
-  position: absolute;
-  cursor: pointer;
 }
 .workspace,
 .map {
@@ -219,7 +220,8 @@ h2 {
 }
 .overview-layer {
   position: absolute;
-  inset: 0;
+  inset: 0 0 0 calc(0px - var(--rail-space));
+  background: var(--background);
 }
 .overview-layer[inert] {
   visibility: hidden;
@@ -279,6 +281,9 @@ h2 {
   vector-effect: non-scaling-stroke;
   stroke-width: 1.15;
 }
+.map .react-flow__controls {
+  margin-inline-start: calc(var(--rail-space) + 12px);
+}
 .map .react-flow {
   --xy-controls-button-background-color: var(--card);
   --xy-controls-button-color: var(--foreground);
@@ -325,8 +330,8 @@ h2 {
   width: 100%;
 }
 @media (max-width: 600px) {
-  .rail {
-    width: 8rem;
+  .viewer {
+    --rail-width: 8.5rem;
   }
 }
 
