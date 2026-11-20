@@ -1,5 +1,5 @@
 #!/bin/sh
-# Generated for one dui release. Pass the HTTPS release directory when piping to sh.
+# Generated for one dui release. Pin asset downloads even when fetched via latest.
 set -eu
 
 fail() { printf 'dui: %s\n' "$*" >&2; exit 1; }
@@ -37,7 +37,16 @@ fetch() {
 
 main() {
     [ "$#" -le 1 ] || fail "usage: sh install.sh [DIRECTORY | HTTPS_URL]"
-    source_dir=${1:-$(dirname "$0")}
+    version='@VERSION@'
+    if [ "$#" -eq 1 ]; then
+        source_dir=$1
+    else
+        case ${0##*/} in
+            bash|sh|dash|-bash|-sh)
+                source_dir="https://github.com/de-novo/dui/releases/download/v$version" ;;
+            *) source_dir=$(dirname "$0") ;;
+        esac
+    fi
     case $source_dir in
         https://*) ;;
         *://*) fail "remote releases require HTTPS" ;;
@@ -45,7 +54,7 @@ main() {
         *) source_dir=$PWD/$source_dir ;;
     esac
     platform=$(target)
-    name=dui-@VERSION@-$platform
+    name=dui-$version-$platform
     archive=$name.tar.gz
     dest=${DUI_INSTALL_DIR:-"$HOME/.local/bin"}
     case $dest in /*) ;; *) dest=$PWD/$dest ;; esac

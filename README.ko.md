@@ -6,13 +6,13 @@ dui는 웹 앱에 목데이터를 넣고, 상태와 화면 폭을 바꿔 가며 
 
 ## 설치
 
-릴리스의 `install.sh`, 압축 파일, 체크섬 파일을 같은 디렉터리에 두고 실행한다.
+첫 공개 릴리스부터 아래 명령으로 설치할 수 있다.
 
 ```sh
-sh install.sh
+curl -fsSL https://github.com/de-novo/dui/releases/latest/download/install.sh | bash
 ```
 
-설치기가 운영체제와 CPU에 맞는 파일을 선택하고 SHA-256을 확인한 뒤 `~/.local/bin/dui`에 설치한다. [HTTPS 설치와 경로 지정](docs/binary-install.md)
+설치기는 체크섬을 확인한 뒤 `~/.local/bin/dui`에 설치한다. [오프라인 설치와 경로 지정](docs/binary-install.md)
 
 ## 첫 캡처
 

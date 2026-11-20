@@ -6,13 +6,13 @@ dui captures a running web app across UI states and viewport widths. It reads th
 
 ## Install
 
-Place the release’s `install.sh`, archive, and checksum in one directory and run the following command.
+After the first public GitHub release, install with one command.
 
 ```sh
-sh install.sh
+curl -fsSL https://github.com/de-novo/dui/releases/latest/download/install.sh | bash
 ```
 
-The installer selects the native binary, checks its SHA-256 digest, and installs it in `~/.local/bin`. [HTTPS and custom-directory installation](docs/binary-install.md)
+The installer verifies the archive checksum and installs `dui` in `~/.local/bin`. [Offline installation and destination options](docs/binary-install.md)
 
 ## First capture
 

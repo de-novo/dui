@@ -2,13 +2,15 @@
 
 ## Shell installer
 
-From a release directory containing `install.sh`, the archive for your target, and its checksum, run `sh install.sh`. The default destination is `$HOME/.local/bin/dui`. To choose another directory, run `DUI_INSTALL_DIR="$PWD/bin" sh install.sh`.
-
-For a hosted release, set `DUI_RELEASE_URL` to its trusted HTTPS asset directory. All three files must belong to the same release.
+Once the repository and release assets are public, install the latest release directly from GitHub.
 
 ```sh
-curl --proto '=https' --proto-redir '=https' -fsSL "$DUI_RELEASE_URL/install.sh" | sh -s -- "$DUI_RELEASE_URL"
+curl -fsSL https://github.com/de-novo/dui/releases/latest/download/install.sh | bash
 ```
+
+The installer downloads the archive and checksum from its own release tag. The default destination is `$HOME/.local/bin/dui`. To change the destination, set `DUI_INSTALL_DIR` on the installer side of the pipe, for example `| DUI_INSTALL_DIR="$PWD/bin" bash`.
+
+For offline installation, place `install.sh`, the archive, and its checksum in one directory and run `sh install.sh` there.
 
 ## Manual installation
 
