@@ -6,13 +6,13 @@ dui captures a running web app across UI states and viewport widths. It reads th
 
 ## Install
 
-After the first public GitHub release, install with one command.
+Once this repository is public, install from source on macOS or Linux with Git, Rust/Cargo, Node.js 26, and npm.
 
 ```sh
-curl -fsSL https://github.com/de-novo/dui/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ```
 
-The installer verifies the archive checksum and installs `dui` in `~/.local/bin`. [Offline installation and destination options](docs/binary-install.md)
+The installer builds the `main` branch for your Rust host target and installs `dui` in `~/.local/bin`. Set `DUI_INSTALL_DIR` to choose another directory. [Prebuilt binary installation](docs/binary-install.md)
 
 ## First capture
 

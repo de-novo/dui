@@ -1,6 +1,8 @@
 # Install the dui binary
 
-## Shell installer
+For a native build from the current source, use the [source installer](https://github.com/de-novo/dui/blob/main/scripts/install). The instructions below use a prebuilt release.
+
+## Release installer
 
 Once the repository and release assets are public, install the latest release directly from GitHub.
 
