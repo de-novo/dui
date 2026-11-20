@@ -1,4 +1,4 @@
-use crate::{analysis, failure, host, replay};
+use crate::{analysis, archive, archive::Capture, failure, replay};
 use serde_json::{Value, json};
 use std::{
     io::{self, BufRead, Write},
@@ -11,6 +11,11 @@ fn schema(names: &[&str]) -> Value {
         .collect();
     json!({"type":"object","additionalProperties":false,"properties":properties,"required":names})
 }
+fn capture_schema(required: &[&str]) -> Value {
+    let mut value = schema(required);
+    value["properties"]["output"] = json!({"type":"string"});
+    value
+}
 fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
     match r["method"].as_str() {
         Some("initialize") => Ok(
@@ -18,7 +23,7 @@ fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
         ),
         Some("ping") => Ok(json!({})),
         Some("tools/list") => Ok(
-            json!({"tools":[{"name":"scan","description":"Extract facts from an installed project compiler","inputSchema":schema(&["project","manifest"])},{"name":"run","description":"Build and exercise a Vite application on loopback","inputSchema":schema(&["project","manifest","output"])},{"name":"replay","description":"Render every cell of a saved plan and compare unbound states against independent setter replays","inputSchema":schema(&["project","manifest","plan","output"])},{"name":"replay_report","description":"Verify and summarize saved replay evidence","inputSchema":schema(&["manifest","plan","output"])}]}),
+            json!({"tools":[{"name":"history","description":"List archived captures across local projects, branches and worktrees","inputSchema":schema(&[])},{"name":"scan","description":"Extract facts from an installed project compiler","inputSchema":schema(&["project","manifest"])},{"name":"run","description":"Build and exercise a Vite application on loopback","inputSchema":capture_schema(&["project","manifest"])},{"name":"replay","description":"Render every cell of a saved plan and compare unbound states against independent setter replays","inputSchema":capture_schema(&["project","manifest","plan"])},{"name":"replay_report","description":"Verify and summarize saved replay evidence","inputSchema":schema(&["manifest","plan","output"])}]}),
         ),
         Some("tools/call") => {
             let args = &r["params"]["arguments"];
@@ -33,14 +38,16 @@ fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
                 Some("replay_report") => {
                     replay::summarize(path("manifest")?, path("plan")?, path("output")?)
                 }
-                Some("replay") => replay::run(
-                    path("project")?,
-                    path("manifest")?,
-                    path("plan")?,
-                    path("output")?,
-                    None,
-                ),
-                Some("run") => host::run(path("project")?, path("manifest")?, path("output")?),
+                Some("history") => archive::history(),
+                Some(name @ ("run" | "replay")) => {
+                    let output = args.get("output").map(|_| path("output")).transpose()?;
+                    let action = if name == "run" {
+                        Capture::Run
+                    } else {
+                        Capture::Replay(path("plan")?, None)
+                    };
+                    archive::capture(path("project")?, path("manifest")?, output, action)
+                }
                 _ => return Err((-32602, "unknown tool".into())),
             };
             let (failed, body) = match result {

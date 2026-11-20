@@ -4,7 +4,7 @@
 
 ## Capture manifest
 
-Pass a JSON manifest to `dui run PROJECT MANIFEST OUTPUT`. `PROJECT` is the target app’s directory. The paths supplied on the command line are relative to the current working directory or absolute.
+Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the target app’s directory. The paths supplied on the command line are relative to the current working directory or absolute.
 
 ```json
 {
@@ -63,6 +63,14 @@ A **cell** represents one scenario, state, and width. `verified` means the obser
 
 **Cell coverage** is `coverage.verified / coverage.renderable`. If all six routes are captured at three widths, that accounts for 18 baseline cells. Additional planned states still count in the denominator. Use `observedBranchOutcomes` and `branchOutcomes` to inspect branch coverage separately.
 
+## Local capture history
+
+`run`, `exercise`, and `replay` save artifacts in `~/.dui/projects/<project-id>/runs/<snapshot-id>/`. Each run gets a new directory, including incomplete captures that return exit code 5. The CLI returns its absolute path as `output`. An optional output argument provides a filesystem link at the requested location. For an existing output directory, dui links the generated files individually.
+
+Run `dui open` to choose a project and compare two snapshots in the browser. `dui history` refreshes the viewer and returns the snapshot list as JSON. MCP exposes the same `history()` operation. Linked Git worktrees share the primary checkout’s project identity. Apps within a monorepo are grouped by relative path. Independent clones and non-Git directories have separate histories. Detached HEAD captures retain the commit.
+
+The viewer pairs cells by route, state ID, and width. It compares the stored PNG file hashes. A missing image is marked unavailable. Different state IDs appear as added or removed cells. Projects captured before home storage can be opened from their original galleries.
+
 ## CLI and MCP
 
 The commands assume `dui` is on your `PATH`. With the default installation you can also use `~/.local/bin/dui`. `PLAN` is the original run’s `report.json`. Give `replay` a new output directory, then use that same directory with `replay-report`.
@@ -70,8 +78,8 @@ The commands assume `dui` is on your `PATH`. With the default installation you c
 | CLI | MCP | Operation |
 | --- | --- | --- |
 | `dui scan PROJECT MANIFEST` | `scan(project, manifest)` | Print compiler facts and generated mocks. |
-| `dui run PROJECT MANIFEST OUTPUT` | `run(project, manifest, output)` | Build the app, capture cells, and write the gallery. |
-| `dui replay PROJECT MANIFEST PLAN OUTPUT` | `replay(project, manifest, plan, output)` | Attempt every cell in a saved plan, including pending states. |
+| `dui run PROJECT MANIFEST [OUTPUT]` | `run(project, manifest, output?)` | Build the app, capture cells, and write the gallery. |
+| `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | Attempt every cell in a saved plan, including pending states. |
 | `dui replay-report MANIFEST PLAN OUTPUT` | `replay_report(manifest, plan, output)` | Recompute the report from saved evidence. |
 
 The CLI also provides `check-ts PROJECT` to check the installed compiler, `plan FIXTURE` to expand explicit states and widths into jobs, and `exercise PROJECT MANIFEST OUTPUT PORT` to capture against an already running local host.

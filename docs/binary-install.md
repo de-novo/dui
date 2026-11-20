@@ -40,7 +40,7 @@ Save the following as `dui.json` in the app directory. Replace the selector with
 ```
 
 ```sh
-dui run . dui.json .dui/capture
+dui run . dui.json
 ```
 
-Open `.dui/capture/graph.html` to browse the screenshots. Read `.dui/capture/report.json` for per-cell results. For MCP clients, use the installed binary as the stdio command with `["mcp"]` as its arguments.
+Run `dui open` to browse the screenshots. The capture result returns an `output` directory containing `report.json` with per-cell results. For MCP clients, use the installed binary as the stdio command with `["mcp"]` as its arguments.

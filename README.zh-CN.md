@@ -35,13 +35,13 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 }
 ```
 
-3. 运行捕获。三个参数依次为项目目录（`.`）、配置文件和输出目录。dui 会自行启动并关闭本地服务器。
+3. 运行以下命令。dui 会启动本地服务器，将每次捕获保存在用户主目录的 `~/.dui/` 中。
 
 ```sh
-~/.local/bin/dui run . dui.json .dui/capture
+~/.local/bin/dui run . dui.json
 ```
 
-4. 在浏览器中打开 `.dui/capture/graph.html`。macOS 可运行 `open .dui/capture/graph.html`，Linux 桌面可运行 `xdg-open .dui/capture/graph.html`。每个格子对应一个页面的一种状态和一种宽度。退出码为 5 时，在同目录的 `report.json` 中查看未验证或无法渲染的原因。
+4. 运行 `~/.local/bin/dui open` 打开本地历史视图。选择项目，然后从按分支和工作树分组的列表中选择两次捕获，并排查看相同状态和宽度的截图。每次捕获都记录提交和工作树是否有未提交的更改。退出码为 5 时，可从结果中的 `output` 路径打开 `report.json` 查看原因。
 
 **更多页面。** 加入 `"routeSelector": "nav a[href]"` 可收集起始页上匹配的同源链接，深度为一层。用 `scenarios` 指定更深的路由或需要不同就绪条件的页面。
 
@@ -55,10 +55,10 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 git clone --depth 1 https://github.com/de-novo/dui.git
 cd dui/fixtures/typed-api
 npm ci
-~/.local/bin/dui run . dui.json .dui/shelf
+~/.local/bin/dui run . dui.json
 ```
 
-在示例目录中打开 `.dui/shelf/graph.html`。应看到一个已验证的 768px 截图，内含三本书。dui 根据 `fetchShelf()` 的返回类型为 `GET /api/shelf` 生成响应。若 Chrome 或 Chromium 安装在自定义路径，可将 `DUI_CHROMIUM` 设为其可执行文件路径。 [示例源码](fixtures/typed-api/main.tsx)
+运行 `~/.local/bin/dui open` 并选择示例项目。应看到一个已验证的 768px 截图，内含三本书。dui 根据 `fetchShelf()` 的返回类型为 `GET /api/shelf` 生成响应。若 Chrome 或 Chromium 安装在自定义路径，可将 `DUI_CHROMIUM` 设为其可执行文件路径。 [示例源码](fixtures/typed-api/main.tsx)
 
 ### 捕获真实的开源应用
 

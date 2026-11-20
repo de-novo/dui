@@ -37,13 +37,13 @@ Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/
 }
 ```
 
-3. Run the capture. The three arguments are the project directory (`.`), the settings file, and the output directory. dui starts and stops the local host itself.
+3. Capture the app. dui starts the local host, captures the screens and saves each run under `~/.dui/` in your home directory.
 
 ```sh
-~/.local/bin/dui run . dui.json .dui/capture
+~/.local/bin/dui run . dui.json
 ```
 
-4. Open `.dui/capture/graph.html` in your browser. On macOS, run `open .dui/capture/graph.html`. On a Linux desktop, use `xdg-open .dui/capture/graph.html`. Each cell shows one route and state at one width. If dui exits with code 5, open `report.json` in the same directory for the reason each cell was left unverified or unrenderable.
+4. Run `~/.local/bin/dui open` to open the local history viewer. Select a project and two captures to compare the same state and width side by side. Captures are grouped by branch and worktree. Each records the commit and whether the working tree had uncommitted changes. If a run exits with code 5, inspect `report.json` in the directory returned as `output`.
 
 **More screens.** Add `"routeSelector": "nav a[href]"` to collect matching same-origin links one level from the start page. Use `scenarios` for deeper routes or screens that need a different readiness selector.
 
@@ -57,10 +57,10 @@ To try a working app with dui already installed, run these commands from a direc
 git clone --depth 1 https://github.com/de-novo/dui.git
 cd dui/fixtures/typed-api
 npm ci
-~/.local/bin/dui run . dui.json .dui/shelf
+~/.local/bin/dui run . dui.json
 ```
 
-Open `.dui/shelf/graph.html` from the example directory. Expect one verified 768 px capture with three books. dui generates the response to `GET /api/shelf` from the return type of `fetchShelf()`. If Chrome or Chromium is installed in a custom location, set `DUI_CHROMIUM` to its executable path. [Example source](fixtures/typed-api/main.tsx)
+Run `~/.local/bin/dui open` and select the example app. Expect one verified 768 px capture with three books. dui generates the response to `GET /api/shelf` from the return type of `fetchShelf()`. If Chrome or Chromium is installed in a custom location, set `DUI_CHROMIUM` to its executable path. [Example source](fixtures/typed-api/main.tsx)
 
 ### Capture an open-source app
 

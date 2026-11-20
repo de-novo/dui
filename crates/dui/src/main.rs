@@ -1,4 +1,6 @@
 mod analysis;
+mod archive;
+use archive::Capture;
 mod chromium;
 mod graph_view;
 mod host;
@@ -112,10 +114,43 @@ fn run() -> Reply {
     {
         return Ok(json!({"name": "dui", "version": env!("CARGO_PKG_VERSION")}));
     }
+    if let [cmd] = args.as_slice()
+        && (cmd == "history" || cmd == "open")
+    {
+        let history = archive::history()?;
+        if cmd == "open" {
+            let opener = if cfg!(target_os = "macos") {
+                "open"
+            } else {
+                "xdg-open"
+            };
+            let gallery = history["gallery"]
+                .as_str()
+                .ok_or_else(|| failure(3, "missing gallery"))?;
+            let status = Command::new(opener)
+                .arg(gallery)
+                .status()
+                .map_err(replay::io)?;
+            if !status.success() {
+                return Err(failure(3, "could not open history viewer"));
+            }
+        }
+        return Ok(history);
+    }
     if let [cmd, manifest, plan, out] = args.as_slice()
         && cmd == "replay-report"
     {
         return replay::summarize(Path::new(manifest), Path::new(plan), Path::new(out));
+    }
+    if let [cmd, project, manifest, plan] = args.as_slice()
+        && cmd == "replay"
+    {
+        return archive::capture(
+            Path::new(project),
+            Path::new(manifest),
+            None,
+            Capture::Replay(Path::new(plan), None),
+        );
     }
     if let [cmd, project, manifest, plan, out, tail @ ..] = args.as_slice()
         && cmd == "replay"
@@ -129,12 +164,11 @@ fn run() -> Reply {
             ),
             _ => return Err(failure(2, "unexpected arguments")),
         };
-        return replay::run(
+        return archive::capture(
             Path::new(project),
             Path::new(manifest),
-            Path::new(plan),
-            Path::new(out),
-            port,
+            Some(Path::new(out)),
+            Capture::Replay(Path::new(plan), port),
         );
     }
     if let [cmd] = args.as_slice()
@@ -143,32 +177,49 @@ fn run() -> Reply {
         mcp::serve()?;
         return Ok(Value::Null);
     }
-    if let [cmd, root, spec, out] = args.as_slice()
+    if let [cmd, root, spec, tail @ ..] = args.as_slice()
         && cmd == "run"
     {
-        return host::run(Path::new(root), Path::new(spec), Path::new(out));
+        let output = match tail {
+            [] => None,
+            [out] => Some(Path::new(out)),
+            _ => return Err(failure(2, "expected run PROJECT MANIFEST [OUTPUT]")),
+        };
+        return archive::capture(Path::new(root), Path::new(spec), output, Capture::Run);
     }
     if let [cmd, root, spec] = args.as_slice()
         && cmd == "scan"
     {
         return analysis::analyze(Path::new(root), Path::new(spec));
     }
-    if let [cmd, root, spec, out, port] = args.as_slice()
+    if let [cmd, root, spec, rest @ ..] = args.as_slice()
         && cmd == "exercise"
     {
-        return analysis::exercise(
+        let (out, port) = match rest {
+            [port] => (None, port),
+            [out, port] => (Some(Path::new(out)), port),
+            _ => {
+                return Err(failure(
+                    2,
+                    "expected exercise PROJECT MANIFEST [OUTPUT] PORT",
+                ));
+            }
+        };
+        let port = port
+            .to_str()
+            .and_then(|p| p.parse().ok())
+            .ok_or_else(|| failure(2, "invalid port"))?;
+        return archive::capture(
             Path::new(root),
             Path::new(spec),
-            Path::new(out),
-            port.to_str()
-                .and_then(|p| p.parse().ok())
-                .ok_or_else(|| failure(2, "invalid port"))?,
+            out,
+            Capture::Exercise(port),
         );
     }
     let [command, path] = args.as_slice() else {
         return Err(failure(
             2,
-            "expected scan PROJECT MANIFEST, run PROJECT MANIFEST OUTPUT, replay PROJECT MANIFEST PLAN_REPORT OUTPUT, replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
+            "expected scan PROJECT MANIFEST, run PROJECT MANIFEST [OUTPUT], history, open, replay PROJECT MANIFEST PLAN_REPORT [OUTPUT], replay-report MANIFEST PLAN_REPORT OUTPUT, exercise PROJECT MANIFEST OUTPUT PORT, mcp, plan FIXTURE, or check-ts PROJECT",
         ));
     };
     if command == "check-ts" {

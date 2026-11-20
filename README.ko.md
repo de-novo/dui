@@ -37,13 +37,13 @@ Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도�
 }
 ```
 
-3. 아래 명령을 실행한다. 인자는 순서대로 프로젝트 폴더(`.`), 설정 파일, 결과를 저장할 폴더다. dui가 로컬 서버를 직접 띄우고 캡처가 끝나면 닫는다.
+3. 아래 명령으로 캡처한다. dui가 로컬 서버를 띄우고 실행할 때마다 사용자 홈의 `~/.dui/`에 결과를 저장한다.
 
 ```sh
-~/.local/bin/dui run . dui.json .dui/capture
+~/.local/bin/dui run . dui.json
 ```
 
-4. 브라우저에서 `.dui/capture/graph.html`을 연다. macOS에서는 `open .dui/capture/graph.html`, Linux 데스크톱에서는 `xdg-open .dui/capture/graph.html`로 연다. 한 칸은 한 화면의 상태 하나를 특정 폭에서 캡처한 결과다. 종료 코드가 5이면 같은 폴더의 `report.json`에서 각 칸이 미검증 또는 렌더 불가로 남은 이유를 확인한다.
+4. `~/.local/bin/dui open`으로 로컬 기록 뷰어를 연다. 프로젝트를 고른 뒤 브랜치·워크트리별 목록에서 이전 캡처와 현재 캡처를 선택한다. 같은 상태와 폭의 스크린샷이 나란히 보인다. 각 캡처에는 커밋과 미커밋 변경 여부가 기록된다. 종료 코드가 5이면 출력의 `output` 경로에서 `report.json`을 열어 이유를 확인한다.
 
 **여러 화면을 보려면** 설정에 `"routeSelector": "nav a[href]"`를 추가한다. 시작 화면에서 이 선택자에 맞는 같은 출처 링크를 한 단계 따라간다. 더 깊은 경로나 준비 조건이 다른 화면은 `scenarios`에 추가한다.
 
@@ -57,10 +57,10 @@ Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도�
 git clone --depth 1 https://github.com/de-novo/dui.git
 cd dui/fixtures/typed-api
 npm ci
-~/.local/bin/dui run . dui.json .dui/shelf
+~/.local/bin/dui run . dui.json
 ```
 
-예제 폴더에서 `.dui/shelf/graph.html`을 열면 책 세 권이 보이는 768px 화면 한 칸이 **검증됨**으로 표시된다. 책 목록은 dui가 `fetchShelf()`의 반환 타입을 읽어 `GET /api/shelf`에 돌려준 목데이터다. Chrome이나 Chromium을 별도 경로에 설치했다면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다. [예제 소스](fixtures/typed-api/main.tsx)
+`~/.local/bin/dui open`으로 예제 앱을 선택하면 책 세 권이 보이는 768px 화면 한 칸이 **검증됨**으로 표시된다. 책 목록은 dui가 `fetchShelf()`의 반환 타입을 읽어 `GET /api/shelf`에 돌려준 목데이터다. Chrome이나 Chromium을 별도 경로에 설치했다면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다. [예제 소스](fixtures/typed-api/main.tsx)
 
 ### 실제 오픈소스 앱 캡처하기
 

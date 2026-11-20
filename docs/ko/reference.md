@@ -4,7 +4,7 @@
 
 ## 캡처 설정
 
-`dui run PROJECT MANIFEST OUTPUT`에 JSON 설정 파일을 전달한다. `PROJECT`는 대상 앱의 디렉터리다. 명령줄 경로는 현재 작업 디렉터리 기준 또는 절대 경로로 지정한다.
+`dui run PROJECT MANIFEST [OUTPUT]`에 JSON 설정 파일을 전달한다. `PROJECT`는 대상 앱의 디렉터리다. 명령줄 경로는 현재 작업 디렉터리 기준 또는 절대 경로로 지정한다.
 
 ```json
 {
@@ -63,6 +63,14 @@
 
 **칸 검증률**은 `coverage.verified / coverage.renderable`이다. 화면 여섯 개를 폭 세 가지에서 모두 캡처하면 기본 상태 18칸을 채운 것이다. 추가로 계획된 상태도 분모에 포함한다. 분기 커버리지는 `observedBranchOutcomes`와 `branchOutcomes`로 따로 확인한다.
 
+## 로컬 캡처 기록
+
+`run`, `exercise`, `replay`는 결과를 사용자 홈의 `~/.dui/projects/<프로젝트 ID>/runs/<캡처 ID>/`에 저장한다. 종료 코드 5인 부분 캡처도 매번 새 폴더에 남는다. CLI 결과의 `output`이 이 폴더의 절대 경로다. 출력 경로를 따로 지정하면 그 위치에 링크를 만든다. 기존 출력 폴더에는 생성한 파일별로 링크를 둔다.
+
+`dui open`으로 브라우저에서 프로젝트와 비교할 캡처 두 개를 고른다. `dui history`는 뷰어를 갱신하고 캡처 목록을 JSON으로 돌려준다. MCP에서는 `history()`를 호출한다. 같은 저장소의 연결된 워크트리는 기본 체크아웃 경로를 기준으로 묶고, 모노레포의 앱은 상대 경로로 구분한다. 별도로 클론한 저장소와 Git을 쓰지 않는 폴더는 각각 독립된 기록을 갖는다. 브랜치 없이 체크아웃한 경우에도 커밋을 기록한다.
+
+뷰어는 경로·상태 ID·폭이 같은 칸의 PNG 파일 해시를 비교한다. 이미지가 없으면 ‘이미지 비교 불가’로 표시한다. 상태 ID가 달라지면 삭제·추가된 칸으로 표시한다. 이전 버전에서 만든 캡처는 원래 갤러리에서 열 수 있다.
+
 ## CLI와 MCP
 
 아래 명령은 `dui`가 `PATH`에 있을 때 쓴다. 기본 경로에 설치했다면 `~/.local/bin/dui`로 실행해도 된다. `PLAN`은 최초 실행의 `report.json`이다. `replay`에는 새 출력 디렉터리를 지정하고, `replay-report`에는 그 디렉터리를 다시 전달한다.
@@ -70,8 +78,8 @@
 | CLI | MCP | 동작 |
 | --- | --- | --- |
 | `dui scan PROJECT MANIFEST` | `scan(project, manifest)` | 컴파일러에서 읽은 사실과 생성한 목 응답을 출력한다. |
-| `dui run PROJECT MANIFEST OUTPUT` | `run(project, manifest, output)` | 앱을 빌드하고 캡처와 갤러리를 저장한다. |
-| `dui replay PROJECT MANIFEST PLAN OUTPUT` | `replay(project, manifest, plan, output)` | 저장한 계획의 모든 칸을 시도한다. 예산 때문에 남았던 칸도 포함한다. |
+| `dui run PROJECT MANIFEST [OUTPUT]` | `run(project, manifest, output?)` | 앱을 빌드하고 캡처와 갤러리를 저장한다. |
+| `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | 저장한 계획의 모든 칸을 시도한다. 예산 때문에 남았던 칸도 포함한다. |
 | `dui replay-report MANIFEST PLAN OUTPUT` | `replay_report(manifest, plan, output)` | 저장한 증거로 보고서를 다시 계산한다. |
 
 CLI 전용 명령도 있다. `check-ts PROJECT`는 설치된 컴파일러를 확인하고, `plan FIXTURE`는 명시한 상태와 폭을 칸 목록으로 변환한다. `exercise PROJECT MANIFEST OUTPUT PORT`는 실행 중인 로컬 호스트에서 캡처한다.
