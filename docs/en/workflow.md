@@ -138,18 +138,18 @@ One milestone = one version. Names are `vX.Y.Z` only. The description gives the 
 
 | Milestone | Version | Goal (from [Design v0 §13](design-v0.md#13-mvp-scope-and-milestones)) |
 |---|---|---|
-| M0 spike | `v0.1.0` | Real render path with hand-picked states ([Architecture §7](architecture.md#7-m0-and-m1-gates)) |
-| M1 automatic states | `v0.2.0` | States and coverage computed automatically ([Architecture §7](architecture.md#7-m0-and-m1-gates)) |
-| M2 GPUI spike | `v0.3.0` | One pippip screen rendered |
-| M3 sequence states | `v0.4.0` | Sequence states verified by replay |
-| M4 canvas | `v0.5.0` | Canvas opened by the AI agent |
-| M5 obora 99% attempt | `v0.6.0` | Coverage report per screen |
+| M0 spike | `v0.0.1` | Real render path with hand-picked states ([Architecture §7](architecture.md#7-m0-and-m1-gates)) |
+| M1 automatic states | `v0.0.2` | States and coverage computed automatically ([Architecture §7](architecture.md#7-m0-and-m1-gates)) |
+| M2 GPUI spike | `v0.0.3` | One pippip screen rendered |
+| M3 sequence states | `v0.0.4` | Sequence states verified by replay |
+| M4 canvas | `v0.0.5` | Canvas opened by the AI agent |
+| M5 obora 99% attempt | `v0.0.6` | Coverage report per screen |
 
 | Rule | Detail |
 |---|---|
 | Open milestones | At most 2: current and next |
 | Due dates | Only when the maintainer sets one. If a due date passes, move the remaining issues to the next milestone and close it |
-| Versioning | semver. While on `0.x`: a big change in scope, usage, or compatibility bumps the minor; everything else bumps the patch |
+| Versioning | The initial M0–M5 milestones use `v0.0.1` through `v0.0.6`. After this series, significant changes in scope, usage or compatibility increment the minor version during `0.x`. Other changes increment the patch version. |
 | Channels | nightly `vX.Y.Z-nightly.YYYYMMDD.N` → release candidate `vX.Y.Z-rc.N` → release `vX.Y.Z` |
 | Tags | Nightly tags need no approval. Release candidate and release tags need maintainer approval |
 | Release notes | Built from the PRs merged in that milestone. Past CHANGELOG entries and Releases are never edited |

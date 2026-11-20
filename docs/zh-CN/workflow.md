@@ -140,18 +140,18 @@ flowchart LR
 
 | Milestone | 版本 | 目标（依据[设计 v0 §13](design-v0.md#13-mvp-范围与里程碑)） |
 |---|---|---|
-| M0 spike | `v0.1.0` | 用手选状态证明真实渲染路径（[架构 §7](architecture.md#7-m0-和-m1-验收标准)） |
-| M1 自动状态 | `v0.2.0` | 自动计算状态和覆盖率（[架构 §7](architecture.md#7-m0-和-m1-验收标准)） |
-| M2 GPUI spike | `v0.3.0` | 渲染一个 pippip 界面 |
-| M3 序列状态 | `v0.4.0` | 通过回放验证的序列状态 |
-| M4 画布 | `v0.5.0` | 由 AI 代理打开的画布 |
-| M5 obora 99% 尝试 | `v0.6.0` | 每个界面的覆盖率报告 |
+| M0 spike | `v0.0.1` | 用手选状态证明真实渲染路径（[架构 §7](architecture.md#7-m0-和-m1-验收标准)） |
+| M1 自动状态 | `v0.0.2` | 自动计算状态和覆盖率（[架构 §7](architecture.md#7-m0-和-m1-验收标准)） |
+| M2 GPUI spike | `v0.0.3` | 渲染一个 pippip 界面 |
+| M3 序列状态 | `v0.0.4` | 通过回放验证的序列状态 |
+| M4 画布 | `v0.0.5` | 由 AI 代理打开的画布 |
+| M5 obora 99% 尝试 | `v0.0.6` | 每个界面的覆盖率报告 |
 
 | 规则 | 说明 |
 |---|---|
 | 开放的 milestone | 最多 2 个：当前和下一个 |
 | 截止日期 | 仅在维护者设定时使用。超过截止日期时，把剩余 issue 移到下一个 milestone 并关闭 |
-| 版本号 | semver。在 `0.x` 期间：范围、用法或兼容性有大变化时升 minor；其他升 patch |
+| 版本号 | 初期 M0 至 M5 依次规划为 `v0.0.1` 至 `v0.0.6`。此后在 `0.x` 期间，范围、用法或兼容性有重大变化时升 minor，其他变化升 patch。 |
 | 渠道 | nightly `vX.Y.Z-nightly.YYYYMMDD.N` → 候选版 `vX.Y.Z-rc.N` → 正式版 `vX.Y.Z` |
 | 标签（tag） | nightly tag 无需批准。候选版和正式版 tag 需要维护者批准 |
 | 发布说明 | 由该 milestone 中合并的 PR 生成。过去的 CHANGELOG 条目和 Releases 从不修改 |

@@ -19,7 +19,7 @@ For offline installation, place `install.sh`, the archive, and its checksum in o
 Choose the archive for your operating system and CPU. For example, `aarch64-apple-darwin` is macOS on Apple silicon. Place the archive and its matching `.sha256` file in the same directory. Set `archive` to the downloaded filename.
 
 ```sh
-archive=dui-0.1.0-aarch64-apple-darwin.tar.gz
+archive=dui-0.0.1-aarch64-apple-darwin.tar.gz
 shasum -a 256 -c "$archive.sha256"
 tar -xzf "$archive"
 mkdir -p "$HOME/.local/bin"

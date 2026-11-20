@@ -6,13 +6,13 @@ dui maps the screens an app actually renders so a reviewer can follow a task fro
 
 **A review should answer a concrete question.** After cancelling an order on a phone, where does the user land? The reviewer follows the path from order details through confirmation, opens the result at mobile width and records what feels unclear. An agent fixes the code. The reviewer returns to the same point on the map and compares the two worktrees.
 
-## Available today
+## v0.0.1 · Current development baseline
 
 Chromium renders the app with its project types and mock data. The local gallery shows captured states at each width, and the history viewer compares snapshots under `~/.dui/` by project, branch and worktree. The npmgraph example starts at one URL, discovers the search screen and produces four verified cells across two widths. [Reproduce the example](../../examples/npmgraph/README.md)
 
 A verified cell establishes that the observed state passed its checks. The reviewer judges whether the layout, wording and next action make sense. The roadmap below builds the map and the review workflow on that evidence.
 
-## v0.2.0
+## v0.0.2
 
 **Open the map, then inspect a live state.** Start with one node per discovered screen. Expand a node to see its states and widths, then open the one that needs attention. On a screen with two menus, an agent can open one, check its contents and close it while the other menu keeps its state.
 
@@ -26,7 +26,7 @@ A verified cell establishes that the observed state passed its checks. The revie
 
 The first benchmark establishes the latency baseline on a recorded machine and fixture. A cross-project latency target remains open.
 
-## v0.3.0
+## v0.0.3
 
 **Native screens on the map.** Render one real GPUI screen at a known width with two typed states. Reuse the same inspect, set, read-back and reset contract. Record the OS, renderer and toolchain with the images. A matching value and independent semantic evidence are required for verification. Missing semantic evidence leaves the cell unverified. A missing render environment produces an unrenderable cell with its reason.
 
@@ -36,8 +36,8 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 
 | Version | Outcome |
 | --- | --- |
-| v0.4.0 | Follow an action from one screen or state to the next. Each edge shows whether it was extracted from code, inferred, or verified by replay. Replay from the initial state and check the destination before marking the edge verified. |
-| v0.5.0 | Open the project map in the GPUI and gpui-kit desktop viewer. Attach a comment to a screen, state, width or transition. An agent reads the location through MCP. The reviewer reopens it on the updated worktree and compares before and after. |
-| v0.6.0 | Audit the map on the reference screens against the 99% coverage goal. Publish verified and renderable cell counts, missing branches and reasons for gaps. Keep unresolved review comments visible alongside the evidence. |
+| v0.0.4 | Follow an action from one screen or state to the next. Each edge shows whether it was extracted from code, inferred, or verified by replay. Replay from the initial state and check the destination before marking the edge verified. |
+| v0.0.5 | Open the project map in the GPUI and gpui-kit desktop viewer. Attach a comment to a screen, state, width or transition. An agent reads the location through MCP. The reviewer reopens it on the updated worktree and compares before and after. |
+| v0.0.6 | Audit the map on the reference screens against the 99% coverage goal. Publish verified and renderable cell counts, missing branches and reasons for gaps. Keep unresolved review comments visible alongside the evidence. |
 
 [GitHub milestones](https://github.com/de-novo/dui/milestones)

@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Entry point for AI coding agents (and humans) working on `de-novo/dui`. Read this first, then follow the links.
-Updated: 2026-11-20 · Stage: web capture and history · Next goal: [v0.2.0 live web state editing](docs/en/roadmap.md#v020)
+Updated: 2026-11-20 · Stage: web capture and history · Next goal: [v0.0.2 live web state editing](docs/en/roadmap.md#v002)
 
 ## Mission
 
@@ -66,7 +66,7 @@ Full rules: [docs/en/workflow.md](docs/en/workflow.md).
 1. **Flow**: Discussion (`Ideas` or `RFC`) → conclusion written into the English doc → Issue → milestone + board → branch → PR (`Closes #N`, evidence) → merge. Small changes: Issue → PR.
 2. **Issues**: one task + done criteria (checklist) + doc links. Labels: exactly 1 type (`bug` `feature` `refactor` `chore` `docs`), 1 priority (`P0` `P1` `P2`), 1 area. Helpers: `needs-decision`, `blocked` only. Every open issue has a milestone and is on the board.
 3. **State lives on the board**, never in labels or issue bodies. Decisions live in docs, never only in Discussions or chat.
-4. **Milestones** are `vX.Y.Z` (M0 = `v0.1.0`, M1 = `v0.2.0`, …), at most 2 open.
+4. **Milestones** are `vX.Y.Z` (M0 = `v0.0.1`, M1 = `v0.0.2`, …), at most 2 open.
 5. **Three-language docs**: change English first; in the same PR update zh-CN and ko or add the "outdated" banner. Keep numbers, links, code, tables, and diagrams identical; keep headings and tables aligned.
 6. **PR body**: summary, `Closes #N` + doc links, checks run and results, evidence, docs changed (or why not), approval quote for irreversible steps.
 
