@@ -6,13 +6,23 @@ dui는 웹 앱에 목데이터를 넣고, 상태와 화면 폭을 바꿔 가며 
 
 ## 설치
 
-macOS와 Linux에서 아래 명령으로 설치한다. Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도구를 사용한다.
+macOS와 Linux에서는 아래 명령 하나로 설치한다. 다시 실행하면 현재 `main` 버전으로 업데이트한다.
 
 ```sh
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ```
 
-설치기는 기존 Rust와 Node.js 26 및 npm을 사용한다. 없는 도구는 임시 디렉터리에 받아 빌드한 뒤 정리한다. 실행 파일은 `~/.local/bin/dui`에 설치하며 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. 웹 캡처를 실행할 때는 Node.js 26과 Chromium이 필요하다. [미리 빌드된 바이너리 설치](docs/binary-install.md)
+Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도구를 사용한다. 설치기는 내 컴퓨터에서 dui를 빌드한다. Rust나 Node.js 26 및 npm이 없으면 빌드에 필요한 도구를 임시로 받아 사용한 뒤 정리한다.
+
+설치 후 아래 명령으로 버전을 확인한다. `dui`만 입력해 실행하려면 `~/.local/bin`을 `PATH`에 추가한다.
+
+```sh
+~/.local/bin/dui --version
+```
+
+**웹 화면을 캡처할 때는** Node.js 26, Chromium 또는 Google Chrome, 대상 앱의 의존성이 필요하다.
+
+설치 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. [바이너리 설치 안내](docs/binary-install.md)
 
 ## 첫 캡처
 

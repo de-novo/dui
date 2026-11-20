@@ -6,13 +6,23 @@ dui captures a running web app across UI states and viewport widths. It reads th
 
 ## Install
 
-Install from source on macOS or Linux with Git, curl, and a C toolchain (Xcode Command Line Tools on macOS).
+On macOS or Linux, run this command to install or update dui from the current `main` branch.
 
 ```sh
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ```
 
-The installer reuses Rust and Node.js 26 with npm when available. It downloads missing build tools into a temporary directory and removes them after the build. It installs `dui` in `~/.local/bin`. Set `DUI_INSTALL_DIR` to choose another directory. Web capture needs Node.js 26 and Chromium at runtime. [Prebuilt binary installation](docs/binary-install.md)
+You need Git, curl, and a C toolchain (Xcode Command Line Tools on macOS). The installer builds dui on your machine. If Rust or Node.js 26 with npm is missing, the installer downloads a temporary copy for the build and removes it afterward.
+
+Check the installed version with the full path. To run `dui` by name, add `~/.local/bin` to your `PATH`.
+
+```sh
+~/.local/bin/dui --version
+```
+
+**For web capture**, install Node.js 26, Chromium or Google Chrome, and the target app’s dependencies.
+
+Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/binary-install.md)
 
 ## First capture
 
