@@ -29,6 +29,16 @@ try {
   });
   assert.ok(run.status === 0 || run.status === 5, run.stderr + run.stdout);
   const [cell] = JSON.parse(readFileSync(join(directory, "report.json"), "utf8")).cells;
+  assert.ok(
+    cell.observation?.instances,
+    JSON.stringify({
+      status: cell.status,
+      reason: cell.reason,
+      path: cell.observation?.path,
+      ready: cell.observation?.ready,
+      requests: cell.observation?.requests,
+    }),
+  );
   const base = { state: cell.state, width: cell.width };
   function inspect(extra: Record<string, unknown> = {}, reason?: string) {
     const selection = { ...base, ...extra };

@@ -50,4 +50,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm ci --prefix fixtures/replay
-      - run: npm run check:inspect
+      - name: Inspect committed React instances in Chrome
+        run: |
+          export DUI_CHROMIUM="$(command -v google-chrome)"
+          "$DUI_CHROMIUM" --version
+          npm run check:inspect
