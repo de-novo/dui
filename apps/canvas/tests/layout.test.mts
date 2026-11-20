@@ -58,3 +58,21 @@ test("focus preserves reverse links and filters evidence by capture width", () =
   );
   assert.equal(isolated.links.length, 0);
 });
+
+test("wide groups share columns without overlapping or inventing links", () => {
+  const screens = Array.from({ length: 26 }, (_, i) => ({
+    id: String(i),
+    path: "/" + i,
+    cells: [],
+  }));
+  const links = screens.slice(1).map((s) => ({ source: "0", target: s.id }));
+  const plan = layoutMap({ screens, links }, 1280, "overview");
+  const positions = plan.nodes.map((n) => n.position);
+  assert.equal(
+    new Set(positions.map((p) => JSON.stringify(p))).size,
+    screens.length,
+  );
+  assert.ok(new Set(positions.map((p) => p.x)).size > 2);
+  assert.ok(new Set(positions.map((p) => p.y)).size < screens.length / 2);
+  assert.deepEqual(new Set(plan.links), new Set(links));
+});

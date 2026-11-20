@@ -27,7 +27,17 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 ### 查看器设计系统
 
-黑白表面、文字、边框和键盘焦点使用 [tokens.css](../../apps/canvas/src/styles/tokens.css)。仅侧边栏和界面卡片使用半透明表面。两种主题均保留截图颜色和宽高比。详情面板以文字显示判定及原因。
+预览使用 Tailwind CSS 4.3.5 和 shadcn/ui 的 Base UI 预设（`base-nova`）。通用按钮与对话框由 shadcn CLI 4.23.0 生成，运行时使用 `@base-ui/react` 1.9.0。Tailwind 与屏幕地图共用主题变量。
+
+[tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
+
+- **色彩与材质** — 两种主题的画布和面板均使用不透明的黑白表面。橙色 `--primary` (#EF803F) 用于 dui 标记和主要操作。仅固定侧栏和截图卡片使用 `--blur` (10 px)。
+- **字体与间距** — 控件使用系统无衬线字体，路径使用系统等宽字体。默认字号下，元信息、正文和面板标题分别为 12 / 14 / 20 px，间距使用 4 / 8 / 12 / 16 / 24 px。控件圆角为 6 px，面板为 12 px。
+- **控件** — 面板操作复用 `Button` 的默认、主要或图标样式。纯图标控件需提供无障碍名称。轮廓线用于键盘焦点，位置和字重表示选中状态。
+- **截图与判定** — 两种地图视图均使用 `CaptureCard`。保持原始宽高比，路径名称位于截图下方。卡片显示待检查的格子数，详情面板显示记录的判定和原因。
+- **导航** — 侧栏顺序固定为工作区、主题、折叠。界面查找位于地图中。选择界面可放大截图，每页显示两个观测到的相邻界面。关闭详情可返回原地图视口。
+
+在实际查看器中检查 375 和 1280 px 下两种主题的总览和选中界面。确认可以访问所有相邻界面，箭头方向与归档相符，截图保留原色，关闭详情后键盘焦点复原。
 
 ## 2. 模块与依赖
 

@@ -34,22 +34,30 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
       aria-label="Workspace"
     >
       <strong className="wordmark" aria-label="dui">
-        {collapsed ? "d" : "dui"}
+        <i aria-hidden="true">d</i>
+        {!collapsed && <span>dui</span>}
       </strong>
       <button
         type="button"
         aria-label="Select workspace"
-        title="Select workspace"
+        className="workspace-switch"
+        title={
+          run
+            ? [run.project, run.branch, run.version].filter(Boolean).join(" / ")
+            : "Select workspace"
+        }
         onClick={open}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 6h6l2 2h10v11H3z" />
         </svg>
         <span>
-          {run?.project ?? "Select workspace"}
+          <strong>{run?.project ?? "Select workspace"}</strong>
           {run && (
             <small>
-              {run.branch ?? "Branch not recorded"} · {run.version}
+              {run.branch ?? "Branch not recorded"}
+              <br />
+              <code>{run.version.split("-").at(-1)}</code>
             </small>
           )}
         </span>

@@ -27,7 +27,17 @@ The preview accepts one or more run directories. With no arguments it lists save
 
 ### Viewer design system
 
-Use [tokens.css](../../apps/canvas/src/styles/tokens.css) for monochrome surfaces, text, borders and keyboard focus. Only the rail and screen cards use translucent surfaces. Preserve capture colors and aspect ratios in both themes. Show verdicts and reasons as text in the inspector.
+The preview uses Tailwind CSS 4.3.5 and the shadcn/ui Base UI preset (`base-nova`). The shared button and dialog were generated with shadcn CLI 4.23.0 and run on `@base-ui/react` 1.9.0. Tailwind reads the same theme tokens as the map.
+
+[tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
+
+- **Color and material** — Use solid monochrome canvas and panel surfaces in both themes. Use orange `--primary` (#EF803F) for the dui mark and the primary action. Only the fixed rail and the capture card use `--blur` (10 px).
+- **Type and spacing** — System sans for controls, system monospace for routes. At the default text size use 12 / 14 / 20 px for metadata, body and panel titles; space elements on a 4 / 8 / 12 / 16 / 24 px scale. Controls use a 6 px radius and panels use 12 px.
+- **Controls** — Use `Button` for panel actions (default, primary or icon). Give icon-only controls accessible names. Reserve the focus outline for keyboard navigation. Selection uses placement and weight.
+- **Evidence** — Use `CaptureCard` in both map views. Fit the original image inside the frame and name the route beneath it. Count reviewable issues on the card; read the recorded verdict and reason in the inspector.
+- **Navigation** — Keep the rail order fixed: workspace, theme, collapse. Screen lookup stays on the map. Selecting a screen enlarges it and pages through its observed neighbors two at a time. Closing details restores the overview viewport.
+
+Check the actual viewer at 375 and 1280 px in both themes. Inspect an overview and a selected screen. Confirm all connected screens remain reachable, arrow directions match the archive, image colors are intact and keyboard focus returns on close.
 
 ## 2. Modules and dependencies
 

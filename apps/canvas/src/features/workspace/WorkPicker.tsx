@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/button";
 import { useState } from "react";
 import type { Run } from "../../data/run";
 
@@ -55,7 +56,9 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
           ))}
         </select>
       </label>
-      <button type="submit">Open workspace</button>
+      <Button type="submit" variant="default">
+        Open workspace
+      </Button>
     </form>
   );
 }

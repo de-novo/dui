@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "./components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { createRoot } from "react-dom/client";
 import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
 import { CaptureStatus } from "./components/ui/CaptureStatus";
+import { ScreenNeighborhood } from "./features/map/ScreenNeighborhood";
+import { routeName } from "./features/map/CaptureCard";
 import { ScreenMap } from "./features/map/ScreenMap";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
@@ -27,7 +31,8 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
   const selectedId = params.get("screen");
   const screen = archive.screens.find((s) => s.id === selectedId);
   const mode = params.get("links") ?? "overview";
-  const options = useRef<HTMLDialogElement>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsButton = useRef<HTMLButtonElement>(null);
   const dismiss = useRef<HTMLButtonElement>(null);
   const origin = useRef<HTMLElement | SVGElement | null>(null);
   useEffect(() => {
@@ -48,8 +53,7 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
     history.pushState(null, "", next);
     setSearch(next.search);
   }
-  function select(id: string) {
-    const active = document.activeElement;
+  function select(id: string, active: Element | null = document.activeElement) {
     if (
       selectedId === null &&
       (active instanceof HTMLElement || active instanceof SVGElement)
@@ -69,78 +73,110 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
   return (
     <section className="workspace" aria-label="Screen map">
       <div className="map">
-        <ScreenMap
-          archive={archive}
-          width={width}
-          mode={mode}
-          selected={screen?.id}
-          imageUrl={(name) => archiveUrl(name, run)}
-          select={select}
-        />
-        <button
+        <div className="overview-layer" aria-hidden={!!screen} inert={!!screen}>
+          <ScreenMap
+            archive={archive}
+            width={width}
+            mode={mode}
+            imageUrl={(name) => archiveUrl(name, run)}
+            select={select}
+          />
+        </div>
+        {screen && (
+          <ScreenNeighborhood
+            key={JSON.stringify([screen.id, width])}
+            archive={archive}
+            screen={screen}
+            cell={cell}
+            width={width}
+            imageUrl={(name) => archiveUrl(name, run)}
+            select={select}
+          />
+        )}
+        <Button
           className="map-options"
-          onClick={() => options.current?.showModal()}
+          variant="outline"
+          ref={optionsButton}
+          aria-haspopup="dialog"
+          aria-expanded={optionsOpen}
+          onClick={() => setOptionsOpen(true)}
         >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
+            <circle cx="10" cy="6" r="2" />
+            <circle cx="14" cy="14" r="2" />
+          </svg>{" "}
           Map options
-        </button>
+        </Button>
       </div>
-      <dialog ref={options} aria-labelledby="options-title">
-        <h2 id="options-title">Map options</h2>
-        <label>
-          Find screen
-          <select
-            value=""
-            onChange={(e) => {
-              if (e.target.value) {
-                options.current?.close();
-                select(e.target.value);
-              }
-            }}
-          >
-            <option value="">Select a screen</option>
-            {archive.screens.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.path}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Connections
-          <select
-            value={mode}
-            onChange={(e) =>
-              update({
-                links: e.target.value === "overview" ? null : e.target.value,
-              })
-            }
-          >
-            <option value="overview">Overview</option>
-            <option value="all">All links</option>
-            <optgroup label="Links to and from a screen">
+      <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
+        <DialogContent
+          finalFocus={() =>
+            selectedId === null ? optionsButton.current : dismiss.current
+          }
+        >
+          <DialogTitle>Map options</DialogTitle>
+          <label>
+            Find screen
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  setOptionsOpen(false);
+                  select(e.target.value, optionsButton.current);
+                }
+              }}
+            >
+              <option value="">Select a screen</option>
               {archive.screens.map((s) => (
-                <option key={s.id} value={"focus:" + s.id}>
+                <option key={s.id} value={s.id}>
                   {s.path}
                 </option>
               ))}
-            </optgroup>
-          </select>
-        </label>
-        <label>
-          Capture width
-          <select
-            value={width}
-            onChange={(e) => update({ width: e.target.value, state: null })}
-          >
-            {widths.map((w) => (
-              <option key={w} value={w}>
-                {w} px
-              </option>
-            ))}
-          </select>
-        </label>
-        <button onClick={() => options.current?.close()}>Close</button>
-      </dialog>
+            </select>
+          </label>
+          <label>
+            Connections
+            <select
+              value={mode}
+              onChange={(e) =>
+                update({
+                  links: e.target.value === "overview" ? null : e.target.value,
+                })
+              }
+            >
+              <option value="overview">Overview</option>
+              <option value="all">All links</option>
+              <optgroup label="Links to and from a screen">
+                {archive.screens.map((s) => (
+                  <option key={s.id} value={"focus:" + s.id}>
+                    {s.path}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          <label>
+            Capture width
+            <select
+              value={width}
+              onChange={(e) => update({ width: e.target.value, state: null })}
+            >
+              {widths.map((w) => (
+                <option key={w} value={w}>
+                  {w} px
+                </option>
+              ))}
+            </select>
+          </label>
+        </DialogContent>
+      </Dialog>
       {selectedId !== null && (
         <aside
           className="inspector"
@@ -150,13 +186,19 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
           }}
         >
           <div className="panel-title">
-            <h2>{screen?.path ?? "Screen unavailable"}</h2>
-            <button
+            <div>
+              <h2>{screen ? routeName(screen.path) : "Screen unavailable"}</h2>
+              {screen && <code className="route-path">{screen.path}</code>}
+            </div>
+            <Button
+              aria-label="Close"
+              variant="ghost"
+              size="icon"
               ref={dismiss}
               onClick={() => update({ screen: null, state: null })}
             >
-              Close
-            </button>
+              ×
+            </Button>
           </div>
           <label>
             Width
@@ -189,13 +231,16 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
               </select>
             </label>
           )}
-          <p className="capture-meta">
-            {state !== null && !cell ? (
-              "State unavailable"
-            ) : (
-              <CaptureStatus cell={cell} />
-            )}
-          </p>
+          <div className="inspection-result">
+            <h3>Verification</h3>
+            <p className="capture-meta">
+              {state !== null && !cell ? (
+                "State unavailable"
+              ) : (
+                <CaptureStatus cell={cell} />
+              )}
+            </p>
+          </div>
           {cell?.image && (
             <img
               alt={"Archived screen at " + width + " px"}
@@ -224,22 +269,21 @@ function Viewer({
   archive?: Archive;
   error?: string;
 }) {
-  const picker = useRef<HTMLDialogElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   return (
     <main className="viewer">
-      <WorkspaceRail run={run} open={() => picker.current?.showModal()} />
+      <WorkspaceRail run={run} open={() => setPickerOpen(true)} />
       {archive && run ? (
         <MapView archive={archive} run={run} />
       ) : (
         <p role="status">{error ?? "No saved screen maps."}</p>
       )}
-      <dialog ref={picker} aria-labelledby="work-title">
-        <div className="panel-title">
-          <h2 id="work-title">Select workspace</h2>
-          <button onClick={() => picker.current?.close()}>Close</button>
-        </div>
-        <WorkPicker current={run} runs={runs} />
-      </dialog>
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent>
+          <DialogTitle>Select workspace</DialogTitle>
+          <WorkPicker current={run} runs={runs} />
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

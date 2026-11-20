@@ -1,3 +1,11 @@
+shadcn/ui Base UI components (viewer)
+Generator: shadcn@4.23.0, base-nova registry, button and dialog
+Upstream: https://github.com/shadcn-ui/ui/tree/96da9cc7f1aa10580a3741664e2a77c721206c00/apps/v4/registry/bases/base/ui
+Source files: button.tsx and dialog.tsx
+Local files: apps/canvas/src/components/ui/button.tsx and dialog.tsx
+License: MIT, Copyright (c) 2023 shadcn
+License text: .agents/skills/shadcn/LICENSE.md
+
 shadcn/ui agent skill (development tooling)
 Source: https://github.com/shadcn-ui/ui/tree/f50887ae68d0fdcbfbe86b57be08af94a4c88a68/skills/shadcn
 License: MIT, Copyright (c) 2023 shadcn

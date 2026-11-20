@@ -103,7 +103,7 @@ const archives = await listArchives();
 const cache = new Map<string, ReturnType<typeof openArchive>>();
 const server = await createServer({
   root: import.meta.dirname,
-  configFile: false,
+  configFile: join(import.meta.dirname, "vite.config.ts"),
   server: {
     host: "127.0.0.1",
     port: 0,

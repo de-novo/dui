@@ -1,40 +1,56 @@
-/* Viewer roles shared by the map, inspector and future shadcn/ui controls. */
+/* Viewer themes. Target screenshots keep their own colors. */
 :root {
   color-scheme: light;
-  --background: #f7f7f7;
-  --foreground: #202020;
-  --card: #fff;
-  --muted: #ededed;
-  --muted-foreground: #555;
-  --border: #d5d5d5;
-  --ring: #494949;
-  --map-link: #626262;
-  --map-grid: #d3d3d3;
+  --background: #f8f8f8;
+  --foreground: #191919;
+  --card: #ffffff;
+  --muted: #eeeeee;
+  --muted-foreground: #565656;
+  --border: #d4d4d4;
+  --ring: #303030;
+  --primary: #ef803f;
+  --primary-foreground: #21170f;
+  --sidebar: rgb(34 34 34 / 97%);
+  --sidebar-foreground: #fafafa;
+  --sidebar-muted: #c1c1c1;
+  --sidebar-accent: rgb(255 255 255 / 9%);
+  --sidebar-line: rgb(255 255 255 / 16%);
+  --capture-surface: rgb(255 255 255 / 80%);
+  --capture-rim: rgb(255 255 255 / 92%);
+  --capture-shadow: 0 3px 10px rgb(0 0 0 / 7%);
+  --map-link: #717171;
+  --map-grid: #cecece;
+  --destructive: #a62d2d;
   --scrim: rgb(0 0 0 / 35%);
+  --blur: 10px;
   --font-sans: system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
   --text-meta: 0.75rem;
   --text-body: 0.875rem;
-  --text-title: 1.125rem;
+  --text-title: 1.25rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-6: 1.5rem;
-  --radius-control: 0.375rem;
-  --radius-panel: 0.625rem;
+  --radius-control: 6px;
+  --radius-panel: 12px;
   --control-height: 2.25rem;
 }
-
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #161616;
-  --foreground: #eee;
+  --background: #171717;
+  --foreground: #f1f1f1;
   --card: #202020;
   --muted: #303030;
-  --muted-foreground: #b9b9b9;
-  --border: #414141;
-  --ring: #ddd;
+  --muted-foreground: #bdbdbd;
+  --border: #444444;
+  --ring: #dedede;
+  --sidebar: rgb(43 43 43 / 87%);
+  --capture-surface: rgb(49 49 49 / 84%);
+  --capture-rim: rgb(255 255 255 / 12%);
+  --capture-shadow: 0 4px 14px rgb(0 0 0 / 20%);
+  --destructive: #ff9898;
   --map-link: #aaa;
-  --map-grid: #424242;
+  --map-grid: #404040;
 }
