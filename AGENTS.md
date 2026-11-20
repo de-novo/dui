@@ -46,7 +46,7 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 
 ## Code rules
 
-When implementing or reviewing the web map, gallery, or live inspector, use the repository skill [dui-web-viewer](.agents/skills/dui-web-viewer/SKILL.md). Its rules apply to dui's interface, independent of the stack of the app being captured.
+Use the official [shadcn/ui skill](.agents/skills/shadcn/SKILL.md) for viewer design system and component work. Keep archive evidence, keyboard navigation and map behavior consistent with the [viewer contract](docs/en/web-viewer.md).
 
 1. Rust, edition 2024. One binary, `dui`.
 2. **Functional core, imperative shell.** `dui-core` has no I/O, no async, no clock, no randomness; same input, same output.

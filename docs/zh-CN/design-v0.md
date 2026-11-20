@@ -289,7 +289,7 @@ pippip 使用 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`，HTTP 使用 `reqwest`（�
 
 **v0.0.2 查看器使用 React 19 和 TypeScript 7。TanStack Start 负责路由和构建，shadcn/ui 提供控件，Tailwind CSS 管理布局与主题变量，React Flow 显示界面地图。** 使用 Start 的 SPA 模式构建静态入口页。Rust 二进制提供入口页、静态资源和本地捕获数据。直接打开查看器路由时应加载入口页；找不到捕获或资源时返回相应错误。保留对已有独立 HTML 图库的访问。[SPA 模式](https://tanstack.com/start/latest/docs/framework/react/guide/spa-mode)
 
-选择项由项目、运行、界面、状态和捕获宽度标识。使用经过验证的路由参数，在总览和详情之间切换、浏览器后退或刷新后保留选择。地图和界面列表均支持键盘导航。在捕获图像旁显示报告中的验证状态及原因。[路由搜索参数](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [查看器开发与审查技能](../../.agents/skills/dui-web-viewer/SKILL.md)
+选择项由项目、运行、界面、状态和捕获宽度标识。使用经过验证的路由参数，在总览和详情之间切换、浏览器后退或刷新后保留选择。地图和界面列表均支持键盘导航。在捕获图像旁显示报告中的验证状态及原因。[路由搜索参数](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [shadcn/ui](../../.agents/skills/shadcn/SKILL.md)
 
 **维护边界。** Rust 负责捕获证据、验证结果和覆盖率计算。查看器在统一入口读取归档报告和图数据，将其转换为地图、列表和详情视图共用的类型。旧记录中缺少的可选字段也在此处理。遇到未知状态或无效的必填字段时显示明确的数据错误。路由管理当前选中的格子，React Flow 管理地图布局、平移和缩放，组件管理菜单开合等临时状态。
 

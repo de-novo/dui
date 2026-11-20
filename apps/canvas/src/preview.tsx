@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
+import { CaptureStatus } from "./components/ui/CaptureStatus";
 import { ScreenMap } from "./features/map/ScreenMap";
 import "./preview.css";
 
@@ -42,8 +43,9 @@ function Preview({ archive }: { archive: Archive }) {
     </option>
   ));
   return (
-    <main>
-      <header>
+    <main className="viewer">
+      <header className="toolbar">
+        <span className="wordmark">dui</span>
         <h1>Screen map</h1>
         <label>
           Connections{" "}
@@ -74,6 +76,9 @@ function Preview({ archive }: { archive: Archive }) {
       </header>
       <div className="workspace">
         <nav aria-label="Screens">
+          <h2>
+            Screens <span>{archive.screens.length}</span>
+          </h2>
           {archive.screens.map((s) => (
             <button key={s.id} onClick={() => navigate(s.id, width)}>
               {s.path}
@@ -110,10 +115,8 @@ function Preview({ archive }: { archive: Archive }) {
             {sizes}
           </select>
         </label>
-        <p>
-          {cell
-            ? [cell.status, cell.reason].filter(Boolean).join(" · ")
-            : "No capture at this width"}
+        <p className="capture-meta">
+          <CaptureStatus cell={cell} />
         </p>
         {cell?.image && (
           <img

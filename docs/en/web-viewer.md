@@ -25,6 +25,10 @@ For new maps, a directed link joins two captured screens when the source DOM con
 
 The default **Connections → Overview** keeps every screen and shows a tree of observed links within each connected group. Arrows retain the recorded direction. Select **All links** to include cycles and return paths, or select a route under **Connections** to see its incoming and outgoing links. The count shows displayed links out of all links at the selected width.
 
+### Viewer design system
+
+Use the roles in [tokens.css](../../apps/canvas/src/styles/tokens.css) for surfaces, text, borders, spacing and focus. Use system sans for controls and monospace for route paths. Keep screenshots at their original aspect ratio. Reserve blue for focus and selection. The shared `CaptureStatus` component pairs every verdict with text and displays the recorded reason. Use green for verified, amber for unverified and slate for unrenderable. An absent capture has its own message. Discovered links use a neutral stroke. Review the map and inspector at 375 and 1280 px, including keyboard focus return.
+
 ## 2. Modules and dependencies
 
 ```text
@@ -97,4 +101,4 @@ Reset restores the selected control’s value at session open. Save writes the l
 | One session with serialized commands | Edit a boolean and an enum through CLI and MCP. Check independent controls, duplicate requests, stale edits, disconnect and reset. Compare both read-back values and visible evidence. |
 | Embedded client and immutable archive | Install from a clean checkout. Open a deep link with the target app stopped. Missing images show their error. Save a live state and reopen both the old run and the new run. |
 
-Implement in this order: archive and schema fixtures → router and accessible list → map → live inspection and editing → packaging and benchmark. Use the real two-screen npmgraph case and a redistributable two-control fixture. Measure 30 warm edits with zero host rebuilds or browser restarts. Report cold startup separately from warm p50 and p95. [Viewer review skill](../../.agents/skills/dui-web-viewer/SKILL.md)
+Implement in this order: archive and schema fixtures → router and accessible list → map → live inspection and editing → packaging and benchmark. Use the real two-screen npmgraph case and a redistributable two-control fixture. Measure 30 warm edits with zero host rebuilds or browser restarts. Report cold startup separately from warm p50 and p95. [shadcn/ui](../../.agents/skills/shadcn/SKILL.md)

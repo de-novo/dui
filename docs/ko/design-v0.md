@@ -289,7 +289,7 @@ pippip은 `gpui-pre 0.3.12` + `gpui-kit 0.10.0`, HTTP는 `reqwest` 사용(Cargo.
 
 **v0.0.2 웹 뷰어는 React 19와 TypeScript 7로 작성한다. 라우팅과 빌드는 TanStack Start, 조작 요소는 shadcn/ui, 레이아웃과 테마 토큰은 Tailwind CSS, 화면 지도는 React Flow를 사용한다.** Start의 SPA 모드로 정적 진입 페이지를 빌드한다. Rust 바이너리가 이 페이지와 리소스, 로컬 캡처 데이터를 제공한다. 뷰어 주소를 직접 열면 진입 페이지를 표시하고, 없는 캡처나 리소스를 요청하면 해당 오류를 반환한다. 기존 독립 HTML 갤러리도 계속 열 수 있게 한다. [SPA 모드](https://tanstack.com/start/latest/docs/framework/react/guide/spa-mode)
 
-선택 항목은 프로젝트·실행·화면·상태·캡처 폭으로 식별한다. 검증된 라우트 매개변수를 사용해 지도와 상세 보기 사이의 이동, 브라우저 뒤로 가기, 새로고침 후에도 선택을 유지한다. 지도와 화면 목록 양쪽에서 키보드로 이동할 수 있게 한다. 캡처 옆에는 보고서의 검증 상태와 이유를 표시한다. [라우터 검색 매개변수](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [뷰어 구현·리뷰 스킬](../../.agents/skills/dui-web-viewer/SKILL.md)
+선택 항목은 프로젝트·실행·화면·상태·캡처 폭으로 식별한다. 검증된 라우트 매개변수를 사용해 지도와 상세 보기 사이의 이동, 브라우저 뒤로 가기, 새로고침 후에도 선택을 유지한다. 지도와 화면 목록 양쪽에서 키보드로 이동할 수 있게 한다. 캡처 옆에는 보고서의 검증 상태와 이유를 표시한다. [라우터 검색 매개변수](https://tanstack.com/router/latest/docs/framework/react/guide/search-params) · [shadcn/ui](../../.agents/skills/shadcn/SKILL.md)
 
 **유지보수 경계.** 캡처 근거, 검증 판정, 커버리지 계산은 Rust가 맡는다. 뷰어는 저장된 보고서와 그래프를 한 곳에서 읽어 지도·목록·상세 보기가 함께 쓰는 타입으로 변환한다. 이전 기록에 없는 선택 필드도 그곳에서 처리한다. 알 수 없는 상태나 잘못된 필수 필드는 읽을 수 있는 오류로 표시한다. 선택한 칸은 라우터, 지도 배치·이동·확대는 React Flow, 메뉴 열림 같은 임시 상태는 해당 컴포넌트가 관리한다.
 

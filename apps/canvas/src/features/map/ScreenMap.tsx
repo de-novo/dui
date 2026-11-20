@@ -1,4 +1,5 @@
 import { Fragment, useMemo } from "react";
+import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { layoutMap } from "./layout";
 import {
   Background,
@@ -51,13 +52,10 @@ function Card({ data }: NodeProps<CardNode>) {
           src={"/archive/" + encodeURIComponent(cell.image)}
         />
       )}
-      <small>
-        {cell
-          ? [cell.width + " px", cell.status, cell.reason]
-              .filter(Boolean)
-              .join(" · ")
-          : "No capture at this width"}
-      </small>
+      <footer className="capture-meta">
+        {cell && <span>{cell.width} px</span>}
+        <CaptureStatus cell={cell} />
+      </footer>
     </article>
   );
 }
@@ -108,8 +106,8 @@ export function ScreenMap({
       targetHandle: into,
       label: layout.total === 1 ? "Discovered link" : undefined,
       ariaLabel: `Discovered link from ${source} to ${target}`,
-      style: { stroke: "#39735e" },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#39735e" },
+      style: { stroke: "var(--map-link)" },
+      markerEnd: { type: MarkerType.ArrowClosed, color: "var(--map-link)" },
     };
   });
   return (
@@ -131,7 +129,7 @@ export function ScreenMap({
       <div className="map-summary" role="status">
         {nodes.length} screens · {edges.length} of {layout.total} links
       </div>
-      <Background />
+      <Background color="var(--map-grid)" />
       <Controls showInteractive={false} />
     </ReactFlow>
   );
