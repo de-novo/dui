@@ -134,7 +134,7 @@ export function instrument(text: string, facts: InstrumentFact[], oxc: Oxc) {
   if (owners.size) {
     text += `\nimport {useId as ${name}Id,useLayoutEffect as ${name}Effect} from "react";
 function ${name}Inspect(id${typed ? ": string" : ""}, instance${typed ? ": string" : ""}, value${typed ? ": unknown" : ""}, setter${typed ? ": unknown" : ""}) {
-  ${name}Effect(() => ${probe}?.commit(id, instance, value, typeof setter === "function"));
+  ${name}Effect(() => ${probe}?.commit(id, instance, value, setter));
 }`;
   }
   return text + "\n" + helperSource(typed).replaceAll("__duiTools", name);

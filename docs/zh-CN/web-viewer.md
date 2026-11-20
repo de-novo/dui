@@ -115,6 +115,20 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 
 重置将所选控件恢复到会话打开时的值。保存时记录最近观测的修订号及验证结果。先检查请求 ID，再检查预期修订号，因此响应丢失后重试仍返回首次结果。请求结果保留至会话关闭，所属进程重启后旧会话失效。若目标应用的版本与归档不同，则单独显示实时运行的来源。
 
+### 通过 CLI 或 MCP 使用实时会话
+
+将 JSON 对象传给 `dui live '{…}'`，或作为 MCP 工具 `live` 的参数。选择归档目录和报告中的单元格，将下列占位符替换为返回的会话、实时实例和槽位 ID。 对于 `dui map` 生成的归档，可省略 `manifest` 以重新发现项目。
+
+```jsonl
+{"op":"open","project":"PROJECT","manifest":"MANIFEST","run":"RUN_DIRECTORY","cell":{"state":"STATE_ID","width":768},"requestId":"open-1"}
+{"op":"inspect","session":"SESSION","cell":{"state":"STATE_ID","width":768}}
+{"op":"set","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","value":true,"expectedRevision":0,"requestId":"edit-1","expect":{"selector":"#menu-toggle","text":"Close"}}
+{"op":"reset","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","expectedRevision":1,"requestId":"reset-1","expect":{"selector":"#menu-toggle","text":"Open"}}
+{"op":"close","session":"SESSION"}
+```
+
+每次编辑使用唯一请求 ID，丢失响应后可重发相同请求。对于 set 和 reset，`expect.selector` 必须匹配一个可见的 HTML 元素，去除首尾空白后的文本必须等于 `expect.text`。写入后断言失败仍会推进修订号，并返回 `unverified`、观测值和文本。reset 恢复打开时的值，close 释放浏览器和主机。空闲会话在 30 分钟后过期。保存修订由 #3 跟踪。
+
 ## 5. 模式与验收
 
 | 模式 | 验收结果 |

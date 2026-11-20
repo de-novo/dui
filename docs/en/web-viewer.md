@@ -115,6 +115,20 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 
 Reset restores the selected control’s value at session open. Save writes the latest observed revision, including its verdict. Check request identity before the expected revision so a retry after a lost reply returns the first result. Retain request outcomes until close. After owner restart the old session expires. If the target revision differs from the archive, show the live provenance separately.
 
+### Run a live CLI or MCP session
+
+Pass a JSON object to `dui live '{…}'` or pass that object as arguments to the MCP tool `live`. Use an archived run directory and a cell from its report. Replace the placeholders below with the returned session ID, live instance ID and slot ID. For runs created by `dui map`, omit `manifest` to rediscover the project.
+
+```jsonl
+{"op":"open","project":"PROJECT","manifest":"MANIFEST","run":"RUN_DIRECTORY","cell":{"state":"STATE_ID","width":768},"requestId":"open-1"}
+{"op":"inspect","session":"SESSION","cell":{"state":"STATE_ID","width":768}}
+{"op":"set","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","value":true,"expectedRevision":0,"requestId":"edit-1","expect":{"selector":"#menu-toggle","text":"Close"}}
+{"op":"reset","session":"SESSION","cell":{"state":"STATE_ID","width":768},"instance":"INSTANCE","slot":"SLOT","expectedRevision":1,"requestId":"reset-1","expect":{"selector":"#menu-toggle","text":"Open"}}
+{"op":"close","session":"SESSION"}
+```
+
+Use a unique request ID per edit. Retry the same payload after a lost reply. For set and reset, `expect.selector` must match one visible HTML element whose trimmed inner text equals `expect.text`. A failed assertion after a write advances the revision and returns `unverified` with the observed value and text. Reset uses the value at open. Close releases the browser and host. An idle session expires after 30 minutes. Saving an edited revision is tracked in #3.
+
 ## 5. Patterns and acceptance
 
 | Pattern | Acceptance check |

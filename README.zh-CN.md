@@ -34,6 +34,8 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 
 dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，则从 `/` 开始，跟随入口页面的同源链接一层。每个地址按 375 和 1280 像素两种宽度捕获。在输出的 `output` 目录打开 `graph.html`。MCP 提供相同的 `map(project)` 操作。
 
+打开已捕获的单元格，在同一个 Chromium 会话中修改和恢复布尔值或枚举值。[CLI 和 MCP 示例](docs/zh-CN/web-viewer.md#通过-cli-或-mcp-使用实时会话)
+
 可在项目的 `dui.json` 中提供 `appRoot`、模拟响应、链接发现的起始 `path` 或动态路径示例值（如 `"routeParams": {"id": "demo"}`）。在全局或 `routeOptions["/path"]` 中设置与页面内容对应的 `readySelector` 即可检查页面。没有此条件时，dui 将图像标为未验证并返回退出码 5。报告列出每个地址的来源和未解析的路由模式。
 
 ## 捕获自己的应用

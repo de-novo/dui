@@ -96,6 +96,143 @@ try {
   assert.equal(unresolved.editable, false);
   inspect({ slot: unresolved.slot, instance: unresolved.instance, value: null }, "read-only");
   assert.deepEqual(inspect(), controls);
+  function live(request: Record<string, unknown>, via: "cli" | "mcp" = "cli", reason?: string) {
+    const mcp = via === "mcp";
+    const result = spawnSync(binary, mcp ? ["mcp"] : ["live", JSON.stringify(request)], {
+      env,
+      encoding: "utf8",
+      timeout: 120000,
+      input: mcp
+        ? JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/call",
+            params: { name: "live", arguments: request },
+          }) + "\n"
+        : undefined,
+    });
+    assert.equal(
+      result.status,
+      mcp || !reason ? 0 : 2,
+      result.stdout + result.stderr + String(result.error ?? ""),
+    );
+    const decoded = JSON.parse(result.stdout);
+    if (mcp) assert.equal(decoded.result.isError, Boolean(reason), result.stdout);
+    const body = mcp ? JSON.parse(decoded.result.content[0].text) : decoded;
+    if (reason) assert.equal(body.reason, reason);
+    return body;
+  }
+  const opening = {
+    op: "open",
+    project,
+    manifest: join(project, "dui.json"),
+    run: directory,
+    cell: base,
+    requestId: "first-open",
+  };
+  const opened = live(opening);
+  const target = { session: opened.session, cell: base };
+  try {
+    assert.deepEqual(live(opening, "mcp"), opened);
+    const current = () => live({ ...target, op: "inspect" }, "mcp").controls as typeof controls;
+    const before = current();
+    const first = before.find((c) => c.label === "open" && c.value === false)!;
+    const other = before.find((c) => c.label === "open" && c.instance !== first.instance)!;
+    const mode = before.find((c) => c.label === "mode" && c.instance === first.instance)!;
+    const change = {
+      ...target,
+      op: "set",
+      slot: first.slot,
+      instance: first.instance,
+      value: true,
+      expectedRevision: 0,
+      requestId: "open-menu",
+      expect: { selector: "section:first-of-type button:first-child", text: "Close" },
+    };
+    live({ ...change, requestId: "bad-type", value: "true" }, "mcp", "invalid-value");
+    live(
+      { ...change, requestId: "wrong-cell", cell: { ...base, width: 1 } },
+      "cli",
+      "cell-mismatch",
+    );
+    const readOnly = before.find((c) => c.label === "metadata" && c.instance === first.instance)!;
+    live({ ...change, slot: readOnly.slot, requestId: "read-only" }, "cli", "read-only");
+    assert.deepEqual(current(), before);
+    const one = live(change);
+    assert.equal(one.status, "verified", JSON.stringify(one));
+    assert.equal(one.observedValue, true);
+    assert.deepEqual(live(change, "mcp"), one);
+    live({ ...change, value: false }, "cli", "request-id-reused");
+    live({ ...change, requestId: "stale" }, "mcp", "stale-revision");
+    assert.deepEqual(
+      current().find((c) => c.slot === other.slot && c.instance === other.instance),
+      other,
+    );
+    const modeChange = {
+      ...change,
+      slot: mode.slot,
+      value: "edit",
+      expectedRevision: 1,
+      requestId: "mode",
+      expect: {
+        selector: "section:first-of-type button:nth-child(2)",
+        text: "intentionally wrong",
+      },
+    };
+    const two = live(modeChange, "mcp");
+    assert.equal(two.status, "unverified");
+    assert.equal(two.reason, "semantic-mismatch");
+    assert.equal(two.observedValue, "edit");
+    const modeReset = live({
+      ...target,
+      op: "reset",
+      slot: mode.slot,
+      instance: mode.instance,
+      expectedRevision: 2,
+      requestId: "reset-mode",
+      expect: { selector: modeChange.expect.selector, text: "view" },
+    });
+    assert.equal(modeReset.status, "verified");
+    assert.equal(modeReset.observedValue, "view");
+    const reset = live(
+      {
+        ...target,
+        op: "reset",
+        slot: first.slot,
+        instance: first.instance,
+        expectedRevision: 3,
+        requestId: "reset-menu",
+        expect: { selector: change.expect.selector, text: "Open" },
+      },
+      "mcp",
+    );
+    assert.equal(reset.status, "verified");
+    assert.equal(reset.observedValue, false);
+    assert.deepEqual(current(), before);
+    assert.equal(live({ ...change, requestId: "last", expectedRevision: 4 }).status, "verified");
+  } finally {
+    live({ ...target, op: "close" });
+  }
+  live({ ...target, op: "inspect" }, "cli", "session-expired");
+  const next = live({ ...opening, requestId: "second-open" }, "mcp");
+  try {
+    assert.notEqual(next.session, target.session);
+    assert.equal(next.revision, 0);
+    const items = live({ op: "inspect", session: next.session, cell: base })
+      .controls as typeof controls;
+    assert.deepEqual(
+      items
+        .filter((c) => c.label === "open")
+        .map((c) => c.value)
+        .sort(),
+      [false, true],
+    );
+  } finally {
+    live({ op: "close", session: next.session }, "mcp");
+  }
+  console.log(
+    "Live CLI/MCP edits: boolean and enum set/reset, independent visible text, revision replay, cleanup and fresh reopen passed.",
+  );
   console.log(
     "CLI and MCP agree on two Menu instances, boolean and enum values, and read-only state.",
   );
