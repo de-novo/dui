@@ -83,6 +83,16 @@ Treat a saved run as immutable. Read identity and Git metadata from `snapshot.js
 
 The Rust listener binds to loopback. Serve finished runs under `/api/runs/$project/$run`, referenced images through lookup inside that run, and the static shell for viewer navigation. Missing API records and assets return their own errors. Scope live mutations to the owning local session. Keep control credentials and filesystem paths out of navigation URLs.
 
+### Inspect captured state
+
+Choose `state` and `width` from one cell in the run’s `report.json`.
+
+```sh
+dui inspect RUN_DIRECTORY '{"state":"STATE_ID","width":768}'
+```
+
+The MCP tool `inspect` accepts `directory` and the same `selection` object. Each control identifies its source, owner, instance, compiler type and captured value when available. Instance IDs are scoped to the cell. Add `slot` and `instance` to select one control. Add `value` to validate a proposed boolean or enum value without applying it. `editable` reports whether the captured control had a setter and a supported type. Older captures without instance evidence return `instance-evidence-unavailable`.
+
 ## 4. Live edits and failure handling
 
 One local dui owner process holds a live session's host and renderer. CLI and MCP address that owner by session ID. The viewer reads the same session's revision and latest observed preview over loopback. A saved image is always labeled as an archive. The live inspector shows the running target’s last observed frame and edit status. Refresh on a revision change and discard superseded responses.

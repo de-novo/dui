@@ -11,6 +11,8 @@ type Check = {
 };
 
 declare var __duiProbe: {
+  instances: Record<string, Record<string, { value?: unknown; setter: boolean }>>;
+  commit(id: string, instance: string, value: unknown, setter: boolean): () => void;
   input: SlotValues;
   slots: SlotValues;
   hits: Set<string>;
@@ -34,6 +36,21 @@ declare var __duiProbe: {
     }
     const timer = globalThis.setTimeout.bind(globalThis);
     globalThis.__duiProbe = {
+      instances: Object.create(null),
+      commit(id, instance, value, setter) {
+        const entries = (this.instances[id] ??= Object.create(null));
+        entries[instance] = { setter };
+        if (
+          value === null ||
+          typeof value === "string" ||
+          typeof value === "boolean" ||
+          (typeof value === "number" && Number.isFinite(value))
+        )
+          entries[instance].value = value;
+        return () => {
+          delete entries[instance];
+        };
+      },
       waitForSample: () => new Promise((resolve) => timer(resolve, 100)),
       input,
       slots,
@@ -255,6 +272,7 @@ declare var __duiProbe: {
     return {
       ready: !!document.querySelector(selector),
       slots: p.slots,
+      instances: p.instances,
       hits: [...p.hits].sort(),
       text: document.body?.innerText?.slice(0, 4000),
       path: location.pathname + location.search + location.hash,

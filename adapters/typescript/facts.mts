@@ -435,6 +435,18 @@ try {
             facts.push({
               ...base,
               kind: "slot",
+              statementStart: stmt.getStart(sf),
+              ownerBlock:
+                name.kind === K.Identifier &&
+                stmt.parent.kind === K.Block &&
+                [
+                  K.FunctionDeclaration,
+                  K.FunctionExpression,
+                  K.ArrowFunction,
+                  K.MethodDeclaration,
+                ].includes(stmt.parent.parent.kind)
+                  ? stmt.parent.getStart(sf)
+                  : null,
               binding: binding(name),
               setter:
                 n.parent.name.elements[1]?.name?.kind === K.Identifier
