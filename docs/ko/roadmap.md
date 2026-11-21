@@ -51,4 +51,4 @@ M0 검수 화면의 다섯 상태를 375·768·1280px에서 검증해 서로 다
 | v0.0.5 | GPUI와 gpui-kit 데스크톱 뷰어에서 프로젝트 지도를 연다. 리뷰어가 화면·상태·폭·전환에 의견을 남기면 AI가 MCP로 그 위치를 읽는다. 수정된 워크트리에서 같은 지점을 열어 전후를 비교한다. |
 | v0.0.6 | 기준 화면에서 99% 커버리지 목표를 측정한다. 검증된 칸 수와 렌더 가능한 칸 수, 누락 분기와 사유를 공개한다. 아직 해결되지 않은 리뷰 의견도 해당 화면에 함께 표시한다. |
 
-[GitHub 마일스톤](https://github.com/de-novo/dui/milestones)
+[GitHub 마일스톤](https://github.com/de-novo/dui/milestones) · [변경 이력](changelog.md)

@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 dui captures a running web or GPUI app across UI states and viewport widths. It reads the app’s official compiler types, generates mock responses, and checks what was actually rendered. Browse the screen map, live sessions, and diffs in the embedded web viewer (`dui open`) or consume the same results as JSON through the CLI or MCP.
 
-[Product roadmap](docs/en/roadmap.md)
+[Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md)
 
 ## Install
 

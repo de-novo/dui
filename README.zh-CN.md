@@ -4,7 +4,7 @@
 
 > ⚠️ 本译文可能已过时，请以[英文原文](README.md)为准。
 
-[产品路线图](docs/zh-CN/roadmap.md)
+[产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md)
 
 ## 安装
 

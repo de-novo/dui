@@ -51,4 +51,4 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 | v0.0.5 | Open the project map in the GPUI and gpui-kit desktop viewer. Attach a comment to a screen, state, width or transition. An agent reads the location through MCP. The reviewer reopens it on the updated worktree and compares before and after. |
 | v0.0.6 | Audit the map on the reference screens against the 99% coverage goal. Publish verified and renderable cell counts, missing branches and reasons for gaps. Keep unresolved review comments visible alongside the evidence. |
 
-[GitHub milestones](https://github.com/de-novo/dui/milestones)
+[GitHub milestones](https://github.com/de-novo/dui/milestones) · [Changelog](../../CHANGELOG.md)
