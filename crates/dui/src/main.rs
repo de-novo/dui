@@ -1,6 +1,7 @@
 mod analysis;
 mod archive;
 use archive::Capture;
+mod cache;
 mod chromium;
 mod graph_view;
 mod host;
@@ -200,15 +201,44 @@ fn run() -> Reply {
         mcp::serve()?;
         return Ok(Value::Null);
     }
-    if let [cmd, root, spec, tail @ ..] = args.as_slice()
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "prune"
+    {
+        let max_bytes = match tail {
+            [] => None,
+            [flag, value] if flag == "--max-bytes" => Some(
+                value
+                    .to_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .ok_or_else(|| failure(2, "invalid --max-bytes"))?,
+            ),
+            _ => return Err(failure(2, "expected prune [--max-bytes BYTES]")),
+        };
+        return archive::prune(max_bytes);
+    }
+    if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "run"
     {
-        let output = match tail {
-            [] => None,
-            [out] => Some(Path::new(out)),
-            _ => return Err(failure(2, "expected run PROJECT MANIFEST [OUTPUT]")),
+        let mut force = false;
+        let mut positional = Vec::new();
+        for arg in rest {
+            if arg == "--force" || arg == "--no-cache" {
+                force = true;
+            } else {
+                positional.push(arg);
+            }
+        }
+        let (root, spec, output) = match positional.as_slice() {
+            [root, spec] => (Path::new(root), Path::new(spec), None),
+            [root, spec, out] => (Path::new(root), Path::new(spec), Some(Path::new(out))),
+            _ => {
+                return Err(failure(
+                    2,
+                    "expected run [--force] PROJECT MANIFEST [OUTPUT]",
+                ));
+            }
         };
-        return archive::capture(Path::new(root), Path::new(spec), output, Capture::Run);
+        return archive::capture(root, spec, output, Capture::Run { force });
     }
     if let [cmd, directory, selection] = args.as_slice()
         && cmd == "inspect"

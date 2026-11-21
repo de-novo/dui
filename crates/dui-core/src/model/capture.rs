@@ -510,6 +510,26 @@ impl Evidence {
         self.observed_width
     }
 
+    pub fn ready(&self) -> Option<bool> {
+        self.ready
+    }
+
+    pub fn settled(&self) -> Option<bool> {
+        self.settled
+    }
+
+    pub fn slots(&self) -> &BTreeMap<String, Value> {
+        &self.slots
+    }
+
+    pub fn responses(&self) -> &BTreeMap<String, u16> {
+        &self.responses
+    }
+
+    pub fn assertions(&self) -> &[Value] {
+        &self.assertions
+    }
+
     pub fn hits(&self) -> &BTreeSet<String> {
         &self.hits
     }

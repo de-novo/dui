@@ -161,6 +161,7 @@ const { SymbolFlags, TypeFlags, SignatureKind } = compiler.enums;
 const { SyntaxKind: K, NodeFlags } = compiler.ast;
 try {
   const sourceFiles = new Set();
+  const moduleGraph = new Map<string, Set<string>>();
   const allFacts: Fact[] = [],
     allDiagnostics = [];
   for (const scope of [spec, ...(spec.additionalScopes ?? [])]) {
@@ -346,11 +347,33 @@ try {
       return { path: url.text, shape: describe(type, 0) };
     }
     for (const filename of files) {
-      sourceFiles.add(filename);
+      const normFile = filename.split(sep).join("/");
+      sourceFiles.add(normFile);
+      let deps = moduleGraph.get(normFile);
+      if (!deps) {
+        deps = new Set();
+        moduleGraph.set(normFile, deps);
+      }
+      const recordDep = (declPath?: string) => {
+        if (!declPath || declPath.includes("/node_modules/")) return;
+        const target = relative(root, declPath).split(sep).join("/");
+        if (target && target !== normFile && target !== ".." && !target.startsWith("../")) {
+          deps.add(target);
+        }
+      };
       const sf = program.getSourceFile(resolve(root, filename));
       if (!sf) throw Error("not in compiler project: " + filename);
       for (const d of project.diagnostics(sf)) diagnostics.push({ file: filename, code: d.code });
       function walk(n: Syntax, owner: string) {
+        const modSpec = n.moduleSpecifier;
+        if (
+          (n.kind === K.ImportDeclaration || n.kind === K.ExportDeclaration) &&
+          modSpec &&
+          modSpec.kind === K.StringLiteral
+        ) {
+          const modSym = symbol(modSpec);
+          recordDep(compiler.declarationPath(modSym?.declarations?.[0]));
+        }
         if ((n.kind === K.FunctionDeclaration || n.kind === K.MethodDeclaration) && n.name)
           owner = n.name.getText();
         if (n.kind === K.ArrowFunction && n.parent.kind === K.VariableDeclaration)
@@ -398,6 +421,7 @@ try {
           const sym = symbol(n.tagName);
           const decl = sym?.valueDeclaration;
           const declPath = compiler.declarationPath(decl);
+          recordDep(declPath);
           if (declPath && !declPath.includes("/node_modules/"))
             facts.push({
               ...base,
@@ -494,6 +518,11 @@ try {
   console.log(
     JSON.stringify({
       sourceFiles: [...sourceFiles].sort(),
+      moduleGraph: Object.fromEntries(
+        [...moduleGraph.entries()]
+          .sort(([a], [b]) => (a < b ? -1 : Number(a > b)))
+          .map(([k, v]) => [k, [...v].sort()]),
+      ),
       versions,
       compiler: compiler.version,
       diagnostics: allDiagnostics,

@@ -10,6 +10,7 @@
     "check:capture": "tsc --project scripts && cargo build && node scripts/check-capture.mts",
     "check:m1": "tsc --project scripts && cargo build --locked && node scripts/check-m1-gates.mts",
     "check:i18n": "tsc --project scripts && cargo build --locked && node scripts/check-i18n.mts",
+    "check:cache": "tsc --project scripts && cargo build --locked && node scripts/check-cache.mts",
     "package:release": "tsc --project scripts && node scripts/package-release.mts",
     "deps:check": "node scripts/dependency-catalog.mts",
     "deps:sync": "node scripts/dependency-catalog.mts --write"

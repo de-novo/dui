@@ -1,8 +1,13 @@
-use crate::{Reply, analysis, failure, ports::Host};
+use crate::{
+    Reply, analysis,
+    chromium::Browser,
+    failure,
+    ports::{Host, Renderer},
+};
 use serde_json::Value;
 use std::{
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     time::{Duration, Instant},
 };
@@ -13,10 +18,63 @@ impl Drop for Server {
         let _ = self.0.wait();
     }
 }
-pub fn run(project: &Path, spec: &Path, out: &Path) -> Reply {
+
+struct LazyViteBrowser<'a> {
+    project: &'a Path,
+    spec: &'a Path,
+    facts: &'a Value,
+    exe: PathBuf,
+    profile: Option<tempfile::TempDir>,
+    host: Option<RunningHost>,
+    browser: Option<Browser>,
+}
+
+impl Renderer for LazyViteBrowser<'_> {
+    fn capture(
+        &mut self,
+        spec: &Value,
+        input: &Value,
+        width: u32,
+        image: &Path,
+    ) -> Result<Value, Box<dyn std::error::Error>> {
+        if self.browser.is_none() {
+            let host = ViteHost
+                .start(self.project, self.spec, self.facts)
+                .map_err(|(_, v)| v.to_string())?;
+            let profile = tempfile::tempdir()?;
+            let browser = Browser::local(&self.exe, profile.path(), host.port)?;
+            self.host = Some(host);
+            self.profile = Some(profile);
+            self.browser = Some(browser);
+        }
+        let browser = self.browser.as_mut().ok_or("browser unavailable")?;
+        browser.capture(spec, input, width, image)
+    }
+}
+
+pub fn run_with_options(project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
     let facts = analysis::analyze(project, spec)?;
-    let host = ViteHost.start(project, spec, &facts)?;
-    analysis::exercise_snapshot(facts, spec, out, host.port)
+    let exe = crate::chromium::executable();
+    let browser_version = crate::chromium::version_tag(&exe);
+    let mut lazy = LazyViteBrowser {
+        project,
+        spec,
+        facts: &facts,
+        exe: exe.clone(),
+        profile: None,
+        host: None,
+        browser: None,
+    };
+    let renderer = exe.is_file().then_some(&mut lazy as &mut dyn Renderer);
+    analysis::exercise_with_renderer(
+        renderer,
+        facts.clone(),
+        spec,
+        Some(project),
+        out,
+        browser_version,
+        force,
+    )
 }
 
 pub(crate) struct ViteHost;

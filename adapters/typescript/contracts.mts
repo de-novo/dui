@@ -19,6 +19,7 @@ export type Syntax = Node & {
   whenTrue: Syntax;
   whenFalse: Syntax;
   tagName: Syntax;
+  moduleSpecifier?: Syntax;
   arguments: Syntax[];
   elements: Syntax[];
   children: Syntax[];

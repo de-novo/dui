@@ -26,6 +26,17 @@ pub fn executable() -> PathBuf {
     .find(|path| path.is_file())
     .unwrap_or_default()
 }
+pub fn version_tag(executable: &Path) -> Option<Value> {
+    if !executable.is_file() {
+        return None;
+    }
+    let output = Command::new(executable).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let product = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!product.is_empty()).then(|| json!({"product": product}))
+}
 pub struct Browser {
     child: Child,
     stream: UnixStream,

@@ -15,9 +15,19 @@ use std::{
 };
 
 pub(crate) enum Capture<'a> {
-    Run,
+    Run { force: bool },
     Replay(&'a Path, Option<u16>),
     Exercise(u16),
+}
+
+pub(crate) fn home_dir() -> Result<PathBuf, Error> {
+    root()
+}
+
+pub(crate) fn prune(max_bytes: Option<u64>) -> Reply {
+    let home = root()?;
+    let (mut store, _) = crate::sqlite_store::SqliteStore::open(&home).map_err(io)?;
+    store.prune(max_bytes).map_err(io)
 }
 
 fn root() -> Result<PathBuf, Error> {
@@ -180,7 +190,7 @@ pub(crate) fn capture(
         }
     }
     let result = publish(metadata, |staged| match action {
-        Capture::Run => host::run(project, manifest, staged),
+        Capture::Run { force } => host::run_with_options(project, manifest, staged, force),
         Capture::Replay(plan, port) => replay::run(project, manifest, plan, staged, port),
         Capture::Exercise(port) => analysis::exercise(project, manifest, staged, port),
     });
