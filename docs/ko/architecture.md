@@ -64,7 +64,7 @@ pub trait Renderer {
 - **`TypeOracle`**은 프로젝트 자신의 공식 컴파일러(정확히 같은 버전)에 심볼과 타입을 묻는다. 답마다 질의 ID와 `Known | Unknown(reason)`이 붙는다. AST는 후보를 찾고, 컴파일러가 타입을 판정한다. AI는 빈 곳만 채우고 `Inferred`로 기록된다.
 - **`Host`**는 주입된 개발 빌드를 띄우고 `Target`(웹 URL 또는 네이티브 진입점)을 돌려준다. 소스 변환은 언어 어댑터 몫이다.
 - **`Renderer`**는 `Target`에서 칸 하나를 열고, 값·이미지·의미 트리·실행된 분기를 모은다.
-- **`Store`**([도메인 모델 §5](domain-model.md#5-스토리지-포트))는 순수 `dui-core::model` 엔티티 위에 `dui-core::storage`가 정의하는 얇은 영속성 인터페이스다. 구체 스토리지 백엔드(로컬 파일 아카이브, `rusqlite` / Drizzle 기반 SQLite, 향후 원격 API)는 `Store` 뒤의 어댑터로 두며, `dui-core`에는 스토리지 의존성이 없다.
+- **`Store` 포트**([도메인 모델 §5](domain-model.md#5-스토리지-포트))는 순수 `dui-core::model` 애그리게잇·값 객체 위에 `dui-core::storage`가 바운디드 컨텍스트별로 나눈 영속성 인터페이스(`WorkspaceRepository`, `RunRepository`, `ArtifactStore`, `CacheRepository`, `CommentRepository`, 조합 슈퍼트레이트 `Store`)다. 구체 스토리지 백엔드(로컬 파일 아카이브, `rusqlite` / Drizzle 기반 SQLite, 향후 원격 API)는 이 포트 뒤의 어댑터로 두며, `dui-core`에는 스토리지 의존성이 없다.
 - 어댑터는 프로세스·브라우저와 대화하므로 포트 트레이트는 `async`일 수 있다. async는 `dui-ports`에서 멈추고, `dui-core`는 절대 보지 않는다.
 - 프레임워크 지식은 **절대** 코어의 코드가 아니다: `if framework == …`도, 스택별 플러그인 계층도 없다. 규칙 팩(§2.5)이나 어댑터 crate 하나에 둔다.
 

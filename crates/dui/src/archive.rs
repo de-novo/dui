@@ -311,54 +311,52 @@ pub(crate) fn history() -> Reply {
 }
 
 #[cfg(test)]
-pub(crate) fn run_bundle(
+pub(crate) struct ImportedRun {
+    pub project: dui_core::model::Project,
+    pub worktree: dui_core::model::Worktree,
+    pub commit: dui_core::model::Commit,
+    pub aggregate: dui_core::model::RunAggregate,
+    pub evidence: Vec<dui_core::model::Evidence>,
+}
+
+#[cfg(test)]
+pub(crate) fn import_run(
     snapshot: &Value,
     report: &Value,
     graph: &Value,
-) -> Result<dui_core::storage::RunBundle, dui_core::model::DomainError> {
-    use dui_core::{
-        model::{
-            BlobId, Cell, CellStatus, Commit, Edge, EdgeEndpoint, EdgeSource, Evidence, ImageBlob,
-            Project, Run, RunEnvironment, RunId, RunKind, Screen, ScreenOrigin, State, StateId,
-            Width, Worktree,
-        },
-        storage::RunBundle,
+) -> Result<ImportedRun, dui_core::model::DomainError> {
+    use dui_core::model::{
+        BlobId, Cell, CellStatus, Commit, Edge, EdgeEndpoint, Evidence, Project, Run, RunAggregate,
+        RunEnvironment, RunId, RunKind, Screen, ScreenOrigin, State, StateId, Width, Worktree,
     };
     use std::collections::{BTreeMap, BTreeSet};
-    let project_root = snapshot["projectRoot"].as_str().unwrap_or_default();
+
+    let project_root = snapshot["projectRoot"].as_str().unwrap_or("/project");
     let project_id = match snapshot["projectId"].as_str() {
         Some(raw) => ProjectId::parse(raw)?,
         None => ProjectId::from_primary_root_bytes(project_root.as_bytes()),
     };
-    let project = Project {
-        id: project_id.clone(),
-        display_name: snapshot["projectName"]
+    let project = Project::with_id(
+        project_id.clone(),
+        project_root,
+        snapshot["projectName"]
             .as_str()
-            .unwrap_or("Unnamed project")
-            .to_owned(),
-        primary_root: project_root.to_owned(),
-    };
-    let worktree_path = snapshot["worktree"]
-        .as_str()
-        .unwrap_or(project_root)
-        .to_owned();
-    let app_relative = snapshot["app"].as_str().unwrap_or_default().to_owned();
-    let worktree = Worktree {
-        id: Worktree::derive_id(&project_id, &worktree_path, &app_relative),
-        project_id: project_id.clone(),
-        path: worktree_path,
+            .unwrap_or("Unnamed project"),
+    )?;
+    let worktree_path = snapshot["worktree"].as_str().unwrap_or(project_root);
+    let app_relative = snapshot["app"].as_str().unwrap_or_default();
+    let worktree = Worktree::new(
+        project_id.clone(),
+        worktree_path,
         app_relative,
-        branch: snapshot["branch"].as_str().map(str::to_owned),
-    };
-    let git_sha = snapshot["commit"].as_str().map(str::to_owned);
-    let dirty = snapshot["dirty"].as_bool().unwrap_or(false);
-    let commit = Commit {
-        id: Commit::derive_id(&project_id, git_sha.as_deref(), dirty, None),
-        project_id: project_id.clone(),
-        git_sha,
-        dirty,
-        tree_digest: None,
-    };
+        snapshot["branch"].as_str().map(str::to_owned),
+    )?;
+    let commit = Commit::new(
+        project_id.clone(),
+        snapshot["commit"].as_str().map(str::to_owned),
+        snapshot["dirty"].as_bool().unwrap_or(false),
+        None,
+    );
     let run_id = RunId::parse(snapshot["id"].as_str().unwrap_or("run"))?;
     let kind = if let Some(live) = report.get("live").filter(|v| v.is_object()) {
         RunKind::LiveSave {
@@ -386,14 +384,14 @@ pub(crate) fn run_bundle(
         .filter_map(Value::as_str)
         .map(str::to_owned)
         .collect();
-    let run = Run {
-        id: run_id.clone(),
+    let run = Run::new(
+        run_id.clone(),
         project_id,
-        worktree_id: worktree.id.clone(),
-        commit_id: commit.id.clone(),
+        worktree.id().clone(),
+        commit.id().clone(),
         kind,
-        created_at_ms: snapshot["timestampMs"].as_i64().unwrap_or(0),
-        environment: RunEnvironment {
+        snapshot["timestampMs"].as_i64().unwrap_or(0),
+        RunEnvironment {
             os: report["os"].as_str().unwrap_or_default().to_owned(),
             compiler: report["compiler"].as_str().map(str::to_owned),
             renderer: report["browser"]["product"].as_str().map(str::to_owned),
@@ -401,74 +399,58 @@ pub(crate) fn run_bundle(
             versions,
         },
         source_files,
-    };
+    );
 
-    let mut screens_by_path = BTreeMap::new();
+    let mut screens_by_path: BTreeMap<String, Screen> = BTreeMap::new();
     let mut states_by_id = BTreeMap::new();
     let mut cells = Vec::new();
     let mut evidence_by_id = BTreeMap::new();
-    let mut blobs_by_id = BTreeMap::new();
 
     for raw in report["cells"].as_array().into_iter().flatten() {
         let path = raw["path"].as_str().unwrap_or("/");
-        let screen = screens_by_path
-            .entry(path.to_owned())
-            .or_insert_with(|| Screen {
-                id: Screen::derive_id(path),
-                path: path.to_owned(),
-                origin: match report["screenDiscovery"]["sources"].get(path) {
-                    Some(Value::String(file)) => ScreenOrigin::Router { file: file.clone() },
-                    Some(obj) if obj["kind"] == "anchor" => ScreenOrigin::Anchor {
-                        from: obj["from"].as_str().unwrap_or("/").to_owned(),
-                        selector: obj["selector"].as_str().map(str::to_owned),
-                    },
-                    _ => ScreenOrigin::Entry,
+        let screen = if let Some(existing) = screens_by_path.get(path) {
+            existing.clone()
+        } else {
+            let origin = match report["screenDiscovery"]["sources"].get(path) {
+                Some(Value::String(file)) => ScreenOrigin::Router { file: file.clone() },
+                Some(obj) if obj["kind"] == "anchor" => ScreenOrigin::Anchor {
+                    from: obj["from"].as_str().unwrap_or("/").to_owned(),
+                    selector: obj["selector"].as_str().map(str::to_owned),
                 },
-            })
-            .clone();
-        let scenario = raw["scenario"].as_str().unwrap_or("default").to_owned();
+                _ => ScreenOrigin::Entry,
+            };
+            let created = Screen::new(path, origin)?;
+            screens_by_path.insert(path.to_owned(), created.clone());
+            created
+        };
+        let scenario = raw["scenario"].as_str().unwrap_or("default");
         let mut inputs = BTreeMap::new();
         if let Some(obj) = raw["input"].as_object() {
             for (k, v) in obj {
                 inputs.insert(k.clone(), v.clone());
             }
         }
-        let state_id = match raw["state"].as_str() {
-            Some(s) => StateId::parse(s)
-                .unwrap_or_else(|_| State::derive_id(&screen.id, &scenario, None, &inputs)),
-            None => State::derive_id(&screen.id, &scenario, None, &inputs),
+        let plan_index = raw["planIndex"].as_u64().unwrap_or(0) as u32;
+        let state = match raw["state"].as_str().and_then(|s| StateId::parse(s).ok()) {
+            Some(id) => {
+                State::with_id(id, screen.id().clone(), scenario, None, inputs, plan_index)?
+            }
+            None => State::new(screen.id().clone(), scenario, None, inputs, plan_index)?,
         };
-        states_by_id
-            .entry(state_id.clone())
-            .or_insert_with(|| State {
-                id: state_id.clone(),
-                screen_id: screen.id.clone(),
-                scenario,
-                locale: None,
-                inputs,
-                plan_index: raw["planIndex"].as_u64().unwrap_or(0) as u32,
-            });
+        let state_id = state.id().clone();
+        states_by_id.entry(state_id.clone()).or_insert(state);
+
         let width = Width::new(raw["width"].as_u64().unwrap_or(0) as u32)?;
         let status = CellStatus::from_wire(
             raw["status"].as_str().unwrap_or("unverified"),
             raw["reason"].as_str().map(str::to_owned),
         )?;
         let image_blob = raw["image"].as_str().map(|name| {
-            let blob_id = raw["imageSha256"]
+            raw["imageSha256"]
                 .as_str()
                 .and_then(|s| BlobId::parse(s).ok())
                 .or_else(|| name.split('-').next().and_then(|s| BlobId::parse(s).ok()))
-                .unwrap_or_else(|| BlobId::from_image_bytes(name.as_bytes()));
-            blobs_by_id
-                .entry(blob_id.clone())
-                .or_insert_with(|| ImageBlob {
-                    id: blob_id.clone(),
-                    media_type: "image/png".into(),
-                    byte_len: 0,
-                    width_px: width.pixels(),
-                    height_px: 0,
-                });
-            blob_id
+                .unwrap_or_else(|| BlobId::from_image_bytes(name.as_bytes()))
         });
         let evidence_id = raw["observation"].as_object().map(|obs| {
             let slots = obs
@@ -505,22 +487,21 @@ pub(crate) fn run_bundle(
                 raw["checks"].as_array().cloned().unwrap_or_default(),
                 vec![],
             );
-            let id = ev.id.clone();
+            let id = ev.id().clone();
             evidence_by_id.entry(id.clone()).or_insert(ev);
             id
         });
-        cells.push(Cell {
-            id: Cell::derive_id(&run_id, &screen.id, &state_id, width, None),
-            run_id: run_id.clone(),
-            screen_id: screen.id,
+        cells.push(Cell::new(
+            run_id.clone(),
+            screen.id().clone(),
             state_id,
             width,
-            locale: None,
+            None,
             status,
             image_blob,
             evidence_id,
-            cache: None,
-        });
+            None,
+        )?);
     }
 
     let mut edges = Vec::new();
@@ -540,48 +521,47 @@ pub(crate) fn run_bundle(
         else {
             continue;
         };
-        let from = EdgeEndpoint::Screen {
-            screen_id: Screen::derive_id(from_path),
-        };
-        let to = EdgeEndpoint::Screen {
-            screen_id: Screen::derive_id(to_path),
-        };
         let mut observed_widths = BTreeSet::new();
         for w in raw["observedWidths"].as_array().into_iter().flatten() {
             if let Some(px) = w.as_u64().and_then(|n| Width::new(n as u32).ok()) {
                 observed_widths.insert(px);
             }
         }
-        edges.push(Edge {
-            id: Edge::derive_id(&run_id, &from, &to, EdgeSource::Extracted, None),
-            run_id: run_id.clone(),
-            from,
-            to,
-            source: EdgeSource::Extracted,
-            trigger: None,
-            selector: raw["selector"].as_str().map(str::to_owned),
+        edges.push(Edge::discovered(
+            run_id.clone(),
+            EdgeEndpoint::Screen {
+                screen_id: Screen::derive_id(from_path),
+            },
+            EdgeEndpoint::Screen {
+                screen_id: Screen::derive_id(to_path),
+            },
+            raw["selector"].as_str().map(str::to_owned),
             observed_widths,
-        });
+        ));
     }
 
-    Ok(RunBundle {
+    let aggregate = RunAggregate::publish(
+        run,
+        screens_by_path.into_values().collect(),
+        states_by_id.into_values().collect(),
+        cells,
+        edges,
+    )?;
+    Ok(ImportedRun {
         project,
         worktree,
         commit,
-        run,
-        screens: screens_by_path.into_values().collect(),
-        states: states_by_id.into_values().collect(),
-        cells,
-        edges,
+        aggregate,
         evidence: evidence_by_id.into_values().collect(),
-        blobs: blobs_by_id.into_values().collect(),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dui_core::storage::{MemoryStore, RunFilter, Store};
+    use dui_core::storage::{
+        ArtifactStore, MemoryStore, RunFilter, RunRepository, WorkspaceRepository,
+    };
 
     #[test]
     fn project_name_survives_manifest_and_branch_changes() {
@@ -660,20 +640,27 @@ mod tests {
         snap_feat["timestampMs"] = json!(2000);
         let report = json!({"os":"macos","cells":[{"path":"/","scenario":"default","state":"s0","width":1280,"planIndex":0,"status":"verified","image":"a.png"}]});
         let graph = json!({"nodes":[],"edges":[]});
-        let b1 = run_bundle(&snap_main, &report, &graph).unwrap();
-        let b2 = run_bundle(&snap_feat, &report, &graph).unwrap();
-        assert_eq!(b1.project.id, b2.project.id);
-        assert_ne!(b1.worktree.id, b2.worktree.id);
-        store.save_run(&b1).unwrap();
-        store.save_run(&b2).unwrap();
+        let b1 = import_run(&snap_main, &report, &graph).unwrap();
+        let b2 = import_run(&snap_feat, &report, &graph).unwrap();
+        assert_eq!(b1.project.id(), b2.project.id());
+        assert_ne!(b1.worktree.id(), b2.worktree.id());
+        for imported in [&b1, &b2] {
+            store.upsert_project(&imported.project).unwrap();
+            store.upsert_worktree(&imported.worktree).unwrap();
+            store.put_commit(&imported.commit).unwrap();
+            for ev in &imported.evidence {
+                store.put_evidence(ev).unwrap();
+            }
+            store.save_run(&imported.aggregate).unwrap();
+        }
         let listed = store
             .list_runs(&RunFilter {
-                project_id: Some(b1.project.id.clone()),
+                project_id: Some(b1.project.id().clone()),
                 branch: Some("layout/new".into()),
                 ..RunFilter::default()
             })
             .unwrap();
         assert_eq!(listed.len(), 1);
-        assert_eq!(listed[0].run.id.as_str(), "0002-feat");
+        assert_eq!(listed[0].run.id().as_str(), "0002-feat");
     }
 }

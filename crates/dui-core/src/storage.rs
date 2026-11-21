@@ -1,11 +1,9 @@
-//! Thin storage port called by the application shell. Concrete backends
-//! (file archives, SQLite via rusqlite/Drizzle, or remote APIs) implement `Store`
-//! outside `dui-core`.
+//! Context-scoped repository and artifact ports behind which concrete storage
+//! adapters (file archives, SQLite via rusqlite/Drizzle, or remote APIs) sit.
 
 use crate::model::{
-    BlobId, CacheEntry, CacheKey, Cell, Comment, CommentId, Commit, CommitId, CoverageSummary,
-    Edge, Evidence, EvidenceId, ImageBlob, Project, ProjectId, Run, RunId, Screen, State, Worktree,
-    WorktreeId,
+    BlobId, CacheEntry, CacheKey, Comment, CommentId, Commit, CommitId, CoverageSummary, Evidence,
+    EvidenceId, ImageBlob, Project, ProjectId, Run, RunAggregate, RunId, Worktree, WorktreeId,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -34,22 +32,6 @@ impl std::error::Error for StoreError {}
 
 pub type StoreResult<T> = Result<T, StoreError>;
 
-/// Immutable snapshot of one run and all entities it owns or references.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RunBundle {
-    pub project: Project,
-    pub worktree: Worktree,
-    pub commit: Commit,
-    pub run: Run,
-    pub screens: Vec<Screen>,
-    pub states: Vec<State>,
-    pub cells: Vec<Cell>,
-    pub edges: Vec<Edge>,
-    pub evidence: Vec<Evidence>,
-    pub blobs: Vec<ImageBlob>,
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunFilter {
@@ -70,28 +52,58 @@ pub struct RunSummary {
     pub coverage: CoverageSummary,
 }
 
-/// Persistence boundary for dui metadata, content-addressed artifacts, cache entries,
-/// and review comments. Implementations live in adapter crates, never in `dui-core`.
-pub trait Store {
+/// Repository for the Workspace bounded context (`Project`, `Worktree`, `Commit`).
+pub trait WorkspaceRepository {
     fn upsert_project(&mut self, project: &Project) -> StoreResult<()>;
+    fn get_project(&self, id: &ProjectId) -> StoreResult<Option<Project>>;
     fn upsert_worktree(&mut self, worktree: &Worktree) -> StoreResult<()>;
+    fn get_worktree(&self, id: &WorktreeId) -> StoreResult<Option<Worktree>>;
     fn put_commit(&mut self, commit: &Commit) -> StoreResult<()>;
+    fn get_commit(&self, id: &CommitId) -> StoreResult<Option<Commit>>;
+}
+
+/// Repository for the Capture bounded context (`RunAggregate` root).
+pub trait RunRepository {
+    fn save_run(&mut self, aggregate: &RunAggregate) -> StoreResult<()>;
+    fn load_run(&self, id: &RunId) -> StoreResult<Option<RunAggregate>>;
+    fn list_runs(&self, filter: &RunFilter) -> StoreResult<Vec<RunSummary>>;
+}
+
+/// Content-addressed artifact store for immutable `ImageBlob`s and `Evidence`.
+pub trait ArtifactStore {
     fn put_blob(&mut self, blob: &ImageBlob, bytes: &[u8]) -> StoreResult<()>;
     fn get_blob(&self, id: &BlobId) -> StoreResult<Option<(ImageBlob, Vec<u8>)>>;
     fn put_evidence(&mut self, evidence: &Evidence) -> StoreResult<()>;
     fn get_evidence(&self, id: &EvidenceId) -> StoreResult<Option<Evidence>>;
-    fn save_run(&mut self, bundle: &RunBundle) -> StoreResult<()>;
-    fn load_run(&self, id: &RunId) -> StoreResult<Option<RunBundle>>;
-    fn list_runs(&self, filter: &RunFilter) -> StoreResult<Vec<RunSummary>>;
-    fn get_cache(&self, key: &CacheKey) -> StoreResult<Option<CacheEntry>>;
-    fn put_cache(&mut self, entry: &CacheEntry) -> StoreResult<()>;
-    fn upsert_comment(&mut self, comment: &Comment) -> StoreResult<()>;
-    fn list_comments(&self, run_id: &RunId) -> StoreResult<Vec<Comment>>;
     fn unreferenced_blobs(&self) -> StoreResult<Vec<BlobId>>;
     fn delete_blob(&mut self, id: &BlobId) -> StoreResult<()>;
 }
 
-/// Deterministic in-memory `Store` for core and shell tests (zero I/O, `BTreeMap` only).
+/// Repository for the Build Cache bounded context (`CacheEntry` aggregate root).
+pub trait CacheRepository {
+    fn get_cache(&self, key: &CacheKey) -> StoreResult<Option<CacheEntry>>;
+    fn put_cache(&mut self, entry: &CacheEntry) -> StoreResult<()>;
+}
+
+/// Repository for the Review bounded context (`Comment` aggregate root).
+pub trait CommentRepository {
+    fn upsert_comment(&mut self, comment: &Comment) -> StoreResult<()>;
+    fn get_comment(&self, id: &CommentId) -> StoreResult<Option<Comment>>;
+    fn list_comments(&self, run_id: &RunId) -> StoreResult<Vec<Comment>>;
+}
+
+/// Convenience supertrait for full storage adapters implementing all five ports.
+pub trait Store:
+    WorkspaceRepository + RunRepository + ArtifactStore + CacheRepository + CommentRepository
+{
+}
+
+impl<T> Store for T where
+    T: WorkspaceRepository + RunRepository + ArtifactStore + CacheRepository + CommentRepository
+{
+}
+
+/// Deterministic in-memory implementation of all five ports for pure tests (`BTreeMap` only).
 #[derive(Clone, Debug, Default)]
 pub struct MemoryStore {
     projects: BTreeMap<ProjectId, Project>,
@@ -99,7 +111,7 @@ pub struct MemoryStore {
     commits: BTreeMap<CommitId, Commit>,
     blobs: BTreeMap<BlobId, (ImageBlob, Vec<u8>)>,
     evidence: BTreeMap<EvidenceId, Evidence>,
-    runs: BTreeMap<RunId, RunBundle>,
+    runs: BTreeMap<RunId, RunAggregate>,
     cache: BTreeMap<CacheKey, CacheEntry>,
     comments: BTreeMap<CommentId, Comment>,
 }
@@ -110,32 +122,134 @@ impl MemoryStore {
     }
 }
 
-impl Store for MemoryStore {
+impl WorkspaceRepository for MemoryStore {
     fn upsert_project(&mut self, project: &Project) -> StoreResult<()> {
-        self.projects.insert(project.id.clone(), project.clone());
+        self.projects.insert(project.id().clone(), project.clone());
         Ok(())
     }
 
+    fn get_project(&self, id: &ProjectId) -> StoreResult<Option<Project>> {
+        Ok(self.projects.get(id).cloned())
+    }
+
     fn upsert_worktree(&mut self, worktree: &Worktree) -> StoreResult<()> {
-        self.worktrees.insert(worktree.id.clone(), worktree.clone());
+        self.worktrees
+            .insert(worktree.id().clone(), worktree.clone());
         Ok(())
+    }
+
+    fn get_worktree(&self, id: &WorktreeId) -> StoreResult<Option<Worktree>> {
+        Ok(self.worktrees.get(id).cloned())
     }
 
     fn put_commit(&mut self, commit: &Commit) -> StoreResult<()> {
         self.commits
-            .entry(commit.id.clone())
+            .entry(commit.id().clone())
             .or_insert_with(|| commit.clone());
         Ok(())
     }
 
+    fn get_commit(&self, id: &CommitId) -> StoreResult<Option<Commit>> {
+        Ok(self.commits.get(id).cloned())
+    }
+}
+
+impl RunRepository for MemoryStore {
+    fn save_run(&mut self, aggregate: &RunAggregate) -> StoreResult<()> {
+        let run = aggregate.run();
+        if self.runs.contains_key(run.id()) {
+            return Err(StoreError::Conflict(format!(
+                "run {} already exists",
+                run.id()
+            )));
+        }
+        if !self.projects.contains_key(run.project_id()) {
+            return Err(StoreError::NotFound(format!(
+                "project {}",
+                run.project_id()
+            )));
+        }
+        if !self.worktrees.contains_key(run.worktree_id()) {
+            return Err(StoreError::NotFound(format!(
+                "worktree {}",
+                run.worktree_id()
+            )));
+        }
+        if !self.commits.contains_key(run.commit_id()) {
+            return Err(StoreError::NotFound(format!("commit {}", run.commit_id())));
+        }
+        self.runs.insert(run.id().clone(), aggregate.clone());
+        Ok(())
+    }
+
+    fn load_run(&self, id: &RunId) -> StoreResult<Option<RunAggregate>> {
+        Ok(self.runs.get(id).cloned())
+    }
+
+    fn list_runs(&self, filter: &RunFilter) -> StoreResult<Vec<RunSummary>> {
+        let mut summaries: Vec<RunSummary> = self
+            .runs
+            .values()
+            .filter(|agg| {
+                let run = agg.run();
+                let wt = self.worktrees.get(run.worktree_id());
+                filter
+                    .project_id
+                    .as_ref()
+                    .is_none_or(|p| run.project_id() == p)
+                    && filter
+                        .worktree_id
+                        .as_ref()
+                        .is_none_or(|w| run.worktree_id() == w)
+                    && filter
+                        .branch
+                        .as_ref()
+                        .is_none_or(|br| wt.and_then(Worktree::branch) == Some(br.as_str()))
+            })
+            .map(|agg| {
+                let run = agg.run();
+                let project_name = self
+                    .projects
+                    .get(run.project_id())
+                    .map_or_else(String::new, |p| p.display_name().to_owned());
+                let branch = self
+                    .worktrees
+                    .get(run.worktree_id())
+                    .and_then(Worktree::branch)
+                    .map(str::to_owned);
+                let commit = self.commits.get(run.commit_id());
+                RunSummary {
+                    run: run.clone(),
+                    project_name,
+                    branch,
+                    commit_sha: commit.and_then(Commit::git_sha).map(str::to_owned),
+                    dirty: commit.is_some_and(Commit::is_dirty),
+                    coverage: agg.coverage(),
+                }
+            })
+            .collect();
+        summaries.sort_by(|a, b| {
+            b.run
+                .created_at_ms()
+                .cmp(&a.run.created_at_ms())
+                .then_with(|| b.run.id().cmp(a.run.id()))
+        });
+        if let Some(limit) = filter.limit {
+            summaries.truncate(limit);
+        }
+        Ok(summaries)
+    }
+}
+
+impl ArtifactStore for MemoryStore {
     fn put_blob(&mut self, blob: &ImageBlob, bytes: &[u8]) -> StoreResult<()> {
-        if BlobId::from_image_bytes(bytes) != blob.id {
+        if BlobId::from_image_bytes(bytes) != *blob.id() {
             return Err(StoreError::Conflict(
                 "blob bytes do not match content hash".into(),
             ));
         }
         self.blobs
-            .entry(blob.id.clone())
+            .entry(blob.id().clone())
             .or_insert_with(|| (blob.clone(), bytes.to_vec()));
         Ok(())
     }
@@ -146,7 +260,7 @@ impl Store for MemoryStore {
 
     fn put_evidence(&mut self, evidence: &Evidence) -> StoreResult<()> {
         self.evidence
-            .entry(evidence.id.clone())
+            .entry(evidence.id().clone())
             .or_insert_with(|| evidence.clone());
         Ok(())
     }
@@ -155,109 +269,17 @@ impl Store for MemoryStore {
         Ok(self.evidence.get(id).cloned())
     }
 
-    fn save_run(&mut self, bundle: &RunBundle) -> StoreResult<()> {
-        if self.runs.contains_key(&bundle.run.id) {
-            return Err(StoreError::Conflict(format!(
-                "run {} already exists",
-                bundle.run.id
-            )));
-        }
-        self.upsert_project(&bundle.project)?;
-        self.upsert_worktree(&bundle.worktree)?;
-        self.put_commit(&bundle.commit)?;
-        for item in &bundle.evidence {
-            self.put_evidence(item)?;
-        }
-        self.runs.insert(bundle.run.id.clone(), bundle.clone());
-        Ok(())
-    }
-
-    fn load_run(&self, id: &RunId) -> StoreResult<Option<RunBundle>> {
-        Ok(self.runs.get(id).cloned())
-    }
-
-    fn list_runs(&self, filter: &RunFilter) -> StoreResult<Vec<RunSummary>> {
-        let mut summaries: Vec<RunSummary> = self
-            .runs
-            .values()
-            .filter(|b| {
-                filter
-                    .project_id
-                    .as_ref()
-                    .is_none_or(|p| &b.run.project_id == p)
-                    && filter
-                        .worktree_id
-                        .as_ref()
-                        .is_none_or(|w| &b.run.worktree_id == w)
-                    && filter
-                        .branch
-                        .as_ref()
-                        .is_none_or(|br| b.worktree.branch.as_deref() == Some(br.as_str()))
-            })
-            .map(|b| RunSummary {
-                run: b.run.clone(),
-                project_name: self.projects.get(&b.run.project_id).map_or_else(
-                    || b.project.display_name.clone(),
-                    |p| p.display_name.clone(),
-                ),
-                branch: b.worktree.branch.clone(),
-                commit_sha: b.commit.git_sha.clone(),
-                dirty: b.commit.dirty,
-                coverage: CoverageSummary::from_cells(&b.cells),
-            })
-            .collect();
-        summaries.sort_by(|a, b| {
-            b.run
-                .created_at_ms
-                .cmp(&a.run.created_at_ms)
-                .then_with(|| b.run.id.cmp(&a.run.id))
-        });
-        if let Some(limit) = filter.limit {
-            summaries.truncate(limit);
-        }
-        Ok(summaries)
-    }
-
-    fn get_cache(&self, key: &CacheKey) -> StoreResult<Option<CacheEntry>> {
-        Ok(self.cache.get(key).cloned())
-    }
-
-    fn put_cache(&mut self, entry: &CacheEntry) -> StoreResult<()> {
-        self.cache.insert(entry.key.clone(), entry.clone());
-        Ok(())
-    }
-
-    fn upsert_comment(&mut self, comment: &Comment) -> StoreResult<()> {
-        self.comments.insert(comment.id.clone(), comment.clone());
-        Ok(())
-    }
-
-    fn list_comments(&self, run_id: &RunId) -> StoreResult<Vec<Comment>> {
-        let mut items: Vec<Comment> = self
-            .comments
-            .values()
-            .filter(|c| &c.run_id == run_id)
-            .cloned()
-            .collect();
-        items.sort_by(|a, b| {
-            a.created_at_ms
-                .cmp(&b.created_at_ms)
-                .then_with(|| a.id.cmp(&b.id))
-        });
-        Ok(items)
-    }
-
     fn unreferenced_blobs(&self) -> StoreResult<Vec<BlobId>> {
         let mut referenced = BTreeSet::new();
-        for bundle in self.runs.values() {
-            for cell in &bundle.cells {
-                if let Some(blob) = &cell.image_blob {
+        for agg in self.runs.values() {
+            for cell in agg.cells() {
+                if let Some(blob) = cell.image_blob() {
                     referenced.insert(blob.clone());
                 }
             }
         }
         for entry in self.cache.values() {
-            if let Some(blob) = &entry.image_blob {
+            if let Some(blob) = entry.image_blob() {
                 referenced.insert(blob.clone());
             }
         }
@@ -275,69 +297,81 @@ impl Store for MemoryStore {
     }
 }
 
+impl CacheRepository for MemoryStore {
+    fn get_cache(&self, key: &CacheKey) -> StoreResult<Option<CacheEntry>> {
+        Ok(self.cache.get(key).cloned())
+    }
+
+    fn put_cache(&mut self, entry: &CacheEntry) -> StoreResult<()> {
+        self.cache.insert(entry.key().clone(), entry.clone());
+        Ok(())
+    }
+}
+
+impl CommentRepository for MemoryStore {
+    fn upsert_comment(&mut self, comment: &Comment) -> StoreResult<()> {
+        self.comments.insert(comment.id().clone(), comment.clone());
+        Ok(())
+    }
+
+    fn get_comment(&self, id: &CommentId) -> StoreResult<Option<Comment>> {
+        Ok(self.comments.get(id).cloned())
+    }
+
+    fn list_comments(&self, run_id: &RunId) -> StoreResult<Vec<Comment>> {
+        let mut items: Vec<Comment> = self
+            .comments
+            .values()
+            .filter(|c| c.run_id() == run_id)
+            .cloned()
+            .collect();
+        items.sort_by(|a, b| {
+            a.created_at_ms()
+                .cmp(&b.created_at_ms())
+                .then_with(|| a.id().cmp(b.id()))
+        });
+        Ok(items)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{
-        CacheInputs, CellStatus, CommentStatus, CommentTarget, ContentHash, EdgeEndpoint,
-        EdgeSource, RunEnvironment, RunKind, ScreenOrigin, Width,
+        CacheInputs, Cell, CellStatus, CommentTarget, ContentHash, Edge, EdgeEndpoint,
+        RunEnvironment, RunKind, Screen, ScreenOrigin, State, Width,
     };
 
     #[test]
-    fn memory_store_covers_runs_blobs_cache_comments_and_gc() {
+    fn split_repositories_enforce_context_boundaries_and_gc() {
         let mut store = MemoryStore::new();
-        let project = Project {
-            id: ProjectId::from_primary_root_bytes(b"/repo/demo"),
-            display_name: "demo".into(),
-            primary_root: "/repo/demo".into(),
-        };
-        let worktree = Worktree {
-            id: Worktree::derive_id(&project.id, "/repo/demo", ""),
-            project_id: project.id.clone(),
-            path: "/repo/demo".into(),
-            app_relative: String::new(),
-            branch: Some("main".into()),
-        };
-        let commit = Commit {
-            id: Commit::derive_id(&project.id, Some("abcdef1"), false, None),
-            project_id: project.id.clone(),
-            git_sha: Some("abcdef1".into()),
-            dirty: false,
-            tree_digest: None,
-        };
-        let screen = Screen {
-            id: Screen::derive_id("/"),
-            path: "/".into(),
-            origin: ScreenOrigin::Entry,
-        };
-        let state = State {
-            id: State::derive_id(&screen.id, "default", None, &BTreeMap::new()),
-            screen_id: screen.id.clone(),
-            scenario: "default".into(),
-            locale: None,
-            inputs: BTreeMap::new(),
-            plan_index: 0,
-        };
+        let project = Project::new("/repo/demo", "demo").unwrap();
+        let worktree =
+            Worktree::new(project.id().clone(), "/repo/demo", "", Some("main".into())).unwrap();
+        let commit = Commit::new(project.id().clone(), Some("abcdef1".into()), false, None);
+        store.upsert_project(&project).unwrap();
+        store.upsert_worktree(&worktree).unwrap();
+        store.put_commit(&commit).unwrap();
+
+        let screen = Screen::new("/", ScreenOrigin::Entry).unwrap();
+        let search = Screen::new(
+            "/search",
+            ScreenOrigin::Anchor {
+                from: "/".into(),
+                selector: Some("header a[href]".into()),
+            },
+        )
+        .unwrap();
+        let state = State::new(screen.id().clone(), "default", None, BTreeMap::new(), 0).unwrap();
         let run_id = RunId::parse("0001-run").unwrap();
         let width = Width::new(1280).unwrap();
-        let bytes = b"fake-png-bytes";
-        let blob = ImageBlob {
-            id: BlobId::from_image_bytes(bytes),
-            media_type: "image/png".into(),
-            byte_len: bytes.len() as u64,
-            width_px: 1280,
-            height_px: 720,
-        };
-        store.put_blob(&blob, bytes).unwrap();
-        let orphan_bytes = b"orphan-png";
-        let orphan = ImageBlob {
-            id: BlobId::from_image_bytes(orphan_bytes),
-            media_type: "image/png".into(),
-            byte_len: orphan_bytes.len() as u64,
-            width_px: 375,
-            height_px: 667,
-        };
-        store.put_blob(&orphan, orphan_bytes).unwrap();
+
+        let png = b"fake-png-bytes";
+        let blob = ImageBlob::from_bytes("image/png", png, 1280, 720).unwrap();
+        store.put_blob(&blob, png).unwrap();
+        let orphan_png = b"orphan-png";
+        let orphan = ImageBlob::from_bytes("image/png", orphan_png, 375, 667).unwrap();
+        store.put_blob(&orphan, orphan_png).unwrap();
 
         let evidence = Evidence::new(
             Some("/".into()),
@@ -352,119 +386,102 @@ mod tests {
             vec![],
             vec![],
         );
-        let cell = Cell {
-            id: Cell::derive_id(&run_id, &screen.id, &state.id, width, None),
-            run_id: run_id.clone(),
-            screen_id: screen.id.clone(),
-            state_id: state.id.clone(),
+        store.put_evidence(&evidence).unwrap();
+
+        let cell = Cell::new(
+            run_id.clone(),
+            screen.id().clone(),
+            state.id().clone(),
             width,
-            locale: None,
-            status: CellStatus::Verified,
-            image_blob: Some(blob.id.clone()),
-            evidence_id: Some(evidence.id.clone()),
-            cache: None,
-        };
-        let edge = Edge {
-            id: Edge::derive_id(
-                &run_id,
-                &EdgeEndpoint::Screen {
-                    screen_id: screen.id.clone(),
-                },
-                &EdgeEndpoint::Screen {
-                    screen_id: Screen::derive_id("/search"),
-                },
-                EdgeSource::Extracted,
-                None,
-            ),
-            run_id: run_id.clone(),
-            from: EdgeEndpoint::Screen {
-                screen_id: screen.id.clone(),
+            None,
+            CellStatus::verified(),
+            Some(blob.id().clone()),
+            Some(evidence.id().clone()),
+            None,
+        )
+        .unwrap();
+        let edge = Edge::discovered(
+            run_id.clone(),
+            EdgeEndpoint::Screen {
+                screen_id: screen.id().clone(),
             },
-            to: EdgeEndpoint::Screen {
-                screen_id: Screen::derive_id("/search"),
+            EdgeEndpoint::Screen {
+                screen_id: search.id().clone(),
             },
-            source: EdgeSource::Extracted,
-            trigger: None,
-            selector: Some("header a[href]".into()),
-            observed_widths: BTreeSet::from([width]),
-        };
-        let bundle = RunBundle {
-            project: project.clone(),
-            worktree,
-            commit,
-            run: Run {
-                id: run_id.clone(),
-                project_id: project.id.clone(),
-                worktree_id: Worktree::derive_id(&project.id, "/repo/demo", ""),
-                commit_id: Commit::derive_id(&project.id, Some("abcdef1"), false, None),
-                kind: RunKind::Capture,
-                created_at_ms: 1_795_200_000_000,
-                environment: RunEnvironment {
-                    os: "macos".into(),
-                    compiler: Some("7.0.2".into()),
-                    renderer: Some("Chrome/157".into()),
-                    dui_version: "0.0.2".into(),
-                    versions: BTreeMap::new(),
-                },
-                source_files: BTreeSet::from(["src/App.tsx".into()]),
+            Some("header a[href]".into()),
+            BTreeSet::from([width]),
+        );
+        let run = Run::new(
+            run_id.clone(),
+            project.id().clone(),
+            worktree.id().clone(),
+            commit.id().clone(),
+            RunKind::Capture,
+            1_795_200_000_000,
+            RunEnvironment {
+                os: "macos".into(),
+                compiler: Some("7.0.2".into()),
+                renderer: Some("Chrome/157".into()),
+                dui_version: "0.0.2".into(),
+                versions: BTreeMap::new(),
             },
-            screens: vec![screen],
-            states: vec![state.clone()],
-            cells: vec![cell.clone()],
-            edges: vec![edge],
-            evidence: vec![evidence.clone()],
-            blobs: vec![blob.clone()],
-        };
-        store.save_run(&bundle).unwrap();
-        assert!(store.save_run(&bundle).is_err());
-        assert_eq!(store.load_run(&run_id).unwrap(), Some(bundle));
+            BTreeSet::from(["src/App.tsx".into()]),
+        );
+        let aggregate = RunAggregate::publish(
+            run,
+            vec![screen, search],
+            vec![state.clone()],
+            vec![cell.clone()],
+            vec![edge],
+        )
+        .unwrap();
+
+        store.save_run(&aggregate).unwrap();
+        assert!(store.save_run(&aggregate).is_err());
+        assert_eq!(store.load_run(&run_id).unwrap(), Some(aggregate));
         assert_eq!(store.list_runs(&RunFilter::default()).unwrap().len(), 1);
-        assert_eq!(store.unreferenced_blobs().unwrap(), vec![orphan.id.clone()]);
-        store.delete_blob(&orphan.id).unwrap();
+        assert_eq!(
+            store.unreferenced_blobs().unwrap(),
+            vec![orphan.id().clone()]
+        );
+        store.delete_blob(orphan.id()).unwrap();
         assert!(store.unreferenced_blobs().unwrap().is_empty());
 
         let inputs = CacheInputs {
             source_files: BTreeMap::new(),
             types_digest: ContentHash::from_bytes(b"t"),
             mocks_digest: ContentHash::from_bytes(b"m"),
-            state_id: state.id,
+            state_id: state.id().clone(),
             width,
             locale: None,
             dui_version: "0.0.2".into(),
             rule_pack_digest: ContentHash::from_bytes(b"r"),
             renderer_env_digest: ContentHash::from_bytes(b"e"),
         };
-        let entry = CacheEntry {
-            key: inputs.key(),
+        let entry = CacheEntry::new(
             inputs,
-            status: CellStatus::Verified,
-            image_blob: Some(blob.id),
-            evidence_id: Some(evidence.id),
-            created_at_ms: 100,
-            last_hit_at_ms: 100,
-        };
+            CellStatus::verified(),
+            Some(blob.id().clone()),
+            Some(evidence.id().clone()),
+            100,
+        )
+        .unwrap();
         store.put_cache(&entry).unwrap();
-        assert_eq!(store.get_cache(&entry.key).unwrap(), Some(entry));
+        assert_eq!(store.get_cache(entry.key()).unwrap(), Some(entry));
 
-        let comment = Comment {
-            id: Comment::derive_id(
-                &run_id,
-                &CommentTarget::Cell {
-                    cell_id: cell.id.clone(),
-                },
-                "reviewer",
-                200,
-                "Check contrast",
-            ),
-            project_id: project.id,
-            run_id: run_id.clone(),
-            target: CommentTarget::Cell { cell_id: cell.id },
-            author: "reviewer".into(),
-            body: "Check contrast".into(),
-            status: CommentStatus::Open,
-            created_at_ms: 200,
-            updated_at_ms: 200,
-        };
+        let mut comment = Comment::open(
+            project.id().clone(),
+            run_id.clone(),
+            CommentTarget::Cell {
+                cell_id: cell.id().clone(),
+            },
+            "reviewer",
+            "Check contrast",
+            200,
+        )
+        .unwrap();
+        store.upsert_comment(&comment).unwrap();
+        comment.resolve(300).unwrap();
         store.upsert_comment(&comment).unwrap();
         assert_eq!(store.list_comments(&run_id).unwrap(), vec![comment]);
     }

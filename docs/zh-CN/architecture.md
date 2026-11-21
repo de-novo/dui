@@ -64,7 +64,7 @@ pub trait Renderer {
 - **`TypeOracle`** 向项目自己的官方编译器（完全相同的版本）询问符号和类型。每个答复带有查询 ID 和 `Known | Unknown(reason)`。AST 找候选，编译器判定类型；AI 只补空缺，并记录为 `Inferred`。
 - **`Host`** 启动注入后的开发构建，返回 `Target`（Web URL 或原生入口）。源码变换属于语言适配器。
 - **`Renderer`** 在 `Target` 上打开一个格子，然后收集值、图像、语义树和已执行的分支。
-- **`Store`**（[领域模型 §5](domain-model.md#5-存储端口)）是在 `dui-core::storage` 中基于纯 `dui-core::model` 实体定义的薄持久化接口。具体存储后端（本地文件归档、基于 `rusqlite` / Drizzle 的 SQLite，或未来的远程 API）作为适配器位于 `Store` 之后；`dui-core` 零存储依赖。
+- **`Store` 端口**（[领域模型 §5](domain-model.md#5-存储端口)）是在 `dui-core::storage` 中基于纯 `dui-core::model` 聚合与值对象、按限界上下文拆分的持久化接口（`WorkspaceRepository`、`RunRepository`、`ArtifactStore`、`CacheRepository`、`CommentRepository`，组合为 `Store`）。具体存储后端（本地文件归档、基于 `rusqlite` / Drizzle 的 SQLite，或未来的远程 API）作为适配器位于这些端口之后；`dui-core` 零存储依赖。
 - 端口 trait 可以是 `async`，因为适配器要与进程和浏览器通信。async 止于 `dui-ports`；`dui-core` 永远看不到它。
 - 框架知识**绝不**作为核心中的代码：没有 `if framework == …`，没有按技术栈划分的插件层级。它放在规则包（§2.5）或某一个适配器 crate 中。
 

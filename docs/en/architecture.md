@@ -62,7 +62,7 @@ pub trait Renderer {
 - **`TypeOracle`** asks the project's own official compiler (same exact version) for symbols and types. Each answer carries its query ID and `Known | Unknown(reason)`. The AST finds candidates; the compiler decides types; AI only fills gaps and is recorded as `Inferred`.
 - **`Host`** starts the injected dev build and returns a `Target` (a web URL or a native entry point). Source transforms belong to the language adapter.
 - **`Renderer`** opens one cell at a `Target`, then collects values, image, semantic tree, and executed branches.
-- **`Store`** ([domain model §5](domain-model.md#5-storage-port)) is the thin persistence interface defined in `dui-core::storage` over pure `dui-core::model` entities. Concrete storage backends (local file archives, SQLite via `rusqlite` / Drizzle, or a future remote API) sit behind `Store` as adapters; `dui-core` has zero storage dependencies.
+- **`Store` ports** ([domain model §5](domain-model.md#5-storage-ports)) split persistence by bounded context (`WorkspaceRepository`, `RunRepository`, `ArtifactStore`, `CacheRepository`, `CommentRepository`, composed into `Store`) in `dui-core::storage` over pure `dui-core::model` aggregates and value objects. Concrete storage backends (local file archives, SQLite via `rusqlite` / Drizzle, or a future remote API) sit behind these ports as adapters; `dui-core` has zero storage dependencies.
 - Port traits may be `async` because adapters talk to processes and browsers. Async stops at `dui-ports`; `dui-core` never sees it.
 - Framework knowledge is **never** code in the core: no `if framework == …`, no per-stack plugin hierarchy. It lives in rule packs (§2.5) or in one adapter crate.
 
