@@ -1,4 +1,4 @@
-import { Fragment, useMemo, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, type KeyboardEvent } from "react";
 
 import { CaptureCard } from "./CaptureCard";
 import { layoutMap } from "./layout";
@@ -8,6 +8,7 @@ import {
   Controls,
   Handle,
   MarkerType,
+  PanOnScrollMode,
   Position,
   ReactFlow,
   useReactFlow,
@@ -38,20 +39,53 @@ function ZoomOneToOneButton({
   cardWidth: number;
   frameHeight: number;
 }) {
-  const { setCenter, zoomTo } = useReactFlow();
+  const { setCenter, zoomTo, zoomIn, zoomOut, fitView } = useReactFlow();
+
+  const jumpOneToOne = () => {
+    if (target) {
+      void setCenter(target.position.x + cardWidth / 2, target.position.y + frameHeight / 2, {
+        zoom: 1,
+        duration: 200,
+      });
+    } else {
+      void zoomTo(1, { duration: 200 });
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      const el = event.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        void zoomIn({ duration: 150 });
+      } else if (event.key === "-") {
+        event.preventDefault();
+        void zoomOut({ duration: 150 });
+      } else if (event.key === "0") {
+        event.preventDefault();
+        jumpOneToOne();
+      } else if (event.key === "!" || (event.shiftKey && event.key === "1")) {
+        event.preventDefault();
+        void fitView({ duration: 200 });
+      }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  });
+
   return (
     <ControlButton
-      onClick={() => {
-        if (target) {
-          void setCenter(target.position.x + cardWidth / 2, target.position.y + frameHeight / 2, {
-            zoom: 1,
-            duration: 200,
-          });
-        } else {
-          void zoomTo(1, { duration: 200 });
-        }
-      }}
-      title="Zoom to 1:1 actual capture size"
+      onClick={jumpOneToOne}
+      title="Zoom to 1:1 actual capture size (0)"
       aria-label="Zoom to 1:1 actual capture size"
     >
       <span className="zoom-1x-label">1:1</span>
@@ -207,8 +241,13 @@ export function ScreenMap({
       minZoom={0.02}
       maxZoom={3}
       panOnDrag
-      zoomOnScroll
+      panOnScroll
+      panOnScrollMode={PanOnScrollMode.Free}
+      panOnScrollSpeed={1.2}
+      zoomOnScroll={false}
       zoomOnPinch
+      zoomOnDoubleClick={false}
+      zoomActivationKeyCode={["Meta", "Control"]}
       fitViewOptions={{
         padding: {
           left: `${railInset + 18}px`,
