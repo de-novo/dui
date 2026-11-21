@@ -200,7 +200,8 @@ pub(crate) fn capture(
 }
 
 pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -> Reply {
-    let archive = root()?.join("projects");
+    let home = root()?;
+    let archive = home.join("projects");
     let id = metadata["projectId"]
         .as_str()
         .ok_or_else(|| failure(3, "missing project id"))?;
@@ -240,6 +241,8 @@ pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -
     metadata["timestampMs"] = json!(stamp as u64);
     analysis::store(&staged.join("snapshot.json"), &metadata)?;
     fs::rename(&staged, &out).map_err(io)?;
+    let (mut store, _) = crate::sqlite_store::SqliteStore::open(&home).map_err(io)?;
+    store.import_run_dir(&out).map_err(io)?;
     report["snapshot"] = metadata;
     report["output"] = json!(out);
     if partial {
@@ -250,10 +253,11 @@ pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -
 }
 
 pub(crate) fn history() -> Reply {
+    use dui_core::storage::{RunFilter, RunRepository, WorkspaceRepository};
+
     let home = root()?;
     let archive = home.join("projects");
     fs::create_dir_all(&archive).map_err(io)?;
-    let mut runs = Vec::new();
     for project in fs::read_dir(&archive).map_err(io)? {
         let directory = project.map_err(io)?.path();
         let path = directory.join("runs");
@@ -267,27 +271,92 @@ pub(crate) fn history() -> Reply {
             {
                 continue;
             }
-            let out = entry.path();
-            let mut meta = read(&out.join("snapshot.json"))?;
-            if let Some(root) = meta["projectRoot"].as_str() {
-                let id = ProjectId::from_primary_root_bytes(root.as_bytes());
+            if let Ok(meta) = read(&entry.path().join("snapshot.json"))
+                && let Some(root_path) = meta["projectRoot"].as_str()
+            {
+                let id = ProjectId::from_primary_root_bytes(root_path.as_bytes());
                 if directory.file_name().and_then(|n| n.to_str()) == Some(id.as_str()) {
-                    meta["projectName"] = json!(project_name(&directory, Path::new(root))?);
+                    let _ = project_name(&directory, Path::new(root_path))?;
                 }
             }
-            let report = read(&out.join("report.json"))?;
-            let cells = report["cells"]
-                .as_array()
-                .ok_or_else(|| failure(3, "invalid archived report"))?;
-            meta["cells"] = json!(cells.iter().map(|c| json!({
-                "path":c["path"],"state":c["state"],"scenario":c["scenario"],"width":c["width"],
-                "status":c["status"],"image":c["image"],"reason":c["reason"]
-            })).collect::<Vec<_>>());
-            meta["output"] = json!(out);
-            runs.push(meta);
         }
     }
-    runs.sort_by(|a, b| b["id"].as_str().cmp(&a["id"].as_str()));
+
+    let (mut store, _) = crate::sqlite_store::SqliteStore::open(&home).map_err(io)?;
+    store.import_disk_archive(&archive).map_err(io)?;
+
+    let summaries = store.list_runs(&RunFilter::default()).map_err(io)?;
+    let mut runs = Vec::with_capacity(summaries.len());
+    for summary in summaries {
+        let run = &summary.run;
+        let project = store
+            .get_project(run.project_id())
+            .map_err(io)?
+            .ok_or_else(|| failure(3, "missing project in sqlite store"))?;
+        let worktree = store
+            .get_worktree(run.worktree_id())
+            .map_err(io)?
+            .ok_or_else(|| failure(3, "missing worktree in sqlite store"))?;
+        let out = archive
+            .join(run.project_id().as_str())
+            .join("runs")
+            .join(run.id().as_str());
+        let cells = if let Ok(report) = read(&out.join("report.json"))
+            && let Some(items) = report["cells"].as_array()
+        {
+            items
+                .iter()
+                .map(|c| {
+                    json!({
+                        "path": c["path"],
+                        "state": c["state"],
+                        "scenario": c["scenario"],
+                        "width": c["width"],
+                        "status": c["status"],
+                        "image": c["image"],
+                        "reason": c["reason"]
+                    })
+                })
+                .collect::<Vec<_>>()
+        } else if let Some(agg) = store.load_run(run.id()).map_err(io)? {
+            agg.cells()
+                .iter()
+                .map(|c| {
+                    let path = agg.screens().get(c.screen_id()).map_or("/", |s| s.path());
+                    let scenario = agg
+                        .states()
+                        .get(c.state_id())
+                        .map_or("default", |s| s.scenario());
+                    json!({
+                        "path": path,
+                        "state": c.state_id().as_str(),
+                        "scenario": scenario,
+                        "width": c.width().pixels(),
+                        "status": c.status().kind(),
+                        "image": c.image_blob().map(|b| format!("{}.png", b.as_str())),
+                        "reason": c.status().reason()
+                    })
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        runs.push(json!({
+            "projectId": run.project_id().as_str(),
+            "projectName": project.display_name(),
+            "projectRoot": project.primary_root(),
+            "app": worktree.app_relative(),
+            "worktree": worktree.path(),
+            "branch": summary.branch,
+            "commit": summary.commit_sha,
+            "dirty": summary.dirty,
+            "id": run.id().as_str(),
+            "timestampMs": run.created_at_ms(),
+            "output": out,
+            "cells": cells
+        }));
+    }
+
     let data = serde_json::to_string(&runs)
         .map_err(io)?
         .replace('<', "\\u003c");

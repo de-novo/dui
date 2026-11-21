@@ -122,4 +122,8 @@ pub trait CommentRepository {
 }
 ```
 
-구체 스토리지 백엔드(파일 아카이브, #10의 `rusqlite` / Drizzle 기반 SQLite, 향후 원격 HTTP 동기화)는 `dui-core` 바깥의 어댑터 계층에서 이 포트들을 구현한다.
+구체 스토리지 백엔드는 `dui-core` 바깥의 어댑터 계층에서 이 포트들을 구현한다.
+
+- **로컬 SQLite + Drizzle 어댑터 ([#10](https://github.com/de-novo/dui/issues/10)):** `crates/dui/src/sqlite_store.rs`(번들 SQLite WAL 모드의 `rusqlite`)와 `packages/db/`(`drizzle-orm` `1.0.0-rc.5` SQLite 방언)가 동일한 전방 전용 SQL 마이그레이션(`packages/db/migrations/`)을 공유한다. 메타데이터는 `~/.dui/dui.db`에, 내용 주소 지정 이미지는 `~/.dui/blobs/<sha256>.png`에 저장한다. `~/.dui/projects/`의 기존 실행은 자동으로 가져오며 DB 파일을 삭제해도 디스크 파일에서 무손실로 복원할 수 있다.
+- **인메모리 테스트 어댑터:** `dui_core::storage::MemoryStore`(`BTreeMap` 기반, I/O 0).
+- **향후 원격 Postgres 동기화:** SQLite 파일을 공유하지 않고 동일한 텍스트 ID·epoch 밀리초 시각·JSON 컬럼 구조로 API를 통해 동기화한다.

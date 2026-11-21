@@ -40,6 +40,9 @@ jobs:
       - run: npm ci --prefix apps/canvas
       - run: npm test --prefix apps/canvas
       - run: npm run build --prefix apps/canvas
+      - run: npm ci --prefix packages/db
+      - run: npm --prefix packages/db run check
+      - run: npm test --prefix packages/db
   inspect:
     runs-on: ubuntu-latest
     steps:
