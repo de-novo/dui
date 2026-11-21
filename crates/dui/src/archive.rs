@@ -1,8 +1,8 @@
 //! Capture storage shared by the CLI and MCP server.
 use crate::{Reply, analysis, failure, host, replay};
+use dui_core::model::ProjectId;
 use replay::{Error, io, read};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::{
     env, fs,
     os::unix::{
@@ -75,7 +75,7 @@ pub(crate) fn provenance(project: &Path) -> Result<Value, Error> {
         dirty =
             git(dir, &["status", "--porcelain", "--untracked-files=normal"]).map(|s| !s.is_empty());
     }
-    let project_id = format!("{:x}", Sha256::digest(repo.as_os_str().as_bytes()));
+    let project_id = ProjectId::from_primary_root_bytes(repo.as_os_str().as_bytes());
     let relative = app
         .strip_prefix(worktree.as_ref().unwrap_or(&app))
         .map_err(io)?;
@@ -270,7 +270,7 @@ pub(crate) fn history() -> Reply {
             let out = entry.path();
             let mut meta = read(&out.join("snapshot.json"))?;
             if let Some(root) = meta["projectRoot"].as_str() {
-                let id = format!("{:x}", Sha256::digest(root.as_bytes()));
+                let id = ProjectId::from_primary_root_bytes(root.as_bytes());
                 if directory.file_name().and_then(|n| n.to_str()) == Some(id.as_str()) {
                     meta["projectName"] = json!(project_name(&directory, Path::new(root))?);
                 }
@@ -311,8 +311,277 @@ pub(crate) fn history() -> Reply {
 }
 
 #[cfg(test)]
+pub(crate) fn run_bundle(
+    snapshot: &Value,
+    report: &Value,
+    graph: &Value,
+) -> Result<dui_core::storage::RunBundle, dui_core::model::DomainError> {
+    use dui_core::{
+        model::{
+            BlobId, Cell, CellStatus, Commit, Edge, EdgeEndpoint, EdgeSource, Evidence, ImageBlob,
+            Project, Run, RunEnvironment, RunId, RunKind, Screen, ScreenOrigin, State, StateId,
+            Width, Worktree,
+        },
+        storage::RunBundle,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
+    let project_root = snapshot["projectRoot"].as_str().unwrap_or_default();
+    let project_id = match snapshot["projectId"].as_str() {
+        Some(raw) => ProjectId::parse(raw)?,
+        None => ProjectId::from_primary_root_bytes(project_root.as_bytes()),
+    };
+    let project = Project {
+        id: project_id.clone(),
+        display_name: snapshot["projectName"]
+            .as_str()
+            .unwrap_or("Unnamed project")
+            .to_owned(),
+        primary_root: project_root.to_owned(),
+    };
+    let worktree_path = snapshot["worktree"]
+        .as_str()
+        .unwrap_or(project_root)
+        .to_owned();
+    let app_relative = snapshot["app"].as_str().unwrap_or_default().to_owned();
+    let worktree = Worktree {
+        id: Worktree::derive_id(&project_id, &worktree_path, &app_relative),
+        project_id: project_id.clone(),
+        path: worktree_path,
+        app_relative,
+        branch: snapshot["branch"].as_str().map(str::to_owned),
+    };
+    let git_sha = snapshot["commit"].as_str().map(str::to_owned);
+    let dirty = snapshot["dirty"].as_bool().unwrap_or(false);
+    let commit = Commit {
+        id: Commit::derive_id(&project_id, git_sha.as_deref(), dirty, None),
+        project_id: project_id.clone(),
+        git_sha,
+        dirty,
+        tree_digest: None,
+    };
+    let run_id = RunId::parse(snapshot["id"].as_str().unwrap_or("run"))?;
+    let kind = if let Some(live) = report.get("live").filter(|v| v.is_object()) {
+        RunKind::LiveSave {
+            source_run: RunId::parse(live["sourceRun"].as_str().unwrap_or("source"))?,
+            source_state: StateId::parse(live["sourceCell"]["state"].as_str().unwrap_or_default())
+                .unwrap_or_else(|_| StateId::derive(&live["sourceCell"]["state"])),
+            source_width: Width::new(live["sourceCell"]["width"].as_u64().unwrap_or(1) as u32)?,
+            revision: live["revision"].as_u64().unwrap_or(0),
+        }
+    } else {
+        RunKind::Capture
+    };
+    let mut versions = BTreeMap::new();
+    if let Some(map) = report["versions"].as_object() {
+        for (k, v) in map {
+            if let Some(s) = v.as_str() {
+                versions.insert(k.clone(), s.to_owned());
+            }
+        }
+    }
+    let source_files = report["sourceFiles"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
+    let run = Run {
+        id: run_id.clone(),
+        project_id,
+        worktree_id: worktree.id.clone(),
+        commit_id: commit.id.clone(),
+        kind,
+        created_at_ms: snapshot["timestampMs"].as_i64().unwrap_or(0),
+        environment: RunEnvironment {
+            os: report["os"].as_str().unwrap_or_default().to_owned(),
+            compiler: report["compiler"].as_str().map(str::to_owned),
+            renderer: report["browser"]["product"].as_str().map(str::to_owned),
+            dui_version: env!("CARGO_PKG_VERSION").to_owned(),
+            versions,
+        },
+        source_files,
+    };
+
+    let mut screens_by_path = BTreeMap::new();
+    let mut states_by_id = BTreeMap::new();
+    let mut cells = Vec::new();
+    let mut evidence_by_id = BTreeMap::new();
+    let mut blobs_by_id = BTreeMap::new();
+
+    for raw in report["cells"].as_array().into_iter().flatten() {
+        let path = raw["path"].as_str().unwrap_or("/");
+        let screen = screens_by_path
+            .entry(path.to_owned())
+            .or_insert_with(|| Screen {
+                id: Screen::derive_id(path),
+                path: path.to_owned(),
+                origin: match report["screenDiscovery"]["sources"].get(path) {
+                    Some(Value::String(file)) => ScreenOrigin::Router { file: file.clone() },
+                    Some(obj) if obj["kind"] == "anchor" => ScreenOrigin::Anchor {
+                        from: obj["from"].as_str().unwrap_or("/").to_owned(),
+                        selector: obj["selector"].as_str().map(str::to_owned),
+                    },
+                    _ => ScreenOrigin::Entry,
+                },
+            })
+            .clone();
+        let scenario = raw["scenario"].as_str().unwrap_or("default").to_owned();
+        let mut inputs = BTreeMap::new();
+        if let Some(obj) = raw["input"].as_object() {
+            for (k, v) in obj {
+                inputs.insert(k.clone(), v.clone());
+            }
+        }
+        let state_id = match raw["state"].as_str() {
+            Some(s) => StateId::parse(s)
+                .unwrap_or_else(|_| State::derive_id(&screen.id, &scenario, None, &inputs)),
+            None => State::derive_id(&screen.id, &scenario, None, &inputs),
+        };
+        states_by_id
+            .entry(state_id.clone())
+            .or_insert_with(|| State {
+                id: state_id.clone(),
+                screen_id: screen.id.clone(),
+                scenario,
+                locale: None,
+                inputs,
+                plan_index: raw["planIndex"].as_u64().unwrap_or(0) as u32,
+            });
+        let width = Width::new(raw["width"].as_u64().unwrap_or(0) as u32)?;
+        let status = CellStatus::from_wire(
+            raw["status"].as_str().unwrap_or("unverified"),
+            raw["reason"].as_str().map(str::to_owned),
+        )?;
+        let image_blob = raw["image"].as_str().map(|name| {
+            let blob_id = raw["imageSha256"]
+                .as_str()
+                .and_then(|s| BlobId::parse(s).ok())
+                .or_else(|| name.split('-').next().and_then(|s| BlobId::parse(s).ok()))
+                .unwrap_or_else(|| BlobId::from_image_bytes(name.as_bytes()));
+            blobs_by_id
+                .entry(blob_id.clone())
+                .or_insert_with(|| ImageBlob {
+                    id: blob_id.clone(),
+                    media_type: "image/png".into(),
+                    byte_len: 0,
+                    width_px: width.pixels(),
+                    height_px: 0,
+                });
+            blob_id
+        });
+        let evidence_id = raw["observation"].as_object().map(|obs| {
+            let slots = obs
+                .get("slots")
+                .and_then(Value::as_object)
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default();
+            let hits = obs
+                .get("hits")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect();
+            let links = obs
+                .get("links")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect();
+            let ev = Evidence::new(
+                obs.get("path").and_then(Value::as_str).map(str::to_owned),
+                obs.get("width").and_then(Value::as_u64).map(|w| w as u32),
+                obs.get("ready").and_then(Value::as_bool),
+                obs.get("settled").and_then(Value::as_bool),
+                slots,
+                BTreeMap::new(),
+                hits,
+                links,
+                BTreeMap::new(),
+                raw["checks"].as_array().cloned().unwrap_or_default(),
+                vec![],
+            );
+            let id = ev.id.clone();
+            evidence_by_id.entry(id.clone()).or_insert(ev);
+            id
+        });
+        cells.push(Cell {
+            id: Cell::derive_id(&run_id, &screen.id, &state_id, width, None),
+            run_id: run_id.clone(),
+            screen_id: screen.id,
+            state_id,
+            width,
+            locale: None,
+            status,
+            image_blob,
+            evidence_id,
+            cache: None,
+        });
+    }
+
+    let mut edges = Vec::new();
+    for raw in graph["edges"].as_array().into_iter().flatten() {
+        if raw["kind"] != "linksTo" {
+            continue;
+        }
+        let Some(from_path) = raw["source"]
+            .as_str()
+            .and_then(|s| s.strip_prefix("route:"))
+        else {
+            continue;
+        };
+        let Some(to_path) = raw["target"]
+            .as_str()
+            .and_then(|s| s.strip_prefix("route:"))
+        else {
+            continue;
+        };
+        let from = EdgeEndpoint::Screen {
+            screen_id: Screen::derive_id(from_path),
+        };
+        let to = EdgeEndpoint::Screen {
+            screen_id: Screen::derive_id(to_path),
+        };
+        let mut observed_widths = BTreeSet::new();
+        for w in raw["observedWidths"].as_array().into_iter().flatten() {
+            if let Some(px) = w.as_u64().and_then(|n| Width::new(n as u32).ok()) {
+                observed_widths.insert(px);
+            }
+        }
+        edges.push(Edge {
+            id: Edge::derive_id(&run_id, &from, &to, EdgeSource::Extracted, None),
+            run_id: run_id.clone(),
+            from,
+            to,
+            source: EdgeSource::Extracted,
+            trigger: None,
+            selector: raw["selector"].as_str().map(str::to_owned),
+            observed_widths,
+        });
+    }
+
+    Ok(RunBundle {
+        project,
+        worktree,
+        commit,
+        run,
+        screens: screens_by_path.into_values().collect(),
+        states: states_by_id.into_values().collect(),
+        cells,
+        edges,
+        evidence: evidence_by_id.into_values().collect(),
+        blobs: blobs_by_id.into_values().collect(),
+    })
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    use dui_core::storage::{MemoryStore, RunFilter, Store};
 
     #[test]
     fn project_name_survives_manifest_and_branch_changes() {
@@ -379,5 +648,32 @@ mod tests {
         let detached = provenance(&linked).unwrap();
         assert!(detached["branch"].is_null());
         assert_eq!(detached["projectId"], baseline["projectId"]);
+
+        let mut store = MemoryStore::new();
+        let mut snap_main = baseline.clone();
+        snap_main["id"] = json!("0001-main");
+        snap_main["projectName"] = json!("demo");
+        snap_main["timestampMs"] = json!(1000);
+        let mut snap_feat = feature.clone();
+        snap_feat["id"] = json!("0002-feat");
+        snap_feat["projectName"] = json!("demo");
+        snap_feat["timestampMs"] = json!(2000);
+        let report = json!({"os":"macos","cells":[{"path":"/","scenario":"default","state":"s0","width":1280,"planIndex":0,"status":"verified","image":"a.png"}]});
+        let graph = json!({"nodes":[],"edges":[]});
+        let b1 = run_bundle(&snap_main, &report, &graph).unwrap();
+        let b2 = run_bundle(&snap_feat, &report, &graph).unwrap();
+        assert_eq!(b1.project.id, b2.project.id);
+        assert_ne!(b1.worktree.id, b2.worktree.id);
+        store.save_run(&b1).unwrap();
+        store.save_run(&b2).unwrap();
+        let listed = store
+            .list_runs(&RunFilter {
+                project_id: Some(b1.project.id.clone()),
+                branch: Some("layout/new".into()),
+                ..RunFilter::default()
+            })
+            .unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].run.id.as_str(), "0002-feat");
     }
 }

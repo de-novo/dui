@@ -4,7 +4,7 @@
 
 > 本文是[英文原文](../en/architecture.md)的简体中文翻译。如有出入，以英文为准。
 
-> 状态：2026-11-20 决定 · 代码结构的权威来源。设计背景：[设计 v0](design-v0.md)。支持的技术栈：[支持的框架](supported-frameworks.md)。
+> 状态：2026-11-20 决定 · 代码结构的权威来源。设计背景：[设计 v0](design-v0.md)。领域实体与存储端口：[领域模型](domain-model.md)。支持的技术栈：[支持的框架](supported-frameworks.md)。
 
 本文确定 dui 的 Rust 代码形态：架构风格、采用与禁止的模式、模块和 crate 边界，以及 M0 和 M1 的验收标准。与[设计 v0](design-v0.md)重叠时，代码结构以本文为准。
 
@@ -64,6 +64,7 @@ pub trait Renderer {
 - **`TypeOracle`** 向项目自己的官方编译器（完全相同的版本）询问符号和类型。每个答复带有查询 ID 和 `Known | Unknown(reason)`。AST 找候选，编译器判定类型；AI 只补空缺，并记录为 `Inferred`。
 - **`Host`** 启动注入后的开发构建，返回 `Target`（Web URL 或原生入口）。源码变换属于语言适配器。
 - **`Renderer`** 在 `Target` 上打开一个格子，然后收集值、图像、语义树和已执行的分支。
+- **`Store`**（[领域模型 §5](domain-model.md#5-存储端口)）是在 `dui-core::storage` 中基于纯 `dui-core::model` 实体定义的薄持久化接口。具体存储后端（本地文件归档、基于 `rusqlite` / Drizzle 的 SQLite，或未来的远程 API）作为适配器位于 `Store` 之后；`dui-core` 零存储依赖。
 - 端口 trait 可以是 `async`，因为适配器要与进程和浏览器通信。async 止于 `dui-ports`；`dui-core` 永远看不到它。
 - 框架知识**绝不**作为核心中的代码：没有 `if framework == …`，没有按技术栈划分的插件层级。它放在规则包（§2.5）或某一个适配器 crate 中。
 

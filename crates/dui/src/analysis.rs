@@ -555,6 +555,15 @@ mod tests {
             assert_eq!(cell["reason"], "capture interrupted");
             assert!(cell.get("image").is_none());
         }
+        let graph: Value =
+            serde_json::from_slice(&fs::read(dir.path().join("graph.json")).unwrap()).unwrap();
+        let snap = json!({"id":"run-partial","projectRoot":"/tmp/demo","projectName":"demo","timestampMs":1});
+        let bundle = crate::archive::run_bundle(&snap, &saved, &graph).unwrap();
+        let summary = dui_core::model::CoverageSummary::from_cells(&bundle.cells);
+        assert_eq!(summary.verified, 10);
+        assert_eq!(summary.unverified, 5);
+        assert_eq!(summary.renderable, 15);
+        assert_eq!(summary.unrenderable, 0);
     }
 
     #[test]
@@ -573,5 +582,18 @@ mod tests {
         assert_eq!(report["coverage"]["renderable"], 0);
         assert_eq!(report["coverage"]["unrenderable"], 1);
         assert_eq!(report["cells"][0]["reason"], "no-render-env");
+        let graph: Value =
+            serde_json::from_slice(&fs::read(dir.path().join("graph.json")).unwrap()).unwrap();
+        let snap = json!({"id":"run-unrenderable","projectRoot":"/tmp/demo","projectName":"demo","timestampMs":1});
+        let bundle = crate::archive::run_bundle(&snap, &report, &graph).unwrap();
+        let summary = dui_core::model::CoverageSummary::from_cells(&bundle.cells);
+        assert_eq!(summary.renderable, 0);
+        assert_eq!(summary.unrenderable, 1);
+        assert_eq!(
+            bundle.cells[0].status,
+            dui_core::model::CellStatus::Unrenderable {
+                reason: "no-render-env".into()
+            }
+        );
     }
 }
