@@ -67,3 +67,4 @@ jobs:
           npm run check:viewer
           npm run check:transitions
           npm run check:comments
+          npm run check:audit

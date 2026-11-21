@@ -15,6 +15,7 @@
     "check:viewer": "tsc --project scripts && cargo build --locked && node scripts/check-viewer.mts",
     "check:transitions": "tsc --project scripts && cargo build --locked && node scripts/check-transitions.mts",
     "check:comments": "tsc --project scripts && cargo build --locked && node scripts/check-comments.mts",
+    "check:audit": "tsc --project scripts && cargo build --locked && node scripts/check-audit.mts",
     "check:desktop": "tsc --project scripts && cargo build --locked && node scripts/check-desktop.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "check:gpui-live": "tsc --project scripts && cargo build --locked && node scripts/check-gpui-live.mts",

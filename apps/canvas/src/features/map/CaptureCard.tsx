@@ -11,6 +11,7 @@ export function CaptureCard({
   selected = false,
   cardWidth,
   frameHeight,
+  openComments = 0,
 }: {
   screen: Screen;
   cell?: Cell;
@@ -18,6 +19,7 @@ export function CaptureCard({
   selected?: boolean;
   cardWidth?: number;
   frameHeight?: number;
+  openComments?: number;
 }) {
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
@@ -30,6 +32,7 @@ export function CaptureCard({
       style={cardWidth ? { width: `${cardWidth}px` } : undefined}
       data-selected={selected ? "true" : undefined}
       data-card-width={cardWidth}
+      data-open-comments={openComments > 0 ? openComments : undefined}
       title={screen.path}
     >
       <div
@@ -49,6 +52,11 @@ export function CaptureCard({
       </div>
       <div className="card-caption">
         <strong>{routeName(screen.path)}</strong>
+        {openComments > 0 && (
+          <small className="card-comment-badge" title={openComments + " unresolved comments"}>
+            Comments {openComments}
+          </small>
+        )}
         {missing > 0 && <small title={missing + " unverified cells"}>Unverified {missing}</small>}
         {unavailable > 0 && <small>Unrenderable {unavailable}</small>}
       </div>

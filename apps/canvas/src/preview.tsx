@@ -15,6 +15,7 @@ import { ScreenNeighborhood } from "./features/map/ScreenNeighborhood";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
+import { type AuditReport, decodeAuditReport, openCommentsByPath } from "./model/audit";
 import type { LiveCellRef } from "./model/live";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import "./preview.css";
@@ -122,10 +123,27 @@ function MapView({
   const { cells, cell } = resolveCell(screen, width, state, locale);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [audit, setAudit] = useState<AuditReport | null>(null);
   const optionsButton = useRef<HTMLButtonElement>(null);
   const dismiss = useRef<HTMLButtonElement>(null);
   const origin = useRef<HTMLElement | SVGElement | null>(null);
   const previousView = useRef(view);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/audit?run=${encodeURIComponent(run.key)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((raw) => {
+        if (!controller.signal.aborted) setAudit(decodeAuditReport(raw));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setAudit(null);
+      });
+    return () => controller.abort();
+  }, [run.key]);
 
   useEffect(() => {
     const pop = () => setSearch(location.search);
@@ -200,11 +218,35 @@ function MapView({
               width={width}
               mode={mode}
               selectedId={selectedId}
+              openCommentsByPath={openCommentsByPath(audit)}
               imageUrl={(name) => archiveUrl(name, run)}
               select={select}
             />
           )}
         </div>
+
+        {showOverview && audit && (
+          <output
+            className="audit-summary-pill glass-panel"
+            data-audit-meets-goal={String(audit.meetsGoal)}
+          >
+            <strong>
+              {t.auditCoverageLabel(audit.summary.verifiedPercent, audit.goalPercent)}
+            </strong>
+            <span>
+              {t.auditCellsLabel(
+                audit.summary.verifiedCells,
+                audit.summary.renderableCells,
+                audit.summary.totalCells,
+              )}
+            </span>
+            {audit.summary.openComments > 0 && (
+              <span className="audit-open-comments">
+                {t.auditOpenCommentsLabel(audit.summary.openComments)}
+              </span>
+            )}
+          </output>
+        )}
 
         {showDetails && screen && (
           <ScreenNeighborhood

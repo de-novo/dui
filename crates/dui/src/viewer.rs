@@ -1,6 +1,6 @@
 //! Embedded loopback HTTP server for `apps/canvas` (`dui open`).
 
-use crate::{Reply, archive, comments, diff, failure, live};
+use crate::{Reply, archive, audit, comments, diff, failure, live};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -465,6 +465,55 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             return;
         }
         send_response(&mut stream, 404, "text/plain", "no-store", b"");
+        return;
+    }
+
+    if path == "/api/audit" || path == "/api/audit/" {
+        if !is_same_origin(&headers) {
+            send_json(
+                &mut stream,
+                403,
+                &json!({"status":"error","reason":"forbidden-origin"}),
+            );
+            return;
+        }
+        if method != "GET" {
+            send_response(&mut stream, 405, "text/plain", "no-store", b"");
+            return;
+        }
+        let run_key = query.get("run").map(String::as_str);
+        let archives = match state.lock() {
+            Ok(guard) => list_archives(&guard),
+            Err(_) => {
+                send_json(&mut stream, 500, &json!({"status":"error"}));
+                return;
+            }
+        };
+        let selected = match run_key {
+            None | Some("") => archives.first(),
+            Some(k) => archives.iter().find(|a| a.run["key"].as_str() == Some(k)),
+        };
+        let Some(entry) = selected else {
+            send_json(
+                &mut stream,
+                404,
+                &json!({"status":"error","reason":"run-not-found"}),
+            );
+            return;
+        };
+        let goal = query.get("goal").and_then(|g| g.parse::<f64>().ok());
+        match audit::audit_run(&entry.root, goal) {
+            Ok(mut reply) => {
+                if let Some(obj) = reply.as_object_mut() {
+                    obj.remove("run");
+                    obj.insert("runKey".into(), entry.run["key"].clone());
+                }
+                send_json(&mut stream, 200, &reply);
+            }
+            Err((code, err)) => {
+                send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
+            }
+        }
         return;
     }
 
