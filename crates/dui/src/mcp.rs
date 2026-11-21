@@ -32,7 +32,7 @@ fn live_tool() -> Value {
                 "cell":{"type":"object","required":["state","width"],"properties":{"state":{"type":"string"},"width":{"type":"integer","minimum":1}}},
                 "expectedRevision":{"type":"integer","minimum":0},
                 "slot":{"type":"string"},"instance":{"type":"string"},"value":{},
-                "expect":{"type":"object","required":["selector","text"],"properties":{"selector":{"type":"string"},"text":{"type":"string"}}}
+                "expect":{"type":"object","properties":{"selector":{"type":"string"},"text":{"type":"string"},"label":{"type":"string"},"checked":{"type":"boolean"}}}
             }
         }
     })

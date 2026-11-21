@@ -37,7 +37,7 @@ The first benchmark establishes the latency baseline on a recorded machine and f
 
 **Native screens on the map.** Render one real GPUI screen at a known width with two typed states. Reuse the same inspect, set, read-back and reset contract. Record the OS, renderer and toolchain with the images. A matching value and independent semantic evidence are required for verification. Missing semantic evidence leaves the cell unverified. A missing render environment produces an unrenderable cell with its reason.
 
-Baseline verified on `fixtures/gpui-kit` (`gpui-kit 0.10.0`, `gpui-pre 0.3.12`, `rustc 1.100.0`, macOS Metal offscreen renderer at 480 px, `elementTreeAvailable: true` via AccessKit / `TestQueryExt`; missing-render-env path reports `unrenderable` with `no-render-env`). Reproduce with `npm run check:gpui`.
+Baseline verified on `fixtures/gpui-kit` (`gpui-kit 0.10.0`, `gpui-pre 0.3.12`, `rustc 1.100.0`, macOS Metal offscreen renderer at 480 px, `elementTreeAvailable: true` via AccessKit / `TestQueryExt`; missing-render-env path reports `unrenderable` with `no-render-env`). Reproduce with `npm run check:gpui`. Live native session round-trip verified through the shared `dui live` / MCP `live` contract across 30 warm edits (**3.65 ms p50 / 4.23 ms p95**, 0 host rebuilds, 0 native restarts, independent second view instance state preserved, missing semantic evidence reported as `unverified` with `missing-semantic-evidence`). Reproduce with `npm run check:gpui-live`.
 
 Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://github.com/de-novo/dui/issues/6)
 
