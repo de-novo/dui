@@ -296,6 +296,26 @@ h2 {
   min-height: 0;
   display: block;
   object-fit: contain;
+  object-position: top center;
+}
+.screen-card-large {
+  padding: var(--space-3);
+  border-radius: 18px;
+}
+.screen-card-large .card-caption {
+  padding: var(--space-3) var(--space-2) var(--space-1);
+}
+.screen-card-large .card-caption strong {
+  font-size: 1.5rem;
+}
+.screen-card-large .card-caption small {
+  font-size: 1rem;
+}
+.zoom-1x-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
 }
 .card-caption {
   display: flex;
@@ -326,6 +346,14 @@ h2 {
 }
 .map .react-flow__controls {
   margin-inline-start: calc(var(--rail-space) + 12px);
+}
+.map .react-flow__controls-button {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.map .react-flow__controls-button:hover {
+  background: var(--muted);
 }
 .map .react-flow {
   --xy-controls-button-background-color: var(--card);

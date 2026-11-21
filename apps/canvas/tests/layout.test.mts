@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { layoutMap } from "../src/features/map/layout.ts";
+import { layoutMap, nodeMetrics } from "../src/features/map/layout.ts";
 import type { ScreenMap } from "../src/data/overview.ts";
 
 const archive: ScreenMap = {
@@ -69,4 +69,23 @@ test("wide groups share columns without overlapping or inventing links", () => {
   assert.ok(new Set(positions.map((p) => p.x)).size > 2);
   assert.ok(new Set(positions.map((p) => p.y)).size < screens.length / 2);
   assert.deepEqual(new Set(plan.links), new Set(links));
+});
+
+test("nodeMetrics sizes map cards 1:1 with capture width and spaces columns without overlap", () => {
+  const mobile = nodeMetrics(375);
+  assert.equal(mobile.cardWidth, 375);
+  assert.ok(mobile.column >= mobile.cardWidth + 120);
+  assert.ok(mobile.frameHeight >= 500);
+
+  const desktop = nodeMetrics(1280);
+  assert.equal(desktop.cardWidth, 1280);
+  assert.equal(desktop.frameHeight, 800);
+  assert.ok(desktop.column >= desktop.cardWidth + 120);
+
+  const plan = layoutMap(archive, 1280, "overview");
+  assert.equal(plan.metrics.cardWidth, 1280);
+  const xs = [...new Set(plan.nodes.map((n) => n.position.x))].sort((a, b) => a - b);
+  for (let i = 1; i < xs.length; i += 1) {
+    assert.ok(xs[i]! - xs[i - 1]! >= desktop.cardWidth, "columns must not overlap at 1:1 width");
+  }
 });

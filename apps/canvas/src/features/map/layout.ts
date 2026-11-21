@@ -5,10 +5,31 @@ type Point = { x: number; y: number };
 type Placed = { screen: Screen; position: Point };
 type Layout = { nodes: Placed[]; links: Link[] };
 
-const column = 355;
-const row = 225;
+export type NodeMetrics = {
+  cardWidth: number;
+  frameHeight: number;
+  column: number;
+  row: number;
+};
 
-function neighborhood(screens: Screen[], links: Link[], focus: Screen): Layout {
+export function nodeMetrics(captureWidth: number): NodeMetrics {
+  const cardWidth = Math.max(
+    360,
+    Number.isFinite(captureWidth) && captureWidth > 0 ? captureWidth : 375,
+  );
+  const frameHeight = Math.round(cardWidth * (cardWidth <= 500 ? 1.6 : 0.625));
+  const column = cardWidth + Math.max(120, Math.round(cardWidth * 0.14));
+  const row = frameHeight + Math.max(160, Math.round(frameHeight * 0.2));
+  return { cardWidth, frameHeight, column, row };
+}
+
+function neighborhood(
+  screens: Screen[],
+  links: Link[],
+  focus: Screen,
+  metrics: NodeMetrics,
+): Layout {
+  const { column, row } = metrics;
   const incident = links.filter((e) => e.source === focus.id || e.target === focus.id);
   const incoming = new Set(incident.filter((e) => e.target === focus.id).map((e) => e.source));
   const outgoing = new Set(incident.filter((e) => e.source === focus.id).map((e) => e.target));
@@ -35,11 +56,14 @@ export function layoutMap(
   archive: ScreenMap,
   width: number,
   mode: string,
-): Layout & { total: number } {
+): Layout & { total: number; metrics: NodeMetrics } {
+  const metrics = nodeMetrics(width);
+  const { column, row } = metrics;
   const screens = [...archive.screens].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const links = archive.links.filter((e) => !e.observedWidths || e.observedWidths.includes(width));
   const focus = screens.find((s) => mode === "focus:" + s.id);
-  if (focus) return { ...neighborhood(screens, links, focus), total: links.length };
+  if (focus)
+    return { ...neighborhood(screens, links, focus, metrics), total: links.length, metrics };
 
   const neighbors = new Map(screens.map((s) => [s.id, new Map<string, Link>()]));
   // Prefer the observed forward edge when either direction can join the same pair.
@@ -147,5 +171,5 @@ export function layoutMap(
     x += block.width;
     shelfHeight = Math.max(shelfHeight, block.height);
   }
-  return { nodes, links: mode === "all" ? links : forest, total: links.length };
+  return { nodes, links: mode === "all" ? links : forest, total: links.length, metrics };
 }

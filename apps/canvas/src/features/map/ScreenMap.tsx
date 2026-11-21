@@ -4,11 +4,13 @@ import { CaptureCard } from "./CaptureCard";
 import { layoutMap } from "./layout";
 import {
   Background,
+  ControlButton,
   Controls,
   Handle,
   MarkerType,
   Position,
   ReactFlow,
+  useReactFlow,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
@@ -19,11 +21,43 @@ type CardNode = Node<
   {
     screen: Screen;
     width: number;
+    cardWidth: number;
+    frameHeight: number;
     selected: boolean;
     imageUrl: (name: string) => string;
   },
   "screen"
 >;
+
+function ZoomOneToOneButton({
+  target,
+  cardWidth,
+  frameHeight,
+}: {
+  target?: { position: { x: number; y: number } };
+  cardWidth: number;
+  frameHeight: number;
+}) {
+  const { setCenter, zoomTo } = useReactFlow();
+  return (
+    <ControlButton
+      onClick={() => {
+        if (target) {
+          void setCenter(target.position.x + cardWidth / 2, target.position.y + frameHeight / 2, {
+            zoom: 1,
+            duration: 200,
+          });
+        } else {
+          void zoomTo(1, { duration: 200 });
+        }
+      }}
+      title="Zoom to 1:1 actual capture size"
+      aria-label="Zoom to 1:1 actual capture size"
+    >
+      <span className="zoom-1x-label">1:1</span>
+    </ControlButton>
+  );
+}
 
 function Card({ data }: NodeProps<CardNode>) {
   const cell = (data.screen.entries ?? data.screen.cells).find((c) => c.width === data.width);
@@ -58,6 +92,8 @@ function Card({ data }: NodeProps<CardNode>) {
         cell={cell}
         imageUrl={data.imageUrl}
         selected={data.selected}
+        cardWidth={data.cardWidth}
+        frameHeight={data.frameHeight}
       />
     </>
   );
@@ -83,6 +119,9 @@ export function ScreenMap({
   select: (id: string, active?: Element | null) => void;
 }) {
   const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
+  const { cardWidth, frameHeight } = layout.metrics;
+  const strokeWidth = Math.max(2, Math.round(cardWidth / 320));
+  const labelFontSize = Math.max(12, Math.round(cardWidth / 48));
   const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => {
     const isSelected = screen.id === selectedId;
     const classes = [
@@ -96,7 +135,7 @@ export function ScreenMap({
       type: "screen",
       position,
       selected: isSelected,
-      data: { screen, width, selected: isSelected, imageUrl },
+      data: { screen, width, cardWidth, frameHeight, selected: isSelected, imageUrl },
       ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
       className: classes || undefined,
     };
@@ -135,15 +174,15 @@ export function ScreenMap({
         sourceHandle: out,
         targetHandle: into,
         label: edgeLabel,
-        labelStyle: { fill: "var(--foreground)", fontSize: 11, fontWeight: 500 },
+        labelStyle: { fill: "var(--foreground)", fontSize: labelFontSize, fontWeight: 500 },
         labelBgStyle: { fill: "var(--card)", fillOpacity: 0.94, stroke: "var(--border)" },
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 4,
+        labelBgPadding: [8, 4] as [number, number],
+        labelBgBorderRadius: 6,
         ariaLabel: replayVerified
           ? `Replay-verified transition from ${source} to ${target}`
           : `${originText} (${provenance}) from ${source} to ${target}, not replay-verified`,
-        style: { stroke: strokeColor, strokeDasharray },
-        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
+        style: { stroke: strokeColor, strokeWidth, strokeDasharray },
+        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 18, height: 18 },
       };
     },
   );
@@ -165,7 +204,11 @@ export function ScreenMap({
       edges={edges}
       nodeTypes={nodeTypes}
       fitView
-      minZoom={0.04}
+      minZoom={0.02}
+      maxZoom={3}
+      panOnDrag
+      zoomOnScroll
+      zoomOnPinch
       fitViewOptions={{
         padding: {
           left: `${railInset + 18}px`,
@@ -173,7 +216,7 @@ export function ScreenMap({
           top: "48px",
           bottom: "18px",
         },
-        minZoom: 0.04,
+        minZoom: 0.02,
       }}
       nodesDraggable={false}
       nodesConnectable={false}
@@ -181,7 +224,13 @@ export function ScreenMap({
       onNodeClick={(_, node) => select(node.id)}
     >
       <Background color="var(--map-grid)" gap={20} size={1} />
-      <Controls showInteractive={false} />
+      <Controls showInteractive={false}>
+        <ZoomOneToOneButton
+          target={layout.nodes.find((n) => n.screen.id === selectedId) ?? layout.nodes[0]}
+          cardWidth={cardWidth}
+          frameHeight={frameHeight}
+        />
+      </Controls>
     </ReactFlow>
   );
 }
