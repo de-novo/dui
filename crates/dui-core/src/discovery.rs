@@ -1,5 +1,14 @@
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FillTermination {
+    Exhausted,
+    BudgetLimit,
+    NoImprovement,
+}
 
 pub fn key(f: &Value) -> String {
     format!(
@@ -51,7 +60,8 @@ pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<St
     }
     let mut singles = Vec::new();
     let mut pairs = Vec::new();
-    for slots in groups.values() {
+    for slots in groups.values_mut() {
+        slots.sort_by(|a, b| a.0.cmp(&b.0));
         for (i, (key, values)) in slots.iter().enumerate() {
             for v in values {
                 singles.push(BTreeMap::from([(key.clone(), v.clone())]));
@@ -119,13 +129,18 @@ pub fn assertions(facts: &[Value], row: &BTreeMap<String, Value>, spec: &Value) 
         let Some(slot) = facts.iter().find(|f| f["kind"] == "slot" && key(f) == *id) else {
             continue;
         };
-        for branch in facts.iter().filter(|f| {
-            f["kind"] == "branch"
-                && f["owner"] == slot["owner"]
-                && f["file"] == slot["file"]
-                && slot["binding"].is_number()
-                && f["predicate"]["binding"] == slot["binding"]
-        }) {
+        let mut matching_branches: Vec<&Value> = facts
+            .iter()
+            .filter(|f| {
+                f["kind"] == "branch"
+                    && f["owner"] == slot["owner"]
+                    && f["file"] == slot["file"]
+                    && slot["binding"].is_number()
+                    && f["predicate"]["binding"] == slot["binding"]
+            })
+            .collect();
+        matching_branches.sort_by_key(|b| key(b));
+        for branch in matching_branches {
             let predicate = &branch["predicate"];
             let truth = match predicate["operator"].as_str() {
                 Some("equals") => value == &predicate["value"],
@@ -217,6 +232,30 @@ mod tests {
         assert_eq!(
             assertions(&[s, branch], &row, &json!({}))[0]["hit"],
             "screen.tsx#30:44:branch:false"
+        );
+    }
+
+    #[test]
+    fn candidates_graph_and_assertions_are_invariant_to_fact_order() {
+        let mut a = slot(2, "List");
+        a["binding"] = json!(10);
+        let mut b = slot(6, "List");
+        b["binding"] = json!(11);
+        let br1 = json!({"file":"screen.tsx","owner":"List","start":20,"end":30,"kind":"branch","predicate":{"binding":10,"operator":"truthy"},"textWhenTrue":"On","textWhenFalse":"Off"});
+        let br2 = json!({"file":"screen.tsx","owner":"List","start":40,"end":50,"kind":"branch","predicate":{"binding":10,"operator":"truthy"},"textWhenTrue":"Open","textWhenFalse":"Closed"});
+        let forward = vec![a.clone(), b.clone(), br1.clone(), br2.clone()];
+        let reversed: Vec<Value> = forward.iter().rev().cloned().collect();
+        let active: BTreeSet<String> = [key(&a), key(&b)].into_iter().collect();
+        let hits = BTreeSet::from([format!("{}:true", key(&br1))]);
+        assert_eq!(
+            candidates(&forward, &active),
+            candidates(&reversed, &active)
+        );
+        assert_eq!(graph(&forward, &hits), graph(&reversed, &hits));
+        let row = BTreeMap::from([(key(&a), json!(true))]);
+        assert_eq!(
+            assertions(&forward, &row, &json!({})),
+            assertions(&reversed, &row, &json!({}))
         );
     }
 }

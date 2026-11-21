@@ -5,7 +5,7 @@ use crate::{
     ports::{Renderer, TypeOracle},
     typescript::TypeScript,
 };
-use dui_core::discovery::{assertions, candidates, graph, key};
+use dui_core::discovery::{FillTermination, assertions, candidates, graph, key};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -151,14 +151,20 @@ fn execute_with(
             .as_u64()
             .unwrap_or(budget as u64)
             .clamp(1, 512) as usize;
+        let max_stagnant = spec["maxNoImprovementRounds"].as_u64().map(|n| n as usize);
         let mut active = BTreeSet::new();
         let mut done = BTreeSet::new();
         let mut pending = vec![BTreeMap::new()];
+        let mut stagnant_rounds = 0usize;
+        let mut termination = FillTermination::Exhausted;
         while let Some(row) = pending.first().cloned() {
             let index = done.len();
             if index >= budget {
+                termination = FillTermination::BudgetLimit;
                 break;
             }
+            let prev_hits = hits.len();
+            let prev_active = active.len();
             done.insert(serde_json::to_string(&row).map_err(|e| failure(3, &e.to_string()))?);
             let checks = assertions(facts, &row, &spec);
             let state_id = state_id(&scenario, &spec, &row);
@@ -242,8 +248,27 @@ fn execute_with(
                 let new_target = list
                     .iter()
                     .any(|check| check["hit"].as_str().is_some_and(|hit| !hits.contains(hit)));
-                (!new_target, !bound, candidate.len())
+                (
+                    !new_target,
+                    !bound,
+                    candidate.len(),
+                    json!(candidate).to_string(),
+                )
             });
+            if index > 0 {
+                if hits.len() > prev_hits || active.len() > prev_active {
+                    stagnant_rounds = 0;
+                } else {
+                    stagnant_rounds += 1;
+                    if let Some(limit) = max_stagnant
+                        && stagnant_rounds >= limit
+                        && !pending.is_empty()
+                    {
+                        termination = FillTermination::NoImprovement;
+                        break;
+                    }
+                }
+            }
         }
         if scenario == "default" && spec["routeSelector"].is_string() {
             let paths: BTreeSet<&str> = cells
@@ -272,7 +297,7 @@ fn execute_with(
             }
         }
         seen_slots.extend(active);
-        rounds.push(json!({"scenario":scenario,"name":spec["name"],"stateBudget":budget,"plannedStates":done.len(),"remainingStates":pending.len()}));
+        rounds.push(json!({"scenario":scenario,"name":spec["name"],"stateBudget":budget,"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
         remaining += pending.len();
     }
     let graph = graph(facts, &hits);
@@ -285,6 +310,8 @@ fn execute_with(
         .iter()
         .filter(|f| f["kind"] == "slot" && !seen_slots.contains(&key(f)))
         .map(key)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect();
     let unrenderable = cells
         .iter()
@@ -592,6 +619,122 @@ mod tests {
         assert_eq!(
             imported.aggregate.cells()[0].status(),
             &dui_core::model::CellStatus::unrenderable("no-render-env").unwrap()
+        );
+    }
+
+    #[test]
+    fn runtime_only_branches_and_stagnation_termination_are_reported_separately() {
+        let slot_a = json!({"file":"screen.tsx","owner":"Panel","start":1,"end":2,"kind":"slot","binding":1,"init":[1,2],"after":3,"shape":{"kind":"boolean"}});
+        let slot_b = json!({"file":"screen.tsx","owner":"Panel","start":4,"end":5,"kind":"slot","binding":2,"init":[4,5],"after":6,"shape":{"kind":"boolean"}});
+        let branch_a = json!({"file":"screen.tsx","owner":"Panel","start":10,"end":20,"kind":"branch","predicate":{"binding":1,"operator":"truthy"},"textWhenTrue":"On","textWhenFalse":"Off"});
+        let key_a = key(&slot_a);
+        let key_b = key(&slot_b);
+        let branch_key = key(&branch_a);
+
+        struct RuntimeBranchRenderer {
+            key_a: String,
+            key_b: String,
+            branch_key: String,
+        }
+        impl Renderer for RuntimeBranchRenderer {
+            fn capture(
+                &mut self,
+                spec: &Value,
+                inputs: &Value,
+                width: u32,
+                image: &Path,
+            ) -> Result<Value, Box<dyn std::error::Error>> {
+                fs::write(image, format!("{inputs}-{width}"))?;
+                let a = inputs
+                    .get(&self.key_a)
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let b = inputs
+                    .get(&self.key_b)
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let assertions: Vec<bool> = spec["assertions"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|_| true)
+                    .collect();
+                Ok(json!({
+                    "ready": true,
+                    "settled": true,
+                    "width": width,
+                    "path": spec["path"],
+                    "assertions": assertions,
+                    "slots": { &self.key_a: a, &self.key_b: b },
+                    "responses": {},
+                    "responseChecks": {},
+                    "hits": [
+                        format!("{}:{a}", self.branch_key),
+                        "runtime-only.tsx#1:2:branch:true"
+                    ]
+                }))
+            }
+        }
+
+        let dir_fwd = tempfile::tempdir().unwrap();
+        let dir_rev = tempfile::tempdir().unwrap();
+        let fwd_facts =
+            json!({"facts":[slot_a.clone(), slot_b.clone(), branch_a.clone()],"diagnostics":[]});
+        let rev_facts = json!({"facts":[branch_a, slot_b, slot_a],"diagnostics":[]});
+        let spec = json!({"path":"/","maxNoImprovementRounds":1});
+        let widths = BTreeSet::from([375]);
+
+        let mut r1 = RuntimeBranchRenderer {
+            key_a: key_a.clone(),
+            key_b: key_b.clone(),
+            branch_key: branch_key.clone(),
+        };
+        let (code_fwd, report_fwd) = execute_with(
+            Some(&mut r1),
+            &fwd_facts,
+            &spec,
+            dir_fwd.path(),
+            &widths,
+            16,
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(code_fwd, 5, "unexpected error: {report_fwd}");
+
+        let mut r2 = RuntimeBranchRenderer {
+            key_a,
+            key_b,
+            branch_key,
+        };
+        let (_, report_rev) = execute_with(
+            Some(&mut r2),
+            &rev_facts,
+            &spec,
+            dir_rev.path(),
+            &widths,
+            16,
+            None,
+        )
+        .unwrap_err();
+
+        // Identical plans, cell IDs, verdicts, and coverage regardless of fact ordering.
+        assert_eq!(report_fwd["cells"], report_rev["cells"]);
+        assert_eq!(report_fwd["coverage"], report_rev["coverage"]);
+        assert_eq!(
+            report_fwd["runtimeOnlyInstrumentedBranches"],
+            json!(["runtime-only.tsx#1:2:branch:true"])
+        );
+        assert_eq!(report_fwd["coverage"]["branchOutcomes"], 2);
+        assert_eq!(report_fwd["coverage"]["observedBranchOutcomes"], 2);
+        assert_eq!(report_fwd["scenarios"][0]["termination"], "no-improvement");
+        assert!(report_fwd["remainingPlans"].as_u64().unwrap() > 0);
+        // Every remaining planned state is preserved as an explicit unverified cell.
+        assert!(
+            report_fwd["cells"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c["status"] == "unverified" && c["reason"] == "not-rendered")
         );
     }
 }

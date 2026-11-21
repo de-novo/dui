@@ -12,7 +12,12 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         .ok_or_else(|| failure(3, "missing cells"))?;
     let mut extra = Vec::new();
     let mut links = Vec::new();
-    let mut known = BTreeSet::new();
+    let mut known: BTreeSet<String> = graph["nodes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|n| n["id"].as_str().map(str::to_owned))
+        .collect();
     let screen_paths: BTreeSet<_> = cells.iter().filter_map(|c| c["path"].as_str()).collect();
     let mut navigation = BTreeMap::<(&str, &str), BTreeSet<u64>>::new();
     // Large sweeps share many identical branch traces. Keep the full membership once.
@@ -57,6 +62,17 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
             .flatten()
             .filter_map(Value::as_str)
             .collect();
+        for hit in &hits {
+            if known.insert((*hit).to_owned()) {
+                extra.push(json!({
+                    "id": hit,
+                    "kind": "runtimeOutcome",
+                    "label": hit,
+                    "observed": true,
+                    "runtimeOnly": true
+                }));
+            }
+        }
         if !hits.is_empty() && cells.len() > 256 {
             hits.sort_unstable();
             hits.dedup();
