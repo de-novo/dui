@@ -236,43 +236,63 @@ export function ScreenInspector({
         <section className="inspector-section" aria-label={t.links}>
           <h3>{t.links}</h3>
           <ul className="link-evidence-list">
-            {connections.map(({ direction, screen: partner }) => (
-              <li key={`${direction}-${partner.id}`}>
-                <button
-                  type="button"
-                  className="cell-row link-row"
-                  onKeyDown={onKeyDown}
-                  onClick={() => onSelectScreen(partner.id)}
-                >
-                  <span className="link-row-target">
-                    {direction === "outgoing" ? (
-                      <ArrowUpRight aria-hidden="true" />
-                    ) : (
-                      <ArrowDownLeft aria-hidden="true" />
-                    )}
-                    <span className="link-route">{partner.path}</span>
-                  </span>
-                  <span className="link-row-state">{t.discovered}</span>
-                </button>
-              </li>
-            ))}
+            {connections.map(({ direction, screen: partner, link }) => {
+              const badge =
+                link.provenance === "verified"
+                  ? t.edgeVerified
+                  : link.provenance === "inferred"
+                    ? t.edgeInferred
+                    : t.edgeExtracted;
+              return (
+                <li key={`${direction}-${partner.id}`}>
+                  <button
+                    type="button"
+                    className="cell-row link-row"
+                    data-edge-provenance={link.provenance}
+                    data-edge-verified={String(link.replayVerified)}
+                    onKeyDown={onKeyDown}
+                    onClick={() => onSelectScreen(partner.id)}
+                  >
+                    <span className="link-row-target">
+                      {direction === "outgoing" ? (
+                        <ArrowUpRight aria-hidden="true" />
+                      ) : (
+                        <ArrowDownLeft aria-hidden="true" />
+                      )}
+                      <span className="link-route">{partner.path}</span>
+                    </span>
+                    <span className="link-row-state">{badge}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           <details className="readonly-disclosure link-details-disclosure">
             <summary>{t.linkEvidence}</summary>
             <ul className="readonly-list">
-              {connections.map(({ direction, screen: partner, link }) => (
-                <li key={`${direction}-${partner.id}`} className="link-evidence-item">
-                  <strong>{partner.path}</strong>
-                  <span>
-                    {link.origin === "anchor" ? t.domAnchor : (link.origin ?? t.observedAnchor)}
-                    {link.observedWidths?.length
-                      ? ` · ${link.observedWidths.join(", ")} px`
-                      : ""} ·{" "}
-                    {t.notReplayVerified}
-                  </span>
-                  {link.selector && <code className="selector-evidence">{link.selector}</code>}
-                </li>
-              ))}
+              {connections.map(({ direction, screen: partner, link }) => {
+                const widths = link.confirmedWidths?.length
+                  ? link.confirmedWidths
+                  : link.observedWidths;
+                return (
+                  <li key={`${direction}-${partner.id}`} className="link-evidence-item">
+                    <strong>{partner.path}</strong>
+                    <span>
+                      {link.action?.label ? `${link.action.label} · ` : ""}
+                      {link.origin === "anchor" ? t.domAnchor : (link.origin ?? t.observedAnchor)}
+                      {widths?.length ? ` · ${widths.join(", ")} px` : ""} ·{" "}
+                      {link.replayVerified ? t.replayVerifiedLabel : t.notReplayVerified}
+                    </span>
+                    {link.selector && <code className="selector-evidence">{link.selector}</code>}
+                    {link.failedWidths &&
+                      Object.entries(link.failedWidths).map(([w, reason]) => (
+                        <code key={w} className="selector-evidence">
+                          {w} px: {reason}
+                        </code>
+                      ))}
+                  </li>
+                );
+              })}
             </ul>
           </details>
         </section>

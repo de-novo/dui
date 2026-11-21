@@ -38,13 +38,23 @@ export type Screen = {
   entries?: Cell[];
   discoveredFrom?: ScreenOrigin;
 };
+export type EdgeProvenance = "extracted" | "inferred" | "verified";
+export type EdgeAction = {
+  kind: string;
+  selector: string;
+  label?: string;
+};
 export type ScreenLink = {
   source: string;
   target: string;
   observedWidths?: number[];
+  confirmedWidths?: number[];
+  failedWidths?: Record<string, string>;
   origin?: string;
+  provenance: EdgeProvenance;
   selector?: string;
-  replayVerified: false;
+  action?: EdgeAction;
+  replayVerified: boolean;
 };
 export type ScreenMap = {
   screens: Screen[];
@@ -175,14 +185,47 @@ export function decodeOverview(raw: unknown): ScreenMap {
         !widths.every((w) => typeof w === "number" && Number.isInteger(w) && w > 0))
     )
       throw Error("Invalid discovery link widths");
-    links.push({
+    const confirmedWidths =
+      Array.isArray(edge.confirmedWidths) &&
+      edge.confirmedWidths.every((w) => typeof w === "number" && Number.isInteger(w) && w > 0)
+        ? edge.confirmedWidths
+        : undefined;
+    const failedWidths = record(edge.failedWidths)
+      ? Object.fromEntries(
+          Object.entries(edge.failedWidths).filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string",
+          ),
+        )
+      : undefined;
+    const action =
+      record(edge.action) &&
+      typeof edge.action.kind === "string" &&
+      typeof edge.action.selector === "string"
+        ? {
+            kind: edge.action.kind,
+            selector: edge.action.selector,
+            label: typeof edge.action.label === "string" ? edge.action.label : undefined,
+          }
+        : undefined;
+    const replayVerified = edge.replayVerified === true && edge.provenance === "verified";
+    const provenance: EdgeProvenance = replayVerified
+      ? "verified"
+      : edge.provenance === "inferred" || edge.origin === "inferred"
+        ? "inferred"
+        : "extracted";
+    const link: ScreenLink = {
       source: edge.source,
       target: edge.target,
       observedWidths: widths,
       origin: typeof edge.origin === "string" ? edge.origin : undefined,
-      selector: typeof edge.selector === "string" ? edge.selector : undefined,
-      replayVerified: false,
-    });
+      provenance,
+      selector: typeof edge.selector === "string" ? edge.selector : action?.selector,
+      replayVerified,
+    };
+    if (confirmedWidths) link.confirmedWidths = confirmedWidths;
+    if (failedWidths && Object.keys(failedWidths).length > 0) link.failedWidths = failedWidths;
+    if (action) link.action = action;
+    links.push(link);
   }
   return { screens, links };
 }

@@ -558,6 +558,145 @@ impl Browser {
     pub fn version(&mut self) -> Result<Value> {
         self.call(None, "Browser.getVersion", json!({}))
     }
+
+    pub fn replay_transition(
+        &mut self,
+        base_spec: &Value,
+        transition: &dui_core::transition::TransitionSpec,
+        width: u32,
+        temp_dir: &Path,
+    ) -> Result<dui_core::transition::TransitionObservation> {
+        use dui_core::transition::TransitionObservation;
+
+        let mut from_spec = base_spec.clone();
+        from_spec["path"] = json!(transition.from);
+        if let Some(obj) = from_spec.as_object_mut() {
+            obj.remove("routeSelector");
+            if let Some(scenarios) = base_spec["scenarios"].as_array()
+                && let Some(matched) = scenarios
+                    .iter()
+                    .find(|s| s["path"].as_str() == Some(transition.from.as_str()))
+                && let Some(ready) = matched.get("readySelector")
+            {
+                obj.insert("readySelector".into(), ready.clone());
+            }
+        }
+        let img = temp_dir.join(format!("transition-{width}.png"));
+        let (target_id, session_id, baseline) =
+            match self.open_page(&from_spec, &json!({}), width, &img) {
+                Ok(opened) => opened,
+                Err(err) => {
+                    return Ok(TransitionObservation {
+                        width,
+                        started_at: String::new(),
+                        landed_at: String::new(),
+                        action_executed: false,
+                        destination_ready: false,
+                        expected_text_matched: None,
+                        error: Some(format!("open-initial-failed: {err}")),
+                    });
+                }
+            };
+        let s = Some(session_id.as_str());
+        let started_at = baseline["path"].as_str().unwrap_or("").to_owned();
+
+        let action_expr = format!(
+            r#"(() => {{
+                const kind = {kind};
+                const selector = {selector};
+                if (kind === "navigate") {{
+                    window.history.pushState({{}}, "", {to});
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                    return {{ executed: true }};
+                }}
+                const el = document.querySelector(selector);
+                if (!el) return {{ executed: false, error: "selector-not-found: " + selector }};
+                if (kind === "submit" && typeof el.requestSubmit === "function") {{
+                    el.requestSubmit();
+                    return {{ executed: true }};
+                }}
+                if (typeof el.click === "function") {{
+                    el.click();
+                    return {{ executed: true }};
+                }}
+                return {{ executed: false, error: "unsupported-action-target" }};
+            }})()"#,
+            kind = json!(transition.action.kind),
+            selector = json!(transition.action.selector),
+            to = json!(transition.to),
+        );
+
+        let action_res = self
+            .call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": action_expr, "awaitPromise": true, "returnByValue": true}),
+            )
+            .ok()
+            .and_then(|r| r["result"].get("value").cloned())
+            .unwrap_or_else(|| json!({"executed": false, "error": "action-eval-failed"}));
+
+        let action_executed = action_res["executed"] == true;
+        let action_error = action_res["error"].as_str().map(str::to_owned);
+
+        let mut landed_at = started_at.clone();
+        let mut destination_ready = false;
+        let mut expected_text_matched: Option<bool> = None;
+
+        if action_executed {
+            let check_expr = format!(
+                r#"(() => {{
+                    const current = location.pathname + location.search + location.hash;
+                    const sel = {expect_sel};
+                    const expectedText = {expect_text};
+                    const el = sel ? document.querySelector(sel) : document.body;
+                    const ready = Boolean(el && (sel || (document.body && document.body.innerText.trim().length > 0)));
+                    let textMatched = null;
+                    if (expectedText !== null) {{
+                        const text = el ? (el.innerText || el.textContent || "") : "";
+                        textMatched = text.includes(expectedText);
+                    }}
+                    return {{ path: current, ready, textMatched }};
+                }})()"#,
+                expect_sel = json!(transition.expect_selector),
+                expect_text = json!(transition.expect_text),
+            );
+            for _ in 0..40 {
+                let probe = self
+                    .call(
+                        s,
+                        "Runtime.evaluate",
+                        json!({"expression": check_expr, "returnByValue": true}),
+                    )
+                    .ok()
+                    .and_then(|r| r["result"].get("value").cloned());
+                if let Some(val) = probe {
+                    landed_at = val["path"].as_str().unwrap_or("").to_owned();
+                    destination_ready = val["ready"] == true;
+                    expected_text_matched = val["textMatched"].as_bool();
+                    if landed_at == transition.to
+                        && destination_ready
+                        && expected_text_matched != Some(false)
+                    {
+                        break;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+
+        let _ = self.call(None, "Target.closeTarget", json!({"targetId": target_id}));
+
+        Ok(TransitionObservation {
+            width,
+            started_at,
+            landed_at,
+            action_executed,
+            destination_ready,
+            expected_text_matched,
+            error: action_error,
+        })
+    }
 }
 
 pub(crate) static BROWSER_LAUNCHES: std::sync::atomic::AtomicU64 =

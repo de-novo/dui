@@ -102,35 +102,51 @@ export function ScreenMap({
     };
   });
   const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
-  const edges = layout.links.map(({ source, target, origin }) => {
-    const a = positions.get(source)!,
-      b = positions.get(target)!;
-    const [out, into] =
-      a.x === b.x
-        ? a.y < b.y
-          ? [Position.Bottom, Position.Top]
-          : [Position.Top, Position.Bottom]
-        : a.x < b.x
-          ? [Position.Right, Position.Left]
-          : [Position.Left, Position.Right];
-    const originText = origin === "anchor" ? "Discovered anchor" : "Discovered link";
-    return {
-      id: JSON.stringify([source, target]),
-      source,
-      target,
-      type: "smoothstep",
-      sourceHandle: out,
-      targetHandle: into,
-      label: layout.total === 1 ? "Discovered" : undefined,
-      labelStyle: { fill: "var(--foreground)", fontSize: 11, fontWeight: 500 },
-      labelBgStyle: { fill: "var(--card)", fillOpacity: 0.94, stroke: "var(--border)" },
-      labelBgPadding: [6, 3] as [number, number],
-      labelBgBorderRadius: 4,
-      ariaLabel: `${originText} from ${source} to ${target}, not replay-verified`,
-      style: { stroke: "var(--map-link)" },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "var(--map-link)" },
-    };
-  });
+  const edges = layout.links.map(
+    ({ source, target, origin, provenance, replayVerified, action }) => {
+      const a = positions.get(source)!,
+        b = positions.get(target)!;
+      const [out, into] =
+        a.x === b.x
+          ? a.y < b.y
+            ? [Position.Bottom, Position.Top]
+            : [Position.Top, Position.Bottom]
+          : a.x < b.x
+            ? [Position.Right, Position.Left]
+            : [Position.Left, Position.Right];
+      const originText = origin === "anchor" ? "Discovered anchor" : "Discovered link";
+      const strokeColor = replayVerified ? "var(--primary)" : "var(--map-link)";
+      const strokeDasharray =
+        provenance === "verified" ? undefined : provenance === "inferred" ? "2 4" : "5 4";
+      const edgeLabel = action?.label
+        ? action.label
+        : replayVerified
+          ? "Verified"
+          : provenance === "inferred"
+            ? "Inferred"
+            : layout.total === 1
+              ? "Extracted"
+              : undefined;
+      return {
+        id: JSON.stringify([source, target]),
+        source,
+        target,
+        type: "smoothstep",
+        sourceHandle: out,
+        targetHandle: into,
+        label: edgeLabel,
+        labelStyle: { fill: "var(--foreground)", fontSize: 11, fontWeight: 500 },
+        labelBgStyle: { fill: "var(--card)", fillOpacity: 0.94, stroke: "var(--border)" },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 4,
+        ariaLabel: replayVerified
+          ? `Replay-verified transition from ${source} to ${target}`
+          : `${originText} (${provenance}) from ${source} to ${target}, not replay-verified`,
+        style: { stroke: strokeColor, strokeDasharray },
+        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
+      };
+    },
+  );
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "Enter" && event.key !== " ") return;

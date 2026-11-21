@@ -88,6 +88,7 @@ test("screen discovery origins and link evidence remain non-replay-verified", ()
     target: "route:/",
     observedWidths: [375, 1280],
     origin: "anchor",
+    provenance: "extracted",
     selector: "header a[href]",
     replayVerified: false,
   });
