@@ -1,4 +1,14 @@
 
+SCOPE NOTICE (OPEN-CORE BOUNDARY)
+
+All files in this repository outside any `ee/` directory are licensed under the
+Apache License, Version 2.0 below.
+
+All files inside any `ee/` directory are EXCLUDED from the Apache License 2.0
+and are governed exclusively by the dui Enterprise License in `ee/LICENSE`.
+
+===========================================================================
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/

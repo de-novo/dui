@@ -92,4 +92,7 @@ AI에 이렇게 요청하면 된다. “dui 저장소에서 npmgraph 예제를 �
 
 ## 라이선스
 
-[Apache License 2.0](LICENSE)
+오픈코어(Open-Core) 모델을 따른다:
+
+- 코어(`ee/` 제외 전체): [Apache License 2.0](LICENSE) — CLI, MCP 서버, 로컬 SQLite 저장소, 웹 뷰어, 로컬 GPUI 데스크톱 뷰어.
+- 엔터프라이즈(`ee/`): [dui Enterprise License](ee/LICENSE) — 유료 팀·기업 기능(감사 로그, SSO/RBAC, 원격 팀 동기화 등). 자세한 경계는 [ee/README.md](ee/README.md) 참고.
