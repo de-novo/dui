@@ -203,7 +203,7 @@ function MapView({
         )}
 
         {showOverview && screen && (
-          <section className="preserved-selection" aria-label="Selected screen">
+          <section className="preserved-selection glass-panel" aria-label="Selected screen">
             <span className="preserved-label">
               Selected: <code>{routeName(screen.path)}</code>
             </span>
@@ -263,7 +263,6 @@ function MapView({
           cell={cell}
           stateParam={state}
           dismissRef={dismiss}
-          imageUrl={(name) => archiveUrl(name, run)}
           onKeyDown={inspectKey}
           onClose={returnToOverview}
           onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}

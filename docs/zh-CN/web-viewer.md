@@ -35,7 +35,7 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 [tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
 
-- **色彩与材质** — 两种主题的画布和面板均使用不透明的黑白表面。橙色 `--primary` (#EF803F) 用于 dui 标记和主要操作。侧栏悬浮在地图上方，浅色主题使用磨砂白玻璃，深色主题使用烟灰色玻璃。仅固定侧栏和截图卡片使用 `--blur` (10 px)。
+- **色彩与材质** — 两种主题的画布底色均使用不透明黑白表面。橙色 `--primary` (#EF803F) 用于 dui 标记和主要操作。侧栏与状态/详情面板均悬浮在地图上方，使用更通透的磨砂玻璃表面（浅色主题为半透明白，深色主题为半透明炭灰），与截图卡片共用 `--blur` (16 px)。
 - **字体与间距** — 控件使用系统无衬线字体，路径使用系统等宽字体。默认字号下，元信息、正文和面板标题分别为 12 / 14 / 20 px，间距使用 4 / 8 / 12 / 16 / 24 px。控件圆角为 6 px，面板为 12 px。
 - **控件** — 面板操作复用 `Button` 的默认、主要或图标样式。纯图标控件需提供无障碍名称。轮廓线用于键盘焦点，位置和字重表示选中状态。
 - **截图与判定** — 两种地图视图均使用 `CaptureCard`。保持原始宽高比，路径名称位于截图下方。卡片显示待检查的格子数，详情面板显示记录的判定和原因。

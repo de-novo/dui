@@ -251,6 +251,45 @@ export function provenanceDiffers(provenance: LiveProvenance): boolean {
   );
 }
 
+export type ControlGroup = {
+  id: string;
+  title: string;
+  controls: LiveControl[];
+};
+
+export function partitionControls(controls: LiveControl[]): {
+  editableGroups: ControlGroup[];
+  readOnly: LiveControl[];
+} {
+  const editable: LiveControl[] = [];
+  const readOnly: LiveControl[] = [];
+  for (const control of controls) {
+    if (control.editable && control.instance !== null) editable.push(control);
+    else readOnly.push(control);
+  }
+  const ownerInstances = new Map<string, string[]>();
+  const byKey = new Map<string, { owner: string; instance: string; controls: LiveControl[] }>();
+  for (const control of editable) {
+    const instance = control.instance!;
+    const list = ownerInstances.get(control.owner) ?? [];
+    if (!list.includes(instance)) {
+      list.push(instance);
+      ownerInstances.set(control.owner, list);
+    }
+    const key = `${control.owner}\0${instance}`;
+    const group = byKey.get(key) ?? { owner: control.owner, instance, controls: [] };
+    group.controls.push(control);
+    byKey.set(key, group);
+  }
+  const editableGroups: ControlGroup[] = [...byKey.entries()].map(([id, group]) => {
+    const instances = ownerInstances.get(group.owner) ?? [];
+    const index = instances.indexOf(group.instance);
+    const title = instances.length > 1 ? `${group.owner} ${index + 1}` : group.owner;
+    return { id, title, controls: group.controls };
+  });
+  return { editableGroups, readOnly };
+}
+
 export function canOpenLiveCell(
   cell: Cell | undefined,
   run: Run,

@@ -4,7 +4,6 @@ import { Button } from "../../components/ui/button";
 import { liveFrameUrl } from "../../data/live";
 import type { Screen } from "../../data/overview";
 import { provenanceDiffers } from "../../model/live";
-import { routeName } from "../map/CaptureCard";
 import type { LiveSessionState } from "./useLiveSession";
 
 function shortCommit(commit: string | null): string {
@@ -70,50 +69,40 @@ export function LiveStage({
 
   return (
     <section className="live-stage" aria-label="Live screen preview">
-      <header className="live-toolbar">
-        <div className="live-toolbar-nav">
-          <Button variant="outline" size="sm" onClick={onBackToOverview}>
-            <ArrowLeft aria-hidden="true" />
-            Overview
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onBackToDetails}>
-            Archive details
-          </Button>
-        </div>
-        <div className="live-toolbar-meta">
-          <span className="live-badge" data-phase={session.phase}>
-            <span className="live-dot" aria-hidden="true" />
-            {session.phase === "opening"
-              ? "Starting live session"
-              : session.phase === "ready"
-                ? `Live · rev ${session.revision}`
-                : "Disconnected"}
-          </span>
-          <span className="live-width-meta">
-            {routeName(screen.path)} · {width} px
-          </span>
-        </div>
+      <header className="live-pill glass-panel">
+        <Button variant="ghost" size="sm" onClick={onBackToOverview}>
+          <ArrowLeft aria-hidden="true" />
+          Overview
+        </Button>
+        <span className="pill-divider" aria-hidden="true" />
+        <Button variant="ghost" size="sm" onClick={onBackToDetails}>
+          Archive
+        </Button>
+        <span className="pill-divider" aria-hidden="true" />
+        <span className="live-badge" data-phase={session.phase}>
+          <span className="live-dot" aria-hidden="true" />
+          {session.phase === "opening"
+            ? "Starting…"
+            : session.phase === "ready"
+              ? `Live · ${width} px`
+              : "Disconnected"}
+        </span>
       </header>
 
       {showLiveProvenance && (
-        <output className="provenance-banner">
-          <strong>Live worktree differs from archive</strong>
-          <span>
-            Archive: {shortCommit(session.provenance.archive.commit)}
-            {session.provenance.archive.dirty ? " (dirty)" : ""} · Live:{" "}
-            {shortCommit(session.provenance.live.commit)}
-            {session.provenance.live.dirty ? " (dirty)" : ""}
-          </span>
+        <output className="provenance-banner glass-panel">
+          Live worktree ({shortCommit(session.provenance.live.commit)}
+          {session.provenance.live.dirty ? " dirty" : ""}) differs from archive (
+          {shortCommit(session.provenance.archive.commit)})
         </output>
       )}
 
       <div className="live-viewport">
         {session.phase === "opening" && (
-          <output className="live-state-card" aria-live="polite">
+          <output className="live-state-card glass-panel" aria-live="polite">
             <h3>Starting live session…</h3>
             <p>
-              Building the local host and launching Chromium for <code>{screen.path}</code> at{" "}
-              {width} px. Source files remain unchanged.
+              Launching <code>{screen.path}</code> at {width} px.
             </p>
             <div className="live-state-actions">
               <Button variant="outline" size="sm" onClick={onBackToDetails}>
@@ -124,16 +113,13 @@ export function LiveStage({
         )}
 
         {session.phase === "error" && (
-          <div className="live-state-card" role="alert">
+          <div className="live-state-card glass-panel" role="alert">
             <h3>Live session unavailable</h3>
-            <p className="capture-meta">
-              <span className="capture-status">Reason</span>
-              <span>{session.reason}</span>
-            </p>
+            <p className="capture-meta">{session.reason}</p>
             <div className="live-state-actions">
               <Button variant="default" size="sm" onClick={onReopen}>
                 <RefreshCw aria-hidden="true" />
-                Reopen live session
+                Reopen
               </Button>
               <Button variant="outline" size="sm" onClick={onBackToDetails}>
                 Back to archive
@@ -143,38 +129,26 @@ export function LiveStage({
         )}
 
         {session.phase === "ready" && (
-          <figure className="live-frame-figure">
-            <div className="live-frame-shell" style={{ maxWidth: `${Math.max(width, 320)}px` }}>
-              {displayedUrl ? (
-                <img
-                  className={loadingFrame ? "frame-refreshing" : undefined}
-                  alt={`Live view of ${screen.path} at ${width} px, revision ${session.revision}`}
-                  src={displayedUrl}
-                />
-              ) : frameFailed ? (
-                <div className="missing-capture-box" role="alert">
-                  <strong>Could not capture the live frame.</strong>
-                  <Button variant="outline" size="sm" onClick={onReopen}>
-                    Reopen live session
-                  </Button>
-                </div>
-              ) : (
-                <output className="missing-capture-box">
-                  <strong>Capturing live frame…</strong>
-                </output>
-              )}
-            </div>
-            <figcaption className="live-frame-caption">
-              <span>
-                Live target · {width} px · rev {session.revision}
-              </span>
-              <span>
-                {loadingFrame
-                  ? "Updating preview…"
-                  : "In-memory session — source files are untouched"}
-              </span>
-            </figcaption>
-          </figure>
+          <div className="live-frame-shell" style={{ maxWidth: `${Math.max(width, 320)}px` }}>
+            {displayedUrl ? (
+              <img
+                className={loadingFrame ? "frame-refreshing" : undefined}
+                alt={`Live view of ${screen.path} at ${width} px`}
+                src={displayedUrl}
+              />
+            ) : frameFailed ? (
+              <div className="missing-capture-box" role="alert">
+                <strong>Could not capture the live frame.</strong>
+                <Button variant="outline" size="sm" onClick={onReopen}>
+                  Reopen
+                </Button>
+              </div>
+            ) : (
+              <output className="missing-capture-box">
+                <strong>Loading live preview…</strong>
+              </output>
+            )}
+          </div>
         )}
       </div>
     </section>

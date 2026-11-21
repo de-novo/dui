@@ -10,8 +10,16 @@ import { routeName } from "../map/CaptureCard";
 
 function originLabel(origin: ScreenOrigin): string {
   if (origin.kind === "entry") return "Entry screen";
-  if (origin.kind === "router") return `Router · ${origin.file}`;
-  return `Discovered anchor from ${origin.from}`;
+  if (origin.kind === "router") return origin.file;
+  return `Linked from ${routeName(origin.from)}`;
+}
+
+function cellLabel(cell: Cell, multipleStates: boolean, index: number): string | null {
+  if (!multipleStates) return null;
+  if (cell.scenario && cell.scenario !== "default" && !cell.scenario.startsWith("link-")) {
+    return cell.scenario;
+  }
+  return `State ${index + 1}`;
 }
 
 export function ScreenInspector({
@@ -24,7 +32,6 @@ export function ScreenInspector({
   cell,
   stateParam,
   dismissRef,
-  imageUrl,
   onKeyDown,
   onClose,
   onSelectWidth,
@@ -41,7 +48,6 @@ export function ScreenInspector({
   cell?: Cell;
   stateParam: string | null;
   dismissRef: RefObject<HTMLButtonElement | null>;
-  imageUrl: (name: string) => string;
   onKeyDown: (event: KeyboardEvent) => void;
   onClose: () => void;
   onSelectWidth: (width: number) => void;
@@ -54,23 +60,24 @@ export function ScreenInspector({
   const screenCells = screen?.cells ?? [];
   const title = screen ? routeName(screen.path) : "Screen unavailable";
   const showFullPath = Boolean(screen && title !== screen.path);
+  const widthsOnScreen = new Set(screenCells.map((c) => c.width)).size;
+  const multipleStatesPerWidth = screenCells.length > widthsOnScreen;
 
   return (
-    <aside className="inspector" aria-label="Screen details">
+    <aside className="inspector glass-panel" aria-label="Screen details">
       <div className="panel-title">
         <div className="panel-heading">
           <h2>{title}</h2>
           {showFullPath && screen && <code className="route-path">{screen.path}</code>}
-          {screen?.discoveredFrom && (
-            <p
-              className="origin-meta"
-              title={
-                screen.discoveredFrom.kind === "anchor" ? screen.discoveredFrom.selector : undefined
-              }
-            >
-              {originLabel(screen.discoveredFrom)}
-            </p>
-          )}
+          <p className="origin-meta">
+            <span>Archive</span>
+            {screen?.discoveredFrom && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{originLabel(screen.discoveredFrom)}</span>
+              </>
+            )}
+          </p>
         </div>
         <Button
           aria-label="Back to overview"
@@ -97,7 +104,7 @@ export function ScreenInspector({
             }}
           >
             <Play aria-hidden="true" />
-            Open live session
+            Open live
           </Button>
           {!liveGate.ok && <p className="live-unavailable-note">{liveGate.reason}</p>}
         </div>
@@ -120,32 +127,16 @@ export function ScreenInspector({
         </label>
       )}
 
-      {cells.length > 4 && (
-        <label>
-          State
-          <select
-            onKeyDown={onKeyDown}
-            value={cell ? cells.indexOf(cell) : -1}
-            onChange={(e) => onSelectState(stateKeyFor(cells, Number(e.target.value)))}
-          >
-            {!cell && <option value={-1}>State unavailable</option>}
-            {cells.map((c, i) => (
-              <option key={i} value={i}>
-                {c.scenario ?? "State"} · {c.state?.slice(0, 8) ?? i + 1}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
       {screen && screenCells.length > 0 && (
         <section className="inspector-section" aria-label="Captured states and widths">
-          <h3>States and widths</h3>
+          <h3>{multipleStatesPerWidth ? "States & widths" : "Widths"}</h3>
           <ul className="cell-matrix">
             {screenCells.map((entry, index) => {
               const widthCells = screenCells.filter((c) => c.width === entry.width);
-              const entryKey = stateKeyFor(widthCells, widthCells.indexOf(entry));
+              const localIndex = widthCells.indexOf(entry);
+              const entryKey = stateKeyFor(widthCells, localIndex);
               const active = entry === cell;
+              const subtitle = cellLabel(entry, widthCells.length > 1, localIndex);
               return (
                 <li key={`${entry.width}-${entry.state ?? index}`}>
                   <button
@@ -157,10 +148,7 @@ export function ScreenInspector({
                   >
                     <span className="cell-row-title">
                       <strong>{entry.width} px</strong>
-                      <span>
-                        {entry.scenario ?? "default"}
-                        {entry.state ? ` · ${entry.state.slice(0, 8)}` : ""}
-                      </span>
+                      {subtitle && <span>{subtitle}</span>}
                     </span>
                     <span className="cell-row-status">
                       <CaptureStatus cell={entry} />
@@ -174,38 +162,24 @@ export function ScreenInspector({
         </section>
       )}
 
-      <div className="inspection-result">
-        <div className="section-header-row">
-          <h3>Verification</h3>
-          <span className="provenance-badge">Archive</span>
-        </div>
-        <p className="capture-meta">
-          {stateParam !== null && !cell ? "State unavailable" : <CaptureStatus cell={cell} />}
-        </p>
-      </div>
+      {cell && !cell.image && (
+        <output className="missing-capture-box">
+          <strong>Image unavailable</strong>
+          <p className="capture-meta">
+            {stateParam !== null && !cell ? "State unavailable" : <CaptureStatus cell={cell} />}
+          </p>
+        </output>
+      )}
 
-      <figure className="archive-preview">
-        <figcaption className="archive-preview-caption">
-          <span>Archived capture</span>
-          <span>{width} px</span>
-        </figcaption>
-        {cell?.image ? (
-          <img alt={`Archived screen at ${width} px`} src={imageUrl(cell.image)} />
-        ) : (
-          <output className="missing-capture-box">
-            <strong>Image unavailable</strong>
-            <p className="capture-meta">
-              {stateParam !== null && !cell ? "State unavailable" : <CaptureStatus cell={cell} />}
-            </p>
-          </output>
-        )}
-      </figure>
+      {stateParam !== null && !cell && cells.length > 0 && (
+        <output className="missing-capture-box">
+          <strong>State unavailable</strong>
+        </output>
+      )}
 
-      <section className="inspector-section" aria-label="Discovered links">
-        <h3>Discovered links</h3>
-        {connections.length === 0 ? (
-          <p className="empty-meta">No discovered links recorded for this screen.</p>
-        ) : (
+      {connections.length > 0 && (
+        <section className="inspector-section" aria-label="Discovered links">
+          <h3>Discovered links</h3>
           <ul className="link-evidence-list">
             {connections.map(({ direction, screen: partner, link }) => (
               <li key={`${direction}-${partner.id}`} className="link-evidence-item">
@@ -223,21 +197,18 @@ export function ScreenInspector({
                   <span className="link-route">{partner.path}</span>
                 </button>
                 <div className="link-evidence-meta">
-                  <span className="evidence-tag">Discovered · not replay-verified</span>
                   <span>
-                    {direction === "outgoing" ? "To" : "From"} ·{" "}
                     {link.origin === "anchor" ? "DOM anchor" : (link.origin ?? "Observed anchor")}
+                    {link.observedWidths?.length ? ` · ${link.observedWidths.join(", ")} px` : ""} ·
+                    Not replay-verified
                   </span>
-                  {link.observedWidths && link.observedWidths.length > 0 && (
-                    <span>Observed at {link.observedWidths.join(", ")} px</span>
-                  )}
                   {link.selector && <code className="selector-evidence">{link.selector}</code>}
                 </div>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
     </aside>
   );
 }

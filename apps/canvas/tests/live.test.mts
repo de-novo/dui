@@ -6,6 +6,7 @@ import {
   decodeLiveInspect,
   decodeLiveOpen,
   decodeLiveSave,
+  partitionControls,
   provenanceDiffers,
 } from "../src/model/live.ts";
 
@@ -107,4 +108,71 @@ test("gates live opening for missing state IDs, saved live revisions, and unrend
     ).ok,
     false,
   );
+});
+
+test("groups editable controls by component instance and separates read-only controls", () => {
+  const { controls } = decodeLiveInspect({
+    session: "b".repeat(64),
+    revision: 0,
+    cell: { state: "s1", width: 768 },
+    controls: [
+      {
+        slot: "s1",
+        owner: "Menu",
+        instance: "i1",
+        label: "open",
+        type: "boolean",
+        source: { file: "a.tsx" },
+        editable: true,
+        reason: null,
+        value: false,
+        options: [false, true],
+      },
+      {
+        slot: "s1",
+        owner: "Menu",
+        instance: "i2",
+        label: "open",
+        type: "boolean",
+        source: { file: "a.tsx" },
+        editable: true,
+        reason: null,
+        value: true,
+        options: [false, true],
+      },
+      {
+        slot: "s2",
+        owner: "Menu",
+        instance: "i1",
+        label: "mode",
+        type: "string",
+        source: { file: "a.tsx" },
+        editable: true,
+        reason: null,
+        value: "view",
+        options: ["view", "edit"],
+      },
+      {
+        slot: "s3",
+        owner: "Menu",
+        instance: "i1",
+        label: "meta",
+        type: "unknown",
+        source: { file: "a.tsx" },
+        editable: false,
+        reason: "unsupported-type",
+        value: null,
+      },
+    ],
+  });
+  const { editableGroups, readOnly } = partitionControls(controls);
+  assert.deepEqual(
+    editableGroups.map((g) => [g.title, g.controls.map((c) => c.label)]),
+    [
+      ["Menu 1", ["open", "mode"]],
+      ["Menu 2", ["open"]],
+    ],
+  );
+  assert.equal(readOnly.length, 1);
+  assert.equal(readOnly[0].label, "meta");
 });
