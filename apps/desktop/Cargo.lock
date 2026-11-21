@@ -1523,10 +1523,12 @@ version = "0.1.0"
 dependencies = [
  "dui-core",
  "gpui-kit",
+ "image",
  "png 0.18.1",
  "rusqlite",
  "serde",
  "serde_json",
+ "smallvec",
  "tempfile",
 ]
 
