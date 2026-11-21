@@ -51,4 +51,4 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 | v0.0.5 | 在 GPUI 和 gpui-kit 桌面查看器中打开项目地图。评审者可在页面、状态、宽度或转换上留言。AI 通过 MCP 读取位置，评审者在修改后的工作树中回到同一位置，对比修改前后。 |
 | v0.0.6 | 在参考页面上测量 99% 覆盖率目标，公布已验证和可渲染格子数、遗漏分支及原因。在对应页面保留尚未解决的评审意见。 |
 
-[GitHub 里程碑](https://github.com/de-novo/dui/milestones)
+[GitHub 里程碑](https://github.com/de-novo/dui/milestones) · [变更日志](changelog.md)

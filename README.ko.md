@@ -4,7 +4,7 @@
 
 dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려진 화면을 검증한다. 사람은 내장 웹 뷰어(`dui open`)에서 화면 지도·라이브 편집·캡처 비교를 보고, 에이전트는 CLI와 MCP로 같은 결과를 JSON으로 읽는다.
 
-[제품 로드맵](docs/ko/roadmap.md)
+[제품 로드맵](docs/ko/roadmap.md) · [변경 이력](docs/ko/changelog.md)
 
 ## 설치
 
