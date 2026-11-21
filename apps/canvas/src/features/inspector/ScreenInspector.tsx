@@ -8,6 +8,7 @@ import { useI18n } from "../../i18n/LocaleContext";
 import { canOpenLiveCell } from "../../model/live";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
+import { CommentPanel } from "./CommentPanel";
 
 function cellLabel(
   cell: Cell,
@@ -296,6 +297,17 @@ export function ScreenInspector({
             </ul>
           </details>
         </section>
+      )}
+      {screen && (
+        <CommentPanel
+          run={run}
+          screen={screen}
+          cell={cell}
+          outgoingTargets={connections
+            .filter((c) => c.direction === "outgoing")
+            .map((c) => c.screen.path)}
+          onKeyDown={onKeyDown}
+        />
       )}
     </aside>
   );

@@ -109,6 +109,19 @@ export type Messages = {
   changedFilesLabel: string;
   statusChangeLabel: string;
   pixelsChangedLabel: (pixels: number, percent: string) => string;
+  comments: string;
+  commentTarget: string;
+  commentTargetScreen: string;
+  commentTargetWidth: string;
+  commentTargetTransition: string;
+  commentPlaceholder: string;
+  addComment: string;
+  resolveComment: string;
+  reopenComment: string;
+  commentOpen: string;
+  commentResolved: string;
+  noComments: string;
+  commentFailed: string;
 };
 
 export const MESSAGES: Record<UiLocale, Messages> = {
@@ -198,6 +211,19 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     changedFilesLabel: "Changed source files",
     statusChangeLabel: "Status change",
     pixelsChangedLabel: (pixels, percent) => `${pixels} px changed (${percent}%)`,
+    comments: "Review comments",
+    commentTarget: "Attach to",
+    commentTargetScreen: "Screen",
+    commentTargetWidth: "Width",
+    commentTargetTransition: "Transition",
+    commentPlaceholder: "Leave review feedback…",
+    addComment: "Post",
+    resolveComment: "Resolve",
+    reopenComment: "Reopen",
+    commentOpen: "Open",
+    commentResolved: "Resolved",
+    noComments: "No review comments on this screen yet.",
+    commentFailed: "Could not save review comments.",
   },
   "zh-CN": {
     workspace: "工作区",
@@ -285,6 +311,19 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     changedFilesLabel: "变更源文件",
     statusChangeLabel: "状态变化",
     pixelsChangedLabel: (pixels, percent) => `变化 ${pixels} 像素 (${percent}%)`,
+    comments: "评审评论",
+    commentTarget: "附着位置",
+    commentTargetScreen: "界面",
+    commentTargetWidth: "宽度",
+    commentTargetTransition: "跳转",
+    commentPlaceholder: "输入评审意见…",
+    addComment: "提交",
+    resolveComment: "解决",
+    reopenComment: "重新打开",
+    commentOpen: "待处理",
+    commentResolved: "已解决",
+    noComments: "此界面暂无评审评论。",
+    commentFailed: "无法保存评审评论。",
   },
   ko: {
     workspace: "워크스페이스",
@@ -372,5 +411,18 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     changedFilesLabel: "변경된 소스 파일",
     statusChangeLabel: "상태 변경",
     pixelsChangedLabel: (pixels, percent) => `${pixels}px 변경 (${percent}%)`,
+    comments: "리뷰 코멘트",
+    commentTarget: "위치",
+    commentTargetScreen: "화면",
+    commentTargetWidth: "폭",
+    commentTargetTransition: "전환",
+    commentPlaceholder: "리뷰 의견을 입력하세요…",
+    addComment: "등록",
+    resolveComment: "해결",
+    reopenComment: "다시 열기",
+    commentOpen: "미해결",
+    commentResolved: "해결됨",
+    noComments: "이 화면에 등록된 코멘트가 없습니다.",
+    commentFailed: "코멘트를 불러오거나 저장할 수 없습니다.",
   },
 };

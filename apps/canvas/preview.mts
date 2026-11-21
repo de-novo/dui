@@ -357,6 +357,88 @@ const server = await createServer({
           }
         });
 
+        vite.middlewares.use("/api/comments", async (req, res, next) => {
+          try {
+            res.setHeader("Cache-Control", "no-store");
+            if (!isSameOriginLoopback(req)) {
+              res.statusCode = 403;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "forbidden-origin" }));
+              return;
+            }
+            const url = new URL(req.url ?? "/", "http://localhost");
+            const bin = resolveDuiBinary();
+            if (req.method === "GET") {
+              const filter: Record<string, unknown> = {};
+              const pid = url.searchParams.get("projectId");
+              const runKey = url.searchParams.get("run");
+              const status = url.searchParams.get("status");
+              const screenPath = url.searchParams.get("path");
+              const widthRaw = url.searchParams.get("width");
+              if (pid) filter.projectId = pid;
+              if (runKey) {
+                const archives = await listArchives();
+                const found = archives.find((a) => a.run.key === runKey);
+                if (found) filter.run = found.root;
+              }
+              if (status) filter.status = status;
+              if (screenPath) filter.path = screenPath;
+              if (widthRaw && Number(widthRaw) > 0) filter.width = Number(widthRaw);
+              const { stdout } = await execFileAsync(bin, [
+                "comment",
+                "list",
+                JSON.stringify(filter),
+              ]);
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "application/json");
+              res.end(stdout);
+              return;
+            }
+            if (req.method !== "POST") {
+              res.statusCode = 405;
+              res.end();
+              return;
+            }
+            const body = await readJsonBody(req);
+            const op = body.op;
+            if (op === "add") {
+              const payload: Record<string, unknown> = { ...body };
+              if (typeof body.run === "string" && body.run.length > 0) {
+                const archives = await listArchives();
+                const found = archives.find((a) => a.run.key === body.run);
+                if (!found) {
+                  res.statusCode = 404;
+                  res.setHeader("Content-Type", "application/json");
+                  res.end(JSON.stringify({ status: "error", reason: "run-not-found" }));
+                  return;
+                }
+                payload.run = found.root;
+              }
+              const { stdout } = await execFileAsync(bin, [
+                "comment",
+                "add",
+                JSON.stringify(payload),
+              ]);
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "application/json");
+              res.end(stdout);
+              return;
+            }
+            if ((op === "resolve" || op === "reopen") && typeof body.id === "string") {
+              const { stdout } = await execFileAsync(bin, ["comment", op, body.id]);
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "application/json");
+              res.end(stdout);
+              return;
+            }
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ status: "error", reason: "unknown-operation" }));
+          } catch (error) {
+            next(error);
+          }
+        });
+
         vite.middlewares.use("/api/live", async (req, res, next) => {
           try {
             res.setHeader("Cache-Control", "no-store");
