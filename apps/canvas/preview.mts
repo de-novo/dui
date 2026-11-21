@@ -357,6 +357,45 @@ const server = await createServer({
           }
         });
 
+        vite.middlewares.use("/api/audit", async (req, res, next) => {
+          try {
+            res.setHeader("Cache-Control", "no-store");
+            if (!isSameOriginLoopback(req)) {
+              res.statusCode = 403;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "forbidden-origin" }));
+              return;
+            }
+            if (req.method !== "GET") {
+              res.statusCode = 405;
+              res.end();
+              return;
+            }
+            const url = new URL(req.url ?? "/", "http://localhost");
+            const runKey = url.searchParams.get("run");
+            const goal = url.searchParams.get("goal");
+            const archives = await listArchives();
+            const found = runKey ? archives.find((a) => a.run.key === runKey) : archives[0];
+            if (!found) {
+              res.statusCode = 404;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "run-not-found" }));
+              return;
+            }
+            const args = ["audit", found.root];
+            if (goal) args.push("--goal", goal);
+            const { stdout } = await execFileAsync(resolveDuiBinary(), args);
+            const parsed = JSON.parse(stdout) as Record<string, unknown>;
+            delete parsed.run;
+            parsed.runKey = found.run.key;
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(parsed));
+          } catch (error) {
+            next(error);
+          }
+        });
+
         vite.middlewares.use("/api/comments", async (req, res, next) => {
           try {
             res.setHeader("Cache-Control", "no-store");

@@ -25,6 +25,7 @@ type CardNode = Node<
     cardWidth: number;
     frameHeight: number;
     selected: boolean;
+    openComments: number;
     imageUrl: (name: string) => string;
   },
   "screen"
@@ -128,6 +129,7 @@ function Card({ data }: NodeProps<CardNode>) {
         selected={data.selected}
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
+        openComments={data.openComments}
       />
     </>
   );
@@ -141,6 +143,7 @@ export function ScreenMap({
   width,
   mode,
   selectedId,
+  openCommentsByPath,
   imageUrl,
   select,
 }: {
@@ -149,6 +152,7 @@ export function ScreenMap({
   width: number;
   mode: string;
   selectedId?: string | null;
+  openCommentsByPath?: Record<string, number>;
   imageUrl: (name: string) => string;
   select: (id: string, active?: Element | null) => void;
 }) {
@@ -169,7 +173,15 @@ export function ScreenMap({
       type: "screen",
       position,
       selected: isSelected,
-      data: { screen, width, cardWidth, frameHeight, selected: isSelected, imageUrl },
+      data: {
+        screen,
+        width,
+        cardWidth,
+        frameHeight,
+        selected: isSelected,
+        openComments: openCommentsByPath?.[screen.path] ?? 0,
+        imageUrl,
+      },
       ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
       className: classes || undefined,
     };

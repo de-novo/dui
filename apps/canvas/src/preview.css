@@ -1325,3 +1325,29 @@ h2 {
   font-size: var(--text-meta);
   color: var(--muted-foreground);
 }
+.audit-summary-pill {
+  position: absolute;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 999px;
+  font-size: var(--text-meta);
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+.audit-summary-pill strong {
+  color: var(--foreground);
+}
+.audit-summary-pill span {
+  color: var(--muted-foreground);
+}
+.audit-open-comments,
+.card-comment-badge {
+  color: var(--primary);
+  font-weight: 600;
+}

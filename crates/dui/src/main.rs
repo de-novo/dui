@@ -1,6 +1,7 @@
 mod analysis;
 mod archive;
 use archive::Capture;
+mod audit;
 mod cache;
 mod chromium;
 mod comments;
@@ -289,6 +290,21 @@ fn run() -> Reply {
     {
         mcp::serve()?;
         return Ok(Value::Null);
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "audit"
+    {
+        return match tail {
+            [run_dir] => audit::audit_run(Path::new(run_dir), None),
+            [run_dir, flag, goal_raw] if flag == "--goal" => {
+                let goal: f64 = goal_raw
+                    .to_str()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or_else(|| failure(2, "invalid --goal percentage"))?;
+                audit::audit_run(Path::new(run_dir), Some(goal))
+            }
+            _ => Err(failure(2, "expected audit RUN_DIR [--goal PERCENT]")),
+        };
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "desktop"
