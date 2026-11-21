@@ -9,21 +9,35 @@ export function CaptureCard({
   cell,
   imageUrl,
   selected = false,
+  cardWidth,
+  frameHeight,
 }: {
   screen: Screen;
   cell?: Cell;
   imageUrl: (name: string) => string;
   selected?: boolean;
+  cardWidth?: number;
+  frameHeight?: number;
 }) {
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
+  const large = Boolean(cardWidth && cardWidth >= 800);
   return (
     <article
-      className={"screen-card" + (selected ? " selected" : "")}
+      className={
+        "screen-card" + (selected ? " selected" : "") + (large ? " screen-card-large" : "")
+      }
+      style={cardWidth ? { width: `${cardWidth}px` } : undefined}
       data-selected={selected ? "true" : undefined}
+      data-card-width={cardWidth}
       title={screen.path}
     >
-      <div className="capture-frame">
+      <div
+        className="capture-frame"
+        style={
+          cardWidth && frameHeight ? { aspectRatio: `${cardWidth} / ${frameHeight}` } : undefined
+        }
+      >
         {cell?.image ? (
           <img loading="lazy" alt="" src={imageUrl(cell.image)} />
         ) : (
