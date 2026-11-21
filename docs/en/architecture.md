@@ -267,6 +267,8 @@ Arrows point from the user to the provider. Adapters have no arrows between them
 3. For the review screen, JSON output gives **executed target branches / all target branches** and **verified cells / renderable cells** separately, plus branches found at runtime outside the denominator, the unverified list, and unrenderable reasons. The fill-in loop stops on no improvement or at the configured limit.
 4. CLI and MCP return the same plan and verdicts for the same input.
 
+Reproducible M1 gate inputs, commands, and verified outputs live in [M1 gates](m1-gates.md) (`npm run check:m1`).
+
 Use the [roadmap](roadmap.md) for release order and the [web viewer architecture](web-viewer.md) for the v0.0.2 implementation contract.
 
 ## 8. Remaining risks

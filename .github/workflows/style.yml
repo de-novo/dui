@@ -53,8 +53,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm ci --prefix fixtures/replay
-      - name: Inspect committed React instances in Chrome
+      - run: npm ci --prefix fixtures/toggle
+      - name: Inspect committed React instances and M1 gates in Chrome
         run: |
           export DUI_CHROMIUM="$(command -v google-chrome)"
           "$DUI_CHROMIUM" --version
           npm run check:inspect
+          npm run check:m1
