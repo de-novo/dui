@@ -2,7 +2,7 @@
 
 English | [简体中文](../zh-CN/architecture.md) | [한국어](../ko/architecture.md)
 
-> Status: decided 2026-11-20 · source of truth for code structure. Design context: [design v0](design-v0.md). Supported stacks: [Supported frameworks](supported-frameworks.md).
+> Status: decided 2026-11-20 · source of truth for code structure. Design context: [design v0](design-v0.md). Domain entities and storage port: [domain model](domain-model.md). Supported stacks: [Supported frameworks](supported-frameworks.md).
 
 This document fixes how dui's Rust code is shaped: the architectural style, the patterns we use and ban, the module and crate boundaries, and the gates for M0 and M1. Where it overlaps with [design v0](design-v0.md), this document wins for code structure.
 
@@ -62,6 +62,7 @@ pub trait Renderer {
 - **`TypeOracle`** asks the project's own official compiler (same exact version) for symbols and types. Each answer carries its query ID and `Known | Unknown(reason)`. The AST finds candidates; the compiler decides types; AI only fills gaps and is recorded as `Inferred`.
 - **`Host`** starts the injected dev build and returns a `Target` (a web URL or a native entry point). Source transforms belong to the language adapter.
 - **`Renderer`** opens one cell at a `Target`, then collects values, image, semantic tree, and executed branches.
+- **`Store` ports** ([domain model §5](domain-model.md#5-storage-ports)) split persistence by bounded context (`WorkspaceRepository`, `RunRepository`, `ArtifactStore`, `CacheRepository`, `CommentRepository`, composed into `Store`) in `dui-core::storage` over pure `dui-core::model` aggregates and value objects. Concrete storage backends (local file archives, SQLite via `rusqlite` / Drizzle, or a future remote API) sit behind these ports as adapters; `dui-core` has zero storage dependencies.
 - Port traits may be `async` because adapters talk to processes and browsers. Async stops at `dui-ports`; `dui-core` never sees it.
 - Framework knowledge is **never** code in the core: no `if framework == …`, no per-stack plugin hierarchy. It lives in rule packs (§2.5) or in one adapter crate.
 
