@@ -380,7 +380,6 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
         "edges": [],
     });
     let graph = crate::graph_view::with_cells(base_graph, &report)?;
-    crate::graph_view::write(out, &graph)?;
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).map_err(|e| failure(3, &e.to_string()))?,

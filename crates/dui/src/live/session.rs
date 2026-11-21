@@ -619,7 +619,6 @@ impl Session {
                     analysis::store(&dir.join("report.json"), &report)?;
                     let graph =
                         crate::graph_view::with_cells(json!({"nodes":[],"edges":[]}), &report)?;
-                    crate::graph_view::write(dir, &graph)?;
                     analysis::store(&dir.join("graph.json"), &graph)?;
                     Ok(report)
                 })?;
@@ -726,7 +725,6 @@ impl Session {
                     analysis::store(&dir.join("report.json"), &report)?;
                     let graph =
                         crate::graph_view::with_cells(json!({"nodes":[],"edges":[]}), &report)?;
-                    crate::graph_view::write(dir, &graph)?;
                     analysis::store(&dir.join("graph.json"), &graph)?;
                     Ok(report)
                 })?;

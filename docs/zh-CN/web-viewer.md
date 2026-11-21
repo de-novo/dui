@@ -128,7 +128,7 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 {"op":"close","session":"SESSION"}
 ```
 
-每次编辑使用唯一请求 ID，丢失响应后可重发相同请求。对于 set 和 reset，`expect.selector` 必须匹配一个可见的 HTML 元素，去除首尾空白后的文本必须等于 `expect.text`。写入后断言失败仍会推进修订号，并返回 `unverified`、观测值和文本。reset 恢复打开时的值，close 释放浏览器和主机。空闲会话在 30 分钟后过期。save 返回 `~/.dui` 下新归档的路径。打开其中的 `graph.html`，或向 `dui inspect` 传入保存的目录和单元格。归档包含 PNG、SHA-256 摘要、观测值和文本断言、编辑序列及 Git 来源。再次实时编辑时打开原始单元格。
+每次编辑使用唯一请求 ID，丢失响应后可重发相同请求。对于 set 和 reset，`expect.selector` 必须匹配一个可见的 HTML 元素，去除首尾空白后的文本必须等于 `expect.text`。写入后断言失败仍会推进修订号，并返回 `unverified`、观测值和文本。reset 恢复打开时的值，close 释放浏览器和主机。空闲会话在 30 分钟后过期。save 返回 `~/.dui` 下新归档的路径。运行 `dui open`（或 `dui open RUN_DIRECTORY`）打开内置查看器，或向 `dui inspect` 传入保存的目录和单元格。归档包含 PNG、SHA-256 摘要、观测值和文本断言、编辑序列及 Git 来源。再次实时编辑时打开原始单元格。
 
 ### 热编辑延迟基线
 

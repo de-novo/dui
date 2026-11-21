@@ -367,26 +367,12 @@ pub(crate) fn history() -> Reply {
         }));
     }
 
-    let data = serde_json::to_string(&runs)
-        .map_err(io)?
-        .replace('<', "\\u003c");
-    let html = include_str!("history.html")
-        .replace(
-            "/*VIEW*/",
-            include_str!(concat!(env!("OUT_DIR"), "/browser/history.js")),
-        )
-        .replace("/*RUNS*/", &data);
-    let index = home.join("history.html");
-    use std::io::Write;
-    let mut stage = tempfile::NamedTempFile::new_in(&home).map_err(io)?;
-    stage.write_all(html.as_bytes()).map_err(io)?;
-    stage.persist(&index).map_err(io)?;
     for run in &mut runs {
         if let Some(o) = run.as_object_mut() {
             o.remove("cells");
         }
     }
-    Ok(json!({"gallery":index,"snapshots":runs}))
+    Ok(json!({"snapshots": runs}))
 }
 
 #[cfg(test)]

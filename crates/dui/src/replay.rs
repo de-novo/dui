@@ -292,7 +292,6 @@ fn unavailable(jobs: &[Job], analysis: &Value, out: &Path) -> Reply {
         &report,
     )?;
     store(&out.join("graph.json"), &g)?;
-    crate::graph_view::write(out, &g)?;
     store(&out.join("report.json"), &report)?;
     Err((5, report))
 }
@@ -669,7 +668,6 @@ fn finish(jobs: &[Job], analysis: &Value, out: &Path) -> Reply {
         }
     }
     store(&out.join("graph.json"), &g)?;
-    crate::graph_view::write(out, &g)?;
     store(&out.join("report.json"), &report)?;
     if verified == jobs.len() {
         Ok(report)

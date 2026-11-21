@@ -267,7 +267,7 @@ try {
     assert.deepEqual(png.subarray(0, 8), Buffer.from("89504e470d0a1a0a", "hex"));
     assert.equal(png.readUInt32BE(16), base.width);
     assert.equal(createHash("sha256").update(png).digest("hex"), saved.imageSha256);
-    assert.ok(readFileSync(join(saved.output, "graph.html"), "utf8").includes(saved.image));
+    assert.ok(readFileSync(join(saved.output, "graph.json"), "utf8").includes(saved.image));
     const inspected = JSON.parse(
       execFileSync(binary, ["inspect", saved.output, JSON.stringify(saved.cell)], {
         env,
