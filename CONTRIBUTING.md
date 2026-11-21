@@ -1,8 +1,18 @@
 # Contributing to dui
 
-Thanks for your interest in dui (de-novo-ui). dui is licensed under the
-[Apache License 2.0](LICENSE). By contributing, you agree that your
-contributions are licensed under the same license.
+Thanks for your interest in dui (de-novo-ui). dui follows an **Open-Core**
+licensing model:
+
+- All files outside `ee/` directories are licensed under the
+  [Apache License 2.0](LICENSE).
+- All files inside `ee/` directories are licensed separately under the
+  [dui Enterprise License](ee/LICENSE).
+
+By contributing to files outside `ee/`, you agree that your contributions are
+licensed under the Apache License 2.0. By contributing to files inside `ee/`,
+you grant de-novo a perpetual, worldwide, irrevocable, royalty-free license to
+use, distribute, and sublicense your contribution under both the dui Enterprise
+License and commercial terms.
 
 ## 1. Sign off every commit (DCO)
 

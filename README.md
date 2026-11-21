@@ -90,4 +90,7 @@ Capture npmgraph, an MIT-licensed npm dependency viewer, from a single entry URL
 
 ## License
 
-[Apache License 2.0](LICENSE)
+Open-Core:
+
+- Core (`ee/` excluded): [Apache License 2.0](LICENSE) — CLI, MCP server, local SQLite storage, web viewer, and local GPUI desktop viewer.
+- Enterprise (`ee/`): [dui Enterprise License](ee/LICENSE) — commercial team and enterprise features (audit logs, SSO/RBAC, remote team sync). See [ee/README.md](ee/README.md).

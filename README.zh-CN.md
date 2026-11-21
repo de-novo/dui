@@ -193,6 +193,6 @@ dui 计划以**开源**方式发布（发布时间待 준혁 批准，目前为�
 3. **受限许可证的代码不看也不抄。** GPL、AGPL、LGPL、PolyForm Noncommercial、SSPL、BSL、tldraw 许可证等受限制的代码（GitNexus、Serena、Semgrep 引擎、FlowDroid、CodeQL 等），在实现时不阅读其源码（净室）。只使用公开文档和论文层面的概念。
 4. **AI 写的代码也遵守同样标准。** 给 AI 代理的工作规则是"不得引入特定项目的代码，依赖只能是宽松许可证"。依赖许可证在 CI 中自动检查（例如 `license-checker`、`cargo-deny`）。
 5. **名称与商标。** Storybook、Figma、Graphify 等他人的名称不用于产品名或包名，只用于"与 ~ 兼容"这类说明。
-6. **dui 自身的许可证：Apache-2.0（已确定，2026-11-19）。** 它带有专利授权条款，企业使用方便，有利于争取成为行业标准。贡献者需通过 DCO 签署提交（`git commit -s`）。全文见 [LICENSE](LICENSE)，声明见 [NOTICE](NOTICE)，贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+6. **dui 自身的许可证：Open-Core（核心 Apache-2.0 + `ee/` 商业企业许可）。** `ee/` 目录以外的代码（CLI、MCP、本地 SQLite 存储、Web 查看器、本地 GPUI 桌面查看器）采用 [Apache-2.0](LICENSE)；`ee/` 目录下的商业团队与企业功能（审计日志、SSO/RBAC、远程团队同步等）单独适用 [dui Enterprise License](ee/LICENSE)（详见 [ee/README.md](ee/README.md)）。贡献者需通过 DCO 签署提交（`git commit -s`），规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 7. **多语言（2026-11-19 决定）。** 项目文档使用英文、简体中文、韩文三种语言。**以英文为准**；修改时先改英文，再在同一个 PR 中同步中文和韩文，或加上 "outdated" 横幅。规则与术语表：[docs/i18n.md](docs/i18n.md)。
 8. **发布前检查：** 检查整个仓库中是否有外部代码片段、密钥和内部路径（obora / pippip 的内部信息）。

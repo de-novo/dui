@@ -1,0 +1,41 @@
+dui Enterprise License (EE)
+Copyright (c) 2026 de-novo. All rights reserved.
+
+This license governs all files, code, assets, and documentation located inside
+any `ee/` directory of this repository (the "Enterprise Software"). Files
+outside `ee/` directories are licensed separately under the Apache License 2.0
+in the repository root `LICENSE`.
+
+1. Production and Commercial Use
+   You may use the Enterprise Software in production or for commercial purposes
+   only if you (and any legal entity you represent) hold a valid, active dui
+   Enterprise license agreement or paid subscription covering the applicable
+   scope and seat/usage limits issued by de-novo, and remain in full compliance
+   with its terms.
+
+2. Development and Testing
+   Notwithstanding Section 1, you may view, copy, compile, and modify the
+   Enterprise Software solely for non-production development, local evaluation,
+   and automated testing without a paid subscription.
+
+3. Restrictions
+   Except as expressly permitted in Sections 1 and 2, you may not copy, modify,
+   merge, publish, distribute, sublicense, rent, lease, sell, or offer the
+   Enterprise Software (in whole or in part, including as a hosted or managed
+   service) to any third party without prior written authorization from
+   de-novo.
+
+4. Modifications and Ownership
+   de-novo retains all right, title, and interest in and to the Enterprise
+   Software. Any modifications or patches you create to the Enterprise Software
+   are subject to the same restrictions set forth in this license and may only
+   be used in production under a valid dui Enterprise license.
+
+5. Disclaimer of Warranty and Limitation of Liability
+   THE ENTERPRISE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+   OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE ENTERPRISE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE ENTERPRISE SOFTWARE.
