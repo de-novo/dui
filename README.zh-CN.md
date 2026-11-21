@@ -14,14 +14,14 @@
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ```
 
-需要 Git、curl 和 C 编译工具链（macOS 上使用 Xcode 命令行工具）。安装程序在本机编译 dui。如果缺少 Rust 或带 npm 的 Node.js 26，安装程序会临时下载所需工具，并在构建结束后清理。
+需要 Git、curl 和 C 编译工具链（macOS 上使用 Xcode 命令行工具）。安装程序在本机编译 dui，自动将安装目录（默认 `~/.local/bin`）加入 shell `PATH`（设置 `DUI_NO_MODIFY_PATH=1` 可跳过），并在可用时创建链接使 `dui` 命令立即可用。如果缺少 Rust 或带 npm 的 Node.js 26，安装程序会临时下载所需工具，并在构建结束后清理。
 
 查看已安装标签、检查是否有新标签或执行标签更新：
 
 ```sh
-~/.local/bin/dui --version
-~/.local/bin/dui update --check
-~/.local/bin/dui update
+dui --version
+dui update --check
+dui update
 ```
 
 **捕获网页时**需要 Node.js 26、Chromium 或 Google Chrome，以及目标应用的依赖。

@@ -88,6 +88,39 @@ try {
   ).trim();
   assert.equal(installResolved, "v0.0.10");
 
+  // Confirm `scripts/install` PATH helper updates shell rc idempotently and respects DUI_NO_MODIFY_PATH=1.
+  const fakeHome = join(stage, "fake-home");
+  const fakeBin = join(fakeHome, ".local/bin");
+  const installScript = join(root, "scripts/install");
+  const helperTest = [
+    `eval "$(sed -n '/^append_path_line()/,/^main()/p' "$1" | sed '$d')"`,
+    `ensure_on_path "$2"`,
+    `ensure_on_path "$2"`,
+  ].join("\n");
+  execFileSync("sh", ["-eu", "-c", helperTest, "sh", installScript, fakeBin], {
+    env: { HOME: fakeHome, SHELL: "/bin/zsh", PATH: "/usr/bin:/bin" },
+  });
+  const zshrc = execFileSync("cat", [join(fakeHome, ".zshrc")], { encoding: "utf8" });
+  assert.equal(
+    zshrc.split(fakeBin).length - 1,
+    1,
+    `expected idempotent PATH entry in .zshrc, got:\n${zshrc}`,
+  );
+  const optOutHome = join(stage, "optout-home");
+  execFileSync(
+    "sh",
+    ["-eu", "-c", helperTest, "sh", installScript, join(optOutHome, ".local/bin")],
+    {
+      env: {
+        HOME: optOutHome,
+        SHELL: "/bin/zsh",
+        PATH: "/usr/bin:/bin",
+        DUI_NO_MODIFY_PATH: "1",
+      },
+    },
+  );
+  assert(!existsSync(join(optOutHome, ".zshrc")), "DUI_NO_MODIFY_PATH=1 must not modify .zshrc");
+
   // 3. Capture a fixture and verify legacy graph.html / history.html are NOT generated.
   const appDir = join(stage, "app");
   cpSync(fixture, appDir, {
