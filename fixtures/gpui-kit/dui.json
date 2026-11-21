@@ -1,0 +1,30 @@
+{
+  "runtime": "gpui-kit",
+  "path": "/settings",
+  "widths": [480],
+  "height": 320,
+  "states": [
+    {
+      "name": "compact-disabled",
+      "input": {
+        "primary": { "enabled": false, "density": "compact" },
+        "secondary": { "enabled": false, "density": "compact" }
+      },
+      "expect": [
+        { "label": "Primary alerts", "checked": false },
+        { "label": "Primary density: compact" }
+      ]
+    },
+    {
+      "name": "expanded-enabled",
+      "input": {
+        "primary": { "enabled": true, "density": "expanded" },
+        "secondary": { "enabled": false, "density": "compact" }
+      },
+      "expect": [
+        { "label": "Primary alerts", "checked": true },
+        { "label": "Primary density: expanded" }
+      ]
+    }
+  ]
+}

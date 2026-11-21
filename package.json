@@ -12,6 +12,7 @@
     "check:i18n": "tsc --project scripts && cargo build --locked && node scripts/check-i18n.mts",
     "check:cache": "tsc --project scripts && cargo build --locked && node scripts/check-cache.mts",
     "check:diff": "tsc --project scripts && cargo build --locked && node scripts/check-diff.mts",
+    "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "package:release": "tsc --project scripts && node scripts/package-release.mts",
     "deps:check": "node scripts/dependency-catalog.mts",
     "deps:sync": "node scripts/dependency-catalog.mts --write"

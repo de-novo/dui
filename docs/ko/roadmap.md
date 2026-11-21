@@ -37,6 +37,8 @@ M0 검수 화면의 다섯 상태를 375·768·1280px에서 검증해 서로 다
 
 **지도에서 네이티브 화면을 리뷰한다.** 실제 GPUI 화면 하나를 지정한 폭에서 두 가지 상태로 그린다. 웹에서 정한 조회·변경·값 확인·복원 방식을 그대로 적용한다. 이미지와 함께 OS·렌더러·툴체인을 기록한다. 값을 다시 읽고 화면의 의미 변화까지 독립적으로 확인해야 검증됨으로 처리한다. 의미를 확인할 수 없으면 미검증, 렌더 환경이 없으면 이유와 함께 렌더 불가로 남긴다.
 
+`fixtures/gpui-kit`(`gpui-kit 0.10.0`, `gpui-pre 0.3.12`, `rustc 1.100.0`, macOS Metal 오프스크린 렌더러 480 px, AccessKit / `TestQueryExt` 기반 `elementTreeAvailable: true`, 렌더 환경 부재 시 `unrenderable` / `no-render-env` 보고)에서 기준선을 검증했다. `npm run check:gpui`로 재현한다.
+
 구현 이슈 · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://github.com/de-novo/dui/issues/6)
 
 **바뀐 것만 다시 그린다.** 입력이 같은 칸은 저장된 결과를 다시 쓰고 이미지는 한 번만 저장한다([캐시](https://github.com/de-novo/dui/issues/8)). 두 캡처를 비교할 때는 바뀐 칸만 보여준다([diff](https://github.com/de-novo/dui/issues/11)).
