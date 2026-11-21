@@ -1,6 +1,7 @@
 mod i18n;
 mod layout;
 mod store;
+mod tokens;
 
 use gpui_kit::{
     AppContext, Bounds, Context, Entity, HeadlessAppContext, Hsla, ImageSource, MouseButton,
@@ -10,12 +11,12 @@ use gpui_kit::{
     base::StyledExt,
     canvas,
     component::{
-        ActiveTheme, Theme, ThemeMode,
+        Theme, ThemeMode,
         button::{Button, ButtonVariants as _},
         input::{Input, InputState},
         label::Label,
     },
-    div, hsla, img, point,
+    div, img, point,
     prelude::*,
     px, size,
     test::{TestQueryExt, TestWindowExt},
@@ -34,6 +35,7 @@ use std::{
 use store::{
     CellItem, DesktopWorkspace, DiffCellEntry, ImageCache, NewCommentAnchor, RunItem, ScreenItem,
 };
+use tokens::Palette;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ViewMode {
@@ -63,6 +65,7 @@ struct LaunchOptions {
     dui_home: PathBuf,
     project: Option<String>,
     run_id: Option<String>,
+    screen_path: Option<String>,
     view: ViewMode,
     dark: bool,
     lang: UiLang,
@@ -79,15 +82,18 @@ struct DuiDesktopView {
     selected_screen: usize,
     selected_width: u32,
     selected_cell: usize,
+    neighbor_page: usize,
+    full_1x_detail: bool,
     view_mode: ViewMode,
-    sidebar_open: bool,
+    rail_collapsed: bool,
+    picker_open: bool,
+    options_open: bool,
     dark_mode: bool,
     lang: UiLang,
     // 2D infinite canvas camera
     pan_x: f32,
     pan_y: f32,
     zoom: f32,
-    detail_zoom: f32,
     dragging: bool,
     drag_last: Point<Pixels>,
     viewport_w: f32,
@@ -109,6 +115,10 @@ fn route_short_name(path: &str) -> String {
     }
     let start = parts.len().saturating_sub(2);
     parts[start..].join("/")
+}
+
+fn short_run_id(id: &str) -> &str {
+    id.split('-').next_back().unwrap_or(id)
 }
 
 impl DuiDesktopView {
@@ -134,7 +144,6 @@ impl DuiDesktopView {
                 .position(|r| r.project_id == *pid || r.project_name == *pid)
                 .unwrap_or(0)
         } else {
-            // Prefer the most recent run that actually has captured images, else 0.
             workspace
                 .runs
                 .iter()
@@ -147,13 +156,23 @@ impl DuiDesktopView {
                 .unwrap_or(0)
         };
 
+        let selected_screen = opts
+            .screen_path
+            .as_deref()
+            .and_then(|target| {
+                workspace
+                    .runs
+                    .get(selected_run)?
+                    .screens
+                    .iter()
+                    .position(|s| s.path == target || s.path.ends_with(target))
+            })
+            .unwrap_or(0);
+
         let selected_width = workspace
             .runs
             .get(selected_run)
-            .and_then(|r| {
-                let ws = r.widths();
-                ws.iter().copied().max()
-            })
+            .and_then(|r| r.widths().into_iter().max())
             .unwrap_or(1280);
 
         let compare_run = workspace.runs.get(selected_run).and_then(|active| {
@@ -174,21 +193,24 @@ impl DuiDesktopView {
             images: ImageCache::default(),
             selected_run,
             compare_run,
-            selected_screen: 0,
+            selected_screen,
             selected_width,
             selected_cell: 0,
+            neighbor_page: 0,
+            full_1x_detail: false,
             view_mode: opts.view,
-            sidebar_open: true,
+            rail_collapsed: false,
+            picker_open: false,
+            options_open: false,
             dark_mode: opts.dark,
             lang: opts.lang,
-            pan_x: 36.0,
-            pan_y: 36.0,
-            zoom: 0.25,
-            detail_zoom: 0.75,
+            pan_x: 32.0,
+            pan_y: 32.0,
+            zoom: 0.12,
             dragging: false,
             drag_last: point(px(0.0), px(0.0)),
-            viewport_w: opts.viewport_width.saturating_sub(580).max(400) as f32,
-            viewport_h: opts.viewport_height.saturating_sub(110).max(320) as f32,
+            viewport_w: opts.viewport_width.saturating_sub(220).max(400) as f32,
+            viewport_h: opts.viewport_height.max(400) as f32,
             comment_input,
             comment_target: CommentTargetChoice::Screen,
             error_message: None,
@@ -200,6 +222,10 @@ impl DuiDesktopView {
             this.ensure_diff_loaded();
         }
         this
+    }
+
+    fn pal(&self) -> Palette {
+        tokens::palette(self.dark_mode)
     }
 
     fn active_run(&self) -> Option<&RunItem> {
@@ -249,21 +275,22 @@ impl DuiDesktopView {
     fn fit_map(&mut self) {
         let layout = self.current_layout();
         if layout.nodes.is_empty() || layout.content_width <= 0.0 || layout.content_height <= 0.0 {
-            self.zoom = 0.25;
+            self.zoom = 0.2;
             self.pan_x = 32.0;
             self.pan_y = 32.0;
             return;
         }
-        let pad = 48.0;
-        let avail_w = (self.viewport_w - pad * 2.0).max(200.0);
-        let avail_h = (self.viewport_h - pad * 2.0).max(200.0);
+        let pad_x = 56.0;
+        let pad_y = 64.0;
+        let avail_w = (self.viewport_w - pad_x * 2.0).max(240.0);
+        let avail_h = (self.viewport_h - pad_y * 2.0).max(240.0);
         let zx = avail_w / layout.content_width;
         let zy = avail_h / layout.content_height;
         self.zoom = zx.min(zy).clamp(0.05, 1.0);
         let scaled_w = layout.content_width * self.zoom;
         let scaled_h = layout.content_height * self.zoom;
-        self.pan_x = ((self.viewport_w - scaled_w) * 0.5).max(pad * 0.5);
-        self.pan_y = ((self.viewport_h - scaled_h) * 0.5).max(pad * 0.5);
+        self.pan_x = ((self.viewport_w - scaled_w) * 0.5).max(pad_x * 0.5);
+        self.pan_y = ((self.viewport_h - scaled_h) * 0.5).max(pad_y * 0.5);
     }
 
     fn zoom_one_to_one(&mut self) {
@@ -296,11 +323,14 @@ impl DuiDesktopView {
         self.selected_run = idx;
         self.selected_screen = 0;
         self.selected_cell = 0;
+        self.neighbor_page = 0;
+        self.full_1x_detail = false;
+        self.picker_open = false;
         self.comment_target = CommentTargetChoice::Screen;
         if let Some(run) = self.workspace.runs.get(idx) {
             let widths = run.widths();
             if !widths.contains(&self.selected_width) {
-                self.selected_width = widths.iter().copied().max().unwrap_or(1280);
+                self.selected_width = widths.into_iter().max().unwrap_or(1280);
             }
             self.compare_run = self
                 .workspace
@@ -360,9 +390,7 @@ impl DuiDesktopView {
                 }
                 self.error_message = None;
             }
-            Err(err) => {
-                self.error_message = Some(err);
-            }
+            Err(err) => self.error_message = Some(err),
         }
         cx.notify();
     }
@@ -428,247 +456,311 @@ impl DuiDesktopView {
         }
     }
 
-    fn render_topbar(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    /// Floating rounded glass left WorkspaceRail matching `apps/canvas/src/features/workspace/WorkspaceRail.tsx` 1:1.
+    fn render_workspace_rail(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
         let tr = i18n::strings(self.lang);
-        let widths = self
-            .active_run()
-            .map(RunItem::widths)
-            .unwrap_or_else(|| vec![1280]);
+        let collapsed = self.rail_collapsed;
+        let rail_w = if collapsed { 52.0 } else { 204.0 };
 
-        let mut width_pills = div().flex().items_center().gap_1();
-        for w in widths {
-            let active = w == self.selected_width;
-            width_pills = width_pills.child(
-                Button::new(format!("top-width-{w}"))
-                    .label(format!("{w}px"))
-                    .when(active, |b| b.primary())
-                    .when(!active, |b| b.ghost())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.selected_width = w;
-                        this.fit_map();
-                        cx.notify();
-                    })),
-            );
-        }
+        let wordmark = div()
+            .flex()
+            .items_baseline()
+            .px_2()
+            .pt_2()
+            .pb_3()
+            .child(
+                Label::new(if collapsed { "d" } else { "dui" })
+                    .text_xl()
+                    .font_bold()
+                    .text_color(p.sidebar_foreground),
+            )
+            .child(Label::new(".").text_xl().font_bold().text_color(p.primary));
 
-        let audit_pill = if let Some(run) = self.active_run() {
-            let (total, verified, _unverified, unrenderable) = run.counts();
-            let renderable = total.saturating_sub(unrenderable);
-            let pct = if total == 0 {
-                0.0
-            } else {
-                (verified as f64 * 100.0) / total as f64
+        let workspace_btn = if let Some(run) = self.active_run() {
+            let short_ver = short_run_id(&run.id);
+            let sub = match run.branch.as_deref() {
+                Some(b) if !b.is_empty() && b != "main" => format!("{b} · {short_ver}"),
+                _ => short_ver.to_owned(),
             };
-            let open_comments: usize = self
-                .workspace
-                .comments
-                .iter()
-                .filter(|c| c.project_id == run.project_id && c.status == "open")
-                .count();
-            let meets_goal = total > 0 && unrenderable == 0 && pct >= 99.0;
-            let dot_color = if meets_goal {
-                hsla(142.0 / 360.0, 0.72, 0.44, 1.0)
-            } else {
-                hsla(24.0 / 360.0, 0.92, 0.54, 1.0)
-            };
-            let mut summary =
-                format!("{pct:.1}% / 99% · {verified}/{total} ({renderable} renderable)");
-            if open_comments > 0 {
-                summary.push_str(&format!(" · {open_comments} open"));
-            }
             div()
-                .id("desktop-audit-pill")
+                .id("rail-workspace-switch")
+                .w_full()
+                .px_2()
+                .py_2()
+                .rounded_md()
+                .cursor_pointer()
                 .flex()
                 .items_center()
+                .justify_between()
                 .gap_2()
-                .px_3()
-                .py_1()
-                .rounded_full()
-                .border_1()
-                .border_color(cx.theme().border)
-                .bg(cx.theme().background)
-                .child(div().w(px(8.0)).h(px(8.0)).rounded_full().bg(dot_color))
-                .child(Label::new(summary).text_xs().font_semibold())
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, cx| {
+                        this.picker_open = !this.picker_open;
+                        this.options_open = false;
+                        cx.notify();
+                    }),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .overflow_hidden()
+                        .child(Label::new("📁").text_sm().text_color(p.sidebar_muted))
+                        .when(!collapsed, |el| {
+                            el.child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .overflow_hidden()
+                                    .child(
+                                        Label::new(run.project_name.clone())
+                                            .text_sm()
+                                            .font_semibold()
+                                            .text_color(p.sidebar_foreground),
+                                    )
+                                    .child(Label::new(sub).text_xs().text_color(p.sidebar_muted)),
+                            )
+                        }),
+                )
+                .when(!collapsed, |el| {
+                    el.child(Label::new("↕").text_xs().text_color(p.sidebar_muted))
+                })
         } else {
-            div().id("desktop-audit-empty")
+            div()
+                .id("rail-workspace-empty")
+                .w_full()
+                .px_2()
+                .py_2()
+                .rounded_md()
+                .child(
+                    Label::new(tr.select_workspace)
+                        .text_xs()
+                        .text_color(p.sidebar_muted),
+                )
         };
 
-        div()
-            .id("desktop-topbar")
-            .h(px(48.0))
+        let lang_row = div()
+            .id("rail-lang-switch")
             .w_full()
-            .px_3()
+            .px_2()
+            .py_2()
+            .rounded_md()
+            .cursor_pointer()
             .flex()
             .items_center()
             .justify_between()
-            .gap_3()
-            .border_b_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().secondary)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.lang = this.lang.next();
+                    cx.notify();
+                }),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(Label::new("🌐").text_xs().text_color(p.sidebar_muted))
+                    .when(!collapsed, |el| {
+                        el.child(
+                            Label::new(self.lang.display_name())
+                                .text_xs()
+                                .text_color(p.sidebar_muted),
+                        )
+                    }),
+            )
+            .when(!collapsed, |el| {
+                el.child(Label::new("⌄").text_xs().text_color(p.sidebar_muted))
+            });
+
+        let theme_row = div()
+            .id("rail-theme-switch")
+            .w_full()
+            .px_2()
+            .py_2()
+            .rounded_md()
+            .cursor_pointer()
+            .flex()
+            .items_center()
+            .justify_between()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.dark_mode = !this.dark_mode;
+                    Theme::change(
+                        if this.dark_mode {
+                            ThemeMode::Dark
+                        } else {
+                            ThemeMode::Light
+                        },
+                        None,
+                        cx,
+                    );
+                    cx.notify();
+                }),
+            )
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap_2()
                     .child(
-                        Button::new("toggle-sidebar")
-                            .label(if self.sidebar_open { "◀" } else { "▶" })
-                            .ghost()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.sidebar_open = !this.sidebar_open;
-                                cx.notify();
-                            })),
+                        Label::new(if self.dark_mode { "☾" } else { "☀" })
+                            .text_xs()
+                            .text_color(p.sidebar_muted),
                     )
-                    .child(Label::new(tr.app_title).font_semibold())
-                    .child(
-                        Button::new("mode-overview")
-                            .label(tr.overview)
-                            .when(self.view_mode == ViewMode::Overview, |b| b.primary())
-                            .when(self.view_mode != ViewMode::Overview, |b| b.ghost())
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.view_mode = ViewMode::Overview;
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        Button::new("mode-detail")
-                            .label(tr.detail)
-                            .when(self.view_mode == ViewMode::Detail, |b| b.primary())
-                            .when(self.view_mode != ViewMode::Detail, |b| b.ghost())
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.view_mode = ViewMode::Detail;
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        Button::new("mode-diff")
-                            .label(tr.diff)
-                            .when(self.view_mode == ViewMode::Diff, |b| b.primary())
-                            .when(self.view_mode != ViewMode::Diff, |b| b.ghost())
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.view_mode = ViewMode::Diff;
-                                this.ensure_diff_loaded();
-                                cx.notify();
-                            })),
-                    )
-                    .child(width_pills),
-            )
-            .child(audit_pill)
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .child(
-                        Button::new("toggle-theme")
-                            .label(if self.dark_mode { tr.light } else { tr.dark })
-                            .outline()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.dark_mode = !this.dark_mode;
-                                let mode = if this.dark_mode {
-                                    ThemeMode::Dark
-                                } else {
-                                    ThemeMode::Light
-                                };
-                                Theme::change(mode, None, cx);
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        Button::new("toggle-lang")
-                            .label(self.lang.short_label())
-                            .outline()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.lang = this.lang.next();
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        Button::new("refresh-workspace")
-                            .label(tr.refresh)
-                            .outline()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.reload(cx);
-                            })),
-                    ),
-            )
-    }
-
-    fn render_sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let tr = i18n::strings(self.lang);
-        let groups = self.workspace.project_groups();
-        let mut list = div()
-            .id("project-groups-scroll")
-            .flex_1()
-            .overflow_y_scroll()
-            .flex()
-            .flex_col()
-            .gap_3();
-
-        if groups.is_empty() {
-            list = list.child(
-                Label::new(tr.workspace_empty)
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground),
-            );
-        } else {
-            for group in groups {
-                let mut group_col = div().flex().flex_col().gap_1().child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .px_1()
-                        .child(
-                            Label::new(group.project_name.clone())
-                                .text_xs()
-                                .font_semibold(),
+                    .when(!collapsed, |el| {
+                        el.child(
+                            Label::new(if self.dark_mode {
+                                tr.theme_dark
+                            } else {
+                                tr.theme_light
+                            })
+                            .text_xs()
+                            .text_color(p.sidebar_muted),
                         )
-                        .child(
-                            Label::new(format!("{} runs", group.run_indices.len()))
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground),
-                        ),
-                );
-                for &run_idx in group.run_indices.iter().take(6) {
-                    let run = &self.workspace.runs[run_idx];
-                    let active = run_idx == self.selected_run;
-                    let (total, verified, _, _) = run.counts();
-                    let short_id = run.id.split('-').next_back().unwrap_or(&run.id);
-                    let branch = run.branch.as_deref().unwrap_or("main");
-                    let label = format!(
-                        "{short_id} · {branch} · {}sc ({verified}/{total})",
-                        run.screens.len()
-                    );
-                    group_col = group_col.child(
-                        Button::new(format!("run-item-{run_idx}"))
-                            .label(label)
-                            .when(active, |b| b.primary())
-                            .when(!active, |b| b.ghost())
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.select_run(run_idx, cx);
-                            })),
-                    );
-                }
-                list = list.child(group_col);
-            }
-        }
+                    }),
+            )
+            .when(!collapsed, |el| {
+                el.child(Label::new("⌄").text_xs().text_color(p.sidebar_muted))
+            });
+
+        let collapse_row = div()
+            .id("rail-collapse-toggle")
+            .w_full()
+            .px_2()
+            .py_2()
+            .rounded_md()
+            .cursor_pointer()
+            .flex()
+            .items_center()
+            .gap_2()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.rail_collapsed = !this.rail_collapsed;
+                    cx.notify();
+                }),
+            )
+            .child(
+                Label::new(if collapsed { "▸" } else { "◧" })
+                    .text_xs()
+                    .text_color(p.sidebar_muted),
+            )
+            .when(!collapsed, |el| {
+                el.child(
+                    Label::new(tr.collapse_rail)
+                        .text_xs()
+                        .text_color(p.sidebar_muted),
+                )
+            });
 
         div()
-            .id("desktop-sidebar")
-            .w(px(250.0))
+            .id("workspace-rail")
+            .w(px(rail_w))
             .h_full()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .p_3()
-            .border_r_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().secondary)
-            .child(list)
+            .flex_shrink_0()
+            .p_2()
+            .child(
+                div()
+                    .size_full()
+                    .p_2()
+                    .rounded_xl()
+                    .border_1()
+                    .border_color(p.sidebar_line)
+                    .bg(p.sidebar)
+                    .shadow_md()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(wordmark)
+                    .child(workspace_btn)
+                    .child(div().flex_1())
+                    .child(lang_row)
+                    .child(div().h(px(16.0)))
+                    .child(theme_row)
+                    .child(collapse_row),
+            )
     }
 
-    fn render_overview_canvas(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    /// Floating Coverage Audit Pill at top-center matching `apps/canvas` `.audit-summary-pill`.
+    fn render_audit_pill(&self) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let Some(run) = self.active_run() else {
+            return div().id("audit-pill-empty");
+        };
+        let (total, verified, _unverified, unrenderable) = run.counts();
+        let renderable = total.saturating_sub(unrenderable);
+        let pct = if total == 0 {
+            0.0
+        } else {
+            (verified as f64 * 100.0) / total as f64
+        };
+        let open_comments: usize = self
+            .workspace
+            .comments
+            .iter()
+            .filter(|c| c.project_id == run.project_id && c.status == "open")
+            .count();
+
+        let (cov_text, cells_text, open_text) = match self.lang {
+            UiLang::Ko => (
+                format!("커버리지 {pct:.1}% / 목표 99%"),
+                format!("검증 {verified} · 렌더 가능 {renderable}/{total}"),
+                format!("미해결 코멘트 {open_comments}개"),
+            ),
+            UiLang::ZhCn => (
+                format!("覆盖率 {pct:.1}% / 目标 99%"),
+                format!("{verified} 已验证 · {renderable}/{total} 可渲染"),
+                format!("{open_comments} 条待处理评论"),
+            ),
+            UiLang::En => (
+                format!("Coverage {pct:.1}% / 99% goal"),
+                format!("{verified} verified · {renderable}/{total} renderable"),
+                format!("{open_comments} unresolved"),
+            ),
+        };
+
+        div()
+            .id("desktop-audit-pill")
+            .px_3()
+            .py_1()
+            .rounded_full()
+            .border_1()
+            .border_color(p.glass_line)
+            .bg(p.glass)
+            .shadow_md()
+            .flex()
+            .items_center()
+            .gap_3()
+            .child(
+                Label::new(cov_text)
+                    .text_xs()
+                    .font_semibold()
+                    .text_color(p.foreground),
+            )
+            .child(
+                Label::new(cells_text)
+                    .text_xs()
+                    .text_color(p.muted_foreground),
+            )
+            .when(open_comments > 0, |el| {
+                el.child(
+                    Label::new(open_text)
+                        .text_xs()
+                        .font_semibold()
+                        .text_color(p.primary),
+                )
+            })
+    }
+
+    /// Full-bleed Overview Screen Map matching `/tmp/obora-dui-overview.png` 1:1.
+    fn render_overview_stage(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
         let tr = i18n::strings(self.lang);
         let Some(run) = self.active_run().cloned() else {
             return div()
@@ -678,20 +770,18 @@ impl DuiDesktopView {
                 .flex()
                 .items_center()
                 .justify_center()
-                .p_6()
-                .child(Label::new(tr.workspace_empty));
+                .child(Label::new(tr.workspace_empty).text_color(p.muted_foreground));
         };
 
         let layout = compute_layout(&run.screens, self.selected_width);
         let open_by_path = self.workspace.open_comments_by_path(&run.project_id);
 
-        // Pre-decode RenderImages synchronously so frame 1 displays crisp UI screenshots!
         let mut decoded_cards: BTreeMap<usize, Option<Arc<RenderImage>>> = BTreeMap::new();
         for (idx, screen) in run.screens.iter().enumerate() {
             let img_opt = self
                 .cell_for_width(screen)
                 .and_then(|c| c.blob_path.as_deref())
-                .and_then(|p| self.images.get_or_decode(p));
+                .and_then(|path| self.images.get_or_decode(path));
             decoded_cards.insert(idx, img_opt);
         }
 
@@ -700,23 +790,12 @@ impl DuiDesktopView {
         let zoom = self.zoom;
         let metrics = layout.metrics;
         let card_w = (metrics.card_width * zoom).max(16.0);
+        let pad_px = (card_w * 0.04).clamp(4.0, 12.0);
+        let inner_w = (card_w - pad_px * 2.0).max(8.0);
         let frame_h = (metrics.frame_height * zoom).max(10.0);
         let caption_h = (metrics.caption_height * zoom).max(18.0);
-        let card_h = frame_h + caption_h;
+        let card_h = frame_h + caption_h + pad_px * 2.0;
 
-        let dot_color = if self.dark_mode {
-            hsla(0.0, 0.0, 1.0, 0.12)
-        } else {
-            hsla(0.0, 0.0, 0.0, 0.12)
-        };
-        let verified_edge_color = hsla(24.0 / 360.0, 0.92, 0.54, 0.95);
-        let extracted_edge_color = if self.dark_mode {
-            hsla(0.0, 0.0, 0.72, 0.65)
-        } else {
-            hsla(0.0, 0.0, 0.38, 0.65)
-        };
-
-        // Snapshot node screen-space positions for GPU edge painting.
         let mut node_rects: BTreeMap<usize, (f32, f32)> = BTreeMap::new();
         for node in &layout.nodes {
             node_rects.insert(
@@ -724,45 +803,49 @@ impl DuiDesktopView {
                 (pan_x + node.x * zoom, pan_y + node.y * zoom),
             );
         }
+
         let edges_for_paint = layout.edges.clone();
         let node_rects_for_paint = node_rects.clone();
+        let grid_color = p.map_grid;
+        let link_color = p.map_link;
+        let primary_color = p.primary;
 
-        let background_and_edges = canvas(
+        let edges_and_grid = canvas(
             |_bounds, _window, _cx| {},
             move |bounds: Bounds<Pixels>, _, window: &mut Window, _cx| {
-                // 1. Subtle Figma dot grid
-                let spacing = (32.0 * zoom).clamp(16.0, 48.0);
                 let ox = f32::from(bounds.origin.x);
                 let oy = f32::from(bounds.origin.y);
                 let bw = f32::from(bounds.size.width);
                 let bh = f32::from(bounds.size.height);
-                let start_x = ((pan_x % spacing) + spacing) % spacing;
-                let start_y = ((pan_y % spacing) + spacing) % spacing;
-                let mut gx = start_x;
+
+                // 1. Exact 20px subtle dot grid matching `apps/canvas` `.viewer`
+                let spacing = 20.0_f32;
+                let sx0 = ((pan_x % spacing) + spacing) % spacing;
+                let sy0 = ((pan_y % spacing) + spacing) % spacing;
+                let mut gx = sx0;
                 while gx < bw {
-                    let mut gy = start_y;
+                    let mut gy = sy0;
                     while gy < bh {
                         let mut dot = PathBuilder::fill();
-                        let p = point(px(ox + gx), px(oy + gy));
                         dot.add_polygon(
                             &[
-                                p,
-                                point(px(ox + gx + 1.5), px(oy + gy)),
-                                point(px(ox + gx + 1.5), px(oy + gy + 1.5)),
-                                point(px(ox + gx), px(oy + gy + 1.5)),
+                                point(px(ox + gx), px(oy + gy)),
+                                point(px(ox + gx + 1.4), px(oy + gy)),
+                                point(px(ox + gx + 1.4), px(oy + gy + 1.4)),
+                                point(px(ox + gx), px(oy + gy + 1.4)),
                             ],
                             true,
                         );
                         if let Ok(path) = dot.build() {
-                            window.paint_path(path, dot_color);
+                            window.paint_path(path, grid_color);
                         }
                         gy += spacing;
                     }
                     gx += spacing;
                 }
 
-                // 2. GPU-painted Bezier transition edges with arrowheads
-                let stroke_w = (2.2 * zoom).clamp(1.5, 3.5);
+                // 2. Orthogonal smooth-step connector edges matching React Flow in `apps/canvas`
+                let stroke_w = (1.6 * zoom.sqrt()).clamp(1.2, 2.5);
                 for edge in &edges_for_paint {
                     let (Some(&(ax, ay)), Some(&(bx, by))) = (
                         node_rects_for_paint.get(&edge.from_idx),
@@ -770,56 +853,64 @@ impl DuiDesktopView {
                     ) else {
                         continue;
                     };
-                    let (sx, sy, tx, ty) = if (bx - ax).abs() >= (by - ay).abs() {
+                    let (sx, sy, tx, ty, horizontal) = if (bx - ax).abs() >= (by - ay).abs() {
                         if bx >= ax {
-                            (ax + card_w, ay + card_h * 0.5, bx, by + card_h * 0.5)
+                            (ax + card_w, ay + card_h * 0.5, bx, by + card_h * 0.5, true)
                         } else {
-                            (ax, ay + card_h * 0.5, bx + card_w, by + card_h * 0.5)
+                            (ax, ay + card_h * 0.5, bx + card_w, by + card_h * 0.5, true)
                         }
                     } else if by >= ay {
-                        (ax + card_w * 0.5, ay + card_h, bx + card_w * 0.5, by)
+                        (ax + card_w * 0.5, ay + card_h, bx + card_w * 0.5, by, false)
                     } else {
-                        (ax + card_w * 0.5, ay, bx + card_w * 0.5, by + card_h)
+                        (ax + card_w * 0.5, ay, bx + card_w * 0.5, by + card_h, false)
                     };
-
-                    let p0 = point(px(ox + sx), px(oy + sy));
-                    let p3 = point(px(ox + tx), px(oy + ty));
-                    let dx = (tx - sx) * 0.45;
-                    let c1 = point(px(ox + sx + dx), px(oy + sy));
-                    let c2 = point(px(ox + tx - dx), px(oy + ty));
 
                     let is_verified = edge.source == "verified";
                     let is_inferred = edge.source == "inferred";
                     let mut pb = PathBuilder::stroke(px(stroke_w));
                     if is_inferred {
                         pb = pb.dash_array(&[px(3.0), px(4.0)]);
-                    } else if !is_verified {
-                        pb = pb.dash_array(&[px(7.0), px(4.0)]);
                     }
-                    pb.move_to(p0);
-                    pb.cubic_bezier_to(p3, c1, c2);
-                    let color: Hsla = if is_verified {
-                        verified_edge_color
+                    pb.move_to(point(px(ox + sx), px(oy + sy)));
+                    if horizontal {
+                        let mid_x = (sx + tx) * 0.5;
+                        pb.line_to(point(px(ox + mid_x), px(oy + sy)));
+                        pb.line_to(point(px(ox + mid_x), px(oy + ty)));
+                        pb.line_to(point(px(ox + tx), px(oy + ty)));
                     } else {
-                        extracted_edge_color
+                        let mid_y = (sy + ty) * 0.5;
+                        pb.line_to(point(px(ox + sx), px(oy + mid_y)));
+                        pb.line_to(point(px(ox + tx), px(oy + mid_y)));
+                        pb.line_to(point(px(ox + tx), px(oy + ty)));
+                    }
+                    let color: Hsla = if is_verified {
+                        primary_color
+                    } else {
+                        link_color
                     };
                     if let Ok(path) = pb.build() {
                         window.paint_path(path, color);
                     }
 
-                    // Arrowhead at target point
-                    let angle = (ty - sy).atan2(tx - sx);
-                    let head_len = 8.0_f32;
+                    // Crisp small directional arrowhead
+                    let (ang_x, ang_y) = if horizontal {
+                        (if tx >= sx { 1.0_f32 } else { -1.0_f32 }, 0.0_f32)
+                    } else {
+                        (0.0_f32, if ty >= sy { 1.0_f32 } else { -1.0_f32 })
+                    };
+                    let angle = ang_y.atan2(ang_x);
+                    let hl = 6.0_f32;
+                    let tip = point(px(ox + tx), px(oy + ty));
                     let left = point(
-                        px(ox + tx - head_len * (angle - 0.45).cos()),
-                        px(oy + ty - head_len * (angle - 0.45).sin()),
+                        px(ox + tx - hl * (angle - 0.5).cos()),
+                        px(oy + ty - hl * (angle - 0.5).sin()),
                     );
                     let right = point(
-                        px(ox + tx - head_len * (angle + 0.45).cos()),
-                        px(oy + ty - head_len * (angle + 0.45).sin()),
+                        px(ox + tx - hl * (angle + 0.5).cos()),
+                        px(oy + ty - hl * (angle + 0.5).sin()),
                     );
                     let mut arrow = PathBuilder::fill();
-                    arrow.add_polygon(&[p3, left, right], true);
+                    arrow.add_polygon(&[tip, left, right], true);
                     if let Ok(path) = arrow.build() {
                         window.paint_path(path, color);
                     }
@@ -829,70 +920,41 @@ impl DuiDesktopView {
         .size_full();
 
         let mut cards_layer = div().absolute().inset_0();
-        let accent = hsla(24.0 / 360.0, 0.92, 0.54, 1.0);
         for node in &layout.nodes {
             let idx = node.screen_idx;
             let screen = &run.screens[idx];
             let (left, top) = node_rects[&idx];
-            let selected = idx == self.selected_screen;
+            let open_comments = open_by_path.get(&screen.path).copied().unwrap_or(0);
             let unverified = screen
                 .cells
                 .iter()
                 .filter(|c| c.status_kind == "unverified")
                 .count();
-            let unrenderable = screen
-                .cells
-                .iter()
-                .filter(|c| c.status_kind == "unrenderable")
-                .count();
-            let open_comments = open_by_path.get(&screen.path).copied().unwrap_or(0);
             let render_img = decoded_cards.get(&idx).and_then(|v| v.clone());
 
             let media_el = if let Some(ri) = render_img {
                 div()
-                    .w(px(card_w))
+                    .w(px(inner_w))
                     .h(px(frame_h))
+                    .rounded_sm()
                     .overflow_hidden()
-                    .bg(cx.theme().secondary)
-                    .child(img(ImageSource::Render(ri)).w(px(card_w)).h(px(frame_h)))
+                    .bg(p.background)
+                    .child(img(ImageSource::Render(ri)).w(px(inner_w)).h(px(frame_h)))
             } else {
                 div()
-                    .w(px(card_w))
+                    .w(px(inner_w))
                     .h(px(frame_h))
+                    .rounded_sm()
                     .flex()
                     .items_center()
                     .justify_center()
-                    .bg(cx.theme().secondary)
+                    .bg(p.background)
                     .child(
                         Label::new("No image")
                             .text_xs()
-                            .text_color(cx.theme().muted_foreground),
+                            .text_color(p.muted_foreground),
                     )
             };
-
-            let mut badges = div().flex().items_center().gap_1();
-            if open_comments > 0 {
-                badges = badges.child(
-                    Label::new(format!("● {open_comments}"))
-                        .text_xs()
-                        .text_color(accent)
-                        .font_semibold(),
-                );
-            }
-            if unverified > 0 {
-                badges = badges.child(
-                    Label::new(format!("U:{unverified}"))
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground),
-                );
-            }
-            if unrenderable > 0 {
-                badges = badges.child(
-                    Label::new(format!("X:{unrenderable}"))
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground),
-                );
-            }
 
             let card = div()
                 .id(format!("map-card-{idx}"))
@@ -901,25 +963,26 @@ impl DuiDesktopView {
                 .top(px(top))
                 .w(px(card_w))
                 .h(px(card_h))
+                .p(px(pad_px))
                 .flex()
                 .flex_col()
-                .overflow_hidden()
+                .justify_between()
                 .rounded_lg()
-                .border_2()
-                .border_color(if selected { accent } else { cx.theme().border })
-                .bg(cx.theme().background)
+                .border_1()
+                .border_color(p.capture_rim)
+                .bg(p.capture_surface)
                 .shadow_md()
+                .cursor_pointer()
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                    cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
-                        if this.selected_screen == idx && event.click_count >= 2 {
-                            this.view_mode = ViewMode::Detail;
-                        } else {
-                            this.selected_screen = idx;
-                            this.selected_cell = 0;
-                            this.comment_target = CommentTargetChoice::Screen;
-                        }
+                        this.selected_screen = idx;
+                        this.selected_cell = 0;
+                        this.neighbor_page = 0;
+                        this.full_1x_detail = false;
+                        this.comment_target = CommentTargetChoice::Screen;
+                        this.view_mode = ViewMode::Detail;
                         cx.notify();
                     }),
                 )
@@ -927,81 +990,143 @@ impl DuiDesktopView {
                 .child(
                     div()
                         .h(px(caption_h))
-                        .px_2()
+                        .pt_1()
                         .flex()
                         .items_center()
                         .justify_between()
                         .gap_1()
-                        .border_t_1()
-                        .border_color(cx.theme().border)
-                        .bg(cx.theme().secondary)
+                        .overflow_hidden()
                         .child(
                             Label::new(route_short_name(&screen.path))
                                 .text_xs()
-                                .font_semibold(),
+                                .font_semibold()
+                                .text_color(p.foreground),
                         )
-                        .child(badges),
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_1()
+                                .when(open_comments > 0, |el| {
+                                    el.child(
+                                        Label::new(format!("● {open_comments}"))
+                                            .text_xs()
+                                            .font_semibold()
+                                            .text_color(p.primary),
+                                    )
+                                })
+                                .when(unverified > 0, |el| {
+                                    el.child(
+                                        Label::new(format!("Unverified {unverified}"))
+                                            .text_xs()
+                                            .text_color(p.muted_foreground),
+                                    )
+                                }),
+                        ),
                 );
-
             cards_layer = cards_layer.child(card);
         }
 
-        // Floating bottom-left zoom controls matching `apps/canvas`
-        let zoom_controls = div()
+        // Bottom-left vertical zoom control stack matching React Flow `<Controls>` in `/tmp/obora-dui-overview.png`
+        let ctrl_btn = |id: &'static str, text: &'static str| {
+            div()
+                .id(id)
+                .w(px(28.0))
+                .h(px(28.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded_md()
+                .border_1()
+                .border_color(p.glass_line)
+                .bg(p.glass)
+                .cursor_pointer()
+                .child(Label::new(text).text_xs().text_color(p.foreground))
+        };
+
+        let zoom_stack = div()
             .id("desktop-zoom-controls")
             .absolute()
-            .left(px(16.0))
-            .bottom(px(16.0))
+            .left(px(12.0))
+            .bottom(px(12.0))
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(ctrl_btn("zoom-in", "+").on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.adjust_zoom(1.25);
+                    cx.notify();
+                }),
+            ))
+            .child(ctrl_btn("zoom-out", "−").on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.adjust_zoom(0.8);
+                    cx.notify();
+                }),
+            ))
+            .child(ctrl_btn("zoom-fit", "⊡").on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.fit_map();
+                    cx.notify();
+                }),
+            ))
+            .child(ctrl_btn("zoom-1x", "1:1").on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.zoom_one_to_one();
+                    cx.notify();
+                }),
+            ));
+
+        // Bottom-right floating `Map options` pill matching `/tmp/obora-dui-overview.png`
+        let map_options_btn = div()
+            .id("map-options-btn")
+            .absolute()
+            .right(px(16.0))
+            .bottom(px(14.0))
+            .px_3()
+            .py_2()
+            .rounded_lg()
+            .border_1()
+            .border_color(p.glass_line)
+            .bg(p.glass)
+            .shadow_md()
+            .cursor_pointer()
             .flex()
             .items_center()
-            .gap_1()
-            .p_1()
-            .rounded_md()
-            .border_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().secondary)
-            .shadow_md()
-            .child(
-                Button::new("zoom-out")
-                    .label("−")
-                    .ghost()
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.adjust_zoom(0.8);
-                        cx.notify();
-                    })),
+            .gap_2()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.options_open = !this.options_open;
+                    this.picker_open = false;
+                    cx.notify();
+                }),
             )
+            .child(Label::new("⊶").text_xs().text_color(p.muted_foreground))
             .child(
-                Label::new(format!("{}%", (self.zoom * 100.0).round() as i32))
+                Label::new(tr.map_options)
                     .text_xs()
-                    .font_semibold(),
-            )
-            .child(
-                Button::new("zoom-in")
-                    .label("+")
-                    .ghost()
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.adjust_zoom(1.25);
-                        cx.notify();
-                    })),
-            )
-            .child(
-                Button::new("zoom-1x")
-                    .label("1:1")
-                    .outline()
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.zoom_one_to_one();
-                        cx.notify();
-                    })),
-            )
-            .child(
-                Button::new("zoom-fit")
-                    .label(tr.fit)
-                    .outline()
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.fit_map();
-                        cx.notify();
-                    })),
+                    .text_color(p.foreground),
             );
+
+        // Top-center floating audit pill
+        let top_pill = div()
+            .absolute()
+            .top(px(12.0))
+            .left_0()
+            .right_0()
+            .flex()
+            .justify_center()
+            .child(self.render_audit_pill());
 
         div()
             .id("desktop-map-viewport")
@@ -1009,17 +1134,14 @@ impl DuiDesktopView {
             .flex_1()
             .h_full()
             .overflow_hidden()
-            .bg(cx.theme().background)
             .on_scroll(cx.listener(|this, event: &ScrollEvent, _, cx| {
                 let delta = match event.delta {
-                    ScrollDelta::Pixels(p) => (f32::from(p.x), f32::from(p.y)),
+                    ScrollDelta::Pixels(pt) => (f32::from(pt.x), f32::from(pt.y)),
                     ScrollDelta::Lines(l) => (l.x * 24.0, l.y * 24.0),
                 };
                 if event.modifiers.platform || event.modifiers.control {
-                    let factor = if delta.1 > 0.0 { 1.1 } else { 0.9 };
-                    this.adjust_zoom(factor);
+                    this.adjust_zoom(if delta.1 > 0.0 { 1.1 } else { 0.9 });
                 } else {
-                    // Figma-style two-finger free 2D trackpad pan!
                     this.pan_x += delta.0;
                     this.pan_y += delta.1;
                 }
@@ -1048,369 +1170,520 @@ impl DuiDesktopView {
                     this.dragging = false;
                 }),
             )
-            .child(background_and_edges)
+            .child(edges_and_grid)
             .child(cards_layer)
-            .child(zoom_controls)
+            .child(top_pill)
+            .child(zoom_stack)
+            .child(map_options_btn)
     }
 
+    /// Screen Neighborhood + Floating Glass Right Inspector matching `/tmp/obora-dui-detail.png` 1:1.
     fn render_detail_stage(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
         let tr = i18n::strings(self.lang);
-        let Some(screen) = self.active_screen().cloned() else {
+        let Some(run) = self.active_run().cloned() else {
             return div()
-                .id("desktop-detail-empty")
+                .id("detail-empty")
                 .flex_1()
                 .h_full()
                 .flex()
                 .items_center()
                 .justify_center()
-                .child(Label::new(tr.workspace_empty));
+                .child(Label::new(tr.workspace_empty).text_color(p.muted_foreground));
         };
-        let cell = self.active_cell().cloned();
-        let render_img = cell
+        let Some(screen) = run.screens.get(self.selected_screen).cloned() else {
+            return div().id("detail-no-screen").flex_1().h_full();
+        };
+
+        let active_cell = self.active_cell().cloned();
+        let focus_img = active_cell
             .as_ref()
             .and_then(|c| c.blob_path.as_deref())
-            .and_then(|p| self.images.get_or_decode(p));
+            .and_then(|path| self.images.get_or_decode(path));
 
-        let status_header = match &cell {
-            Some(c) => match c.reason.as_deref() {
-                Some(r) => format!(
-                    "{} · {} px · {} ({r})",
-                    screen.path, c.width_px, c.status_kind
-                ),
-                None => format!("{} · {} px · {}", screen.path, c.width_px, c.status_kind),
-            },
-            None => screen.path.clone(),
-        };
+        // Connected partner screens (outgoing + incoming)
+        let mut partner_indices: Vec<usize> = Vec::new();
+        for edge in &screen.outgoing {
+            if let Some(idx) = run.screens.iter().position(|s| s.path == edge.to_path)
+                && idx != self.selected_screen
+                && !partner_indices.contains(&idx)
+            {
+                partner_indices.push(idx);
+            }
+        }
+        for (idx, other) in run.screens.iter().enumerate() {
+            if idx != self.selected_screen
+                && !partner_indices.contains(&idx)
+                && other.outgoing.iter().any(|e| e.to_path == screen.path)
+            {
+                partner_indices.push(idx);
+            }
+        }
 
-        let preview = if let Some(ri) = render_img {
-            let size_px = ri.size(0);
-            let w = (size_px.width.0 as f32 * self.detail_zoom).max(200.0);
-            let h = (size_px.height.0 as f32 * self.detail_zoom).max(200.0);
-            div()
-                .id("detail-image-scroll")
-                .flex_1()
-                .overflow_y_scroll()
-                .p_4()
-                .flex()
-                .justify_center()
-                .child(
-                    div()
-                        .rounded_lg()
-                        .overflow_hidden()
-                        .border_1()
-                        .border_color(cx.theme().border)
-                        .shadow_lg()
-                        .child(img(ImageSource::Render(ri)).w(px(w)).h(px(h))),
-                )
-        } else {
-            div()
-                .id("detail-image-empty")
-                .flex_1()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(Label::new("No PNG captured for this cell."))
-        };
-
-        div()
-            .id("desktop-detail-stage")
-            .flex_1()
-            .h_full()
-            .flex()
-            .flex_col()
-            .bg(cx.theme().background)
-            .child(
-                div()
-                    .px_4()
-                    .py_2()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .border_b_1()
-                    .border_color(cx.theme().border)
-                    .bg(cx.theme().secondary)
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .child(
-                                Button::new("detail-back-map")
-                                    .label(format!("← {}", tr.back_to_map))
-                                    .outline()
-                                    .on_click(cx.listener(|this, _, _, cx| {
-                                        this.view_mode = ViewMode::Overview;
-                                        cx.notify();
-                                    })),
-                            )
-                            .child(Label::new(status_header).text_sm().font_semibold()),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .child(Button::new("detail-zoom-out").label("−").ghost().on_click(
-                                cx.listener(|this, _, _, cx| {
-                                    this.detail_zoom = (this.detail_zoom * 0.8).clamp(0.25, 3.0);
-                                    cx.notify();
-                                }),
-                            ))
-                            .child(
-                                Button::new("detail-zoom-1x")
-                                    .label("1:1")
-                                    .outline()
-                                    .on_click(cx.listener(|this, _, _, cx| {
-                                        this.detail_zoom = 1.0;
-                                        cx.notify();
-                                    })),
-                            )
-                            .child(Button::new("detail-zoom-in").label("+").ghost().on_click(
-                                cx.listener(|this, _, _, cx| {
-                                    this.detail_zoom = (this.detail_zoom * 1.25).clamp(0.25, 3.0);
-                                    cx.notify();
-                                }),
-                            )),
-                    ),
-            )
-            .child(preview)
-    }
-
-    fn render_diff_stage(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let tr = i18n::strings(self.lang);
-        let Some(after_run) = self.active_run().cloned() else {
-            return div()
-                .id("desktop-diff-empty")
-                .flex_1()
-                .h_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(Label::new(tr.workspace_empty));
-        };
-        let peer_runs: Vec<(usize, String)> = self
-            .workspace
-            .runs
+        let total_partners = partner_indices.len();
+        let per_page = 2usize;
+        let max_page = total_partners.saturating_sub(1) / per_page;
+        if self.neighbor_page > max_page {
+            self.neighbor_page = 0;
+        }
+        let page_start = self.neighbor_page * per_page;
+        let visible_partners: Vec<usize> = partner_indices
             .iter()
-            .enumerate()
-            .filter(|(i, r)| *i != self.selected_run && r.project_id == after_run.project_id)
-            .map(|(i, r)| {
-                let short = r.id.split('-').next_back().unwrap_or(&r.id);
-                (i, format!("{short} ({}sc)", r.screens.len()))
-            })
+            .skip(page_start)
+            .take(per_page)
+            .copied()
             .collect();
 
-        if peer_runs.is_empty() {
-            return div()
-                .id("desktop-diff-need-two")
-                .flex_1()
-                .h_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .p_6()
-                .child(Label::new(tr.need_two_runs));
+        let mut partner_imgs: Vec<(usize, String, Option<Arc<RenderImage>>)> = Vec::new();
+        for &p_idx in &visible_partners {
+            let ps = &run.screens[p_idx];
+            let ri = self
+                .cell_for_width(ps)
+                .and_then(|c| c.blob_path.as_deref())
+                .and_then(|path| self.images.get_or_decode(path));
+            partner_imgs.push((p_idx, ps.path.clone(), ri));
         }
 
-        self.ensure_diff_loaded();
-        let mut selector_row = div().flex().items_center().gap_2().child(
-            Label::new(format!("{}:", tr.before))
-                .text_xs()
-                .font_semibold(),
-        );
-        for (idx, label) in peer_runs.into_iter().take(5) {
-            let active = self.compare_run == Some(idx);
-            selector_row = selector_row.child(
-                Button::new(format!("diff-before-{idx}"))
-                    .label(label)
-                    .when(active, |b| b.primary())
-                    .when(!active, |b| b.outline())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.compare_run = Some(idx);
-                        this.diff_cache_key = None;
-                        this.ensure_diff_loaded();
-                        cx.notify();
-                    })),
-            );
-        }
+        let grid_color = p.map_grid;
+        let link_color = p.map_link;
+        let partner_count = partner_imgs.len();
+        let full_1x = self.full_1x_detail;
 
-        let entries = self.diff_entries.clone();
-        let mut cards = div()
-            .id("desktop-diff-scroll")
-            .flex_1()
-            .overflow_y_scroll()
-            .p_4()
-            .flex()
-            .flex_col()
-            .gap_4();
+        // Dot grid + orthogonal connectors between main card and right partner cards
+        let bg_canvas = canvas(
+            |_bounds, _window, _cx| {},
+            move |bounds: Bounds<Pixels>, _, window: &mut Window, _cx| {
+                let ox = f32::from(bounds.origin.x);
+                let oy = f32::from(bounds.origin.y);
+                let bw = f32::from(bounds.size.width);
+                let bh = f32::from(bounds.size.height);
 
-        if entries.is_empty() {
-            cards = cards.child(Label::new(tr.no_changes).text_sm());
-        } else {
-            for (idx, entry) in entries.iter().take(12).enumerate() {
-                let before_img = entry
-                    .before_blob
-                    .as_deref()
-                    .and_then(|p| self.images.get_or_decode(p));
-                let after_img = entry
-                    .after_blob
-                    .as_deref()
-                    .and_then(|p| self.images.get_or_decode(p));
-                let meta = match (entry.changed_pixels, entry.diff_percent) {
-                    (Some(px_cnt), Some(pct)) => {
-                        format!(
-                            "{} · {} px · {} · {px_cnt} px ({pct:.2}%)",
-                            entry.path, entry.width_px, entry.kind
-                        )
+                let spacing = 20.0_f32;
+                let mut gx = 10.0_f32;
+                while gx < bw {
+                    let mut gy = 10.0_f32;
+                    while gy < bh {
+                        let mut dot = PathBuilder::fill();
+                        dot.add_polygon(
+                            &[
+                                point(px(ox + gx), px(oy + gy)),
+                                point(px(ox + gx + 1.4), px(oy + gy)),
+                                point(px(ox + gx + 1.4), px(oy + gy + 1.4)),
+                                point(px(ox + gx), px(oy + gy + 1.4)),
+                            ],
+                            true,
+                        );
+                        if let Ok(path) = dot.build() {
+                            window.paint_path(path, grid_color);
+                        }
+                        gy += spacing;
                     }
-                    _ => format!("{} · {} px · {}", entry.path, entry.width_px, entry.kind),
-                };
+                    gx += spacing;
+                }
 
-                let thumb = |title: &str, ri: Option<Arc<RenderImage>>| {
-                    let body = if let Some(image) = ri {
-                        div()
-                            .w(px(220.0))
-                            .h(px(150.0))
-                            .overflow_hidden()
-                            .rounded_md()
-                            .border_1()
-                            .border_color(cx.theme().border)
-                            .child(img(ImageSource::Render(image)).w(px(220.0)).h(px(150.0)))
+                if !full_1x && partner_count > 0 {
+                    // Clean orthogonal connector from focused card center-right to partner stack
+                    let mid_y = oy + bh * 0.5;
+                    let left_x = ox + (bw * 0.48).min(520.0);
+                    let right_x = left_x + 76.0;
+                    let fork_x = (left_x + right_x) * 0.5;
+                    let targets: Vec<f32> = if partner_count == 1 {
+                        vec![mid_y]
                     } else {
-                        div()
-                            .w(px(220.0))
-                            .h(px(150.0))
-                            .rounded_md()
-                            .border_1()
-                            .border_color(cx.theme().border)
-                            .bg(cx.theme().secondary)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(Label::new("—").text_xs())
+                        vec![mid_y - 135.0, mid_y + 135.0]
                     };
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            Label::new(title.to_owned())
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground),
-                        )
-                        .child(body)
-                };
+                    for ty in targets {
+                        let mut pb = PathBuilder::stroke(px(1.5));
+                        pb.move_to(point(px(left_x), px(mid_y)));
+                        pb.line_to(point(px(fork_x), px(mid_y)));
+                        pb.line_to(point(px(fork_x), px(ty)));
+                        pb.line_to(point(px(right_x), px(ty)));
+                        if let Ok(path) = pb.build() {
+                            window.paint_path(path, link_color);
+                        }
+                    }
+                }
+            },
+        )
+        .size_full();
 
-                cards = cards.child(
+        let center_content = if full_1x {
+            let full_preview = if let Some(ri) = focus_img {
+                let dims = ri.size(0);
+                let w = (dims.width.0 as f32).min(1280.0);
+                let h = (dims.height.0 as f32).min(2400.0);
+                div()
+                    .id("full-1x-scroll")
+                    .size_full()
+                    .overflow_y_scroll()
+                    .p_6()
+                    .flex()
+                    .justify_center()
+                    .child(
+                        div()
+                            .p_2()
+                            .rounded_xl()
+                            .border_1()
+                            .border_color(p.capture_rim)
+                            .bg(p.capture_surface)
+                            .shadow_lg()
+                            .child(img(ImageSource::Render(ri)).w(px(w)).h(px(h))),
+                    )
+            } else {
+                div()
+                    .id("full-1x-empty")
+                    .size_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(Label::new("No image").text_color(p.muted_foreground))
+            };
+            div().absolute().inset_0().child(full_preview)
+        } else {
+            let focus_w = if active_cell.as_ref().is_some_and(|c| c.width_px <= 480) {
+                320.0_f32
+            } else {
+                440.0_f32
+            };
+            let focus_h = if active_cell.as_ref().is_some_and(|c| c.width_px <= 480) {
+                460.0_f32
+            } else {
+                275.0_f32
+            };
+            let focus_card = div()
+                .id("neighborhood-focus-card")
+                .w(px(focus_w + 20.0))
+                .p(px(10.0))
+                .rounded_xl()
+                .border_1()
+                .border_color(p.capture_rim)
+                .bg(p.capture_surface)
+                .shadow_lg()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(if let Some(ri) = focus_img {
                     div()
-                        .id(format!("diff-card-{idx}"))
-                        .p_3()
-                        .rounded_lg()
+                        .w(px(focus_w))
+                        .h(px(focus_h))
+                        .rounded_md()
+                        .overflow_hidden()
+                        .bg(p.background)
+                        .child(img(ImageSource::Render(ri)).w(px(focus_w)).h(px(focus_h)))
+                } else {
+                    div()
+                        .w(px(focus_w))
+                        .h(px(focus_h))
+                        .rounded_md()
+                        .bg(p.background)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(Label::new("No image").text_color(p.muted_foreground))
+                })
+                .child(
+                    Label::new(route_short_name(&screen.path))
+                        .text_sm()
+                        .font_semibold()
+                        .text_color(p.foreground),
+                );
+
+            let mut partners_col = div().flex().flex_col().gap_5();
+            for (p_idx, p_path, p_ri) in partner_imgs {
+                let pw = 300.0_f32;
+                let ph = 188.0_f32;
+                partners_col = partners_col.child(
+                    div()
+                        .id(format!("neighbor-partner-{p_idx}"))
+                        .w(px(pw + 16.0))
+                        .p(px(8.0))
+                        .rounded_xl()
                         .border_1()
-                        .border_color(cx.theme().border)
-                        .bg(cx.theme().secondary)
+                        .border_color(p.capture_rim)
+                        .bg(p.capture_surface)
+                        .shadow_md()
+                        .cursor_pointer()
                         .flex()
                         .flex_col()
                         .gap_2()
-                        .child(Label::new(meta).text_sm().font_semibold())
-                        .child(
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.selected_screen = p_idx;
+                                this.selected_cell = 0;
+                                this.neighbor_page = 0;
+                                this.comment_target = CommentTargetChoice::Screen;
+                                cx.notify();
+                            }),
+                        )
+                        .child(if let Some(ri) = p_ri {
                             div()
+                                .w(px(pw))
+                                .h(px(ph))
+                                .rounded_md()
+                                .overflow_hidden()
+                                .bg(p.background)
+                                .child(img(ImageSource::Render(ri)).w(px(pw)).h(px(ph)))
+                        } else {
+                            div()
+                                .w(px(pw))
+                                .h(px(ph))
+                                .rounded_md()
+                                .bg(p.background)
                                 .flex()
-                                .flex_wrap()
-                                .gap_3()
-                                .child(thumb(tr.before, before_img))
-                                .child(thumb(tr.after, after_img))
-                                .child(thumb(tr.overlay, entry.overlay.clone())),
+                                .items_center()
+                                .justify_center()
+                                .child(
+                                    Label::new("No image")
+                                        .text_xs()
+                                        .text_color(p.muted_foreground),
+                                )
+                        })
+                        .child(
+                            Label::new(route_short_name(&p_path))
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(p.foreground),
                         ),
                 );
             }
-        }
+
+            div()
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .gap(px(76.0))
+                .child(focus_card)
+                .when(total_partners > 0, |el| el.child(partners_col))
+        };
+
+        // Bottom-left pagination bar matching `/tmp/obora-dui-detail.png` (`Connected screens · 1–2 of 3 < >`)
+        let pagination = if total_partners > 0 && !full_1x {
+            let from_n = page_start + 1;
+            let to_n = (page_start + visible_partners.len()).min(total_partners);
+            div()
+                .id("neighborhood-pagination")
+                .absolute()
+                .left(px(16.0))
+                .bottom(px(16.0))
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    Label::new(format!(
+                        "{} · {from_n}–{to_n} of {total_partners}",
+                        tr.connected_screens
+                    ))
+                    .text_xs()
+                    .text_color(p.muted_foreground),
+                )
+                .child(
+                    div()
+                        .id("neighbor-prev")
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                this.neighbor_page = this.neighbor_page.saturating_sub(1);
+                                cx.notify();
+                            }),
+                        )
+                        .child(Label::new("‹").text_xs().text_color(p.foreground)),
+                )
+                .child(
+                    div()
+                        .id("neighbor-next")
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                if this.neighbor_page < max_page {
+                                    this.neighbor_page += 1;
+                                }
+                                cx.notify();
+                            }),
+                        )
+                        .child(Label::new("›").text_xs().text_color(p.foreground)),
+                )
+        } else {
+            div().id("neighborhood-pagination-empty")
+        };
+
+        let map_options_btn = div()
+            .id("detail-map-options-btn")
+            .absolute()
+            .right(px(16.0))
+            .bottom(px(14.0))
+            .px_3()
+            .py_2()
+            .rounded_lg()
+            .border_1()
+            .border_color(p.glass_line)
+            .bg(p.glass)
+            .shadow_md()
+            .cursor_pointer()
+            .flex()
+            .items_center()
+            .gap_2()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.options_open = !this.options_open;
+                    this.picker_open = false;
+                    cx.notify();
+                }),
+            )
+            .child(Label::new("⊶").text_xs().text_color(p.muted_foreground))
+            .child(
+                Label::new(tr.map_options)
+                    .text_xs()
+                    .text_color(p.foreground),
+            );
+
+        let neighborhood_area = div()
+            .id("detail-neighborhood-area")
+            .relative()
+            .flex_1()
+            .h_full()
+            .overflow_hidden()
+            .child(bg_canvas)
+            .child(center_content)
+            .child(pagination)
+            .child(map_options_btn);
+
+        let inspector = self.render_floating_inspector(&run, &screen, cx);
 
         div()
-            .id("desktop-diff-stage")
+            .id("desktop-detail-layout")
+            .relative()
             .flex_1()
             .h_full()
             .flex()
-            .flex_col()
-            .bg(cx.theme().background)
-            .child(
-                div()
-                    .px_4()
-                    .py_2()
-                    .border_b_1()
-                    .border_color(cx.theme().border)
-                    .bg(cx.theme().secondary)
-                    .child(selector_row),
-            )
-            .child(cards)
+            .flex_row()
+            .child(neighborhood_area)
+            .child(inspector)
     }
 
-    fn render_inspector(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    /// Floating right glass ScreenInspector matching `/tmp/obora-dui-detail.png` 1:1.
+    fn render_floating_inspector(
+        &self,
+        run: &RunItem,
+        screen: &ScreenItem,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
+        let p = self.pal();
         let tr = i18n::strings(self.lang);
-        let Some(run) = self.active_run() else {
-            return div().id("desktop-inspector-empty").w(px(320.0));
-        };
-        let Some(screen) = self.active_screen() else {
-            return div().id("desktop-inspector-no-screen").w(px(320.0));
+
+        let status_label = |kind: &str| match kind {
+            "verified" => tr.verified,
+            "unrenderable" => tr.unrenderable,
+            _ => tr.unverified,
         };
 
-        let mut cell_list = div().flex().flex_col().gap_1();
+        let mut cells_col = div().flex().flex_col().gap_2();
         for (c_idx, entry) in screen.cells.iter().enumerate() {
             let active = c_idx == self.selected_cell;
-            let text = match (&entry.locale, &entry.reason) {
-                (Some(loc), Some(r)) => {
-                    format!("{}px · {loc} · {} ({r})", entry.width_px, entry.status_kind)
-                }
-                (Some(loc), None) => {
-                    format!("{}px · {loc} · {}", entry.width_px, entry.status_kind)
-                }
-                (None, Some(r)) => format!("{}px · {} ({r})", entry.width_px, entry.status_kind),
-                (None, None) => format!("{}px · {}", entry.width_px, entry.status_kind),
-            };
             let entry_w = entry.width_px;
-            cell_list = cell_list.child(
-                Button::new(format!("insp-cell-{c_idx}"))
-                    .label(text)
-                    .when(active, |b| b.primary())
-                    .when(!active, |b| b.outline())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.selected_cell = c_idx;
-                        this.selected_width = entry_w;
-                        cx.notify();
-                    })),
+            let st_text = status_label(&entry.status_kind);
+            cells_col = cells_col.child(
+                div()
+                    .id(format!("insp-cell-{c_idx}"))
+                    .w_full()
+                    .px_3()
+                    .py_2()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(if active { p.foreground } else { p.glass_line })
+                    .bg(p.glass_surface)
+                    .cursor_pointer()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.selected_cell = c_idx;
+                            this.selected_width = entry_w;
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        Label::new(format!("{} px", entry.width_px))
+                            .text_xs()
+                            .font_semibold()
+                            .text_color(p.foreground),
+                    )
+                    .child(Label::new(st_text).text_xs().text_color(p.muted_foreground)),
             );
         }
 
-        let mut transitions_box = div().flex().flex_col().gap_1();
+        let mut links_col = div().flex().flex_col().gap_2();
         if screen.outgoing.is_empty() {
-            transitions_box = transitions_box.child(
-                Label::new(tr.no_transitions)
+            links_col = links_col.child(
+                Label::new(tr.no_links)
                     .text_xs()
-                    .text_color(cx.theme().muted_foreground),
+                    .text_color(p.muted_foreground),
             );
         } else {
-            for (e_idx, edge) in screen.outgoing.iter().enumerate() {
+            for (e_idx, edge) in screen.outgoing.iter().take(6).enumerate() {
                 let target_idx = run.screens.iter().position(|s| s.path == edge.to_path);
-                let label = format!("→ {} [{}]", edge.to_path, edge.source);
-                if let Some(t_idx) = target_idx {
-                    transitions_box = transitions_box.child(
-                        Button::new(format!("insp-edge-{e_idx}"))
-                            .label(label)
-                            .ghost()
-                            .on_click(cx.listener(move |this, _, _, cx| {
+                let row = div()
+                    .id(format!("insp-edge-{e_idx}"))
+                    .w_full()
+                    .px_3()
+                    .py_2()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(p.glass_line)
+                    .bg(p.glass_surface)
+                    .cursor_pointer()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_2()
+                    .overflow_hidden()
+                    .child(
+                        Label::new(format!("↗ {}", edge.to_path))
+                            .text_xs()
+                            .text_color(p.foreground),
+                    )
+                    .when_some(target_idx, |el, t_idx| {
+                        el.on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
                                 this.selected_screen = t_idx;
                                 this.selected_cell = 0;
+                                this.neighbor_page = 0;
                                 this.comment_target = CommentTargetChoice::Screen;
                                 cx.notify();
-                            })),
-                    );
-                } else {
-                    transitions_box = transitions_box.child(Label::new(label).text_xs());
-                }
+                            }),
+                        )
+                    });
+                links_col = links_col.child(row);
             }
         }
 
-        // Comment target picker (Screen / Width / Transition)
+        // Comment target pills
         let active_w = self
             .active_cell()
             .map(|c| c.width_px)
@@ -1449,12 +1722,16 @@ impl DuiDesktopView {
             );
         if let Some(first_edge) = screen.outgoing.first() {
             let to = first_edge.to_path.clone();
-            let is_active = self.comment_target == CommentTargetChoice::Transition(to.clone());
+            let active = self.comment_target == CommentTargetChoice::Transition(to.clone());
             target_bar = target_bar.child(
                 Button::new("cmt-target-transition")
-                    .label(format!("{} → {to}", tr.target_transition))
-                    .when(is_active, |b| b.primary())
-                    .when(!is_active, |b| b.outline())
+                    .label(format!(
+                        "{} → {}",
+                        tr.target_transition,
+                        route_short_name(&to)
+                    ))
+                    .when(active, |b| b.primary())
+                    .when(!active, |b| b.outline())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.comment_target = CommentTargetChoice::Transition(to.clone());
                         cx.notify();
@@ -1474,34 +1751,28 @@ impl DuiDesktopView {
             .cloned()
             .collect();
 
-        let mut comments_list = div()
-            .id("comments-list-scroll")
-            .flex_1()
-            .overflow_y_scroll()
-            .flex()
-            .flex_col()
-            .gap_2();
+        let mut comments_col = div().flex().flex_col().gap_2();
         if matching_comments.is_empty() {
-            comments_list = comments_list.child(
+            comments_col = comments_col.child(
                 Label::new(tr.no_comments)
                     .text_xs()
-                    .text_color(cx.theme().muted_foreground),
+                    .text_color(p.muted_foreground),
             );
         } else {
             for (idx, c) in matching_comments.iter().enumerate() {
                 let cid = c.id.clone();
                 let is_open = c.status == "open";
-                comments_list = comments_list.child(
+                comments_col = comments_col.child(
                     div()
                         .id(format!("desktop-comment-{idx}"))
-                        .flex()
-                        .flex_col()
-                        .gap_1()
                         .p_2()
                         .rounded_md()
                         .border_1()
-                        .border_color(cx.theme().border)
-                        .bg(cx.theme().background)
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .flex()
+                        .flex_col()
+                        .gap_1()
                         .child(
                             div()
                                 .flex()
@@ -1510,7 +1781,7 @@ impl DuiDesktopView {
                                 .child(
                                     Label::new(format!("{} · {}", c.target_label, c.status))
                                         .text_xs()
-                                        .text_color(cx.theme().muted_foreground),
+                                        .text_color(p.muted_foreground),
                                 )
                                 .child(
                                     Button::new(format!("toggle-comment-{idx}"))
@@ -1521,135 +1792,719 @@ impl DuiDesktopView {
                                         })),
                                 ),
                         )
-                        .child(Label::new(c.body.clone()).text_sm())
+                        .child(
+                            Label::new(c.body.clone())
+                                .text_xs()
+                                .text_color(p.foreground),
+                        )
                         .child(
                             Label::new(c.author.clone())
                                 .text_xs()
-                                .text_color(cx.theme().muted_foreground),
+                                .text_color(p.muted_foreground),
                         ),
                 );
             }
         }
 
-        let open_count = matching_comments
+        let title = route_short_name(&screen.path);
+        let multiple_states = screen.cells.len() > 2;
+
+        // Floating glass panel (margin: 10px, rounded-xl) matching `/tmp/obora-dui-detail.png`!
+        div()
+            .id("floating-inspector-wrapper")
+            .w(px(332.0))
+            .h_full()
+            .flex_shrink_0()
+            .p_2()
+            .child(
+                div()
+                    .id("desktop-inspector")
+                    .size_full()
+                    .p_4()
+                    .rounded_xl()
+                    .border_1()
+                    .border_color(p.glass_line)
+                    .bg(p.glass)
+                    .shadow_lg()
+                    .overflow_y_scroll()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .child(
+                        div()
+                            .flex()
+                            .items_start()
+                            .justify_between()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(
+                                        Label::new(title)
+                                            .text_base()
+                                            .font_bold()
+                                            .text_color(p.foreground),
+                                    )
+                                    .child(
+                                        Label::new(screen.path.clone())
+                                            .text_xs()
+                                            .text_color(p.muted_foreground),
+                                    )
+                                    .child(
+                                        Label::new(tr.archive)
+                                            .text_xs()
+                                            .text_color(p.muted_foreground),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .id("inspector-close-btn")
+                                    .w(px(28.0))
+                                    .h(px(28.0))
+                                    .rounded_md()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .cursor_pointer()
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(|this, _, _, cx| {
+                                            this.full_1x_detail = false;
+                                            this.view_mode = ViewMode::Overview;
+                                            cx.notify();
+                                        }),
+                                    )
+                                    .child(
+                                        Label::new("✕").text_sm().text_color(p.muted_foreground),
+                                    ),
+                            ),
+                    )
+                    // Brand orange `#ef803f` CTA matching web `라이브 열기` button in `/tmp/obora-dui-detail.png`
+                    .child(
+                        div()
+                            .id("inspector-primary-cta")
+                            .w_full()
+                            .py_2()
+                            .rounded_md()
+                            .bg(p.primary)
+                            .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .gap_2()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, cx| {
+                                    this.full_1x_detail = !this.full_1x_detail;
+                                    cx.notify();
+                                }),
+                            )
+                            .child(
+                                Label::new(if self.full_1x_detail {
+                                    tr.connected_screens
+                                } else {
+                                    tr.inspect_1x
+                                })
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(p.primary_foreground),
+                            ),
+                    )
+                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                    .child(
+                        Label::new(if multiple_states {
+                            tr.states_and_widths
+                        } else {
+                            tr.widths
+                        })
+                        .text_xs()
+                        .text_color(p.muted_foreground),
+                    )
+                    .child(cells_col)
+                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                    .child(
+                        Label::new(tr.links)
+                            .text_xs()
+                            .text_color(p.muted_foreground),
+                    )
+                    .child(links_col)
+                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                    .child(
+                        Label::new(format!(
+                            "{} ({})",
+                            tr.review_comments,
+                            matching_comments.len()
+                        ))
+                        .text_xs()
+                        .text_color(p.muted_foreground),
+                    )
+                    .child(target_bar)
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(div().flex_1().child(Input::new(&self.comment_input)))
+                            .child(
+                                Button::new("post-comment")
+                                    .label(tr.post)
+                                    .primary()
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.post_comment(window, cx);
+                                    })),
+                            ),
+                    )
+                    .when_some(self.error_message.clone(), |el, err| {
+                        el.child(Label::new(err).text_xs().text_color(p.primary))
+                    })
+                    .child(comments_col),
+            )
+    }
+
+    /// Capture Diff view matching `/tmp/obora-dui-diff.png` 1:1.
+    fn render_diff_stage(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let tr = i18n::strings(self.lang);
+        let Some(after_run) = self.active_run().cloned() else {
+            return div()
+                .id("desktop-diff-empty")
+                .flex_1()
+                .h_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(Label::new(tr.workspace_empty).text_color(p.muted_foreground));
+        };
+
+        let peer_runs: Vec<(usize, String)> = self
+            .workspace
+            .runs
             .iter()
-            .filter(|c| c.status == "open")
-            .count();
+            .enumerate()
+            .filter(|(i, r)| *i != self.selected_run && r.project_id == after_run.project_id)
+            .map(|(i, r)| (i, format!("{} · {}", r.project_name, short_run_id(&r.id))))
+            .collect();
+
+        if peer_runs.is_empty() {
+            return div()
+                .id("desktop-diff-need-two")
+                .flex_1()
+                .h_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(Label::new(tr.need_two_runs).text_color(p.muted_foreground));
+        }
+
+        self.ensure_diff_loaded();
+        let entries = self.diff_entries.clone();
+
+        let mut before_pills = div().flex().items_center().gap_1();
+        for (idx, label) in peer_runs.into_iter().take(3) {
+            let active = self.compare_run == Some(idx);
+            before_pills = before_pills.child(
+                Button::new(format!("diff-before-{idx}"))
+                    .label(label)
+                    .when(active, |b| b.primary())
+                    .when(!active, |b| b.outline())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.compare_run = Some(idx);
+                        this.diff_cache_key = None;
+                        this.ensure_diff_loaded();
+                        cx.notify();
+                    })),
+            );
+        }
+
+        let header = div()
+            .mx_3()
+            .mt_2()
+            .px_4()
+            .py_3()
+            .rounded_xl()
+            .border_1()
+            .border_color(p.glass_line)
+            .bg(p.glass)
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap_3()
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .child(
+                        Button::new("diff-back-overview")
+                            .label(format!("← {}", tr.back_to_overview))
+                            .outline()
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.view_mode = ViewMode::Overview;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Label::new(tr.diff_title)
+                            .text_sm()
+                            .font_semibold()
+                            .text_color(p.foreground),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                Label::new(tr.before_capture)
+                                    .text_xs()
+                                    .text_color(p.muted_foreground),
+                            )
+                            .child(before_pills),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                Label::new(tr.after_capture)
+                                    .text_xs()
+                                    .text_color(p.muted_foreground),
+                            )
+                            .child(
+                                Label::new(format!(
+                                    "{} · {}",
+                                    after_run.project_name,
+                                    short_run_id(&after_run.id)
+                                ))
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(p.foreground),
+                            ),
+                    ),
+            )
+            .child(
+                Label::new(format!("{} changed", entries.len()))
+                    .text_xs()
+                    .text_color(p.muted_foreground),
+            );
+
+        let mut cards = div()
+            .id("desktop-diff-scroll")
+            .flex_1()
+            .overflow_y_scroll()
+            .p_3()
+            .flex()
+            .flex_col()
+            .gap_3();
+
+        if entries.is_empty() {
+            cards = cards.child(
+                div()
+                    .p_6()
+                    .rounded_xl()
+                    .border_1()
+                    .border_color(p.glass_line)
+                    .bg(p.glass)
+                    .child(
+                        Label::new(tr.no_changes)
+                            .text_sm()
+                            .text_color(p.muted_foreground),
+                    ),
+            );
+        } else {
+            for (idx, entry) in entries.iter().take(12).enumerate() {
+                let before_img = entry
+                    .before_blob
+                    .as_deref()
+                    .and_then(|path| self.images.get_or_decode(path));
+                let after_img = entry
+                    .after_blob
+                    .as_deref()
+                    .and_then(|path| self.images.get_or_decode(path));
+
+                let meta = match (entry.changed_pixels, entry.diff_percent) {
+                    (Some(px_cnt), Some(pct)) => format!(
+                        "{} · {} px · {} · {px_cnt} px ({pct:.2}%)",
+                        entry.path, entry.width_px, entry.kind
+                    ),
+                    _ => format!("{} · {} px · {}", entry.path, entry.width_px, entry.kind),
+                };
+
+                let thumb = |title: &str, ri: Option<Arc<RenderImage>>, accent_border: bool| {
+                    let body = if let Some(image) = ri {
+                        div()
+                            .w(px(260.0))
+                            .h(px(176.0))
+                            .overflow_hidden()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(if accent_border { p.primary } else { p.border })
+                            .bg(p.card)
+                            .child(img(ImageSource::Render(image)).w(px(260.0)).h(px(176.0)))
+                    } else {
+                        div()
+                            .w(px(260.0))
+                            .h(px(176.0))
+                            .rounded_md()
+                            .border_1()
+                            .border_color(p.glass_line)
+                            .bg(p.card)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(Label::new("—").text_xs().text_color(p.muted_foreground))
+                    };
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            Label::new(title.to_owned())
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                        )
+                        .child(body)
+                };
+
+                cards = cards.child(
+                    div()
+                        .id(format!("diff-card-{idx}"))
+                        .p_4()
+                        .rounded_xl()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass)
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(
+                            Label::new(meta)
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(p.foreground),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_wrap()
+                                .gap_3()
+                                .child(thumb(tr.before, before_img, false))
+                                .child(thumb(tr.after, after_img, false))
+                                .child(thumb(tr.overlay, entry.overlay.clone(), true)),
+                        ),
+                );
+            }
+        }
 
         div()
-            .id("desktop-inspector")
-            .w(px(330.0))
+            .id("desktop-diff-stage")
+            .flex_1()
             .h_full()
             .flex()
             .flex_col()
-            .gap_3()
-            .p_3()
-            .border_l_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().secondary)
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap_2()
-                    .child(
-                        Label::new(format!(
-                            "{} · {}",
-                            tr.inspector,
-                            route_short_name(&screen.path)
-                        ))
-                        .font_semibold(),
-                    )
-                    .child(
-                        Button::new("inspector-open-detail")
-                            .label(tr.open_detail)
-                            .outline()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.view_mode = ViewMode::Detail;
-                                cx.notify();
-                            })),
-                    ),
-            )
-            .child(
-                Label::new(screen.path.clone())
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground),
-            )
-            .child(Label::new(tr.states_and_widths).text_xs().font_semibold())
-            .child(cell_list)
-            .child(Label::new(tr.transitions).text_xs().font_semibold())
-            .child(transitions_box)
-            .child(
+            .child(header)
+            .child(cards)
+    }
+
+    /// Centered WorkPicker modal overlay matching `apps/canvas/src/features/workspace/WorkPicker.tsx`.
+    fn render_work_picker_modal(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let tr = i18n::strings(self.lang);
+        let groups = self.workspace.project_groups();
+
+        let mut list = div()
+            .id("work-picker-scroll")
+            .max_h(px(420.0))
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap_3();
+
+        for group in groups {
+            let mut col = div().flex().flex_col().gap_1().child(
                 Label::new(format!(
-                    "{} ({open_count}/{})",
-                    tr.review_comments,
-                    matching_comments.len()
+                    "{} ({})",
+                    group.project_name,
+                    group.run_indices.len()
                 ))
                 .text_xs()
-                .font_semibold(),
+                .font_semibold()
+                .text_color(p.muted_foreground),
+            );
+            for &run_idx in group.run_indices.iter().take(8) {
+                let run = &self.workspace.runs[run_idx];
+                let active = run_idx == self.selected_run;
+                let (total, verified, _, _) = run.counts();
+                let short = short_run_id(&run.id);
+                let branch = run.branch.as_deref().unwrap_or("main");
+                col = col.child(
+                    div()
+                        .id(format!("picker-run-{run_idx}"))
+                        .w_full()
+                        .px_3()
+                        .py_2()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(if active { p.primary } else { p.glass_line })
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.select_run(run_idx, cx);
+                            }),
+                        )
+                        .child(
+                            Label::new(format!("{short} · {branch}"))
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(p.foreground),
+                        )
+                        .child(
+                            Label::new(format!(
+                                "{} screens · {verified}/{total}",
+                                run.screens.len()
+                            ))
+                            .text_xs()
+                            .text_color(p.muted_foreground),
+                        ),
+                );
+            }
+            list = list.child(col);
+        }
+
+        div()
+            .id("work-picker-backdrop")
+            .absolute()
+            .inset_0()
+            .bg(p.scrim)
+            .flex()
+            .items_center()
+            .justify_center()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.picker_open = false;
+                    cx.notify();
+                }),
             )
-            .child(target_bar)
             .child(
                 div()
+                    .id("work-picker-dialog")
+                    .w(px(460.0))
+                    .p_4()
+                    .rounded_xl()
+                    .border_1()
+                    .border_color(p.glass_line)
+                    .bg(p.card)
+                    .shadow_lg()
                     .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(div().flex_1().child(Input::new(&self.comment_input)))
+                    .flex_col()
+                    .gap_3()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
-                        Button::new("post-comment")
-                            .label(tr.post)
-                            .primary()
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.post_comment(window, cx);
-                            })),
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                Label::new(tr.select_workspace)
+                                    .text_sm()
+                                    .font_semibold()
+                                    .text_color(p.foreground),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        Button::new("picker-open-diff")
+                                            .label(tr.compare_captures)
+                                            .outline()
+                                            .on_click(cx.listener(|this, _, _, cx| {
+                                                this.picker_open = false;
+                                                this.view_mode = ViewMode::Diff;
+                                                this.ensure_diff_loaded();
+                                                cx.notify();
+                                            })),
+                                    )
+                                    .child(
+                                        Button::new("picker-refresh")
+                                            .label(tr.refresh)
+                                            .ghost()
+                                            .on_click(cx.listener(|this, _, _, cx| {
+                                                this.reload(cx);
+                                            })),
+                                    ),
+                            ),
+                    )
+                    .child(list),
+            )
+    }
+
+    /// Map options dialog matching `apps/canvas` bottom-right `Map options` modal.
+    fn render_map_options_modal(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let tr = i18n::strings(self.lang);
+        let widths = self
+            .active_run()
+            .map(RunItem::widths)
+            .unwrap_or_else(|| vec![1280]);
+
+        let mut width_row = div().flex().flex_wrap().gap_2();
+        for w in widths {
+            let active = w == self.selected_width;
+            width_row = width_row.child(
+                Button::new(format!("opt-width-{w}"))
+                    .label(format!("{w} px"))
+                    .when(active, |b| b.primary())
+                    .when(!active, |b| b.outline())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.selected_width = w;
+                        this.options_open = false;
+                        this.fit_map();
+                        cx.notify();
+                    })),
+            );
+        }
+
+        div()
+            .id("map-options-backdrop")
+            .absolute()
+            .inset_0()
+            .bg(p.scrim)
+            .flex()
+            .items_center()
+            .justify_center()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.options_open = false;
+                    cx.notify();
+                }),
+            )
+            .child(
+                div()
+                    .id("map-options-dialog")
+                    .w(px(340.0))
+                    .p_4()
+                    .rounded_xl()
+                    .border_1()
+                    .border_color(p.glass_line)
+                    .bg(p.card)
+                    .shadow_lg()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                Label::new(tr.map_options)
+                                    .text_sm()
+                                    .font_semibold()
+                                    .text_color(p.foreground),
+                            )
+                            .child(Button::new("opt-close").label(tr.close).ghost().on_click(
+                                cx.listener(|this, _, _, cx| {
+                                    this.options_open = false;
+                                    cx.notify();
+                                }),
+                            )),
+                    )
+                    .child(
+                        Label::new(tr.widths)
+                            .text_xs()
+                            .text_color(p.muted_foreground),
+                    )
+                    .child(width_row)
+                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(
+                                Button::new("opt-compare")
+                                    .label(tr.compare_captures)
+                                    .outline()
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.options_open = false;
+                                        this.view_mode = ViewMode::Diff;
+                                        this.ensure_diff_loaded();
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(
+                                Button::new("opt-refresh")
+                                    .label(tr.refresh)
+                                    .outline()
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.options_open = false;
+                                        this.reload(cx);
+                                    })),
+                            ),
                     ),
             )
-            .when_some(self.error_message.clone(), |el, err| {
-                el.child(Label::new(err).text_xs())
-            })
-            .child(comments_list)
     }
 }
 
 impl Render for DuiDesktopView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = self.pal();
         let win_bounds = window.viewport_size();
-        let sidebar_w = if self.sidebar_open { 250.0 } else { 0.0 };
-        let inspector_w = if self.view_mode == ViewMode::Diff {
-            0.0
+        let rail_w = if self.rail_collapsed { 52.0 } else { 204.0 };
+        let insp_w = if self.view_mode == ViewMode::Detail {
+            332.0
         } else {
-            330.0
+            0.0
         };
-        self.viewport_w = (f32::from(win_bounds.width) - sidebar_w - inspector_w).max(320.0);
-        self.viewport_h = (f32::from(win_bounds.height) - 48.0).max(260.0);
+        self.viewport_w = (f32::from(win_bounds.width) - rail_w - insp_w).max(320.0);
+        self.viewport_h = f32::from(win_bounds.height).max(320.0);
 
-        let topbar = self.render_topbar(cx);
-        let sidebar = self.sidebar_open.then(|| self.render_sidebar(cx));
-        let inspector = (self.view_mode != ViewMode::Diff).then(|| self.render_inspector(cx));
+        let rail = self.render_workspace_rail(cx);
+        let picker_modal = self.picker_open.then(|| self.render_work_picker_modal(cx));
+        let options_modal = self.options_open.then(|| self.render_map_options_modal(cx));
 
-        let mut body = div().flex_1().w_full().min_h_0().flex().flex_row();
-        if let Some(sb) = sidebar {
-            body = body.child(sb);
-        }
-        body = match self.view_mode {
-            ViewMode::Overview => body.child(self.render_overview_canvas(cx)),
-            ViewMode::Detail => body.child(self.render_detail_stage(cx)),
-            ViewMode::Diff => body.child(self.render_diff_stage(cx)),
-        };
-        if let Some(insp) = inspector {
-            body = body.child(insp);
-        }
-
-        div()
+        let mut root = div()
             .id("dui-desktop-root")
+            .relative()
             .size_full()
             .flex()
-            .flex_col()
-            .bg(cx.theme().background)
-            .text_color(cx.theme().foreground)
-            .child(topbar)
-            .child(body)
+            .flex_row()
+            .bg(p.background)
+            .text_color(p.foreground)
+            .child(rail);
+
+        root = match self.view_mode {
+            ViewMode::Overview => root.child(self.render_overview_stage(cx)),
+            ViewMode::Detail => root.child(self.render_detail_stage(cx)),
+            ViewMode::Diff => root.child(self.render_diff_stage(cx)),
+        };
+
+        if let Some(modal) = picker_modal {
+            root = root.child(modal);
+        }
+        if let Some(modal) = options_modal {
+            root = root.child(modal);
+        }
+        root
     }
 }
 
@@ -1780,8 +2635,9 @@ fn main() {
         dui_home: store::default_dui_home(),
         project: None,
         run_id: None,
+        screen_path: None,
         view: ViewMode::Overview,
-        dark: false,
+        dark: true,
         lang: UiLang::En,
         viewport_width: 1440,
         viewport_height: 900,
@@ -1809,6 +2665,12 @@ fn main() {
                     i += 1;
                 }
             }
+            "--screen" => {
+                if let Some(val) = args.get(i + 1) {
+                    opts.screen_path = Some(val.clone());
+                    i += 1;
+                }
+            }
             "--view" => {
                 if let Some(val) = args.get(i + 1) {
                     opts.view = ViewMode::parse(val);
@@ -1817,7 +2679,7 @@ fn main() {
             }
             "--theme" => {
                 if let Some(val) = args.get(i + 1) {
-                    opts.dark = val.eq_ignore_ascii_case("dark");
+                    opts.dark = !val.eq_ignore_ascii_case("light");
                     i += 1;
                 }
             }
