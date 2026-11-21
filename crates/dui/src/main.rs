@@ -3,6 +3,7 @@ mod archive;
 use archive::Capture;
 mod cache;
 mod chromium;
+mod comments;
 mod diff;
 mod gpui;
 mod graph_view;
@@ -259,6 +260,45 @@ fn run() -> Reply {
     {
         mcp::serve()?;
         return Ok(Value::Null);
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "comment"
+    {
+        return match tail {
+            [sub, payload] if sub == "add" => {
+                let raw = payload
+                    .to_str()
+                    .ok_or_else(|| failure(2, "invalid UTF-8 comment JSON"))?;
+                let parsed: Value = serde_json::from_str(raw)
+                    .map_err(|e| failure(2, &format!("invalid comment JSON: {e}")))?;
+                comments::add(&parsed)
+            }
+            [sub] if sub == "list" => comments::list(&json!({})),
+            [sub, payload] if sub == "list" => {
+                let raw = payload
+                    .to_str()
+                    .ok_or_else(|| failure(2, "invalid UTF-8 filter JSON"))?;
+                let parsed: Value = serde_json::from_str(raw)
+                    .map_err(|e| failure(2, &format!("invalid filter JSON: {e}")))?;
+                comments::list(&parsed)
+            }
+            [sub, id] if sub == "resolve" => {
+                let id_str = id
+                    .to_str()
+                    .ok_or_else(|| failure(2, "invalid comment id"))?;
+                comments::resolve(&json!({ "id": id_str }))
+            }
+            [sub, id] if sub == "reopen" => {
+                let id_str = id
+                    .to_str()
+                    .ok_or_else(|| failure(2, "invalid comment id"))?;
+                comments::reopen(&json!({ "id": id_str }))
+            }
+            _ => Err(failure(
+                2,
+                "expected comment <add JSON | list [JSON] | resolve ID | reopen ID>",
+            )),
+        };
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "transitions"

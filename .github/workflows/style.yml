@@ -66,3 +66,4 @@ jobs:
           npm run check:diff
           npm run check:viewer
           npm run check:transitions
+          npm run check:comments

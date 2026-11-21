@@ -1,6 +1,6 @@
 //! Embedded loopback HTTP server for `apps/canvas` (`dui open`).
 
-use crate::{Reply, archive, diff, failure, live};
+use crate::{Reply, archive, comments, diff, failure, live};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -465,6 +465,122 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             return;
         }
         send_response(&mut stream, 404, "text/plain", "no-store", b"");
+        return;
+    }
+
+    if path == "/api/comments" || path == "/api/comments/" {
+        if !is_same_origin(&headers) {
+            send_json(
+                &mut stream,
+                403,
+                &json!({"status":"error","reason":"forbidden-origin"}),
+            );
+            return;
+        }
+        if method == "GET" {
+            let mut args = serde_json::Map::new();
+            if let Some(pid) = query.get("projectId").filter(|s| !s.is_empty()) {
+                args.insert("projectId".into(), json!(pid));
+            }
+            if let Some(run_key) = query.get("run").filter(|s| !s.is_empty())
+                && let Ok(guard) = state.lock()
+                && let Some(entry) = list_archives(&guard)
+                    .into_iter()
+                    .find(|a| a.run["key"].as_str() == Some(run_key.as_str()))
+            {
+                args.insert("run".into(), json!(entry.root.display().to_string()));
+            }
+            if let Some(status) = query.get("status").filter(|s| !s.is_empty()) {
+                args.insert("status".into(), json!(status));
+            }
+            if let Some(screen_path) = query.get("path").filter(|s| !s.is_empty()) {
+                args.insert("path".into(), json!(screen_path));
+            }
+            if let Some(w) = query.get("width").and_then(|s| s.parse::<u64>().ok()) {
+                args.insert("width".into(), json!(w));
+            }
+            match comments::list(&Value::Object(args)) {
+                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Err((code, err)) => {
+                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
+                }
+            }
+            return;
+        }
+        if method != "POST" {
+            send_response(&mut stream, 405, "text/plain", "no-store", b"");
+            return;
+        }
+        let Ok(mut body) = serde_json::from_slice::<Value>(&body_bytes) else {
+            send_json(
+                &mut stream,
+                400,
+                &json!({"status":"error","reason":"invalid-json"}),
+            );
+            return;
+        };
+        if !body.is_object() {
+            send_json(
+                &mut stream,
+                400,
+                &json!({"status":"error","reason":"invalid-json"}),
+            );
+            return;
+        }
+        let op = body["op"].as_str().unwrap_or("").to_owned();
+        if op == "add" {
+            if let Some(run_key) = body["run"].as_str().filter(|s| !s.is_empty()) {
+                let archive = state
+                    .lock()
+                    .ok()
+                    .map(|g| list_archives(&g))
+                    .and_then(|list| {
+                        list.into_iter()
+                            .find(|a| a.run["key"].as_str() == Some(run_key))
+                    });
+                let Some(entry) = archive else {
+                    send_json(
+                        &mut stream,
+                        404,
+                        &json!({"status":"error","reason":"run-not-found"}),
+                    );
+                    return;
+                };
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("run".into(), json!(entry.root.display().to_string()));
+                }
+            }
+            match comments::add(&body) {
+                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Err((code, err)) => {
+                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
+                }
+            }
+            return;
+        }
+        if op == "resolve" {
+            match comments::resolve(&body) {
+                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Err((code, err)) => {
+                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
+                }
+            }
+            return;
+        }
+        if op == "reopen" {
+            match comments::reopen(&body) {
+                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Err((code, err)) => {
+                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
+                }
+            }
+            return;
+        }
+        send_json(
+            &mut stream,
+            400,
+            &json!({"status":"error","reason":"unknown-operation"}),
+        );
         return;
     }
 

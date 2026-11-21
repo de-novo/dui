@@ -3,10 +3,11 @@
 
 use dui_core::{
     model::{
-        BlobId, CacheEntry, CacheInputs, CacheKey, CacheOutcome, Cell, CellStatus, Comment,
-        CommentId, Commit, CommitId, ContentHash, CoverageSummary, Edge, EdgeEndpoint, EdgeSource,
-        Evidence, EvidenceId, ImageBlob, Project, ProjectId, Run, RunAggregate, RunEnvironment,
-        RunId, RunKind, Screen, ScreenOrigin, State, StateId, Width, Worktree, WorktreeId,
+        BlobId, CacheEntry, CacheInputs, CacheKey, CacheOutcome, Cell, CellId, CellStatus, Comment,
+        CommentId, Commit, CommitId, ContentHash, CoverageSummary, Edge, EdgeEndpoint, EdgeId,
+        EdgeSource, Evidence, EvidenceId, ImageBlob, Project, ProjectId, Run, RunAggregate,
+        RunEnvironment, RunId, RunKind, Screen, ScreenId, ScreenOrigin, State, StateId, Width,
+        Worktree, WorktreeId,
     },
     storage::{
         ArtifactStore, CacheRepository, CommentRepository, RunFilter, RunRepository, RunSummary,
@@ -1548,6 +1549,239 @@ impl CommentRepository for SqliteStore {
     }
 }
 
+impl SqliteStore {
+    pub fn list_comments_by_project(&self, project_id: &ProjectId) -> StoreResult<Vec<Comment>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT project_id, run_id, target_json, author, body, status, created_at_ms, updated_at_ms
+                 FROM comments WHERE project_id = ?1 ORDER BY created_at_ms ASC, id ASC",
+            )
+            .map_err(db_err)?;
+        let rows = stmt
+            .query_map(params![project_id.as_str()], |r| {
+                Ok(CommentRow {
+                    pid: r.get(0)?,
+                    rid: r.get(1)?,
+                    target_json: r.get(2)?,
+                    author: r.get(3)?,
+                    body: r.get(4)?,
+                    status: r.get(5)?,
+                    created_at_ms: r.get(6)?,
+                    updated_at_ms: r.get(7)?,
+                })
+            })
+            .map_err(db_err)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(decode_comment(row.map_err(db_err)?)?);
+        }
+        Ok(out)
+    }
+
+    pub fn list_all_comments(&self) -> StoreResult<Vec<Comment>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT project_id, run_id, target_json, author, body, status, created_at_ms, updated_at_ms
+                 FROM comments ORDER BY created_at_ms ASC, id ASC",
+            )
+            .map_err(db_err)?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(CommentRow {
+                    pid: r.get(0)?,
+                    rid: r.get(1)?,
+                    target_json: r.get(2)?,
+                    author: r.get(3)?,
+                    body: r.get(4)?,
+                    status: r.get(5)?,
+                    created_at_ms: r.get(6)?,
+                    updated_at_ms: r.get(7)?,
+                })
+            })
+            .map_err(db_err)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(decode_comment(row.map_err(db_err)?)?);
+        }
+        Ok(out)
+    }
+
+    pub fn ensure_screen_record(&self, screen_id: &ScreenId, path: &str) -> StoreResult<()> {
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO screens (id, path, origin_json) VALUES (?1, ?2, ?3)",
+                params![screen_id.as_str(), path, r#"{"kind":"entry"}"#],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn ensure_edge_record(
+        &self,
+        edge_id: &EdgeId,
+        run_id: &RunId,
+        from_screen_id: &ScreenId,
+        to_screen_id: &ScreenId,
+    ) -> StoreResult<()> {
+        let from_json = serde_json::to_string(&EdgeEndpoint::Screen {
+            screen_id: from_screen_id.clone(),
+        })
+        .map_err(db_err)?;
+        let to_json = serde_json::to_string(&EdgeEndpoint::Screen {
+            screen_id: to_screen_id.clone(),
+        })
+        .map_err(db_err)?;
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO edges (id, run_id, from_json, to_json, source, trigger, selector, observed_widths_json)
+                 VALUES (?1, ?2, ?3, ?4, 'extracted', NULL, NULL, '[]')",
+                params![edge_id.as_str(), run_id.as_str(), from_json, to_json],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn find_cell_id(
+        &self,
+        run_id: &RunId,
+        path: &str,
+        state: Option<&str>,
+        width: u32,
+    ) -> StoreResult<Option<CellId>> {
+        let screen_id = Screen::derive_id(path);
+        let id: Option<String> = match state {
+            Some(st) => self
+                .conn
+                .query_row(
+                    "SELECT id FROM cells WHERE run_id = ?1 AND screen_id = ?2 AND state_id = ?3 AND width_px = ?4 LIMIT 1",
+                    params![run_id.as_str(), screen_id.as_str(), st, i64::from(width)],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(db_err)?,
+            None => self
+                .conn
+                .query_row(
+                    "SELECT id FROM cells WHERE run_id = ?1 AND screen_id = ?2 AND width_px = ?3 LIMIT 1",
+                    params![run_id.as_str(), screen_id.as_str(), i64::from(width)],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(db_err)?,
+        };
+        id.map(|raw| CellId::parse(raw).map_err(db_err)).transpose()
+    }
+
+    pub fn describe_comment_target(&self, target: &dui_core::model::CommentTarget) -> Value {
+        use dui_core::model::CommentTarget;
+        match target {
+            CommentTarget::Screen { screen_id } => {
+                let path: Option<String> = self
+                    .conn
+                    .query_row(
+                        "SELECT path FROM screens WHERE id = ?1",
+                        params![screen_id.as_str()],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten();
+                json!({
+                    "kind": "screen",
+                    "screenId": screen_id.as_str(),
+                    "path": path,
+                })
+            }
+            CommentTarget::State { state_id } => {
+                let row: Option<(String, String)> = self
+                    .conn
+                    .query_row(
+                        "SELECT st.screen_id, sc.path FROM states st LEFT JOIN screens sc ON sc.id = st.screen_id WHERE st.id = ?1",
+                        params![state_id.as_str()],
+                        |r| Ok((r.get(0)?, r.get::<_, Option<String>>(1)?.unwrap_or_default())),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten();
+                json!({
+                    "kind": "state",
+                    "stateId": state_id.as_str(),
+                    "screenId": row.as_ref().map(|(s, _)| s),
+                    "path": row.as_ref().map(|(_, p)| p).filter(|p| !p.is_empty()),
+                })
+            }
+            CommentTarget::Cell { cell_id } => {
+                let row: Option<(String, String, i64, Option<String>)> = self
+                    .conn
+                    .query_row(
+                        "SELECT c.screen_id, c.state_id, c.width_px, sc.path FROM cells c LEFT JOIN screens sc ON sc.id = c.screen_id WHERE c.id = ?1",
+                        params![cell_id.as_str()],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten();
+                json!({
+                    "kind": "cell",
+                    "cellId": cell_id.as_str(),
+                    "screenId": row.as_ref().map(|(s, _, _, _)| s),
+                    "stateId": row.as_ref().map(|(_, st, _, _)| st),
+                    "width": row.as_ref().map(|(_, _, w, _)| *w),
+                    "path": row.as_ref().and_then(|(_, _, _, p)| p.as_ref()),
+                })
+            }
+            CommentTarget::Edge { edge_id } => {
+                let row: Option<(String, String)> = self
+                    .conn
+                    .query_row(
+                        "SELECT from_json, to_json FROM edges WHERE id = ?1",
+                        params![edge_id.as_str()],
+                        |r| Ok((r.get(0)?, r.get(1)?)),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten();
+                let mut from_path = None;
+                let mut to_path = None;
+                if let Some((fj, tj)) = row {
+                    if let Ok(ep) = serde_json::from_str::<EdgeEndpoint>(&fj) {
+                        from_path = self
+                            .conn
+                            .query_row(
+                                "SELECT path FROM screens WHERE id = ?1",
+                                params![ep.screen_id().as_str()],
+                                |r| r.get::<_, String>(0),
+                            )
+                            .optional()
+                            .ok()
+                            .flatten();
+                    }
+                    if let Ok(ep) = serde_json::from_str::<EdgeEndpoint>(&tj) {
+                        to_path = self
+                            .conn
+                            .query_row(
+                                "SELECT path FROM screens WHERE id = ?1",
+                                params![ep.screen_id().as_str()],
+                                |r| r.get::<_, String>(0),
+                            )
+                            .optional()
+                            .ok()
+                            .flatten();
+                    }
+                }
+                json!({
+                    "kind": "transition",
+                    "edgeId": edge_id.as_str(),
+                    "path": from_path,
+                    "to": to_path,
+                })
+            }
+        }
+    }
+}
+
 fn decode_comment(row: CommentRow) -> StoreResult<Comment> {
     let mut comment = Comment::open(
         ProjectId::parse(row.pid).map_err(db_err)?,
@@ -1560,6 +1794,9 @@ fn decode_comment(row: CommentRow) -> StoreResult<Comment> {
     .map_err(db_err)?;
     if row.status == "resolved" {
         comment.resolve(row.updated_at_ms).map_err(db_err)?;
+    } else if row.updated_at_ms > row.created_at_ms {
+        comment.resolve(row.updated_at_ms).map_err(db_err)?;
+        comment.reopen(row.updated_at_ms).map_err(db_err)?;
     }
     Ok(comment)
 }
