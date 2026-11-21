@@ -985,3 +985,210 @@ h2 {
     font-size: 0.6875rem;
   }
 }
+
+/* Capture diff view (#11) */
+.diff-workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+.diff-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.diff-toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.diff-toolbar-title h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.diff-title-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--primary);
+}
+.diff-pickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.diff-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-meta);
+  color: var(--muted-foreground);
+}
+.diff-picker select {
+  font-size: var(--text-body);
+  color: var(--foreground);
+  max-width: 18rem;
+}
+.diff-summary-pill {
+  font-size: var(--text-meta);
+  font-family: var(--font-mono);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+  color: var(--foreground);
+}
+.diff-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.diff-state-box,
+.diff-empty {
+  padding: var(--space-6);
+  text-align: center;
+}
+.diff-empty h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-title);
+}
+.diff-empty p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.diff-error {
+  color: var(--destructive);
+}
+.diff-screen-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.diff-screen-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.diff-screen-heading h3 {
+  margin: 0;
+  font-size: var(--text-body);
+  font-family: var(--font-mono);
+}
+.diff-screen-count {
+  font-size: var(--text-meta);
+  font-family: var(--font-mono);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-control);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.diff-cell-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.diff-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.diff-cell-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.diff-kind-badge {
+  font-size: var(--text-meta);
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-control);
+  text-transform: uppercase;
+}
+.diff-kind-changed {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--foreground);
+}
+.diff-kind-added {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.diff-kind-removed {
+  background: color-mix(in srgb, var(--destructive) 20%, transparent);
+  color: var(--destructive);
+}
+.diff-cell-meta,
+.diff-pixel-summary {
+  font-size: var(--text-meta);
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+}
+.diff-changed-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-meta);
+}
+.diff-files-label {
+  color: var(--muted-foreground);
+}
+.diff-file-chip {
+  font-family: var(--font-mono);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-control);
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+.diff-status-change {
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+  font-size: var(--text-body);
+}
+.diff-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.diff-single-side {
+  max-width: 24rem;
+}
+.diff-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.diff-figure figcaption {
+  font-size: var(--text-meta);
+  color: var(--muted-foreground);
+}
+.diff-figure img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.diff-figure-overlay img {
+  border-color: var(--primary);
+}
+.diff-bounds {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--muted-foreground);
+}
+@media (max-width: 720px) {
+  .diff-visual-grid {
+    grid-template-columns: 1fr;
+  }
+}

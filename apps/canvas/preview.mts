@@ -2,9 +2,9 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { access, readFile, readdir, realpath } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { createServer } from "vite";
@@ -21,6 +21,7 @@ type ArchiveEntry = {
 const cliPaths = process.argv.slice(2);
 const extraSavedPaths = new Set<string>();
 const activeSessions = new Set<string>();
+const diffOverlayDirs = new Map<string, string>();
 
 function resolveDuiBinary(): string {
   if (process.env.DUI_BIN) return process.env.DUI_BIN;
@@ -274,6 +275,88 @@ const server = await createServer({
           }
         });
 
+        vite.middlewares.use("/api/diff", async (req, res, next) => {
+          try {
+            res.setHeader("Cache-Control", "no-store");
+            if (!isSameOriginLoopback(req)) {
+              res.statusCode = 403;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "forbidden-origin" }));
+              return;
+            }
+            const url = new URL(req.url ?? "/", "http://localhost");
+            const beforeKey = url.searchParams.get("before");
+            const afterKey = url.searchParams.get("after");
+            if (!beforeKey || !afterKey) {
+              res.statusCode = 400;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "missing-before-or-after" }));
+              return;
+            }
+            const pairKey = `${beforeKey}:${afterKey}`;
+            if (req.method === "GET" && url.pathname === "/overlay") {
+              const file = url.searchParams.get("file");
+              const dir = diffOverlayDirs.get(pairKey);
+              if (!dir || !file || !/^[0-9a-f]{16}-diff\.png$/i.test(file)) {
+                res.statusCode = 404;
+                res.end();
+                return;
+              }
+              const target = join(dir, file);
+              const resolved = await realpath(target).catch(() => undefined);
+              const resolvedDir = await realpath(dir).catch(() => undefined);
+              if (!resolved || !resolvedDir || dirname(resolved) !== resolvedDir) {
+                res.statusCode = 404;
+                res.end();
+                return;
+              }
+              res.setHeader("Content-Type", "image/png");
+              createReadStream(resolved)
+                .on("error", () => res.destroy())
+                .pipe(res);
+              return;
+            }
+            if (req.method !== "GET" || (url.pathname !== "/" && url.pathname !== "")) {
+              res.statusCode = 405;
+              res.end();
+              return;
+            }
+            const archives = await listArchives();
+            const beforeArchive = archives.find((a) => a.run.key === beforeKey);
+            const afterArchive = archives.find((a) => a.run.key === afterKey);
+            if (!beforeArchive || !afterArchive) {
+              res.statusCode = 404;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "run-not-found" }));
+              return;
+            }
+            let overlayDir = diffOverlayDirs.get(pairKey);
+            if (!overlayDir) {
+              overlayDir = await mkdtemp(join(tmpdir(), "dui-diff-overlay-"));
+              diffOverlayDirs.set(pairKey, overlayDir);
+            }
+            const binary = resolveDuiBinary();
+            const { stdout } = await execFileAsync(
+              binary,
+              ["diff", beforeArchive.root, afterArchive.root, "--overlay-dir", overlayDir],
+              { maxBuffer: 16 * 1024 * 1024, timeout: 60000 },
+            );
+            const parsed = JSON.parse(stdout) as Record<string, unknown>;
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                beforeRunKey: beforeKey,
+                afterRunKey: afterKey,
+                summary: parsed.summary,
+                screens: parsed.screens,
+              }),
+            );
+          } catch (error) {
+            next(error);
+          }
+        });
+
         vite.middlewares.use("/api/live", async (req, res, next) => {
           try {
             res.setHeader("Cache-Control", "no-store");
@@ -417,9 +500,10 @@ let closing = false;
 async function cleanup() {
   if (closing) return;
   closing = true;
-  await Promise.allSettled(
-    [...activeSessions].map((session) => runLiveCommand({ op: "close", session })),
-  );
+  await Promise.allSettled([
+    ...[...activeSessions].map((session) => runLiveCommand({ op: "close", session })),
+    ...[...diffOverlayDirs.values()].map((dir) => rm(dir, { recursive: true, force: true })),
+  ]);
   await server.close();
   process.exit(0);
 }

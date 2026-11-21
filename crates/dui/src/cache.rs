@@ -298,6 +298,18 @@ impl CellCache {
         self.force
     }
 
+    pub(crate) fn source_file_hashes(&self) -> BTreeMap<String, String> {
+        let mut map: BTreeMap<String, String> = self
+            .source_files
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_str().to_owned()))
+            .collect();
+        for (loc, hash) in &self.locale_files {
+            map.insert(format!("locale:{loc}"), hash.as_str().to_owned());
+        }
+        map
+    }
+
     fn scoped_files(&self, path: &str, spec: &Value) -> Option<BTreeSet<String>> {
         let mut seeds = BTreeSet::new();
         if let Some(file) = spec["sourceFile"]

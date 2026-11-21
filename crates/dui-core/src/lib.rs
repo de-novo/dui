@@ -93,6 +93,7 @@ pub mod mock;
 pub mod tabular;
 pub mod verification;
 
+pub mod diff;
 pub mod edit;
 pub mod inspect;
 pub mod locale;

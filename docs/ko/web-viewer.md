@@ -144,5 +144,6 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 | 세션 하나에서 명령 순차 처리 | CLI와 MCP로 불리언과 열거형을 변경한다. 독립된 조작 요소, 중복 요청, 오래된 요청, 연결 끊김, 초기화를 확인한다. 다시 읽은 값과 화면 근거를 모두 대조한다. |
 | 내장 클라이언트와 불변 기록 | 깨끗한 체크아웃에서 설치하고 대상 앱을 꺼둔 채 상세 주소를 바로 연다. 없는 이미지는 오류를 표시한다. 라이브 상태를 저장하고 이전 기록과 새 기록을 모두 다시 연다. |
 | 다국어 캡처와 뷰어 i18n ([#12](https://github.com/de-novo/dui/issues/12)) | 매니페스트 `locales` 또는 자동 감지된 메시지 파일(`locales/*.json` / `messages/*.json`)에서 `screen × state × width × locale`을 캡처한다. 로케일별 요약(`report.locales`), 번역 키 누락, 텍스트 넘침 선택자, RTL 불일치를 보고한다. 워크스페이스 레일에서 뷰어 UI 언어를 `en`, `zh-CN`, `ko`로 전환하고 아카이브 칸을 로케일별로 필터링한다(`npm run check:i18n`). |
+| 캡처 비교와 픽셀 차이 오버레이 ([#11](https://github.com/de-novo/dui/issues/11)) | `dui diff BEFORE AFTER [--overlay-dir DIR]`, MCP `diff`, 뷰어의 `?view=diff` 화면(`/api/diff`)으로 두 캡처를 비교한다. 콘텐츠 해시가 같은 미변경 칸은 숨기고 추가·삭제·변경된 칸만 화면·상태·폭 순으로 묶어 칸별 변경 소스 파일을 표시한다. 검증된 칸은 이전·이후·픽셀 차이 오버레이를 제공하고, 미검증·렌더 불가 칸은 픽셀 차이 대신 상태 변경만 보고한다(`npm run check:diff`). |
 
 구현 순서는 기록·스키마 픽스처 → 라우터와 키보드 탐색 목록 → 지도 → 라이브 조회·편집 → 패키징·측정으로 한다. 실제 npmgraph 화면 두 개와 재배포 가능한 독립 조작 요소 두 개짜리 픽스처를 사용한다. 준비된 세션에서 30번 편집하며 호스트 재빌드와 브라우저 재시작이 모두 0회인지 확인한다. 최초 시작 시간과 편집의 p50·p95를 따로 보고한다. [shadcn/ui](../../.agents/skills/shadcn/SKILL.md)
