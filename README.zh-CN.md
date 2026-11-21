@@ -8,7 +8,7 @@
 
 ## 安装
 
-在 macOS 或 Linux 上运行以下命令即可安装 dui。再次运行即可更新到当前的 `main` 分支版本。
+在 macOS 或 Linux 上运行以下命令，按最新 SemVer 发布标签（`vX.Y.Z`，无标签时回退到 `main`）拉取仓库并在本机编译安装。可通过 `DUI_TAG=v0.0.1` 指定特定标签。
 
 ```sh
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
@@ -16,10 +16,12 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 
 需要 Git、curl 和 C 编译工具链（macOS 上使用 Xcode 命令行工具）。安装程序在本机编译 dui。如果缺少 Rust 或带 npm 的 Node.js 26，安装程序会临时下载所需工具，并在构建结束后清理。
 
-用以下命令查看已安装的版本。要直接运行 `dui`，请将 `~/.local/bin` 加入 `PATH`。
+查看已安装标签、检查是否有新标签或执行标签更新：
 
 ```sh
 ~/.local/bin/dui --version
+~/.local/bin/dui update --check
+~/.local/bin/dui update
 ```
 
 **捕获网页时**需要 Node.js 26、Chromium 或 Google Chrome，以及目标应用的依赖。
@@ -32,7 +34,7 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ~/.local/bin/dui map .
 ```
 
-dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，则从 `/` 开始，跟随入口页面的同源链接一层。每个地址按 375 和 1280 像素两种宽度捕获。在输出的 `output` 目录打开 `graph.html`。MCP 提供相同的 `map(project)` 操作。
+dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，则从 `/` 开始，跟随入口页面的同源链接一层。每个地址按 375 和 1280 像素两种宽度捕获。运行 `dui open`（或 `dui open <output>`）打开内置界面地图查看器。MCP 提供相同的 `map(project)` 操作。
 
 打开已捕获的单元格，在同一个 Chromium 会话中修改和恢复布尔值或枚举值。[CLI 和 MCP 示例](docs/zh-CN/web-viewer.md#通过-cli-或-mcp-使用实时会话)
 

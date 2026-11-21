@@ -17,6 +17,8 @@ mod retry;
 mod screen_map;
 mod sqlite_store;
 mod typescript;
+mod update;
+mod viewer;
 use serde_json::{Value, json};
 use std::{
     env, fs,
@@ -138,30 +140,80 @@ fn run() -> Reply {
     if let [flag] = args.as_slice()
         && (flag == "--version" || flag == "-V")
     {
-        return Ok(json!({"name": "dui", "version": env!("CARGO_PKG_VERSION")}));
+        return Ok(json!({
+            "name": "dui",
+            "version": update::current_version_string(),
+            "tag": update::current_tag(),
+        }));
     }
-    if let [cmd] = args.as_slice()
-        && (cmd == "history" || cmd == "open")
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "update"
     {
-        let history = archive::history()?;
-        if cmd == "open" {
-            let opener = if cfg!(target_os = "macos") {
-                "open"
+        let mut check_only = false;
+        let mut repo_override: Option<String> = None;
+        let mut requested_tag: Option<String> = None;
+        let mut install_dir: Option<std::path::PathBuf> = None;
+        let mut iter = tail.iter();
+        while let Some(arg) = iter.next() {
+            if arg == "--check" {
+                check_only = true;
+            } else if arg == "--repo" {
+                let Some(v) = iter.next().and_then(|s| s.to_str()) else {
+                    return Err(failure(2, "missing value for --repo"));
+                };
+                repo_override = Some(v.to_owned());
+            } else if arg == "--tag" {
+                let Some(v) = iter.next().and_then(|s| s.to_str()) else {
+                    return Err(failure(2, "missing value for --tag"));
+                };
+                requested_tag = Some(v.to_owned());
+            } else if arg == "--install-dir" {
+                let Some(v) = iter.next() else {
+                    return Err(failure(2, "missing value for --install-dir"));
+                };
+                install_dir = Some(std::path::PathBuf::from(v));
             } else {
-                "xdg-open"
-            };
-            let gallery = history["gallery"]
-                .as_str()
-                .ok_or_else(|| failure(3, "missing gallery"))?;
-            let status = Command::new(opener)
-                .arg(gallery)
-                .status()
-                .map_err(replay::io)?;
-            if !status.success() {
-                return Err(failure(3, "could not open history viewer"));
+                return Err(failure(
+                    2,
+                    "expected update [--check] [--tag TAG] [--repo URL] [--install-dir DIR]",
+                ));
             }
         }
-        return Ok(history);
+        let repo = update::repo_url(repo_override.as_deref());
+        return if check_only {
+            update::check(&repo)
+        } else {
+            update::apply(&repo, requested_tag.as_deref(), install_dir.as_deref())
+        };
+    }
+    if let [cmd] = args.as_slice()
+        && cmd == "history"
+    {
+        return archive::history();
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
+        && (cmd == "open" || cmd == "serve")
+    {
+        let mut port: u16 = 0;
+        let mut open_browser = cmd == "open";
+        let mut run_dirs = Vec::new();
+        let mut iter = tail.iter();
+        while let Some(arg) = iter.next() {
+            if arg == "--no-open" {
+                open_browser = false;
+            } else if arg == "--port" {
+                let Some(val) = iter.next() else {
+                    return Err(failure(2, "missing value for --port"));
+                };
+                port = val
+                    .to_str()
+                    .and_then(|s| s.parse::<u16>().ok())
+                    .ok_or_else(|| failure(2, "invalid --port"))?;
+            } else {
+                run_dirs.push(std::path::PathBuf::from(arg));
+            }
+        }
+        return viewer::serve(run_dirs, port, open_browser);
     }
     if let [cmd, manifest, plan, out] = args.as_slice()
         && cmd == "replay-report"

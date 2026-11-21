@@ -658,7 +658,6 @@ fn execute_with_locales(
         });
     }
     let graph = crate::graph_view::with_cells(graph, &report)?;
-    crate::graph_view::write(out, &graph)?;
     store(&out.join("report.json"), &report)?;
     store(&out.join("graph.json"), &graph)?;
     store(&out.join("facts.json"), analysis)?;

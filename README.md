@@ -2,13 +2,13 @@
 
 English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
-dui captures a running web app across UI states and viewport widths. It reads the app’s TypeScript types, generates mock responses, and checks what Chromium actually rendered. Browse the screenshots in a local HTML gallery or consume the same results as JSON through the CLI or MCP.
+dui captures a running web or GPUI app across UI states and viewport widths. It reads the app’s official compiler types, generates mock responses, and checks what was actually rendered. Browse the screen map, live sessions, and diffs in the embedded web viewer (`dui open`) or consume the same results as JSON through the CLI or MCP.
 
 [Product roadmap](docs/en/roadmap.md)
 
 ## Install
 
-On macOS or Linux, run this command to install or update dui from the current `main` branch.
+On macOS or Linux, run this command to clone the latest release tag (`vX.Y.Z`, falling back to `main` if no tags exist) and build dui from source. Pass a tag with `DUI_TAG=v0.0.1` to pin a specific release.
 
 ```sh
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
@@ -16,10 +16,12 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 
 You need Git, curl, and a C toolchain (Xcode Command Line Tools on macOS). The installer builds dui on your machine. If Rust or Node.js 26 with npm is missing, the installer downloads a temporary copy for the build and removes it afterward.
 
-Check the installed version with the full path. To run `dui` by name, add `~/.local/bin` to your `PATH`.
+Check the installed tag or check for newer release tags with:
 
 ```sh
 ~/.local/bin/dui --version
+~/.local/bin/dui update --check
+~/.local/bin/dui update
 ```
 
 **For web capture**, install Node.js 26, Chromium or Google Chrome, and the target app’s dependencies.
@@ -34,7 +36,7 @@ From an installed Vite app, run:
 ~/.local/bin/dui map .
 ```
 
-dui finds TanStack file routes with a screen component. If it finds no concrete routes, it starts at `/` and follows same-origin links from the entry page once. It captures each URL at 375 and 1280 px. Open `graph.html` in the returned `output` directory. MCP exposes the same operation as `map(project)`.
+dui finds TanStack file routes with a screen component. If it finds no concrete routes, it starts at `/` and follows same-origin links from the entry page once. It captures each URL at 375 and 1280 px. Run `dui open` (or `dui open <output>`) to open the embedded screen map viewer. MCP exposes the same operation as `map(project)`.
 
 Inspect a captured cell and edit its boolean or enum state in a running Chromium session. [CLI and MCP examples](docs/en/web-viewer.md#run-a-live-cli-or-mcp-session)
 

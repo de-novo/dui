@@ -128,7 +128,7 @@ Pass a JSON object to `dui live '{…}'` or pass that object as arguments to the
 {"op":"close","session":"SESSION"}
 ```
 
-Use a unique request ID per edit. Retry the same payload after a lost reply. For set and reset, `expect.selector` must match one visible HTML element whose trimmed inner text equals `expect.text`. A failed assertion after a write advances the revision and returns `unverified` with the observed value and text. Reset uses the value at open. Close releases the browser and host. An idle session expires after 30 minutes. Save returns the path of a new run under `~/.dui`. Open its `graph.html` or pass the saved directory and cell to `dui inspect`. The archive contains the PNG, its SHA-256 digest, the observed control values and text assertion, the edit sequence and Git provenance. To edit again, open the original source cell.
+Use a unique request ID per edit. Retry the same payload after a lost reply. For set and reset, `expect.selector` must match one visible HTML element whose trimmed inner text equals `expect.text`. A failed assertion after a write advances the revision and returns `unverified` with the observed value and text. Reset uses the value at open. Close releases the browser and host. An idle session expires after 30 minutes. Save returns the path of a new run under `~/.dui`. Run `dui open` (or `dui open RUN_DIRECTORY`) to open the embedded viewer, or pass the saved directory and cell to `dui inspect`. The archive contains the PNG, its SHA-256 digest, the observed control values and text assertion, the edit sequence and Git provenance. To edit again, open the original source cell.
 
 ### Warm edit baseline
 

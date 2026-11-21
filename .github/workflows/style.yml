@@ -64,3 +64,4 @@ jobs:
           npm run check:i18n
           npm run check:cache
           npm run check:diff
+          npm run check:viewer

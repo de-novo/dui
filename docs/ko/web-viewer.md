@@ -128,7 +128,7 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 {"op":"close","session":"SESSION"}
 ```
 
-편집마다 고유한 요청 ID를 쓰고 응답을 잃으면 같은 요청을 재전송한다. set과 reset에서 `expect.selector`는 표시된 HTML 요소 하나와 일치해야 하며, 양끝 공백을 뺀 텍스트가 `expect.text`와 같아야 한다. 쓰기 후 검증에 실패해도 리비전은 증가하고 관찰값·텍스트와 함께 `unverified`를 반환한다. reset은 세션을 열었을 때의 값으로 복원한다. close는 브라우저와 호스트를 종료한다. 유휴 세션은 30분 후 만료된다. save는 `~/.dui` 아래 새 실행 경로를 반환한다. 그 안의 `graph.html`을 열거나, 저장된 디렉터리와 칸을 `dui inspect`에 전달한다. PNG와 SHA-256 해시, 관찰된 상태값과 텍스트 단언, 편집 순서와 Git 출처가 함께 저장된다. 다시 라이브로 편집할 때는 원본 칸을 연다.
+편집마다 고유한 요청 ID를 쓰고 응답을 잃으면 같은 요청을 재전송한다. set과 reset에서 `expect.selector`는 표시된 HTML 요소 하나와 일치해야 하며, 양끝 공백을 뺀 텍스트가 `expect.text`와 같아야 한다. 쓰기 후 검증에 실패해도 리비전은 증가하고 관찰값·텍스트와 함께 `unverified`를 반환한다. reset은 세션을 열었을 때의 값으로 복원한다. close는 브라우저와 호스트를 종료한다. 유휴 세션은 30분 후 만료된다. save는 `~/.dui` 아래 새 실행 경로를 반환한다. `dui open`(또는 `dui open RUN_DIRECTORY`)으로 내장 뷰어를 열거나, 저장된 디렉터리와 칸을 `dui inspect`에 전달한다. PNG와 SHA-256 해시, 관찰된 상태값과 텍스트 단언, 편집 순서와 Git 출처가 함께 저장된다. 다시 라이브로 편집할 때는 원본 칸을 연다.
 
 ### 편집 지연 시간 기준값
 

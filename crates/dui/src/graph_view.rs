@@ -1,10 +1,6 @@
 use crate::{Reply, failure};
 use serde_json::{Value, json};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs,
-    path::Path,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
     let cells = report["cells"]
@@ -137,19 +133,6 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         json!({"path":c["path"], "width":c["width"], "image":c["image"], "status":c["status"], "reason":c["reason"]})
     }).collect());
     Ok(graph)
-}
-pub fn write(dir: &Path, graph: &Value) -> Result<(), (u8, Value)> {
-    let data = graph.to_string().replace('<', "\\u003c");
-    fs::write(
-        dir.join("graph.html"),
-        include_str!("graph.html")
-            .replace(
-                "/*VIEW*/",
-                include_str!(concat!(env!("OUT_DIR"), "/browser/graph.js")),
-            )
-            .replace("/*GRAPH*/", &data),
-    )
-    .map_err(|e| failure(3, &e.to_string()))
 }
 
 #[cfg(test)]

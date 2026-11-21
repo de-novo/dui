@@ -2,13 +2,13 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | 한국어
 
-dui는 웹 앱에 목데이터를 넣고, 상태와 화면 폭을 바꿔 가며 Chromium에 실제로 그려진 화면을 검증한다. 사람은 로컬 HTML 갤러리에서 캡처를 보고, 에이전트는 CLI와 MCP로 같은 결과를 JSON으로 읽는다.
+dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려진 화면을 검증한다. 사람은 내장 웹 뷰어(`dui open`)에서 화면 지도·라이브 편집·캡처 비교를 보고, 에이전트는 CLI와 MCP로 같은 결과를 JSON으로 읽는다.
 
 [제품 로드맵](docs/ko/roadmap.md)
 
 ## 설치
 
-macOS와 Linux에서는 아래 명령 하나로 설치한다. 다시 실행하면 현재 `main` 버전으로 업데이트한다.
+macOS와 Linux에서는 아래 명령 하나로 최신 릴리스 태그(`vX.Y.Z`, 태그가 없으면 `main`)를 클론해 소스에서 빌드·설치한다. 특정 태그를 고정하려면 `DUI_TAG=v0.0.1`을 지정한다.
 
 ```sh
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
@@ -16,10 +16,12 @@ curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 
 Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도구를 사용한다. 설치기는 내 컴퓨터에서 dui를 빌드한다. Rust나 Node.js 26 및 npm이 없으면 빌드에 필요한 도구를 임시로 받아 사용한 뒤 정리한다.
 
-설치 후 아래 명령으로 버전을 확인한다. `dui`만 입력해 실행하려면 `~/.local/bin`을 `PATH`에 추가한다.
+설치된 태그 확인 및 새 릴리스 태그 업데이트 확인은 아래 명령을 사용한다.
 
 ```sh
 ~/.local/bin/dui --version
+~/.local/bin/dui update --check
+~/.local/bin/dui update
 ```
 
 **웹 화면을 캡처할 때는** Node.js 26, Chromium 또는 Google Chrome, 대상 앱의 의존성이 필요하다.
@@ -34,7 +36,7 @@ Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도�
 ~/.local/bin/dui map .
 ```
 
-dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구체적인 경로를 찾지 못하면 `/`에서 시작해 같은 출처의 링크를 한 단계 따라간다. 각 주소를 375px와 1280px로 캡처한다. 출력의 `output` 폴더에서 `graph.html`을 열면 된다. MCP에서는 `map(project)`를 호출한다.
+dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구체적인 경로를 찾지 못하면 `/`에서 시작해 같은 출처의 링크를 한 단계 따라간다. 각 주소를 375px와 1280px로 캡처한다. `dui open` 또는 `dui open <output>`을 실행하면 내장 화면 지도 뷰어가 열린다. MCP에서는 `map(project)`를 호출한다.
 
 캡처한 칸을 열어 같은 Chromium 세션에서 불리언·열거형 상태를 변경하고 복원할 수 있다. [CLI·MCP 사용 예](docs/ko/web-viewer.md#climcp에서-라이브-세션-사용)
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build the current main branch for the installing machine.
+# Build dui from the latest SemVer release tag (vX.Y.Z) on the installing machine.
 set -eu
 
 fail() { printf 'dui: %s\n' "$*" >&2; exit 1; }
@@ -50,6 +50,13 @@ prepare_node() {
     export PATH="$work/${archive%.tar.gz}/bin:$PATH"
 }
 
+resolve_latest_tag() {
+    git ls-remote --tags --refs "$1" 'v*' 2>/dev/null |
+        awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/) print $2 }' |
+        sort -t. -k1.2,1n -k2,2n -k3,3n |
+        tail -n 1
+}
+
 main() {
     case $(uname -s) in Darwin|Linux) ;; *) fail "source installation supports macOS and Linux" ;; esac
     for tool in git curl cc; do
@@ -59,6 +66,18 @@ main() {
     case $dest in /*) ;; *) dest=$PWD/$dest ;; esac
     [ ! -d "$dest/dui" ] || fail "installation path is a directory: $dest/dui"
 
+    repo_url=${DUI_REPO_URL:-"https://github.com/de-novo/dui.git"}
+    requested_tag=${DUI_TAG:-"${1:-}"}
+    if [ -n "$requested_tag" ]; then
+        ref=$requested_tag
+    else
+        ref=$(resolve_latest_tag "$repo_url" || true)
+        if [ -z "$ref" ]; then
+            printf '%s\n' 'dui: no release tags found; building main' >&2
+            ref=main
+        fi
+    fi
+
     work=$(mktemp -d "${TMPDIR:-/tmp}/dui-source.XXXXXXXX")
     case $work in /*) ;; *) work=$PWD/$work ;; esac
     pending=''
@@ -67,11 +86,16 @@ main() {
 
     prepare_rust
     prepare_node
-    git clone --depth 1 --branch main https://github.com/de-novo/dui.git "$work/src"
+    printf 'dui: cloning %s (%s)\n' "$repo_url" "$ref" >&2
+    git clone --depth 1 --branch "$ref" "$repo_url" "$work/src"
     cd "$work/src"
     npm ci --include=dev
+    npm ci --prefix apps/canvas
     host=$(rustc -vV | sed -n 's/^host: //p')
     [ -n "$host" ] || fail "could not determine the Rust host target"
+    case $ref in
+        v[0-9]*.[0-9]*.[0-9]*) export DUI_VERSION="$ref" ;;
+    esac
     cargo build --locked --release --bin dui --target "$host" --target-dir "$work/build"
     binary="$work/build/$host/release/dui"
     "$binary" --version
@@ -81,7 +105,7 @@ main() {
     install -m 755 "$binary" "$pending"
     mv -f "$pending" "$dest/dui"
     pending=''
-    printf 'Installed %s/dui\n' "$dest"
+    printf 'Installed %s/dui (%s)\n' "$dest" "$ref"
 }
 
 main "$@" </dev/null
