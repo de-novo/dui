@@ -37,6 +37,8 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 
 **在地图中评审原生页面。** 在给定宽度下，用两种有类型的状态渲染一个真实的 GPUI 页面。复用网页会话的查询、设置、读回和恢复操作。随图片记录操作系统、渲染器和工具链。值一致且有独立的界面语义证据才能标记为已验证。缺少语义证据则保留为未验证。缺少渲染环境则标记为无法渲染并说明原因。
 
+基线已在 `fixtures/gpui-kit` 上验证（`gpui-kit 0.10.0`、`gpui-pre 0.3.12`、`rustc 1.100.0`、macOS Metal 离屏渲染 480 px，通过 AccessKit / `TestQueryExt` 提供 `elementTreeAvailable: true`，缺少渲染环境时报告 `unrenderable` 与 `no-render-env`）。运行 `npm run check:gpui` 可复现。
+
 实施任务 · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://github.com/de-novo/dui/issues/6)
 
 **只渲染有变化的部分。** 输入未变的格子复用已存结果，每张图片只存一次（[缓存](https://github.com/de-novo/dui/issues/8)）。比较两次捕获时只列出有变化的格子（[差异](https://github.com/de-novo/dui/issues/11)）。

@@ -4,6 +4,7 @@ use archive::Capture;
 mod cache;
 mod chromium;
 mod diff;
+mod gpui;
 mod graph_view;
 mod host;
 mod inspect;
