@@ -21,7 +21,14 @@ use std::{
 
 fn launches() -> Value {
     use std::sync::atomic::Ordering::Relaxed;
-    json!({"hostBuilds":crate::host::HOST_BUILDS.load(Relaxed),"browserLaunches":crate::chromium::BROWSER_LAUNCHES.load(Relaxed)})
+    let host_builds = crate::host::HOST_BUILDS.load(Relaxed);
+    let browser_launches = crate::chromium::BROWSER_LAUNCHES.load(Relaxed);
+    let native_launches = crate::gpui::NATIVE_LAUNCHES.load(Relaxed);
+    if native_launches > 0 {
+        json!({"hostBuilds":host_builds,"browserLaunches":browser_launches,"nativeLaunches":native_launches})
+    } else {
+        json!({"hostBuilds":host_builds,"browserLaunches":browser_launches})
+    }
 }
 fn invalid(s: &str) -> (u8, Value) {
     failure(2, s)

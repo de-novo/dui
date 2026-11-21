@@ -9,7 +9,10 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
 };
+
+pub(crate) static NATIVE_LAUNCHES: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) struct GpuiRenderer {
     binary: PathBuf,
@@ -59,7 +62,7 @@ impl Renderer for GpuiRenderer {
     }
 }
 
-fn select_toolchain() -> Option<String> {
+pub(crate) fn select_toolchain() -> Option<String> {
     if let Ok(tc) = env::var("DUI_RUST_TOOLCHAIN")
         && !tc.trim().is_empty()
     {
@@ -115,7 +118,7 @@ fn cargo_cmd(toolchain: Option<&str>) -> Command {
     cmd
 }
 
-fn rustc_version(toolchain: Option<&str>) -> String {
+pub(crate) fn rustc_version(toolchain: Option<&str>) -> String {
     let mut cmd = Command::new("rustc");
     if let Some(tc) = toolchain {
         cmd.env("RUSTUP_TOOLCHAIN", tc);
@@ -161,7 +164,7 @@ fn package_name_from_manifest(project: &Path) -> Result<String, (u8, Value)> {
     Err(failure(2, "Cargo.toml missing [package] name"))
 }
 
-fn lockfile_versions(project: &Path) -> BTreeMap<String, String> {
+pub(crate) fn lockfile_versions(project: &Path) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     let Ok(raw) = fs::read_to_string(project.join("Cargo.lock")) else {
         return out;
@@ -188,7 +191,11 @@ fn lockfile_versions(project: &Path) -> BTreeMap<String, String> {
     out
 }
 
-fn build_fixture(project: &Path, toolchain: Option<&str>) -> Result<PathBuf, (u8, Value)> {
+pub(crate) fn build_fixture(
+    project: &Path,
+    toolchain: Option<&str>,
+) -> Result<PathBuf, (u8, Value)> {
+    crate::host::HOST_BUILDS.fetch_add(1, Ordering::Relaxed);
     let bin_name = package_name_from_manifest(project)?;
     let bin_path = project.join("target").join("debug").join(&bin_name);
     let manifest_path = project.join("Cargo.toml");
