@@ -195,18 +195,33 @@ try {
     stdio: "pipe",
   });
   const server = spawn(process.execPath, [join(root, "apps/canvas/preview.mts"), runOut], {
-    env: { ...process.env, HOME: homeDir, PORT: "0" },
+    env: { ...process.env, HOME: homeDir, PORT: "0", NO_COLOR: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   try {
+    const ansiPattern = new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;]*m`, "g");
     const url = await new Promise<string>((resolveUrl, rejectUrl) => {
       let buf = "";
+      let errBuf = "";
+      const timer = setTimeout(() => {
+        rejectUrl(new Error(`timed out waiting for preview URL: ${buf}\n${errBuf}`));
+      }, 30_000);
       server.stdout.on("data", (chunk) => {
         buf += chunk.toString();
-        const match = buf.match(/http:\/\/127\.0\.0\.1:\d+/);
-        if (match) resolveUrl(match[0]);
+        const plain = buf.replaceAll(ansiPattern, "");
+        const match = plain.match(/http:\/\/127\.0\.0\.1:\d+/);
+        if (match) {
+          clearTimeout(timer);
+          resolveUrl(match[0]);
+        }
       });
-      server.on("exit", (code) => rejectUrl(new Error(`preview exited early (${code})`)));
+      server.stderr.on("data", (chunk) => {
+        errBuf += chunk.toString();
+      });
+      server.on("exit", (code) => {
+        clearTimeout(timer);
+        rejectUrl(new Error(`preview exited early (${code}): ${errBuf}`));
+      });
     });
 
     const chrome = chromeExecutable();
@@ -219,14 +234,14 @@ try {
       const dom = execFileSync(
         chrome,
         [
-          "--headless",
+          "--headless=new",
           "--disable-gpu",
           "--no-sandbox",
           "--virtual-time-budget=3000",
           "--dump-dom",
           `${url}/?screen=route%3A%2F&uiLang=${encodeURIComponent(uiLang)}`,
         ],
-        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
       );
       assert(
         dom.includes(`lang="${uiLang}"`),
