@@ -256,13 +256,25 @@ impl SqliteStore {
                 }
             }
             let plan_index = raw["planIndex"].as_u64().unwrap_or(0) as u32;
+            let locale = raw["locale"].as_str().map(str::to_owned);
             let state = match raw["state"].as_str().and_then(|s| StateId::parse(s).ok()) {
-                Some(id) => {
-                    State::with_id(id, screen.id().clone(), scenario, None, inputs, plan_index)
-                        .map_err(db_err)?
-                }
-                None => State::new(screen.id().clone(), scenario, None, inputs, plan_index)
-                    .map_err(db_err)?,
+                Some(id) => State::with_id(
+                    id,
+                    screen.id().clone(),
+                    scenario,
+                    locale.clone(),
+                    inputs,
+                    plan_index,
+                )
+                .map_err(db_err)?,
+                None => State::new(
+                    screen.id().clone(),
+                    scenario,
+                    locale.clone(),
+                    inputs,
+                    plan_index,
+                )
+                .map_err(db_err)?,
             };
             let state_id = state.id().clone();
             states_by_id.entry(state_id.clone()).or_insert(state);
@@ -350,7 +362,7 @@ impl SqliteStore {
                 screen.id().clone(),
                 state_id,
                 width,
-                None,
+                locale,
                 status,
                 image_blob,
                 evidence_id,

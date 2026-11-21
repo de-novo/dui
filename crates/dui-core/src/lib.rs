@@ -95,5 +95,6 @@ pub mod verification;
 
 pub mod edit;
 pub mod inspect;
+pub mod locale;
 pub mod model;
 pub mod storage;

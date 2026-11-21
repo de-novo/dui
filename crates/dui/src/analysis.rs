@@ -5,7 +5,10 @@ use crate::{
     ports::{Renderer, TypeOracle},
     typescript::TypeScript,
 };
-use dui_core::discovery::{FillTermination, assertions, candidates, graph, key};
+use dui_core::{
+    discovery::{FillTermination, assertions, candidates, graph, key},
+    locale::{flatten_message_keys, is_rtl_locale, missing_translation_keys, summarize_by_locale},
+};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -95,7 +98,8 @@ pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16
         }
     }
     store(&out.join("manifest.json"), &stored_spec)?;
-    execute_with(
+    let (locales, missing_by_locale) = resolve_locales(&spec, manifest.parent());
+    execute_with_locales(
         browser.as_mut().map(|b| b as &mut dyn Renderer),
         &analysis,
         &spec,
@@ -103,10 +107,106 @@ pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16
         &widths,
         budget,
         browser_version,
+        &locales,
+        &missing_by_locale,
     )
 }
 
+fn resolve_locales(
+    spec: &Value,
+    base_dir: Option<&Path>,
+) -> (Vec<String>, BTreeMap<String, Vec<String>>) {
+    let mut configured: Vec<String> = spec["locales"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect();
+
+    let mut catalogs: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    if let Some(dir) = base_dir {
+        let candidate_dirs: Vec<std::path::PathBuf> = if let Some(rel) = spec["localesDir"].as_str()
+        {
+            vec![dir.join(rel)]
+        } else {
+            vec![dir.join("locales"), dir.join("messages")]
+        };
+        for messages_dir in candidate_dirs {
+            if !messages_dir.is_dir() {
+                continue;
+            }
+            if let Ok(entries) = fs::read_dir(&messages_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                        continue;
+                    }
+                    let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                        continue;
+                    };
+                    if !configured.is_empty() && !configured.iter().any(|l| l == stem) {
+                        continue;
+                    }
+                    if let Ok(bytes) = fs::read(&path)
+                        && let Ok(parsed) = serde_json::from_slice::<Value>(&bytes)
+                    {
+                        catalogs.insert(stem.to_owned(), flatten_message_keys(&parsed));
+                    }
+                }
+            }
+            if !catalogs.is_empty() {
+                break;
+            }
+        }
+    }
+
+    if configured.is_empty() {
+        configured = catalogs.keys().cloned().collect();
+    } else {
+        for loc in &configured {
+            catalogs.entry(loc.clone()).or_default();
+        }
+    }
+
+    let missing = if catalogs.len() > 1 {
+        missing_translation_keys(&catalogs)
+    } else {
+        configured.iter().map(|l| (l.clone(), Vec::new())).collect()
+    };
+    (configured, missing)
+}
+
+#[cfg(test)]
 fn execute_with(
+    renderer: Option<&mut dyn Renderer>,
+    analysis: &Value,
+    spec: &Value,
+    out: &Path,
+    widths: &BTreeSet<u32>,
+    budget: usize,
+    browser_version: Option<Value>,
+) -> Reply {
+    execute_with_locales(
+        renderer,
+        analysis,
+        spec,
+        out,
+        widths,
+        budget,
+        browser_version,
+        &[],
+        &BTreeMap::new(),
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "keeps capture execution inputs explicit without introducing hidden mutable state"
+)]
+fn execute_with_locales(
     mut renderer: Option<&mut dyn Renderer>,
     analysis: &Value,
     spec: &Value,
@@ -114,6 +214,8 @@ fn execute_with(
     widths: &BTreeSet<u32>,
     budget: usize,
     browser_version: Option<Value>,
+    locales: &[String],
+    missing_by_locale: &BTreeMap<String, Vec<String>>,
 ) -> Reply {
     let facts = analysis["facts"]
         .as_array()
@@ -167,73 +269,104 @@ fn execute_with(
             let prev_active = active.len();
             done.insert(serde_json::to_string(&row).map_err(|e| failure(3, &e.to_string()))?);
             let checks = assertions(facts, &row, &spec);
-            let state_id = state_id(&scenario, &spec, &row);
-            for width in widths {
-                let Some(browser) = renderer.as_deref_mut() else {
-                    cells.push(json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state_id,"planIndex":index,"status":"unrenderable","reason":"no-render-env"}));
-                    continue;
-                };
-                let staged =
-                    tempfile::NamedTempFile::new_in(out).map_err(|e| failure(3, &e.to_string()))?;
-                let input = json!(row);
-
-                let mut capture_spec = spec.clone();
-                capture_spec["assertions"] = checks.clone();
-                if scenario != "default" || index != 0 {
-                    capture_spec
-                        .as_object_mut()
-                        .unwrap()
-                        .remove("routeSelector");
+            let locale_slots: Vec<Option<&str>> = if locales.is_empty() {
+                vec![None]
+            } else {
+                locales.iter().map(|l| Some(l.as_str())).collect()
+            };
+            for locale in &locale_slots {
+                let mut locale_spec = spec.clone();
+                if let Some(loc) = locale {
+                    locale_spec["locale"] = json!(loc);
                 }
-                let reached = browser.capture(&capture_spec, &input, *width, staged.path());
-                let cell = match reached {
-                    Ok(obs) => {
-                        let bytes =
-                            fs::read(staged.path()).map_err(|e| failure(3, &e.to_string()))?;
-                        let name = format!("{:x}-{width}.png", Sha256::digest(bytes));
-                        staged
-                            .persist(out.join(&name))
-                            .map_err(|e| failure(3, &e.to_string()))?;
-                        let slot_values = obs["slots"].as_object();
-                        if let Some(slots) = slot_values {
-                            active.extend(slots.keys().cloned());
+                let state_id = state_id(&scenario, &locale_spec, &row);
+                for width in widths {
+                    let Some(browser) = renderer.as_deref_mut() else {
+                        let mut cell = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state_id,"planIndex":index,"status":"unrenderable","reason":"no-render-env"});
+                        if let Some(loc) = locale {
+                            cell["locale"] = json!(loc);
                         }
-                        let observed: Vec<_> = obs["hits"]
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .filter_map(Value::as_str)
-                            .collect();
-                        hits.extend(observed.iter().map(|s| s.to_string()));
-                        let intent = dui_core::verification::Intent {
-                            path: spec["path"].as_str().unwrap_or_default(),
-                            width: *width,
-                            inputs: &row,
-                            assertions: checks.as_array().map(Vec::as_slice).unwrap_or_default(),
-                            required_requests: spec["requiredRequests"]
+                        cells.push(cell);
+                        continue;
+                    };
+                    let staged = tempfile::NamedTempFile::new_in(out)
+                        .map_err(|e| failure(3, &e.to_string()))?;
+                    let input = json!(row);
+
+                    let mut capture_spec = locale_spec.clone();
+                    capture_spec["assertions"] = checks.clone();
+                    if scenario != "default" || index != 0 {
+                        capture_spec
+                            .as_object_mut()
+                            .unwrap()
+                            .remove("routeSelector");
+                    }
+                    let reached = browser.capture(&capture_spec, &input, *width, staged.path());
+                    let mut cell = match reached {
+                        Ok(obs) => {
+                            let bytes =
+                                fs::read(staged.path()).map_err(|e| failure(3, &e.to_string()))?;
+                            let name = format!("{:x}-{width}.png", Sha256::digest(bytes));
+                            staged
+                                .persist(out.join(&name))
+                                .map_err(|e| failure(3, &e.to_string()))?;
+                            let slot_values = obs["slots"].as_object();
+                            if let Some(slots) = slot_values {
+                                active.extend(slots.keys().cloned());
+                            }
+                            let observed: Vec<_> = obs["hits"]
                                 .as_array()
-                                .map(Vec::as_slice)
-                                .unwrap_or_default(),
-                            analyzed: analysis["diagnostics"]
-                                .as_array()
-                                .is_some_and(Vec::is_empty),
-                            expects_probe: facts.iter().any(|f| f["kind"] == "branch"),
-                        };
-                        let reason = intent.failure(&obs).or_else(|| {
-                            (spec.get("screenDiscovery").is_some()
-                                && spec["hasScreenAssertion"] == false)
-                                .then_some(dui_core::verification::Failure::MissingScreenAssertion)
-                        });
-                        if reason.is_none() {
-                            verified += 1;
+                                .into_iter()
+                                .flatten()
+                                .filter_map(Value::as_str)
+                                .collect();
+                            hits.extend(observed.iter().map(|s| s.to_string()));
+                            let intent = dui_core::verification::Intent {
+                                path: spec["path"].as_str().unwrap_or_default(),
+                                width: *width,
+                                inputs: &row,
+                                assertions: checks
+                                    .as_array()
+                                    .map(Vec::as_slice)
+                                    .unwrap_or_default(),
+                                required_requests: spec["requiredRequests"]
+                                    .as_array()
+                                    .map(Vec::as_slice)
+                                    .unwrap_or_default(),
+                                analyzed: analysis["diagnostics"]
+                                    .as_array()
+                                    .is_some_and(Vec::is_empty),
+                                expects_probe: facts.iter().any(|f| f["kind"] == "branch"),
+                            };
+                            let reason = intent.failure(&obs).or_else(|| {
+                                (spec.get("screenDiscovery").is_some()
+                                    && spec["hasScreenAssertion"] == false)
+                                    .then_some(
+                                        dui_core::verification::Failure::MissingScreenAssertion,
+                                    )
+                            });
+                            if reason.is_none() {
+                                verified += 1;
+                            }
+                            let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason,"observation":obs});
+                            if let Some(loc) = locale {
+                                entry["localeAudit"] = build_locale_audit(
+                                    loc,
+                                    &entry["observation"],
+                                    missing_by_locale,
+                                );
+                            }
+                            entry
                         }
-                        json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason,"observation":obs})
+                        Err(e) => {
+                            json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"status":"unverified","reason":e.to_string()})
+                        }
+                    };
+                    if let Some(loc) = locale {
+                        cell["locale"] = json!(loc);
                     }
-                    Err(e) => {
-                        json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"status":"unverified","reason":e.to_string()})
-                    }
-                };
-                cells.push(cell);
+                    cells.push(cell);
+                }
             }
             pending = candidates(facts, &active)
                 .into_iter()
@@ -291,9 +424,24 @@ fn execute_with(
             }
         }
         for (offset, row) in pending.iter().enumerate() {
-            let state = state_id(&scenario, &spec, row);
-            for width in widths {
-                cells.push(json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state,"planIndex":done.len()+offset,"status":"unverified","reason":"not-rendered"}));
+            let locale_slots: Vec<Option<&str>> = if locales.is_empty() {
+                vec![None]
+            } else {
+                locales.iter().map(|l| Some(l.as_str())).collect()
+            };
+            for locale in &locale_slots {
+                let mut locale_spec = spec.clone();
+                if let Some(loc) = locale {
+                    locale_spec["locale"] = json!(loc);
+                }
+                let state = state_id(&scenario, &locale_spec, row);
+                for width in widths {
+                    let mut cell = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state,"planIndex":done.len()+offset,"status":"unverified","reason":"not-rendered"});
+                    if let Some(loc) = locale {
+                        cell["locale"] = json!(loc);
+                    }
+                    cells.push(cell);
+                }
             }
         }
         seen_slots.extend(active);
@@ -323,6 +471,9 @@ fn execute_with(
         .count();
     let renderable = cells.len() - unrenderable;
     let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"budget":budget,"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
+    if !locales.is_empty() {
+        report["locales"] = summarize_by_locale(&cells, missing_by_locale);
+    }
     if let Some(discovery) = spec.get("screenDiscovery") {
         let mut discovered = discovery.clone();
         if let Some(paths) = report["discoveredRoutes"].as_array() {
@@ -426,7 +577,48 @@ pub(crate) fn state_id(scenario: &str, spec: &Value, row: &BTreeMap<String, Valu
     if let Some(csv) = spec.get("generatedCsvResponses") {
         parts.as_array_mut().unwrap().push(json!({"csv":csv}));
     }
+    if let Some(locale) = spec.get("locale").filter(|v| v.is_string()) {
+        parts.as_array_mut().unwrap().push(locale.clone());
+    }
     format!("{:x}", Sha256::digest(parts.to_string()))
+}
+
+fn build_locale_audit(
+    locale: &str,
+    obs: &Value,
+    missing_by_locale: &BTreeMap<String, Vec<String>>,
+) -> Value {
+    let raw = &obs["localeAudit"];
+    let mut missing: BTreeSet<String> = missing_by_locale
+        .get(locale)
+        .into_iter()
+        .flatten()
+        .cloned()
+        .collect();
+    for key in raw["runtimeMissingKeys"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+    {
+        missing.insert(key.to_owned());
+    }
+    let overflows = raw["overflows"].as_array().cloned().unwrap_or_default();
+    let rtl_expected = is_rtl_locale(locale);
+    let document_dir = raw["documentDir"].as_str().unwrap_or("ltr");
+    let rtl_mismatch = if rtl_expected && document_dir != "rtl" {
+        json!({"expected": "rtl", "observed": document_dir})
+    } else {
+        Value::Null
+    };
+    json!({
+        "locale": locale,
+        "missingKeys": missing.into_iter().collect::<Vec<_>>(),
+        "overflows": overflows,
+        "rtlExpected": rtl_expected,
+        "documentDir": document_dir,
+        "rtlMismatch": rtl_mismatch,
+    })
 }
 
 #[cfg(test)]

@@ -1,17 +1,19 @@
 import type { Cell } from "../../data/overview";
-
-const labels = {
-  verified: "Verified",
-  unverified: "Unverified",
-  unrenderable: "Unrenderable",
-} satisfies Record<Cell["status"], string>;
+import { useI18n } from "../../i18n/LocaleContext";
 
 export function CaptureStatus({ cell }: { cell?: Cell }) {
-  if (!cell) return <span className="capture-reason">No capture at this width</span>;
+  const { t } = useI18n();
+  if (!cell) return <span className="capture-reason">{t.noCaptureAtWidth}</span>;
+  const label =
+    cell.status === "verified"
+      ? t.verified
+      : cell.status === "unrenderable"
+        ? t.unrenderable
+        : t.unverified;
   return (
     <>
       <span className="capture-status" data-status={cell.status}>
-        {labels[cell.status]}
+        {label}
       </span>
       {cell.reason && <span className="capture-reason">{cell.reason}</span>}
     </>

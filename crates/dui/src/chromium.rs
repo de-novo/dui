@@ -363,8 +363,24 @@ impl Browser {
             "Emulation.setDeviceMetricsOverride",
             json!({"width":width,"height":800,"deviceScaleFactor":1,"mobile":false}),
         )?;
+        let locale_prelude = if let Some(locale) = spec["locale"].as_str() {
+            let _ = self.call(s, "Emulation.setLocaleOverride", json!({"locale": locale}));
+            self.call(
+                s,
+                "Network.setExtraHTTPHeaders",
+                json!({"headers": {"Accept-Language": locale}}),
+            )?;
+            let encoded = serde_json::to_string(locale)?;
+            format!(
+                "Object.defineProperty(navigator,'language',{{get:()=>({encoded}),configurable:true}});\
+                 Object.defineProperty(navigator,'languages',{{get:()=>[{encoded}],configurable:true}});\
+                 globalThis.__duiLocale={encoded};\n"
+            )
+        } else {
+            String::new()
+        };
         let script = format!(
-            "{}\nglobalThis.__duiRuntime.install({input});",
+            "{locale_prelude}{}\nglobalThis.__duiRuntime.install({input});",
             include_str!(concat!(env!("OUT_DIR"), "/browser/runtime.js"))
         );
         self.call(
@@ -436,6 +452,14 @@ impl Browser {
         if spec["measureSemantics"] == true {
             let tree = self.call(s, "Runtime.evaluate",json!({"expression":"globalThis.__duiRuntime.semantic()","awaitPromise":true,"returnByValue":true}))?;
             v["semantic"] = tree["result"]["value"].clone();
+        }
+        if spec["locale"].is_string() {
+            let audit = self.call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression":"globalThis.__duiRuntime.auditLocale()","returnByValue":true}),
+            )?;
+            v["localeAudit"] = audit["result"]["value"].clone();
         }
         let data = self.call(s, "Page.captureScreenshot", json!({"format":"png"}))?;
         fs::write(

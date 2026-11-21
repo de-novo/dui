@@ -7,6 +7,8 @@ export type ViewerSelection = {
   state: string | null;
   width: number;
   widths: number[];
+  locale: string | null;
+  locales: string[];
   view: ViewMode;
   links: string;
 };
@@ -17,12 +19,25 @@ export function archiveWidths(archive: ScreenMap): number[] {
   );
 }
 
+export function archiveLocales(archive: ScreenMap): string[] {
+  return [
+    ...new Set(
+      archive.screens.flatMap((s) =>
+        s.cells.map((c) => c.locale).filter((l): l is string => typeof l === "string"),
+      ),
+    ),
+  ].sort();
+}
+
 export function parseSelection(search: string, archive: ScreenMap): ViewerSelection {
   const params = new URLSearchParams(search);
   const widths = archiveWidths(archive);
+  const locales = archiveLocales(archive);
   const rawWidth = params.get("width");
   const parsedWidth = rawWidth !== null ? Number(rawWidth) : NaN;
   const width = Number.isInteger(parsedWidth) && parsedWidth > 0 ? parsedWidth : (widths[0] ?? 0);
+  const rawLocale = params.get("locale");
+  const locale = rawLocale && locales.includes(rawLocale) ? rawLocale : null;
   const screen = params.get("screen");
   const state = params.get("state");
   const links = params.get("links") ?? "overview";
@@ -32,7 +47,7 @@ export function parseSelection(search: string, archive: ScreenMap): ViewerSelect
   else if (rawView === "live" && screen !== null) view = "live";
   else if (screen !== null) view = "details";
   else view = "overview";
-  return { screen, state, width, widths, view, links };
+  return { screen, state, width, widths, locale, locales, view, links };
 }
 
 export function stateKeyFor(cells: Cell[], index: number): string {
@@ -47,8 +62,11 @@ export function resolveCell(
   screen: Screen | undefined,
   width: number,
   state: string | null,
+  locale: string | null = null,
 ): { cells: Cell[]; cell: Cell | undefined } {
-  const cells = screen?.cells.filter((c) => c.width === width) ?? [];
+  const cells =
+    screen?.cells.filter((c) => c.width === width && (locale === null || c.locale === locale)) ??
+    [];
   const cell =
     state === null ? cells[0] : cells.find((_, index) => stateKeyFor(cells, index) === state);
   return { cells, cell };

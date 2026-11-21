@@ -384,6 +384,79 @@ declare var __duiProbe: {
         }
         return [...paths].sort();
       },
+      auditLocale() {
+        function selectorFor(el: Element): string {
+          const testId = el.getAttribute("data-testid");
+          if (testId) return `[data-testid=${JSON.stringify(testId)}]`;
+          if (el.id) return `#${CSS.escape(el.id)}`;
+          const parts: string[] = [];
+          let cur: Element | null = el;
+          while (cur && cur !== document.body && parts.length < 4) {
+            let part = cur.localName;
+            const parentEl: Element | null = cur.parentElement;
+            if (parentEl) {
+              const siblings = [...parentEl.children].filter((c) => c.localName === cur!.localName);
+              if (siblings.length > 1) {
+                part += `:nth-of-type(${siblings.indexOf(cur) + 1})`;
+              }
+            }
+            parts.unshift(part);
+            cur = parentEl;
+          }
+          return parts.join(" > ");
+        }
+
+        const overflows: {
+          selector: string;
+          text: string;
+          scrollWidth: number;
+          clientWidth: number;
+          scrollHeight: number;
+          clientHeight: number;
+        }[] = [];
+        const seenSelectors = new Set<string>();
+        const runtimeMissingKeys = new Set<string>();
+
+        if (document.body) {
+          for (const el of document.body.querySelectorAll("*")) {
+            if (!(el instanceof HTMLElement)) continue;
+            const missingKey = el.getAttribute("data-dui-missing-key");
+            if (missingKey) runtimeMissingKeys.add(missingKey);
+            if (!el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) continue;
+            const hasDirectText = [...el.childNodes].some(
+              (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 0,
+            );
+            if (!hasDirectText) continue;
+            const style = getComputedStyle(el);
+            const horiz = el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1;
+            const vert =
+              el.clientHeight > 0 &&
+              el.scrollHeight > el.clientHeight + 1 &&
+              (style.overflowY === "hidden" || style.overflowY === "clip");
+            if (horiz || vert) {
+              const selector = selectorFor(el);
+              if (seenSelectors.has(selector)) continue;
+              seenSelectors.add(selector);
+              overflows.push({
+                selector,
+                text: el.innerText.trim().slice(0, 120),
+                scrollWidth: Math.round(el.scrollWidth),
+                clientWidth: Math.round(el.clientWidth),
+                scrollHeight: Math.round(el.scrollHeight),
+                clientHeight: Math.round(el.clientHeight),
+              });
+            }
+          }
+        }
+
+        const docStyle = getComputedStyle(document.documentElement);
+        return {
+          documentDir: docStyle.direction || "ltr",
+          htmlLang: document.documentElement.lang || null,
+          overflows,
+          runtimeMissingKeys: [...runtimeMissingKeys].sort(),
+        };
+      },
       assertions: (checks: Check[]) => checks.map(check),
     },
   });
