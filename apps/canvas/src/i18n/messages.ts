@@ -87,6 +87,10 @@ export type Messages = {
   domAnchor: string;
   observedAnchor: string;
   notReplayVerified: string;
+  edgeExtracted: string;
+  edgeInferred: string;
+  edgeVerified: string;
+  replayVerifiedLabel: string;
   compareCaptures: string;
   diffTitle: string;
   beforeCapture: string;
@@ -172,6 +176,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     domAnchor: "DOM anchor",
     observedAnchor: "Observed anchor",
     notReplayVerified: "Not replay-verified",
+    edgeExtracted: "Extracted",
+    edgeInferred: "Inferred",
+    edgeVerified: "Verified by replay",
+    replayVerifiedLabel: "Replay-verified",
     compareCaptures: "Compare captures",
     diffTitle: "Capture diff",
     beforeCapture: "Before capture",
@@ -255,6 +263,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     domAnchor: "DOM 链接",
     observedAnchor: "观测到的链接",
     notReplayVerified: "未经回放验证",
+    edgeExtracted: "代码提取",
+    edgeInferred: "推断",
+    edgeVerified: "回放已验证",
+    replayVerifiedLabel: "回放已验证",
     compareCaptures: "对比两次捕获",
     diffTitle: "捕获差异",
     beforeCapture: "变更前捕获",
@@ -338,6 +350,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     domAnchor: "DOM 앵커",
     observedAnchor: "관측된 앵커",
     notReplayVerified: "재생 미검증",
+    edgeExtracted: "코드 추출",
+    edgeInferred: "추정",
+    edgeVerified: "재생 검증됨",
+    replayVerifiedLabel: "재생 검증됨",
     compareCaptures: "캡처 비교",
     diffTitle: "캡처 변경 비교",
     beforeCapture: "이전 캡처",

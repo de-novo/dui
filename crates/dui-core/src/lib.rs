@@ -99,4 +99,5 @@ pub mod inspect;
 pub mod locale;
 pub mod model;
 pub mod storage;
+pub mod transition;
 pub mod version;

@@ -13,6 +13,7 @@
     "check:cache": "tsc --project scripts && cargo build --locked && node scripts/check-cache.mts",
     "check:diff": "tsc --project scripts && cargo build --locked && node scripts/check-diff.mts",
     "check:viewer": "tsc --project scripts && cargo build --locked && node scripts/check-viewer.mts",
+    "check:transitions": "tsc --project scripts && cargo build --locked && node scripts/check-transitions.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "check:gpui-live": "tsc --project scripts && cargo build --locked && node scripts/check-gpui-live.mts",
     "package:release": "tsc --project scripts && node scripts/package-release.mts",

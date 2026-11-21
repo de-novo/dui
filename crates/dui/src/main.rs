@@ -16,6 +16,7 @@ mod replay;
 mod retry;
 mod screen_map;
 mod sqlite_store;
+mod transition;
 mod typescript;
 mod update;
 mod viewer;
@@ -258,6 +259,21 @@ fn run() -> Reply {
     {
         mcp::serve()?;
         return Ok(Value::Null);
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "transitions"
+    {
+        let (root, spec, run_dir) = match tail {
+            [root, spec] => (Path::new(root), Path::new(spec), None),
+            [root, spec, run_dir] => (Path::new(root), Path::new(spec), Some(Path::new(run_dir))),
+            _ => {
+                return Err(failure(
+                    2,
+                    "expected transitions PROJECT MANIFEST [RUN_DIR]",
+                ));
+            }
+        };
+        return transition::replay(root, spec, run_dir);
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "diff"
