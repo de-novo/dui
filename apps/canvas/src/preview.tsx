@@ -13,6 +13,7 @@ import { ScreenMap } from "./features/map/ScreenMap";
 import { ScreenNeighborhood } from "./features/map/ScreenNeighborhood";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
+import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
 import type { LiveCellRef } from "./model/live";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import "./preview.css";
@@ -99,11 +100,21 @@ function MapView({
     return () => observer.disconnect();
   }, []);
 
+  const { t } = useI18n();
   const [search, setSearch] = useState(location.search);
   const selection = parseSelection(search, archive);
-  const { screen: selectedId, state, width, widths, view, links: mode } = selection;
+  const {
+    screen: selectedId,
+    state,
+    width,
+    widths,
+    locale,
+    locales,
+    view,
+    links: mode,
+  } = selection;
   const screen = archive.screens.find((s) => s.id === selectedId);
-  const { cells, cell } = resolveCell(screen, width, state);
+  const { cells, cell } = resolveCell(screen, width, state, locale);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const optionsButton = useRef<HTMLButtonElement>(null);
@@ -169,7 +180,7 @@ function MapView({
   const showOverview = view === "overview";
 
   return (
-    <section className="workspace" aria-label="Screen map">
+    <section className="workspace" aria-label={t.screenMap}>
       <div className="map" ref={mapArea}>
         <div
           ref={overviewLayer}
@@ -259,6 +270,8 @@ function MapView({
           screen={screen}
           width={width}
           widths={widths}
+          locale={locale}
+          locales={locales}
           cells={cells}
           cell={cell}
           stateParam={state}
@@ -266,6 +279,7 @@ function MapView({
           onKeyDown={inspectKey}
           onClose={returnToOverview}
           onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}
+          onSelectLocale={(nextLocale) => update({ locale: nextLocale, state: null })}
           onSelectState={(nextState, nextWidth) =>
             update({
               state: nextState,
@@ -395,7 +409,15 @@ try {
   run = key === null ? runs[0] : runs.find((r) => r.key === key);
   if (key !== null && !run) throw Error("This workspace is unavailable.");
   const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
-  root.render(<Viewer initialRuns={runs} run={run} archive={archive} />);
+  root.render(
+    <LocaleProvider>
+      <Viewer initialRuns={runs} run={run} archive={archive} />
+    </LocaleProvider>,
+  );
 } catch (error) {
-  root.render(<Viewer initialRuns={runs} run={run} error={String(error)} />);
+  root.render(
+    <LocaleProvider>
+      <Viewer initialRuns={runs} run={run} error={String(error)} />
+    </LocaleProvider>,
+  );
 }

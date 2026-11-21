@@ -52,11 +52,13 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
+      - run: npm ci --prefix apps/canvas
       - run: npm ci --prefix fixtures/replay
       - run: npm ci --prefix fixtures/toggle
-      - name: Inspect committed React instances and M1 gates in Chrome
+      - name: Inspect committed React instances, M1 gates, and i18n in Chrome
         run: |
           export DUI_CHROMIUM="$(command -v google-chrome)"
           "$DUI_CHROMIUM" --version
           npm run check:inspect
           npm run check:m1
+          npm run check:i18n

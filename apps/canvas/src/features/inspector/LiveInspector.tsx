@@ -2,6 +2,7 @@ import { RotateCcw, Save, X } from "lucide-react";
 import type { KeyboardEvent, RefObject } from "react";
 import { Button } from "../../components/ui/button";
 import type { Screen } from "../../data/overview";
+import { useI18n } from "../../i18n/LocaleContext";
 import {
   formatControlValue,
   partitionControls,
@@ -43,6 +44,7 @@ export function LiveInspector({
   onMutate: (op: "set" | "reset", slot: string, instance: string, value: unknown) => void;
   onSave: () => void;
 }) {
+  const { t } = useI18n();
   const title = routeName(screen.path);
   const showFullPath = title !== screen.path;
   const { editableGroups, readOnly } =
@@ -57,7 +59,7 @@ export function LiveInspector({
     session.lastEdit.reason !== "missing-assertion";
 
   return (
-    <aside className="inspector live-inspector glass-panel" aria-label="Live state controls">
+    <aside className="inspector live-inspector glass-panel" aria-label={t.liveControls}>
       <div className="panel-title">
         <div className="panel-heading">
           <h2>{title}</h2>
@@ -65,8 +67,8 @@ export function LiveInspector({
           <p className="origin-meta">Live · {width} px</p>
         </div>
         <Button
-          aria-label="Close live session"
-          title="Close live session"
+          aria-label={t.closeLiveSession}
+          title={t.closeLiveSession}
           variant="ghost"
           size="icon"
           ref={dismissRef}
@@ -82,14 +84,14 @@ export function LiveInspector({
           <div className="live-inspector-body">
             {session.lastError && (
               <div className="live-feedback error" role="alert">
-                <strong>Could not apply change</strong>
+                <strong>{t.couldNotApply}</strong>
                 <span>{session.lastError}</span>
               </div>
             )}
 
             {editFailed && session.lastEdit && (
               <div className="live-feedback error" role="alert">
-                <strong>Value did not stick</strong>
+                <strong>{t.valueDidNotStick}</strong>
                 <span>
                   Observed {formatControlValue(session.lastEdit.observedValue)} (
                   {session.lastEdit.reason})
@@ -98,7 +100,7 @@ export function LiveInspector({
             )}
 
             {editableGroups.length === 0 ? (
-              <p className="empty-meta">No editable states on this screen.</p>
+              <p className="empty-meta">{t.noEditableStates}</p>
             ) : (
               <div className="control-groups">
                 {editableGroups.map((group) => (
@@ -120,7 +122,7 @@ export function LiveInspector({
                                 <Button
                                   variant="ghost"
                                   size="xs"
-                                  aria-label={`Reset ${group.title} ${control.label}`}
+                                  aria-label={`${t.reset} ${group.title} ${control.label}`}
                                   disabled={session.busy}
                                   onKeyDown={onKeyDown}
                                   onClick={() =>
@@ -128,7 +130,7 @@ export function LiveInspector({
                                   }
                                 >
                                   <RotateCcw aria-hidden="true" />
-                                  Reset
+                                  {t.reset}
                                 </Button>
                               )}
                             </div>
@@ -150,7 +152,7 @@ export function LiveInspector({
                                       onKeyDown={onKeyDown}
                                       onClick={() => onMutate("set", control.slot, instance, opt)}
                                     >
-                                      {opt ? "On" : "Off"}
+                                      {opt ? t.on : t.off}
                                     </button>
                                   );
                                 })}
@@ -188,7 +190,7 @@ export function LiveInspector({
 
             {readOnly.length > 0 && (
               <details className="readonly-disclosure">
-                <summary>{readOnly.length} read-only</summary>
+                <summary>{t.readOnlyCount(readOnly.length)}</summary>
                 <ul className="readonly-list">
                   {readOnly.map((control, index) => (
                     <li key={controlKey(control, index)} className="readonly-item">
@@ -196,7 +198,7 @@ export function LiveInspector({
                         {control.owner}.{control.label}
                       </span>
                       <span className="readonly-meta">
-                        {control.hasValue ? formatControlValue(control.value) : "Not shown"}
+                        {control.hasValue ? formatControlValue(control.value) : t.notShown}
                         {control.reason ? ` · ${control.reason}` : ""}
                       </span>
                     </li>
@@ -210,13 +212,13 @@ export function LiveInspector({
             <footer className="live-inspector-footer">
               {session.lastSave && (
                 <output className="live-feedback saved" aria-live="polite">
-                  <span>Saved snapshot</span>
+                  <span>{t.savedSnapshot}</span>
                   {session.lastSave.runKey && (
                     <a
                       className="saved-run-link"
                       href={`/?run=${encodeURIComponent(session.lastSave.runKey)}`}
                     >
-                      Open saved
+                      {t.openSaved}
                     </a>
                   )}
                 </output>
@@ -229,14 +231,14 @@ export function LiveInspector({
                 onClick={onSave}
               >
                 <Save aria-hidden="true" />
-                Save snapshot
+                {t.saveSnapshot}
               </Button>
             </footer>
           )}
         </>
       )}
 
-      {session.phase === "opening" && <p className="empty-meta">Loading states…</p>}
+      {session.phase === "opening" && <p className="empty-meta">{t.loadingStates}</p>}
     </aside>
   );
 }

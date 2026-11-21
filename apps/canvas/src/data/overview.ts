@@ -1,3 +1,21 @@
+export type LocaleOverflow = {
+  selector: string;
+  text: string;
+  scrollWidth: number;
+  clientWidth: number;
+  scrollHeight: number;
+  clientHeight: number;
+};
+
+export type LocaleAudit = {
+  locale: string;
+  missingKeys: string[];
+  overflows: LocaleOverflow[];
+  rtlExpected: boolean;
+  documentDir: string;
+  rtlMismatch: { expected: string; observed: string } | null;
+};
+
 export type Cell = {
   path: string;
   width: number;
@@ -6,6 +24,8 @@ export type Cell = {
   image?: string;
   state?: string;
   scenario?: string;
+  locale?: string;
+  localeAudit?: LocaleAudit;
 };
 export type ScreenOrigin =
   | { kind: "entry" }
@@ -47,6 +67,39 @@ function decodeOrigin(raw: unknown): ScreenOrigin | undefined {
     };
   }
   return undefined;
+}
+
+function decodeLocaleAudit(raw: unknown): LocaleAudit | undefined {
+  if (!record(raw) || typeof raw.locale !== "string") return undefined;
+  const missingKeys = Array.isArray(raw.missingKeys)
+    ? raw.missingKeys.filter((k): k is string => typeof k === "string")
+    : [];
+  const overflows: LocaleOverflow[] = Array.isArray(raw.overflows)
+    ? raw.overflows
+        .filter((o): o is Record<string, unknown> => record(o) && typeof o.selector === "string")
+        .map((o) => ({
+          selector: o.selector as string,
+          text: typeof o.text === "string" ? o.text : "",
+          scrollWidth: typeof o.scrollWidth === "number" ? o.scrollWidth : 0,
+          clientWidth: typeof o.clientWidth === "number" ? o.clientWidth : 0,
+          scrollHeight: typeof o.scrollHeight === "number" ? o.scrollHeight : 0,
+          clientHeight: typeof o.clientHeight === "number" ? o.clientHeight : 0,
+        }))
+    : [];
+  const rtlMismatch =
+    record(raw.rtlMismatch) &&
+    typeof raw.rtlMismatch.expected === "string" &&
+    typeof raw.rtlMismatch.observed === "string"
+      ? { expected: raw.rtlMismatch.expected, observed: raw.rtlMismatch.observed }
+      : null;
+  return {
+    locale: raw.locale,
+    missingKeys,
+    overflows,
+    rtlExpected: raw.rtlExpected === true,
+    documentDir: typeof raw.documentDir === "string" ? raw.documentDir : "ltr",
+    rtlMismatch,
+  };
 }
 
 export function decodeOverview(raw: unknown): ScreenMap {
@@ -99,6 +152,8 @@ export function decodeOverview(raw: unknown): ScreenMap {
         status: cell.status,
         image: typeof cell.image === "string" ? cell.image : undefined,
         reason: typeof cell.reason === "string" ? cell.reason : undefined,
+        locale: typeof cell.locale === "string" ? cell.locale : undefined,
+        localeAudit: decodeLocaleAudit(cell.localeAudit),
       });
     }
   }

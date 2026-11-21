@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { liveFrameUrl } from "../../data/live";
 import type { Screen } from "../../data/overview";
+import { useI18n } from "../../i18n/LocaleContext";
 import { provenanceDiffers } from "../../model/live";
 import type { LiveSessionState } from "./useLiveSession";
 
@@ -25,6 +26,7 @@ export function LiveStage({
   onBackToDetails: () => void;
   onReopen: () => void;
 }) {
+  const { t } = useI18n();
   const [frameState, setFrameState] = useState<{
     sessionId: string;
     loadedUrl: string | null;
@@ -68,24 +70,24 @@ export function LiveStage({
   const showLiveProvenance = session.phase === "ready" && provenanceDiffers(session.provenance);
 
   return (
-    <section className="live-stage" aria-label="Live screen preview">
+    <section className="live-stage" aria-label={t.livePreview}>
       <header className="live-pill glass-panel">
         <Button variant="ghost" size="sm" onClick={onBackToOverview}>
           <ArrowLeft aria-hidden="true" />
-          Overview
+          {t.overview}
         </Button>
         <span className="pill-divider" aria-hidden="true" />
         <Button variant="ghost" size="sm" onClick={onBackToDetails}>
-          Archive
+          {t.archive}
         </Button>
         <span className="pill-divider" aria-hidden="true" />
         <span className="live-badge" data-phase={session.phase}>
           <span className="live-dot" aria-hidden="true" />
           {session.phase === "opening"
-            ? "Starting…"
+            ? t.starting
             : session.phase === "ready"
               ? `Live · ${width} px`
-              : "Disconnected"}
+              : t.disconnected}
         </span>
       </header>
 

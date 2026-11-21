@@ -143,5 +143,6 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 | 组合无障碍控件 | 检查已验证、未验证和不可渲染格子。在 375 和 1280 像素下均可读到状态与原因，加载占位图保留记录的判定。 |
 | 单会话串行命令 | 用 CLI 和 MCP 编辑布尔值和枚举。检查独立控件、重复请求、过期编辑、断线和重置，同时核对回读值与可见证据。 |
 | 内嵌客户端与不可变归档 | 从干净的检出安装。在目标应用停止时直接打开详情链接。缺失图像显示错误。保存实时状态后，新旧记录均可重新打开。 |
+| 多语言捕获与查看器 i18n（[#12](https://github.com/de-novo/dui/issues/12)） | 根据清单 `locales` 或自动检测的消息文件（`locales/*.json` / `messages/*.json`）按 `screen × state × width × locale` 捕获。按语言区域汇总（`report.locales`）并报告缺失翻译键、文本溢出选择器与 RTL 不匹配。可在工作区侧栏将查看器界面语言切换为 `en`、`zh-CN`、`ko`，并按语言区域筛选归档格子（`npm run check:i18n`）。 |
 
 实施顺序为归档和模式夹具 → 路由与可键盘操作的列表 → 地图 → 实时查询与编辑 → 打包和测量。使用 npmgraph 的两个真实界面，以及包含两个独立控件的可再分发夹具。测量 30 次热编辑，期间宿主重建和浏览器重启均为零。分别报告冷启动时间与热编辑的 p50、p95。[shadcn/ui](../../.agents/skills/shadcn/SKILL.md)

@@ -4,16 +4,27 @@ import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
 import type { Cell, Screen, ScreenMap } from "../../data/overview";
 import type { Run } from "../../data/run";
+import { useI18n } from "../../i18n/LocaleContext";
 import { canOpenLiveCell } from "../../model/live";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
 
-function cellLabel(cell: Cell, multipleStates: boolean, index: number): string | null {
-  if (!multipleStates) return null;
-  if (cell.scenario && cell.scenario !== "default" && !cell.scenario.startsWith("link-")) {
-    return cell.scenario;
+function cellLabel(
+  cell: Cell,
+  multipleStates: boolean,
+  index: number,
+  stateLabel: (n: number) => string,
+): string | null {
+  const parts: string[] = [];
+  if (cell.locale) parts.push(cell.locale);
+  if (multipleStates) {
+    if (cell.scenario && cell.scenario !== "default" && !cell.scenario.startsWith("link-")) {
+      parts.push(cell.scenario);
+    } else if (!cell.locale) {
+      parts.push(stateLabel(index + 1));
+    }
   }
-  return `State ${index + 1}`;
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export function ScreenInspector({
@@ -22,6 +33,8 @@ export function ScreenInspector({
   screen,
   width,
   widths,
+  locale,
+  locales,
   cells,
   cell,
   stateParam,
@@ -29,6 +42,7 @@ export function ScreenInspector({
   onKeyDown,
   onClose,
   onSelectWidth,
+  onSelectLocale,
   onSelectState,
   onSelectScreen,
   onOpenLive,
@@ -38,6 +52,8 @@ export function ScreenInspector({
   screen?: Screen;
   width: number;
   widths: number[];
+  locale: string | null;
+  locales: string[];
   cells: Cell[];
   cell?: Cell;
   stateParam: string | null;
@@ -45,29 +61,37 @@ export function ScreenInspector({
   onKeyDown: (event: KeyboardEvent) => void;
   onClose: () => void;
   onSelectWidth: (width: number) => void;
+  onSelectLocale: (locale: string | null) => void;
   onSelectState: (stateKey: string, width?: number) => void;
   onSelectScreen: (screenId: string) => void;
   onOpenLive: (targetCell: { state: string; width: number }) => void;
 }) {
+  const { t } = useI18n();
   const liveGate = canOpenLiveCell(cell, run);
   const connections = screen ? screenConnections(archive, screen.id) : [];
-  const screenCells = screen?.cells ?? [];
-  const title = screen ? routeName(screen.path) : "Screen unavailable";
+  const rawScreenCells = screen?.cells ?? [];
+  const screenCells =
+    locale === null ? rawScreenCells : rawScreenCells.filter((c) => c.locale === locale);
+  const title = screen ? routeName(screen.path) : t.screenUnavailable;
   const showFullPath = Boolean(screen && title !== screen.path);
   const widthsOnScreen = new Set(screenCells.map((c) => c.width)).size;
   const multipleStatesPerWidth = screenCells.length > widthsOnScreen;
+  const audit = cell?.localeAudit;
+  const hasLocaleIssues = Boolean(
+    audit && (audit.missingKeys.length > 0 || audit.overflows.length > 0 || audit.rtlMismatch),
+  );
 
   return (
-    <aside className="inspector glass-panel" aria-label="Screen details">
+    <aside className="inspector glass-panel" aria-label={t.screenDetails}>
       <div className="panel-title">
         <div className="panel-heading">
           <h2>{title}</h2>
           {showFullPath && screen && <code className="route-path">{screen.path}</code>}
-          <p className="origin-meta">Archive</p>
+          <p className="origin-meta">{t.archive}</p>
         </div>
         <Button
-          aria-label="Back to overview"
-          title="Back to overview"
+          aria-label={t.backToOverview}
+          title={t.backToOverview}
           variant="ghost"
           size="icon"
           ref={dismissRef}
@@ -90,15 +114,34 @@ export function ScreenInspector({
             }}
           >
             <Play aria-hidden="true" />
-            Open live
+            {t.openLive}
           </Button>
           {!liveGate.ok && <p className="live-unavailable-note">{liveGate.reason}</p>}
         </div>
       )}
 
+      {locales.length > 1 && (
+        <label>
+          {t.localeFilter}
+          <select
+            aria-label={t.localeFilter}
+            onKeyDown={onKeyDown}
+            value={locale ?? ""}
+            onChange={(e) => onSelectLocale(e.target.value || null)}
+          >
+            <option value="">{t.allLocales}</option>
+            {locales.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {(!screen || screenCells.length === 0) && (
         <label>
-          Width
+          {t.width}
           <select
             onKeyDown={onKeyDown}
             value={width}
@@ -114,17 +157,17 @@ export function ScreenInspector({
       )}
 
       {screen && screenCells.length > 0 && (
-        <section className="inspector-section" aria-label="Captured states and widths">
-          <h3>{multipleStatesPerWidth ? "States & widths" : "Widths"}</h3>
+        <section className="inspector-section" aria-label={t.statesAndWidths}>
+          <h3>{multipleStatesPerWidth ? t.statesAndWidths : t.widths}</h3>
           <ul className="cell-matrix">
             {screenCells.map((entry, index) => {
               const widthCells = screenCells.filter((c) => c.width === entry.width);
               const localIndex = widthCells.indexOf(entry);
               const entryKey = stateKeyFor(widthCells, localIndex);
               const active = entry === cell;
-              const subtitle = cellLabel(entry, widthCells.length > 1, localIndex);
+              const subtitle = cellLabel(entry, widthCells.length > 1, localIndex, t.stateLabel);
               return (
-                <li key={`${entry.width}-${entry.state ?? index}`}>
+                <li key={`${entry.width}-${entry.locale ?? ""}-${entry.state ?? index}`}>
                   <button
                     type="button"
                     className={"cell-row" + (active ? " active" : "")}
@@ -138,7 +181,7 @@ export function ScreenInspector({
                     </span>
                     <span className="cell-row-status">
                       <CaptureStatus cell={entry} />
-                      {!entry.image && <span className="missing-image-tag">No image</span>}
+                      {!entry.image && <span className="missing-image-tag">{t.noImage}</span>}
                     </span>
                   </button>
                 </li>
@@ -148,24 +191,50 @@ export function ScreenInspector({
         </section>
       )}
 
+      {hasLocaleIssues && audit && (
+        <details className="readonly-disclosure link-details-disclosure" open>
+          <summary>{t.localeIssues}</summary>
+          <ul className="readonly-list">
+            {audit.missingKeys.length > 0 && (
+              <li className="link-evidence-item">
+                <span>{t.missingKeysLabel(audit.missingKeys)}</span>
+              </li>
+            )}
+            {audit.overflows.map((ov) => (
+              <li key={ov.selector} className="link-evidence-item">
+                <span>{t.overflowLabel(ov.selector)}</span>
+                <code className="selector-evidence">
+                  {ov.scrollWidth} / {ov.clientWidth} px
+                </code>
+              </li>
+            ))}
+            {audit.rtlMismatch && (
+              <li className="link-evidence-item">
+                <span>{t.rtlMismatchLabel(audit.rtlMismatch.observed)}</span>
+              </li>
+            )}
+          </ul>
+        </details>
+      )}
+
       {cell && !cell.image && (
         <output className="missing-capture-box">
-          <strong>Image unavailable</strong>
+          <strong>{t.imageUnavailable}</strong>
           <p className="capture-meta">
-            {stateParam !== null && !cell ? "State unavailable" : <CaptureStatus cell={cell} />}
+            {stateParam !== null && !cell ? t.stateUnavailable : <CaptureStatus cell={cell} />}
           </p>
         </output>
       )}
 
       {stateParam !== null && !cell && cells.length > 0 && (
         <output className="missing-capture-box">
-          <strong>State unavailable</strong>
+          <strong>{t.stateUnavailable}</strong>
         </output>
       )}
 
       {connections.length > 0 && (
-        <section className="inspector-section" aria-label="Links">
-          <h3>Links</h3>
+        <section className="inspector-section" aria-label={t.links}>
+          <h3>{t.links}</h3>
           <ul className="link-evidence-list">
             {connections.map(({ direction, screen: partner }) => (
               <li key={`${direction}-${partner.id}`}>
@@ -183,21 +252,23 @@ export function ScreenInspector({
                     )}
                     <span className="link-route">{partner.path}</span>
                   </span>
-                  <span className="link-row-state">Discovered</span>
+                  <span className="link-row-state">{t.discovered}</span>
                 </button>
               </li>
             ))}
           </ul>
           <details className="readonly-disclosure link-details-disclosure">
-            <summary>Link evidence</summary>
+            <summary>{t.linkEvidence}</summary>
             <ul className="readonly-list">
               {connections.map(({ direction, screen: partner, link }) => (
                 <li key={`${direction}-${partner.id}`} className="link-evidence-item">
                   <strong>{partner.path}</strong>
                   <span>
-                    {link.origin === "anchor" ? "DOM anchor" : (link.origin ?? "Observed anchor")}
-                    {link.observedWidths?.length ? ` · ${link.observedWidths.join(", ")} px` : ""} ·
-                    Not replay-verified
+                    {link.origin === "anchor" ? t.domAnchor : (link.origin ?? t.observedAnchor)}
+                    {link.observedWidths?.length
+                      ? ` · ${link.observedWidths.join(", ")} px`
+                      : ""} ·{" "}
+                    {t.notReplayVerified}
                   </span>
                   {link.selector && <code className="selector-evidence">{link.selector}</code>}
                 </li>
