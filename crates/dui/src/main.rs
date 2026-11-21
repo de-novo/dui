@@ -3,6 +3,7 @@ mod archive;
 use archive::Capture;
 mod cache;
 mod chromium;
+mod diff;
 mod graph_view;
 mod host;
 mod inspect;
@@ -200,6 +201,30 @@ fn run() -> Reply {
     {
         mcp::serve()?;
         return Ok(Value::Null);
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "diff"
+    {
+        let mut overlay_dir: Option<&Path> = None;
+        let mut positional = Vec::new();
+        let mut iter = tail.iter();
+        while let Some(arg) = iter.next() {
+            if arg == "--overlay-dir" {
+                let Some(dir) = iter.next() else {
+                    return Err(failure(2, "missing value for --overlay-dir"));
+                };
+                overlay_dir = Some(Path::new(dir));
+            } else {
+                positional.push(arg);
+            }
+        }
+        let (before, after) = match positional.as_slice() {
+            [before, after] => (Path::new(before), Path::new(after)),
+            _ => {
+                return Err(failure(2, "expected diff BEFORE AFTER [--overlay-dir DIR]"));
+            }
+        };
+        return diff::compare(before, after, overlay_dir);
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "prune"

@@ -4,6 +4,7 @@ import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import { decodeOverview, type Screen, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
+import { CaptureDiffView } from "./features/diff/CaptureDiffView";
 import { LiveInspector } from "./features/inspector/LiveInspector";
 import { LiveStage } from "./features/inspector/LiveStage";
 import { ScreenInspector } from "./features/inspector/ScreenInspector";
@@ -79,10 +80,14 @@ function LiveOverlay({
 function MapView({
   archive,
   run,
+  runs,
+  onOpenDiff,
   onRefreshRuns,
 }: {
   archive: Archive;
   run: Run;
+  runs: Run[];
+  onOpenDiff: () => void;
   onRefreshRuns: () => void;
 }) {
   const mapArea = useRef<HTMLDivElement>(null);
@@ -350,6 +355,17 @@ function MapView({
               ))}
             </select>
           </label>
+          {runs.length >= 2 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOptionsOpen(false);
+                onOpenDiff();
+              }}
+            >
+              {t.compareCaptures}
+            </Button>
+          )}
         </DialogContent>
       </Dialog>
     </section>
@@ -375,6 +391,13 @@ function Viewer({
 }) {
   const [runs, setRuns] = useState(initialRuns);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState(location.search);
+
+  useEffect(() => {
+    const pop = () => setSearch(location.search);
+    addEventListener("popstate", pop);
+    return () => removeEventListener("popstate", pop);
+  }, []);
 
   const refreshRuns = useCallback(() => {
     void json("/archive/runs.json")
@@ -382,11 +405,50 @@ function Viewer({
       .catch(() => {});
   }, []);
 
+  const params = new URLSearchParams(search);
+  const isDiffView = params.get("view") === "diff";
+  const diffBefore = params.get("before") ?? (runs.length >= 2 ? runs[1]?.key : runs[0]?.key) ?? "";
+  const diffAfter = params.get("after") ?? run?.key ?? runs[0]?.key ?? "";
+
+  function openDiff(beforeKey = diffBefore, afterKey = diffAfter) {
+    const next = withSearchChanges(location.href, {
+      view: "diff",
+      before: beforeKey,
+      after: afterKey,
+    });
+    history.pushState(null, "", next);
+    setSearch(next.search);
+  }
+
+  function closeDiff() {
+    const next = withSearchChanges(location.href, {
+      view: null,
+      before: null,
+      after: null,
+    });
+    history.pushState(null, "", next);
+    setSearch(next.search);
+  }
+
   return (
     <main className="viewer">
       <WorkspaceRail run={run} open={() => setPickerOpen(true)} />
-      {archive && run ? (
-        <MapView archive={archive} run={run} onRefreshRuns={refreshRuns} />
+      {isDiffView && diffBefore && diffAfter ? (
+        <CaptureDiffView
+          runs={runs}
+          beforeKey={diffBefore}
+          afterKey={diffAfter}
+          onSelectPair={(nextBefore, nextAfter) => openDiff(nextBefore, nextAfter)}
+          onClose={closeDiff}
+        />
+      ) : archive && run ? (
+        <MapView
+          archive={archive}
+          run={run}
+          runs={runs}
+          onOpenDiff={() => openDiff()}
+          onRefreshRuns={refreshRuns}
+        />
       ) : (
         <output>{error ?? "No saved screen maps."}</output>
       )}

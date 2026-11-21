@@ -380,6 +380,10 @@ fn execute_with_locales(
                             "observation": obs,
                             "cache": CacheOutcome::Hit { key: cache_key },
                         });
+                        if let Some(inputs) = cache_inputs.as_ref() {
+                            cell["sourceFiles"] =
+                                json!(inputs.source_files.keys().cloned().collect::<Vec<_>>());
+                        }
                         if let Some(loc) = locale {
                             cell["localeAudit"] =
                                 build_locale_audit(loc, &cell["observation"], missing_by_locale);
@@ -488,6 +492,10 @@ fn execute_with_locales(
                             entry
                         }
                     };
+                    if let Some(inputs) = cache_inputs.as_ref() {
+                        cell["sourceFiles"] =
+                            json!(inputs.source_files.keys().cloned().collect::<Vec<_>>());
+                    }
                     if let Some(loc) = locale {
                         cell["locale"] = json!(loc);
                     }
@@ -607,6 +615,10 @@ fn execute_with_locales(
             "rendered": cache_misses,
             "forced": c.is_forced(),
         });
+        let hashes = c.source_file_hashes();
+        if !hashes.is_empty() {
+            report["sourceFileHashes"] = json!(hashes);
+        }
     }
     if let Some(discovery) = spec.get("screenDiscovery") {
         let mut discovered = discovery.clone();

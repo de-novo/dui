@@ -87,6 +87,24 @@ export type Messages = {
   domAnchor: string;
   observedAnchor: string;
   notReplayVerified: string;
+  compareCaptures: string;
+  diffTitle: string;
+  beforeCapture: string;
+  afterCapture: string;
+  loadingDiff: string;
+  diffFailed: string;
+  emptyDiffTitle: string;
+  emptyDiffDetail: (unchanged: number) => string;
+  diffSummaryLabel: (changed: number, unchanged: number) => string;
+  diffAdded: string;
+  diffRemoved: string;
+  diffChanged: string;
+  beforeLabel: string;
+  afterLabel: string;
+  pixelDiffOverlay: string;
+  changedFilesLabel: string;
+  statusChangeLabel: string;
+  pixelsChangedLabel: (pixels: number, percent: string) => string;
 };
 
 export const MESSAGES: Record<UiLocale, Messages> = {
@@ -154,6 +172,24 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     domAnchor: "DOM anchor",
     observedAnchor: "Observed anchor",
     notReplayVerified: "Not replay-verified",
+    compareCaptures: "Compare captures",
+    diffTitle: "Capture diff",
+    beforeCapture: "Before capture",
+    afterCapture: "After capture",
+    loadingDiff: "Comparing captures…",
+    diffFailed: "Could not compare these captures.",
+    emptyDiffTitle: "No changed cells",
+    emptyDiffDetail: (unchanged) => `All ${unchanged} cells match between these captures.`,
+    diffSummaryLabel: (changed, unchanged) => `${changed} changed · ${unchanged} unchanged hidden`,
+    diffAdded: "Added",
+    diffRemoved: "Removed",
+    diffChanged: "Changed",
+    beforeLabel: "Before",
+    afterLabel: "After",
+    pixelDiffOverlay: "Pixel difference overlay",
+    changedFilesLabel: "Changed source files",
+    statusChangeLabel: "Status change",
+    pixelsChangedLabel: (pixels, percent) => `${pixels} px changed (${percent}%)`,
   },
   "zh-CN": {
     workspace: "工作区",
@@ -219,6 +255,24 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     domAnchor: "DOM 链接",
     observedAnchor: "观测到的链接",
     notReplayVerified: "未经回放验证",
+    compareCaptures: "对比两次捕获",
+    diffTitle: "捕获差异",
+    beforeCapture: "变更前捕获",
+    afterCapture: "变更后捕获",
+    loadingDiff: "正在对比捕获…",
+    diffFailed: "无法对比这两次捕获。",
+    emptyDiffTitle: "无变更单元格",
+    emptyDiffDetail: (unchanged) => `两次捕获间全部 ${unchanged} 个单元格一致。`,
+    diffSummaryLabel: (changed, unchanged) => `${changed} 处变更 · 已隐藏 ${unchanged} 个未变更项`,
+    diffAdded: "新增",
+    diffRemoved: "移除",
+    diffChanged: "已变更",
+    beforeLabel: "变更前",
+    afterLabel: "变更后",
+    pixelDiffOverlay: "像素差异叠加层",
+    changedFilesLabel: "变更源文件",
+    statusChangeLabel: "状态变化",
+    pixelsChangedLabel: (pixels, percent) => `变化 ${pixels} 像素 (${percent}%)`,
   },
   ko: {
     workspace: "워크스페이스",
@@ -284,5 +338,23 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     domAnchor: "DOM 앵커",
     observedAnchor: "관측된 앵커",
     notReplayVerified: "재생 미검증",
+    compareCaptures: "캡처 비교",
+    diffTitle: "캡처 변경 비교",
+    beforeCapture: "이전 캡처",
+    afterCapture: "이후 캡처",
+    loadingDiff: "캡처 비교 중…",
+    diffFailed: "두 캡처를 비교할 수 없습니다.",
+    emptyDiffTitle: "변경된 칸 없음",
+    emptyDiffDetail: (unchanged) => `두 캡처의 ${unchanged}개 칸이 모두 동일합니다.`,
+    diffSummaryLabel: (changed, unchanged) => `변경 ${changed}개 · 동일 ${unchanged}개 숨김`,
+    diffAdded: "추가됨",
+    diffRemoved: "삭제됨",
+    diffChanged: "변경됨",
+    beforeLabel: "이전",
+    afterLabel: "이후",
+    pixelDiffOverlay: "픽셀 차이 오버레이",
+    changedFilesLabel: "변경된 소스 파일",
+    statusChangeLabel: "상태 변경",
+    pixelsChangedLabel: (pixels, percent) => `${pixels}px 변경 (${percent}%)`,
   },
 };
