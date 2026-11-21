@@ -23,7 +23,7 @@ fn live_tool() -> Value {
         "inputSchema":{
             "type":"object","required":["op"],"additionalProperties":false,
             "properties":{
-                "op":{"enum":["open","inspect","set","reset","save","close"]},
+                "op":{"enum":["open","inspect","frame","set","reset","save","close"]},
                 "project":{"type":"string"},"manifest":{"type":"string"},"run":{"type":"string"},
                 "session":{"type":"string"},"requestId":{"type":"string"},
                 "cell":{"type":"object","required":["state","width"],"properties":{"state":{"type":"string"},"width":{"type":"integer","minimum":1}}},

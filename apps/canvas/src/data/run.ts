@@ -4,4 +4,5 @@ export type Run = {
   project: string;
   branch: string | null;
   version: string;
+  liveAvailable?: boolean;
 };

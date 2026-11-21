@@ -1,22 +1,89 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
-import { createRoot } from "react-dom/client";
-import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
+import { decodeOverview, type Screen, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
-import { CaptureStatus } from "./components/ui/CaptureStatus";
-import { ScreenNeighborhood } from "./features/map/ScreenNeighborhood";
+import { LiveInspector } from "./features/inspector/LiveInspector";
+import { LiveStage } from "./features/inspector/LiveStage";
+import { ScreenInspector } from "./features/inspector/ScreenInspector";
+import { useLiveSession } from "./features/inspector/useLiveSession";
 import { routeName } from "./features/map/CaptureCard";
 import { ScreenMap } from "./features/map/ScreenMap";
+import { ScreenNeighborhood } from "./features/map/ScreenNeighborhood";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
+import type { LiveCellRef } from "./model/live";
+import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import "./preview.css";
 
 function archiveUrl(name: string, run: Run) {
   return "/archive/" + encodeURIComponent(name) + "?run=" + encodeURIComponent(run.key);
 }
 
-function MapView({ archive, run }: { archive: Archive; run: Run }) {
+function LiveOverlay({
+  run,
+  screen,
+  cell,
+  dismissRef,
+  onKeyDown,
+  onBackToOverview,
+  onBackToDetails,
+  onRefreshRuns,
+}: {
+  run: Run;
+  screen: Screen;
+  cell: LiveCellRef;
+  dismissRef: React.RefObject<HTMLButtonElement | null>;
+  onKeyDown: (event: React.KeyboardEvent) => void;
+  onBackToOverview: () => void;
+  onBackToDetails: () => void;
+  onRefreshRuns: () => void;
+}) {
+  const { state, mutate, save, reopen, close } = useLiveSession(run.key, cell, onRefreshRuns);
+
+  const leaveToOverview = () => {
+    close();
+    onBackToOverview();
+  };
+  const leaveToDetails = () => {
+    close();
+    onBackToDetails();
+  };
+
+  return (
+    <div className="live-overlay">
+      <LiveStage
+        screen={screen}
+        width={cell.width}
+        session={state}
+        onBackToOverview={leaveToOverview}
+        onBackToDetails={leaveToDetails}
+        onReopen={reopen}
+      />
+      <LiveInspector
+        screen={screen}
+        width={cell.width}
+        session={state}
+        dismissRef={dismissRef}
+        onKeyDown={onKeyDown}
+        onClose={leaveToDetails}
+        onMutate={mutate}
+        onSave={save}
+      />
+    </div>
+  );
+}
+
+function MapView({
+  archive,
+  run,
+  onRefreshRuns,
+}: {
+  archive: Archive;
+  run: Run;
+  onRefreshRuns: () => void;
+}) {
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
   const [railInset, setRailInset] = useState<number>();
@@ -31,68 +98,99 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
     observer.observe(layer);
     return () => observer.disconnect();
   }, []);
+
   const [search, setSearch] = useState(location.search);
-  const params = new URLSearchParams(search);
-  const widths = [...new Set(archive.screens.flatMap((s) => s.cells.map((c) => c.width)))].sort(
-    (a, b) => b - a,
-  );
-  const width = Number(params.get("width") ?? widths[0] ?? 0);
-  const selectedId = params.get("screen");
+  const selection = parseSelection(search, archive);
+  const { screen: selectedId, state, width, widths, view, links: mode } = selection;
   const screen = archive.screens.find((s) => s.id === selectedId);
-  const mode = params.get("links") ?? "overview";
+  const { cells, cell } = resolveCell(screen, width, state);
+
   const [optionsOpen, setOptionsOpen] = useState(false);
   const optionsButton = useRef<HTMLButtonElement>(null);
   const dismiss = useRef<HTMLButtonElement>(null);
   const origin = useRef<HTMLElement | SVGElement | null>(null);
+  const previousView = useRef(view);
+
   useEffect(() => {
     const pop = () => setSearch(location.search);
     addEventListener("popstate", pop);
     return () => removeEventListener("popstate", pop);
   }, []);
+
   useEffect(() => {
-    if (selectedId !== null) dismiss.current?.focus();
-    else origin.current?.focus();
-  }, [selectedId]);
-  function update(changes: Record<string, string | null>) {
-    const next = new URL(location.href);
-    for (const [key, value] of Object.entries(changes)) {
-      if (value === null) next.searchParams.delete(key);
-      else next.searchParams.set(key, value);
+    const prev = previousView.current;
+    previousView.current = view;
+    if (view === "details" || view === "live") {
+      if (prev !== view) dismiss.current?.focus();
+    } else if (prev !== "overview") {
+      const target = selectedId
+        ? Array.from(
+            overviewLayer.current?.querySelectorAll<HTMLElement>(".react-flow__node") ?? [],
+          ).find((node) => node.dataset.id === selectedId)
+        : null;
+      (target ?? origin.current)?.focus();
     }
+  }, [view, selectedId]);
+
+  function update(changes: Record<string, string | null>) {
+    const next = withSearchChanges(location.href, changes);
     history.pushState(null, "", next);
     setSearch(next.search);
   }
+
+  function returnToOverview() {
+    if (selectedId) {
+      update({ view: "overview" });
+    } else {
+      update({ screen: null, state: null, view: null });
+    }
+  }
+
+  function returnToDetails() {
+    update({ view: null });
+  }
+
   function inspectKey(event: React.KeyboardEvent) {
-    if (event.key === "Escape") update({ screen: null, state: null });
+    if (event.key === "Escape") {
+      if (view === "live") returnToDetails();
+      else returnToOverview();
+    }
   }
+
   function select(id: string, active: Element | null = document.activeElement) {
-    if (selectedId === null && (active instanceof HTMLElement || active instanceof SVGElement))
+    if (view === "overview" && (active instanceof HTMLElement || active instanceof SVGElement)) {
       origin.current = active;
-    update({ screen: id, state: null });
+    }
+    update({ screen: id, state: null, view: null });
   }
-  const cells = screen?.cells.filter((c) => c.width === width) ?? [];
-  const state = params.get("state");
-  const stateKey = (i: number) =>
-    cells[i].state && cells.filter((c) => c.state === cells[i].state).length === 1
-      ? cells[i].state!
-      : "cell:" + i;
-  const cell = state === null ? cells[0] : cells.find((_, i) => stateKey(i) === state);
+
+  const showLive = view === "live" && Boolean(screen && cell?.state);
+  const showDetails = view === "details" || (view === "live" && !showLive && selectedId !== null);
+  const showOverview = view === "overview";
+
   return (
     <section className="workspace" aria-label="Screen map">
       <div className="map" ref={mapArea}>
-        <div ref={overviewLayer} className="overview-layer" aria-hidden={!!screen} inert={!!screen}>
+        <div
+          ref={overviewLayer}
+          className="overview-layer"
+          aria-hidden={!showOverview}
+          inert={!showOverview}
+        >
           {railInset !== undefined && (
             <ScreenMap
               railInset={railInset}
               archive={archive}
               width={width}
               mode={mode}
+              selectedId={selectedId}
               imageUrl={(name) => archiveUrl(name, run)}
               select={select}
             />
           )}
         </div>
-        {screen && (
+
+        {showDetails && screen && (
           <ScreenNeighborhood
             key={JSON.stringify([screen.id, width])}
             archive={archive}
@@ -103,32 +201,90 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
             select={select}
           />
         )}
-        <Button
-          className="map-options"
-          variant="outline"
-          ref={optionsButton}
-          aria-haspopup="dialog"
-          aria-expanded={optionsOpen}
-          onClick={() => setOptionsOpen(true)}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
+
+        {showOverview && screen && (
+          <section className="preserved-selection glass-panel" aria-label="Selected screen">
+            <span className="preserved-label">
+              Selected: <code>{routeName(screen.path)}</code>
+            </span>
+            <Button variant="outline" size="sm" onClick={() => update({ view: null })}>
+              Inspect screen
+            </Button>
+          </section>
+        )}
+
+        {!showLive && (
+          <Button
+            className="map-options"
+            variant="outline"
+            ref={optionsButton}
+            aria-haspopup="dialog"
+            aria-expanded={optionsOpen}
+            onClick={() => setOptionsOpen(true)}
           >
-            <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
-            <circle cx="10" cy="6" r="2" />
-            <circle cx="14" cy="14" r="2" />
-          </svg>{" "}
-          Map options
-        </Button>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
+              <circle cx="10" cy="6" r="2" />
+              <circle cx="14" cy="14" r="2" />
+            </svg>{" "}
+            Map options
+          </Button>
+        )}
+
+        {showLive && screen && cell?.state && (
+          <LiveOverlay
+            key={`${run.key}:${cell.state}:${cell.width}`}
+            run={run}
+            screen={screen}
+            cell={{ state: cell.state, width: cell.width }}
+            dismissRef={dismiss}
+            onKeyDown={inspectKey}
+            onBackToOverview={returnToOverview}
+            onBackToDetails={returnToDetails}
+            onRefreshRuns={onRefreshRuns}
+          />
+        )}
       </div>
+
+      {showDetails && (
+        <ScreenInspector
+          archive={archive}
+          run={run}
+          screen={screen}
+          width={width}
+          widths={widths}
+          cells={cells}
+          cell={cell}
+          stateParam={state}
+          dismissRef={dismiss}
+          onKeyDown={inspectKey}
+          onClose={returnToOverview}
+          onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}
+          onSelectState={(nextState, nextWidth) =>
+            update({
+              state: nextState,
+              ...(nextWidth !== undefined ? { width: String(nextWidth) } : {}),
+            })
+          }
+          onSelectScreen={(id) => select(id)}
+          onOpenLive={(targetCell) =>
+            update({
+              width: String(targetCell.width),
+              state: targetCell.state,
+              view: "live",
+            })
+          }
+        />
+      )}
+
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
-        <DialogContent
-          finalFocus={() => (selectedId === null ? optionsButton.current : dismiss.current)}
-        >
+        <DialogContent finalFocus={() => (showOverview ? optionsButton.current : dismiss.current)}>
           <DialogTitle>Map options</DialogTitle>
           <label>
             Find screen
@@ -182,66 +338,6 @@ function MapView({ archive, run }: { archive: Archive; run: Run }) {
           </label>
         </DialogContent>
       </Dialog>
-      {selectedId !== null && (
-        <aside className="inspector" aria-label="Screen details">
-          <div className="panel-title">
-            <div>
-              <h2>{screen ? routeName(screen.path) : "Screen unavailable"}</h2>
-              {screen && <code className="route-path">{screen.path}</code>}
-            </div>
-            <Button
-              aria-label="Close"
-              variant="ghost"
-              size="icon"
-              ref={dismiss}
-              onKeyDown={inspectKey}
-              onClick={() => update({ screen: null, state: null })}
-            >
-              ×
-            </Button>
-          </div>
-          <label>
-            Width
-            <select
-              onKeyDown={inspectKey}
-              value={width}
-              onChange={(e) => update({ width: e.target.value, state: null })}
-            >
-              {widths.map((w) => (
-                <option key={w} value={w}>
-                  {w} px
-                </option>
-              ))}
-            </select>
-          </label>
-          {cells.length > 1 && (
-            <label>
-              State
-              <select
-                onKeyDown={inspectKey}
-                value={cell ? cells.indexOf(cell) : -1}
-                onChange={(e) => update({ state: stateKey(Number(e.target.value)) })}
-              >
-                {!cell && <option value={-1}>State unavailable</option>}
-                {cells.map((c, i) => (
-                  <option key={i} value={i}>
-                    {c.scenario ?? "State"} · {c.state?.slice(0, 8) ?? i + 1}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <div className="inspection-result">
-            <h3>Verification</h3>
-            <p className="capture-meta">
-              {state !== null && !cell ? "State unavailable" : <CaptureStatus cell={cell} />}
-            </p>
-          </div>
-          {cell?.image && (
-            <img alt={"Archived screen at " + width + " px"} src={archiveUrl(cell.image, run)} />
-          )}
-        </aside>
-      )}
     </section>
   );
 }
@@ -251,23 +347,32 @@ async function json(url: string) {
   if (!response.ok) throw Error("Could not load the archive");
   return response.json();
 }
+
 function Viewer({
-  runs,
+  initialRuns,
   run,
   archive,
   error,
 }: {
-  runs: Run[];
+  initialRuns: Run[];
   run?: Run;
   archive?: Archive;
   error?: string;
 }) {
+  const [runs, setRuns] = useState(initialRuns);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  const refreshRuns = useCallback(() => {
+    void json("/archive/runs.json")
+      .then((next: Run[]) => setRuns(next))
+      .catch(() => {});
+  }, []);
+
   return (
     <main className="viewer">
       <WorkspaceRail run={run} open={() => setPickerOpen(true)} />
       {archive && run ? (
-        <MapView archive={archive} run={run} />
+        <MapView archive={archive} run={run} onRefreshRuns={refreshRuns} />
       ) : (
         <output>{error ?? "No saved screen maps."}</output>
       )}
@@ -280,6 +385,7 @@ function Viewer({
     </main>
   );
 }
+
 const root = createRoot(document.getElementById("root")!);
 let runs: Run[] = [],
   run: Run | undefined;
@@ -289,7 +395,7 @@ try {
   run = key === null ? runs[0] : runs.find((r) => r.key === key);
   if (key !== null && !run) throw Error("This workspace is unavailable.");
   const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
-  root.render(<Viewer runs={runs} run={run} archive={archive} />);
+  root.render(<Viewer initialRuns={runs} run={run} archive={archive} />);
 } catch (error) {
-  root.render(<Viewer runs={runs} run={run} error={String(error)} />);
+  root.render(<Viewer initialRuns={runs} run={run} error={String(error)} />);
 }

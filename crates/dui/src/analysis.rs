@@ -77,6 +77,24 @@ pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16
         None
     };
     let browser_version = browser.as_mut().and_then(|b| b.version().ok());
+    let mut stored_spec = spec.clone();
+    if let Some(base) = manifest.parent() {
+        if let Some(packs) = stored_spec["rulePacks"].as_array_mut() {
+            for entry in packs.iter_mut() {
+                if let Some(rel) = entry.as_str()
+                    && let Ok(abs) = base.join(rel).canonicalize()
+                {
+                    *entry = json!(abs);
+                }
+            }
+        }
+        if let Some(rel) = stored_spec["mockPreload"].as_str()
+            && let Ok(abs) = base.join(rel).canonicalize()
+        {
+            stored_spec["mockPreload"] = json!(abs);
+        }
+    }
+    store(&out.join("manifest.json"), &stored_spec)?;
     execute_with(
         browser.as_mut().map(|b| b as &mut dyn Renderer),
         &analysis,
@@ -282,7 +300,11 @@ fn execute_with(
         let mut discovered = discovery.clone();
         if let Some(paths) = report["discoveredRoutes"].as_array() {
             for path in paths.iter().filter_map(Value::as_str) {
-                discovered["sources"][path] = json!({"kind":"anchor","from":spec["path"]});
+                let mut source = json!({"kind":"anchor","from":spec["path"]});
+                if let Some(selector) = spec["routeSelector"].as_str() {
+                    source["selector"] = json!(selector);
+                }
+                discovered["sources"][path] = source;
             }
         }
         if let Some(cells) = report["cells"].as_array() {
@@ -290,6 +312,26 @@ fn execute_with(
                 json!(cells.iter().filter(|c| c["image"].is_string()).count());
         }
         report["screenDiscovery"] = discovered;
+    } else if let Some(selector) = spec["routeSelector"].as_str() {
+        let entry_path = spec["path"].as_str().unwrap_or("/");
+        let mut sources = serde_json::Map::new();
+        sources.insert(entry_path.to_owned(), json!({"kind":"entry"}));
+        if let Some(paths) = report["discoveredRoutes"].as_array() {
+            for path in paths.iter().filter_map(Value::as_str) {
+                sources.insert(
+                    path.to_owned(),
+                    json!({"kind":"anchor","from":entry_path,"selector":selector}),
+                );
+            }
+        }
+        let captured = report["cells"].as_array().map_or(0, |c| {
+            c.iter().filter(|cell| cell["image"].is_string()).count()
+        });
+        report["screenDiscovery"] = json!({
+            "mode": "links",
+            "sources": sources,
+            "capturedCells": captured,
+        });
     }
     let graph = crate::graph_view::with_cells(graph, &report)?;
     crate::graph_view::write(out, &graph)?;

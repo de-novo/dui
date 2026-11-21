@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from "react";
+import { Fragment, useMemo, type KeyboardEvent } from "react";
 
 import { CaptureCard } from "./CaptureCard";
 import { layoutMap } from "./layout";
@@ -16,7 +16,12 @@ import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 
 type CardNode = Node<
-  { screen: Screen; width: number; imageUrl: (name: string) => string },
+  {
+    screen: Screen;
+    width: number;
+    selected: boolean;
+    imageUrl: (name: string) => string;
+  },
   "screen"
 >;
 
@@ -48,7 +53,12 @@ function Card({ data }: NodeProps<CardNode>) {
           />
         </Fragment>
       ))}
-      <CaptureCard screen={data.screen} cell={cell} imageUrl={data.imageUrl} />
+      <CaptureCard
+        screen={data.screen}
+        cell={cell}
+        imageUrl={data.imageUrl}
+        selected={data.selected}
+      />
     </>
   );
 }
@@ -60,6 +70,7 @@ export function ScreenMap({
   archive,
   width,
   mode,
+  selectedId,
   imageUrl,
   select,
 }: {
@@ -67,20 +78,31 @@ export function ScreenMap({
   archive: Archive;
   width: number;
   mode: string;
+  selectedId?: string | null;
   imageUrl: (name: string) => string;
-  select: (id: string) => void;
+  select: (id: string, active?: Element | null) => void;
 }) {
   const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
-  const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => ({
-    id: screen.id,
-    type: "screen",
-    position,
-    data: { screen, width, imageUrl },
-    ariaLabel: screen.path,
-    className: mode === "focus:" + screen.id ? "focus-screen" : undefined,
-  }));
+  const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => {
+    const isSelected = screen.id === selectedId;
+    const classes = [
+      mode === "focus:" + screen.id ? "focus-screen" : "",
+      isSelected ? "selected-screen" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return {
+      id: screen.id,
+      type: "screen",
+      position,
+      selected: isSelected,
+      data: { screen, width, selected: isSelected, imageUrl },
+      ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
+      className: classes || undefined,
+    };
+  });
   const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
-  const edges = layout.links.map(({ source, target }) => {
+  const edges = layout.links.map(({ source, target, origin }) => {
     const a = positions.get(source)!,
       b = positions.get(target)!;
     const [out, into] =
@@ -91,6 +113,7 @@ export function ScreenMap({
         : a.x < b.x
           ? [Position.Right, Position.Left]
           : [Position.Left, Position.Right];
+    const originText = origin === "anchor" ? "Discovered anchor" : "Discovered link";
     return {
       id: JSON.stringify([source, target]),
       source,
@@ -98,12 +121,27 @@ export function ScreenMap({
       type: "smoothstep",
       sourceHandle: out,
       targetHandle: into,
-      label: layout.total === 1 ? "Discovered link" : undefined,
-      ariaLabel: `Discovered link from ${source} to ${target}`,
+      label: layout.total === 1 ? "Discovered" : undefined,
+      labelStyle: { fill: "var(--foreground)", fontSize: 11, fontWeight: 500 },
+      labelBgStyle: { fill: "var(--card)", fillOpacity: 0.94, stroke: "var(--border)" },
+      labelBgPadding: [6, 3] as [number, number],
+      labelBgBorderRadius: 4,
+      ariaLabel: `${originText} from ${source} to ${target}, not replay-verified`,
       style: { stroke: "var(--map-link)" },
       markerEnd: { type: MarkerType.ArrowClosed, color: "var(--map-link)" },
     };
   });
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const node = (event.target as Element | null)?.closest?.(".react-flow__node");
+    const id = node?.getAttribute("data-id");
+    if (id && archive.screens.some((s) => s.id === id)) {
+      event.preventDefault();
+      select(id, node);
+    }
+  }
+
   return (
     <ReactFlow
       key={JSON.stringify([mode, width])}
@@ -123,6 +161,7 @@ export function ScreenMap({
       }}
       nodesDraggable={false}
       nodesConnectable={false}
+      onKeyDown={handleKeyDown}
       onNodeClick={(_, node) => select(node.id)}
     >
       <Background color="var(--map-grid)" gap={20} size={1} />

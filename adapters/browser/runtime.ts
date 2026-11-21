@@ -306,16 +306,41 @@ declare var __duiProbe: {
         slot: string,
         instance: string,
         value: unknown,
-        selector: string,
-        text: string,
+        selector: string | null,
+        text: string | null,
       ) {
         const probe = globalThis.__duiProbe;
-        try {
-          visibleText(selector);
-        } catch {
-          return { error: "invalid-selector" };
+        if (selector !== null) {
+          try {
+            visibleText(selector);
+          } catch {
+            return { error: "invalid-selector" };
+          }
         }
+        const before = selector === null ? await semantic() : null;
         if (!probe.edit(slot, instance, value)) return { error: "instance-not-found" };
+        if (selector === null || text === null) {
+          let observed: unknown;
+          let after = before!;
+          for (let sample = 0; sample < 10; sample++) {
+            await probe.waitForSample();
+            observed = probe.instances[slot]?.[instance]?.value;
+            after = await semantic();
+            if (observed === value && (after.hash !== before!.hash || sample >= 1)) break;
+          }
+          const reason = observed !== value ? "value-mismatch" : "missing-assertion";
+          return {
+            status: "unverified",
+            reason,
+            observedValue: observed,
+            evidence: {
+              mode: "semantic-diff",
+              beforeHash: before!.hash,
+              afterHash: after.hash,
+              changed: before!.hash !== after.hash,
+            },
+          };
+        }
         let observed: unknown;
         let visible: string | null = null;
         for (let sample = 0; sample < 10; sample++) {

@@ -81,7 +81,23 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         }
     }
     for ((from, to), widths) in navigation {
-        links.push(json!({"source":format!("route:{from}"),"target":format!("route:{to}"),"kind":"linksTo","observedWidths":widths}));
+        let mut edge = json!({
+            "source": format!("route:{from}"),
+            "target": format!("route:{to}"),
+            "kind": "linksTo",
+            "observedWidths": widths,
+        });
+        if let Some(source) = report["screenDiscovery"]["sources"].get(to)
+            && source["from"].as_str() == Some(from)
+        {
+            if let Some(origin) = source.get("kind").filter(|v| v.is_string()) {
+                edge["origin"] = origin.clone();
+            }
+            if let Some(selector) = source.get("selector").filter(|v| v.is_string()) {
+                edge["selector"] = selector.clone();
+            }
+        }
+        links.push(edge);
     }
     let nodes = graph["nodes"]
         .as_array_mut()
@@ -153,6 +169,43 @@ mod tests {
         assert_eq!(
             links[1],
             &json!({"kind":"linksTo","source":"route:/a","target":"route:/","observedWidths":[375]})
+        );
+    }
+
+    #[test]
+    fn links_carry_discovery_origin_and_selector_evidence_when_recorded() {
+        let report = json!({
+            "screenDiscovery": {
+                "mode": "links",
+                "sources": {
+                    "/?q=demo": {"kind": "entry"},
+                    "/": {"kind": "anchor", "from": "/?q=demo", "selector": "header a[href]"}
+                }
+            },
+            "cells": [
+                {"path": "/?q=demo", "scenario": "default", "state": "s0", "width": 375, "planIndex": 0, "status": "verified", "observation": {"path": "/?q=demo", "links": ["/"]}},
+                {"path": "/?q=demo", "scenario": "default", "state": "s0", "width": 1280, "planIndex": 0, "status": "verified", "observation": {"path": "/?q=demo", "links": ["/"]}},
+                {"path": "/", "scenario": "link-0", "state": "s1", "width": 375, "planIndex": 0, "status": "verified", "observation": {"path": "/", "links": []}},
+                {"path": "/", "scenario": "link-0", "state": "s1", "width": 1280, "planIndex": 0, "status": "verified", "observation": {"path": "/", "links": []}}
+            ]
+        });
+        let graph = with_cells(json!({"nodes":[],"edges":[]}), &report).unwrap();
+        let links: Vec<_> = graph["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|edge| edge["kind"] == "linksTo")
+            .collect();
+        assert_eq!(
+            links,
+            vec![&json!({
+                "kind": "linksTo",
+                "source": "route:/?q=demo",
+                "target": "route:/",
+                "observedWidths": [375, 1280],
+                "origin": "anchor",
+                "selector": "header a[href]"
+            })]
         );
     }
 }

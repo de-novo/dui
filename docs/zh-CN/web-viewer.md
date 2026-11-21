@@ -21,11 +21,11 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 查看器使用 [Vite](../../dependency-catalog.json) 和官方 Tailwind Vite 插件构建。`npm --prefix apps/canvas run build` 将浏览器资源写入 `apps/canvas/dist`。CSS 构建工具适用范围有限的[许可证例外](../en/architecture.md#62-automated-checks-ci-fails-on-any-violation)。
 
-使用 npmgraph 归档确认了两个界面节点、一条发现的链接，以及 375 和 1280 像素的四张截图。Chrome 检查覆盖键盘选择、焦点恢复、刷新、后退和默认署名。此预览仅验证地图组件，Start 应用和实时详情将在后续实现。已安装的 CLI 仍打开独立图库。
+使用 npmgraph 归档确认了两个界面节点、一条附带来源与选择器依据的发现链接（标注未回放验证），以及 375 和 1280 像素的四张截图。Chrome 检查覆盖展开状态与宽度、从所选界面打开实时会话、在双控件夹具中编辑 `boolean` 与 `enum` 值并保存已验证修订、返回总览时保留所选界面、键盘焦点恢复、刷新、后退和默认署名。已安装的 CLI 仍打开独立图库。
 
 新地图中，若已捕获页面的 DOM 含有指向另一已捕获页面地址的同源链接，则绘制有向边。重复链接合并为一条边，仅在观测到该链接的宽度显示。它说明页面提供此导航选项；验证实际跳转还需回放。
 
-预览可接收一个或多个运行目录。省略参数时从 `~/.dui/projects` 查找已保存的界面地图。在 **Select workspace** 中选择项目、已记录的分支和版本。侧边栏依次提供工作区选择、主题和折叠。**Map options** 提供界面查找、连接模式和捕获宽度。选择卡片可查看详情及已观测到的连接。卡片统计已有状态和宽度中的未验证与无法渲染格子数。
+预览可接收一个或多个运行目录。省略参数时从 `~/.dui/projects` 查找已保存的界面地图。在 **Select workspace** 中选择项目、已记录的分支和版本。侧边栏依次提供工作区选择、主题和折叠。**Map options** 提供界面查找、连接模式和捕获宽度。选择卡片可查看该界面的状态、宽度、验证结果、缺失截图原因、已观测链接依据及 **Open live session** 操作。返回总览时会保留所选界面。卡片统计已有状态和宽度中的未验证与无法渲染格子数。
 
 同一项目 ID 在所有分支、工作树和版本中共用一个显示名称。首次保存截图时记录主项目的 `package.json` 名称，缺失时使用根目录名。`dui history` 为已有本地归档登记名称。
 
@@ -35,7 +35,7 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 [tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
 
-- **色彩与材质** — 两种主题的画布和面板均使用不透明的黑白表面。橙色 `--primary` (#EF803F) 用于 dui 标记和主要操作。侧栏悬浮在地图上方，浅色主题使用磨砂白玻璃，深色主题使用烟灰色玻璃。仅固定侧栏和截图卡片使用 `--blur` (10 px)。
+- **色彩与材质** — 两种主题的画布底色均使用不透明黑白表面。橙色 `--primary` (#EF803F) 用于 dui 标记和主要操作。侧栏与状态/详情面板均悬浮在地图上方，使用更通透的磨砂玻璃表面（浅色主题为半透明白，深色主题为半透明炭灰），与截图卡片共用 `--blur` (16 px)。
 - **字体与间距** — 控件使用系统无衬线字体，路径使用系统等宽字体。默认字号下，元信息、正文和面板标题分别为 12 / 14 / 20 px，间距使用 4 / 8 / 12 / 16 / 24 px。控件圆角为 6 px，面板为 12 px。
 - **控件** — 面板操作复用 `Button` 的默认、主要或图标样式。纯图标控件需提供无障碍名称。轮廓线用于键盘焦点，位置和字重表示选中状态。
 - **截图与判定** — 两种地图视图均使用 `CaptureCard`。保持原始宽高比，路径名称位于截图下方。卡片显示待检查的格子数，详情面板显示记录的判定和原因。

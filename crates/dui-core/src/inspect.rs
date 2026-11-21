@@ -40,6 +40,32 @@ fn accepts(shape: &Value, value: &Value) -> bool {
     }
 }
 
+fn collect_options(shape: &Value, out: &mut Vec<Value>) -> bool {
+    match shape["kind"].as_str() {
+        Some("boolean") => {
+            for value in [Value::Bool(false), Value::Bool(true)] {
+                if !out.contains(&value) {
+                    out.push(value);
+                }
+            }
+            true
+        }
+        Some("literal") => {
+            let Some(value) = shape.get("value") else {
+                return false;
+            };
+            if !out.contains(value) {
+                out.push(value.clone());
+            }
+            true
+        }
+        Some("union") => shape["members"].as_array().is_some_and(|members| {
+            !members.is_empty() && members.iter().all(|m| collect_options(m, out))
+        }),
+        _ => false,
+    }
+}
+
 pub fn inspect(facts: &[Value], cells: &[Value], query: &Selection) -> Result<Value, &'static str> {
     if query.slot.is_none() && (query.instance.is_some() || query.value.is_some()) {
         return Err("slot-required");
@@ -77,6 +103,10 @@ pub fn inspect(facts: &[Value], cells: &[Value], query: &Selection) -> Result<Va
                 None
             };
             let mut control = json!({"slot":id,"owner":fact["owner"],"instance":instance,"source":{"file":fact["file"],"start":fact["start"],"end":fact["end"]},"label":fact["label"],"type":fact["type"],"editable":reason.is_none(),"reason":reason});
+            let mut allowed = Vec::new();
+            if collect_options(&fact["shape"], &mut allowed) {
+                control["options"] = json!(allowed);
+            }
             if let Some(v) = entry.get("value") {
                 control["value"] = v.clone();
             }
@@ -108,4 +138,41 @@ pub fn inspect(facts: &[Value], cells: &[Value], query: &Selection) -> Result<Va
         return Err("slot-or-instance-not-found");
     }
     Ok(json!({"state":query.state,"width":query.width,"observation":"archive","controls":controls}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exposes_typed_options_for_boolean_and_literal_union_controls() {
+        let facts = vec![
+            json!({"kind":"slot","file":"app.tsx","start":1,"end":2,"owner":"Menu","label":"open","type":"boolean","shape":{"kind":"boolean"}}),
+            json!({"kind":"slot","file":"app.tsx","start":3,"end":4,"owner":"Menu","label":"mode","type":"\"view\" | \"edit\"","shape":{"kind":"union","members":[{"kind":"literal","value":"view"},{"kind":"literal","value":"edit"}]}}),
+            json!({"kind":"slot","file":"app.tsx","start":5,"end":6,"owner":"Menu","label":"meta","type":"unknown","shape":{"kind":"unknown"}}),
+        ];
+        let cells = vec![json!({
+            "state": "s1",
+            "width": 1280,
+            "observation": {
+                "instances": {
+                    key(&facts[0]): { "i1": { "value": false, "setter": true } },
+                    key(&facts[1]): { "i1": { "value": "view", "setter": true } },
+                    key(&facts[2]): { "i1": { "value": null, "setter": false } },
+                }
+            }
+        })];
+        let query = Selection {
+            state: "s1".into(),
+            width: 1280,
+            slot: None,
+            instance: None,
+            value: None,
+        };
+        let result = inspect(&facts, &cells, &query).unwrap();
+        let controls = result["controls"].as_array().unwrap();
+        assert_eq!(controls[0]["options"], json!([false, true]));
+        assert_eq!(controls[1]["options"], json!(["view", "edit"]));
+        assert!(controls[2].get("options").is_none());
+    }
 }
