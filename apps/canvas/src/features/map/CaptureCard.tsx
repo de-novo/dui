@@ -8,20 +8,29 @@ export function CaptureCard({
   screen,
   cell,
   imageUrl,
+  selected = false,
 }: {
   screen: Screen;
   cell?: Cell;
   imageUrl: (name: string) => string;
+  selected?: boolean;
 }) {
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
   return (
-    <article className="screen-card" title={screen.path}>
+    <article
+      className={"screen-card" + (selected ? " selected" : "")}
+      data-selected={selected ? "true" : undefined}
+      title={screen.path}
+    >
       <div className="capture-frame">
         {cell?.image ? (
           <img loading="lazy" alt="" src={imageUrl(cell.image)} />
         ) : (
-          <span>No capture at this width</span>
+          <div className="missing-frame-copy">
+            <span>{cell ? "Missing image" : "No capture at this width"}</span>
+            {cell?.reason && <small>{cell.reason}</small>}
+          </div>
         )}
       </div>
       <div className="card-caption">

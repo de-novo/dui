@@ -7,19 +7,46 @@ export type Cell = {
   state?: string;
   scenario?: string;
 };
+export type ScreenOrigin =
+  | { kind: "entry" }
+  | { kind: "anchor"; from: string; selector?: string }
+  | { kind: "router"; file: string };
 export type Screen = {
   id: string;
   path: string;
   cells: Cell[];
   entries?: Cell[];
+  discoveredFrom?: ScreenOrigin;
+};
+export type ScreenLink = {
+  source: string;
+  target: string;
+  observedWidths?: number[];
+  origin?: string;
+  selector?: string;
+  replayVerified: false;
 };
 export type ScreenMap = {
   screens: Screen[];
-  links: { source: string; target: string; observedWidths?: number[] }[];
+  links: ScreenLink[];
 };
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function decodeOrigin(raw: unknown): ScreenOrigin | undefined {
+  if (typeof raw === "string" && raw.length > 0) return { kind: "router", file: raw };
+  if (!record(raw)) return undefined;
+  if (raw.kind === "entry") return { kind: "entry" };
+  if (raw.kind === "anchor" && typeof raw.from === "string") {
+    return {
+      kind: "anchor",
+      from: raw.from,
+      selector: typeof raw.selector === "string" ? raw.selector : undefined,
+    };
+  }
+  return undefined;
 }
 
 export function decodeOverview(raw: unknown): ScreenMap {
@@ -36,7 +63,12 @@ export function decodeOverview(raw: unknown): ScreenMap {
     if (!record(node) || node.kind !== "screen") continue;
     if (typeof node.id !== "string" || typeof node.label !== "string")
       throw Error("Invalid screen");
-    const screen: Screen = { id: node.id, path: node.label, cells: [] };
+    const screen: Screen = {
+      id: node.id,
+      path: node.label,
+      cells: [],
+      discoveredFrom: decodeOrigin(node.discoveredFrom),
+    };
     byPath.set(screen.path, screen);
     screens.push(screen);
   }
@@ -71,7 +103,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
     }
   }
   const ids = new Set(screens.map((s) => s.id));
-  const links: ScreenMap["links"] = [];
+  const links: ScreenLink[] = [];
   for (const edge of raw.edges) {
     if (!record(edge) || edge.kind !== "linksTo") continue;
     if (
@@ -92,6 +124,9 @@ export function decodeOverview(raw: unknown): ScreenMap {
       source: edge.source,
       target: edge.target,
       observedWidths: widths,
+      origin: typeof edge.origin === "string" ? edge.origin : undefined,
+      selector: typeof edge.selector === "string" ? edge.selector : undefined,
+      replayVerified: false,
     });
   }
   return { screens, links };

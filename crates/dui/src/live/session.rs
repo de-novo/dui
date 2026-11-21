@@ -60,8 +60,11 @@ impl Session {
         }
         let profile = tempfile::tempdir().map_err(io)?;
         let generated = profile.path().join("map.json");
+        let archived_manifest = directory.join("manifest.json");
         let manifest = if request.get("manifest").is_some() {
             Path::new(field(request, "manifest")?)
+        } else if archived_manifest.is_file() {
+            &archived_manifest
         } else {
             crate::screen_map::discover(project, &generated)?;
             &generated
@@ -190,7 +193,36 @@ impl Session {
             value,
         };
         let row = json!({"state":q.state,"width":q.width,"observation":{"instances":instances}});
-        Ok(inspect(&self.facts, &[row], &q).map_err(invalid)?["controls"].take())
+        let mut controls = inspect(&self.facts, &[row], &q).map_err(invalid)?["controls"].take();
+        if let Some(items) = controls.as_array_mut() {
+            for control in items {
+                if let (Some(slot), Some(instance)) =
+                    (control["slot"].as_str(), control["instance"].as_str())
+                    && let Some(initial) = self.baseline["instances"][slot][instance].get("value")
+                {
+                    control["initialValue"] = initial.clone();
+                }
+            }
+        }
+        Ok(controls)
+    }
+    fn frame(&mut self) -> Reply {
+        self.tick()?;
+        let image = self
+            .browser
+            .call(
+                Some(&self.page),
+                "Page.captureScreenshot",
+                json!({"format":"png"}),
+            )
+            .map_err(io)?;
+        Ok(json!({
+            "session": self.id,
+            "cell": self.cell,
+            "revision": self.revision,
+            "mimeType": "image/png",
+            "imageBase64": field(&image, "data")?,
+        }))
     }
     pub fn handle(&mut self, r: &Value) -> Reply {
         let accepted = std::time::Instant::now();
@@ -203,6 +235,9 @@ impl Session {
             return Ok(
                 json!({"session":self.id,"cell":self.cell,"revision":self.revision,"controls":self.controls(instances,None,None,None)?,"observation":"live"}),
             );
+        }
+        if op == "frame" {
+            return self.frame();
         }
         if !matches!(op, "set" | "reset" | "save") {
             return Err(invalid("unknown-operation"));
@@ -240,10 +275,18 @@ impl Session {
             r.get("value").ok_or_else(|| invalid("missing-value"))?
         }
         .clone();
-        let selector = field(&r["expect"], "selector")?;
-        let text = r["expect"]["text"]
-            .as_str()
-            .ok_or_else(|| invalid("missing-expected-text"))?;
+        let expect = r.get("expect").filter(|v| !v.is_null());
+        let (selector, text) = match expect {
+            Some(expect) => (
+                Some(field(expect, "selector")?),
+                Some(
+                    expect["text"]
+                        .as_str()
+                        .ok_or_else(|| invalid("missing-expected-text"))?,
+                ),
+            ),
+            None => (None, None),
+        };
         let instances = self.instances()?;
         self.controls(
             instances,
@@ -286,11 +329,17 @@ impl Session {
             .last()
             .cloned()
             .ok_or_else(|| invalid("no-edited-revision"))?;
-        let selector = &result["evidence"]["selector"];
-        let sample = format!(
-            "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,visibleText:globalThis.__duiRuntime.visibleText({selector}),path:location.pathname+location.search+location.hash,width:innerWidth}}) : null",
-            json!(self.id)
-        );
+        let selector = result["evidence"].get("selector").filter(|v| v.is_string());
+        let sample = match selector {
+            Some(selector) => format!(
+                "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,visibleText:globalThis.__duiRuntime.visibleText({selector}),path:location.pathname+location.search+location.hash,width:innerWidth}}) : null",
+                json!(self.id)
+            ),
+            None => format!(
+                "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,path:location.pathname+location.search+location.hash,width:innerWidth}}) : null",
+                json!(self.id)
+            ),
+        };
         let before = self.eval(&sample)?;
         let image = self
             .browser
@@ -316,7 +365,9 @@ impl Session {
             result["reason"].as_str().or(Some("unverified-edit"))
         } else if value != result.get("expectedValue") {
             Some("value-mismatch")
-        } else if observation["visibleText"] != result["evidence"]["expectedText"] {
+        } else if selector.is_some()
+            && observation["visibleText"] != result["evidence"]["expectedText"]
+        {
             Some("semantic-mismatch")
         } else {
             None
@@ -329,9 +380,27 @@ impl Session {
                 json!([self.source_run, self.cell, self.revision, observation]).to_string()
             )
         );
+        let assertion = match selector {
+            Some(selector) => json!({
+                "selector": selector,
+                "expectedText": result["evidence"]["expectedText"],
+                "visibleText": observation["visibleText"],
+                "expectedValue": result["expectedValue"],
+                "observedValue": value,
+                "slot": slot,
+                "instance": instance,
+            }),
+            None => json!({
+                "expectedValue": result["expectedValue"],
+                "observedValue": value,
+                "slot": slot,
+                "instance": instance,
+                "evidence": result["evidence"],
+            }),
+        };
         let cell = json!({"path":self.path,"scenario":"live","state":state,"width":self.cell["width"],"planIndex":0,
             "status":if reason.is_some(){"unverified"}else{"verified"},"reason":reason,"image":filename,"imageSha256":digest,"observation":observation,
-            "assertion":{"selector":selector,"expectedText":result["evidence"]["expectedText"],"visibleText":observation["visibleText"],"expectedValue":result["expectedValue"],"observedValue":value,"slot":slot,"instance":instance}});
+            "assertion":assertion});
         let report = json!({"path":self.path,"live":{"sourceRun":self.source_run,"sourceCell":self.cell,"revision":self.revision,"edits":self.edits,"environment":self.environment},
             "coverage":{"verified":u8::from(reason.is_none()),"renderable":1,"attempted":1,"unrenderable":0},"cells":[cell]});
         let published = crate::archive::publish(self.provenance["live"].clone(), |dir| {

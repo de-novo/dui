@@ -1,11 +1,38 @@
-// Local development entry point for the archive viewer.
-import { createReadStream } from "node:fs";
-import { readFile, readdir, realpath, access } from "node:fs/promises";
+// Local development entry point for the archive and live viewer.
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createReadStream, existsSync } from "node:fs";
+import { access, readFile, readdir, realpath } from "node:fs/promises";
+import type { IncomingMessage } from "node:http";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { createServer } from "vite";
 import type { Run } from "./src/data/run";
+
+const execFileAsync = promisify(execFile);
+
+type ArchiveEntry = {
+  root: string;
+  projectPath?: string;
+  run: Run;
+};
+
+const cliPaths = process.argv.slice(2);
+const extraSavedPaths = new Set<string>();
+const activeSessions = new Set<string>();
+
+function resolveDuiBinary(): string {
+  if (process.env.DUI_BIN) return process.env.DUI_BIN;
+  const repoRoot = resolve(import.meta.dirname, "../..");
+  for (const candidate of [
+    join(repoRoot, "target/debug/dui"),
+    join(repoRoot, "target/release/dui"),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return "dui";
+}
 
 async function directories(root: string) {
   const entries = await readdir(root, { withFileTypes: true }).catch((error) => {
@@ -26,9 +53,38 @@ async function optionalJson(root: string, name: string) {
   }
 }
 
-async function listArchives() {
-  const paths = process.argv.slice(2);
-  if (!paths.length) {
+async function resolveProjectPath(
+  meta: Record<string, unknown> | undefined,
+): Promise<string | undefined> {
+  if (!meta) return undefined;
+  const base =
+    typeof meta.worktree === "string" && meta.worktree.length > 0
+      ? meta.worktree
+      : typeof meta.projectRoot === "string" && meta.projectRoot.length > 0
+        ? meta.projectRoot
+        : undefined;
+  if (!base) return undefined;
+  const app = typeof meta.app === "string" && meta.app.length > 0 ? meta.app : ".";
+  const full = resolve(base, app);
+  const exists = await access(full).then(
+    () => true,
+    () => false,
+  );
+  if (exists) return full;
+  if (typeof meta.projectRoot === "string" && meta.projectRoot !== base) {
+    const fallback = resolve(meta.projectRoot, app);
+    const ok = await access(fallback).then(
+      () => true,
+      () => false,
+    );
+    if (ok) return fallback;
+  }
+  return undefined;
+}
+
+async function listArchives(): Promise<ArchiveEntry[]> {
+  const paths = [...cliPaths, ...extraSavedPaths];
+  if (!cliPaths.length) {
     for (const project of await directories(join(homedir(), ".dui", "projects"))) {
       for (const run of await directories(join(project, "runs"))) {
         if (
@@ -42,8 +98,10 @@ async function listArchives() {
     }
     paths.sort((a, b) => basename(b).localeCompare(basename(a)));
   }
+  const resolved = await Promise.all(paths.map((path) => realpath(path).catch(() => undefined)));
+  const unique = [...new Set(resolved.filter((p): p is string => typeof p === "string"))];
   return Promise.all(
-    [...new Set(await Promise.all(paths.map((path) => realpath(path))))].map(async (root) => {
+    unique.map(async (root) => {
       const meta = await optionalJson(root, "snapshot.json");
       const key = createHash("sha256").update(root).digest("hex");
       const projectDir = dirname(dirname(root));
@@ -51,14 +109,16 @@ async function listArchives() {
         dirname(root) === join(homedir(), ".dui", "projects", basename(projectDir), "runs") &&
         basename(projectDir) === meta?.projectId;
       const record = localProject ? await optionalJson(projectDir, "project.json") : undefined;
+      const projectPath = await resolveProjectPath(meta);
       const run: Run = {
         key,
         projectId: meta?.projectId ?? key,
         project: record?.name ?? meta?.projectName ?? basename(meta?.projectRoot ?? root),
         branch: meta?.branch ?? null,
         version: meta?.id ?? basename(root),
+        liveAvailable: Boolean(projectPath),
       };
-      return { root, run };
+      return { root, projectPath, run };
     }),
   );
 }
@@ -72,6 +132,7 @@ type Capture = {
   state?: string;
   scenario?: string;
 };
+
 async function openArchive(root: string) {
   const graph = JSON.parse(await readFile(join(root, "graph.json"), "utf8"));
   const report = await optionalJson(root, "report.json");
@@ -92,7 +153,74 @@ async function openArchive(root: string) {
   }
   return { graph: JSON.stringify({ ...graph, cells }), images };
 }
-const archives = await listArchives();
+
+function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > 65536) {
+        rejectBody(Error("request-too-large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      try {
+        const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        if (typeof parsed !== "object" || parsed === null) rejectBody(Error("invalid-json"));
+        else resolveBody(parsed as Record<string, unknown>);
+      } catch {
+        rejectBody(Error("invalid-json"));
+      }
+    });
+    req.on("error", rejectBody);
+  });
+}
+
+function isSameOriginLoopback(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  const host = req.headers.host;
+  if (!host) return false;
+  return origin === `http://${host}`;
+}
+
+async function runLiveCommand(
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> {
+  const binary = resolveDuiBinary();
+  try {
+    const { stdout } = await execFileAsync(binary, ["live", JSON.stringify(payload)], {
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 180000,
+    });
+    return { ok: true, status: 200, body: JSON.parse(stdout) };
+  } catch (error) {
+    const failed = error as { stdout?: string; code?: number | string; message?: string };
+    if (typeof failed.stdout === "string" && failed.stdout.trim()) {
+      try {
+        const parsed = JSON.parse(failed.stdout) as Record<string, unknown>;
+        const code = typeof failed.code === "number" ? failed.code : 3;
+        return { ok: false, status: code === 2 ? 400 : 500, body: parsed };
+      } catch {
+        // Fall through to generic error below.
+      }
+    }
+    return {
+      ok: false,
+      status: 500,
+      body: { status: "error", reason: failed.message ?? "live-command-failed" },
+    };
+  }
+}
+
+function validSessionId(id: unknown): id is string {
+  return typeof id === "string" && /^[0-9a-f]{64}$/i.test(id);
+}
+
 const cache = new Map<string, ReturnType<typeof openArchive>>();
 const server = await createServer({
   root: import.meta.dirname,
@@ -111,6 +239,7 @@ const server = await createServer({
             const url = new URL(req.url ?? "/", "http://localhost");
             const name = decodeURIComponent(url.pathname.slice(1));
             res.setHeader("Cache-Control", "no-store");
+            const archives = await listArchives();
             if (name === "runs.json") {
               res.setHeader("Content-Type", "application/json");
               res.end(JSON.stringify(archives.map((a) => a.run)));
@@ -144,9 +273,158 @@ const server = await createServer({
             next(error);
           }
         });
+
+        vite.middlewares.use("/api/live", async (req, res, next) => {
+          try {
+            res.setHeader("Cache-Control", "no-store");
+            if (!isSameOriginLoopback(req)) {
+              res.statusCode = 403;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: "forbidden-origin" }));
+              return;
+            }
+            const url = new URL(req.url ?? "/", "http://localhost");
+            if (req.method === "GET" && url.pathname === "/frame") {
+              const session = url.searchParams.get("session");
+              const state = url.searchParams.get("state");
+              const width = Number(url.searchParams.get("width"));
+              if (!validSessionId(session) || !state || !Number.isInteger(width) || width <= 0) {
+                res.statusCode = 400;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ status: "error", reason: "invalid-frame-query" }));
+                return;
+              }
+              const reply = await runLiveCommand({
+                op: "frame",
+                session,
+                cell: { state, width },
+              });
+              if (!reply.ok || typeof reply.body.imageBase64 !== "string") {
+                res.statusCode = reply.status;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify(reply.body));
+                return;
+              }
+              const png = Buffer.from(reply.body.imageBase64, "base64");
+              res.setHeader("Content-Type", "image/png");
+              res.end(png);
+              return;
+            }
+            if (req.method !== "POST" || (url.pathname !== "/" && url.pathname !== "")) {
+              res.statusCode = 405;
+              res.end();
+              return;
+            }
+            let body: Record<string, unknown>;
+            try {
+              body = await readJsonBody(req);
+            } catch (error) {
+              res.statusCode = 400;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ status: "error", reason: (error as Error).message }));
+              return;
+            }
+            const op = body.op;
+            if (op === "open") {
+              const archives = await listArchives();
+              const archive = archives.find((a) => a.run.key === body.run);
+              if (!archive) {
+                res.statusCode = 404;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ status: "error", reason: "run-not-found" }));
+                return;
+              }
+              if (!archive.projectPath) {
+                res.statusCode = 400;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ status: "error", reason: "project-unavailable" }));
+                return;
+              }
+              const reply = await runLiveCommand({
+                op: "open",
+                project: archive.projectPath,
+                run: archive.root,
+                cell: body.cell,
+                requestId: body.requestId,
+              });
+              if (reply.ok && typeof reply.body.session === "string") {
+                activeSessions.add(reply.body.session);
+              }
+              res.statusCode = reply.status;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(reply.body));
+              return;
+            }
+            if (
+              op === "inspect" ||
+              op === "set" ||
+              op === "reset" ||
+              op === "save" ||
+              op === "close"
+            ) {
+              if (!validSessionId(body.session)) {
+                res.statusCode = 400;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ status: "error", reason: "invalid-session" }));
+                return;
+              }
+              const forwarded: Record<string, unknown> = { op, session: body.session };
+              if (op !== "close") forwarded.cell = body.cell;
+              if (op === "set" || op === "reset" || op === "save") {
+                forwarded.expectedRevision = body.expectedRevision;
+                forwarded.requestId = body.requestId;
+              }
+              if (op === "set" || op === "reset") {
+                forwarded.slot = body.slot;
+                forwarded.instance = body.instance;
+                if (op === "set") forwarded.value = body.value;
+                if (body.expect) forwarded.expect = body.expect;
+              }
+              const reply = await runLiveCommand(forwarded);
+              if (op === "close" && reply.ok) {
+                activeSessions.delete(body.session);
+              }
+              if (op === "save" && reply.ok && typeof reply.body.output === "string") {
+                const savedRoot = await realpath(reply.body.output).catch(
+                  () => reply.body.output as string,
+                );
+                extraSavedPaths.add(savedRoot);
+                const runKey = createHash("sha256").update(savedRoot).digest("hex");
+                const { output: _output, ...rest } = reply.body;
+                res.statusCode = 200;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ ...rest, runKey }));
+                return;
+              }
+              res.statusCode = reply.status;
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(reply.body));
+              return;
+            }
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ status: "error", reason: "unknown-operation" }));
+          } catch (error) {
+            next(error);
+          }
+        });
       },
     },
   ],
 });
+
+let closing = false;
+async function cleanup() {
+  if (closing) return;
+  closing = true;
+  await Promise.allSettled(
+    [...activeSessions].map((session) => runLiveCommand({ op: "close", session })),
+  );
+  await server.close();
+  process.exit(0);
+}
+process.on("SIGINT", () => void cleanup());
+process.on("SIGTERM", () => void cleanup());
+
 await server.listen();
 server.printUrls();
