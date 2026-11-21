@@ -122,4 +122,8 @@ pub trait CommentRepository {
 }
 ```
 
-具体存储后端（本地文件归档、#10 中基于 `rusqlite` / Drizzle 的 SQLite，或未来的远程 HTTP 同步）在 `dui-core` 之外的适配器层实现这些端口。
+具体存储后端在 `dui-core` 之外的适配器层实现这些端口：
+
+- **本地 SQLite + Drizzle 适配器（[#10](https://github.com/de-novo/dui/issues/10)）：** `crates/dui/src/sqlite_store.rs`（内置 SQLite WAL 模式的 `rusqlite`）与 `packages/db/`（`drizzle-orm` `1.0.0-rc.5` SQLite 方言）共用同一套仅向前 SQL 迁移（`packages/db/migrations/`）。元数据存于 `~/.dui/dui.db`，内容寻址图片存于 `~/.dui/blobs/<sha256>.png`。`~/.dui/projects/` 下的现有运行会自动导入；删除数据库文件后也可从磁盘文件无损重建。
+- **内存测试适配器：** `dui_core::storage::MemoryStore`（基于 `BTreeMap`，零 I/O）。
+- **未来的远程 Postgres 同步：** 通过 API 同步，不共享 SQLite 文件，并沿用相同的文本 ID、epoch 毫秒时间戳与 JSON 列结构。

@@ -12,6 +12,7 @@ mod reference;
 mod replay;
 mod retry;
 mod screen_map;
+mod sqlite_store;
 mod typescript;
 use serde_json::{Value, json};
 use std::{

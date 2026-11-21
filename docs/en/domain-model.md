@@ -120,4 +120,8 @@ pub trait CommentRepository {
 }
 ```
 
-Concrete storage backends (file archives, SQLite via `rusqlite` / Drizzle in #10, or remote HTTP sync) implement these ports in adapter layers outside `dui-core`.
+Concrete storage backends implement these ports in adapter layers outside `dui-core`:
+
+- **Local SQLite + Drizzle adapter ([#10](https://github.com/de-novo/dui/issues/10)):** `crates/dui/src/sqlite_store.rs` (`rusqlite` with bundled SQLite in WAL mode) and `packages/db/` (`drizzle-orm` `1.0.0-rc.5` SQLite dialect) share the same forward-only SQL migrations (`packages/db/migrations/`). Metadata lives in `~/.dui/dui.db` and content-addressed images live under `~/.dui/blobs/<sha256>.png`. Existing runs under `~/.dui/projects/` are imported automatically and can rebuild `dui.db` losslessly if the database file is removed.
+- **In-memory test adapter:** `dui_core::storage::MemoryStore` (`BTreeMap`-backed, zero I/O).
+- **Future remote Postgres sync:** Uses the same text IDs, epoch-millisecond timestamps, and JSON columns over the API without sharing SQLite files.
