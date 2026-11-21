@@ -125,5 +125,6 @@ pub trait CommentRepository {
 具体存储后端在 `dui-core` 之外的适配器层实现这些端口：
 
 - **本地 SQLite + Drizzle 适配器（[#10](https://github.com/de-novo/dui/issues/10)）：** `crates/dui/src/sqlite_store.rs`（内置 SQLite WAL 模式的 `rusqlite`）与 `packages/db/`（`drizzle-orm` `1.0.0-rc.5` SQLite 方言）共用同一套仅向前 SQL 迁移（`packages/db/migrations/`）。元数据存于 `~/.dui/dui.db`，内容寻址图片存于 `~/.dui/blobs/<sha256>.png`。`~/.dui/projects/` 下的现有运行会自动导入；删除数据库文件后也可从磁盘文件无损重建。
+- **内容寻址捕获缓存（[#8](https://github.com/de-novo/dui/issues/8)）：** `crates/dui/src/cache.rs` 为每个格子计算 `CacheInputs`（源文件哈希、编译器事实、模拟数据、状态、宽度、语言区域、`dui` 版本、规则包、渲染器环境）；命中时零渲染直接复用已存储的 `ImageBlob`（硬链接到运行目录）和 `Evidence`，未命中时报告具体变更输入。支持 `--force` / MCP `force: true` 强制重绘，以及 `dui prune [--max-bytes N]` / MCP `prune` 清理未引用块（`npm run check:cache`）。
 - **内存测试适配器：** `dui_core::storage::MemoryStore`（基于 `BTreeMap`，零 I/O）。
 - **未来的远程 Postgres 同步：** 通过 API 同步，不共享 SQLite 文件，并沿用相同的文本 ID、epoch 毫秒时间戳与 JSON 列结构。

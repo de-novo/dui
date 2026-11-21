@@ -62,3 +62,4 @@ jobs:
           npm run check:inspect
           npm run check:m1
           npm run check:i18n
+          npm run check:cache

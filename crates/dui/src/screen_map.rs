@@ -6,7 +6,12 @@ pub fn capture(project: &Path) -> Reply {
     let work = tempfile::tempdir().map_err(io)?;
     let manifest = work.path().join("map.json");
     discover(&project, &manifest)?;
-    archive::capture(&project, &manifest, None, archive::Capture::Run)
+    archive::capture(
+        &project,
+        &manifest,
+        None,
+        archive::Capture::Run { force: false },
+    )
 }
 
 pub(crate) fn discover(project: &Path, manifest: &Path) -> Result<(), (u8, serde_json::Value)> {

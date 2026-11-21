@@ -1,5 +1,6 @@
 use crate::{
     Reply,
+    cache::{CacheLookup, CellCache},
     chromium::Browser,
     failure,
     ports::{Renderer, TypeOracle},
@@ -8,6 +9,7 @@ use crate::{
 use dui_core::{
     discovery::{FillTermination, assertions, candidates, graph, key},
     locale::{flatten_message_keys, is_rtl_locale, missing_translation_keys, summarize_by_locale},
+    model::{CacheOutcome, CellStatus},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -62,6 +64,33 @@ pub fn exercise(project: &Path, manifest: &Path, out: &Path, port: u16) -> Reply
     exercise_snapshot(analysis, manifest, out, port)
 }
 pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16) -> Reply {
+    let exe = crate::chromium::executable();
+    let temp = tempfile::tempdir().map_err(|e| failure(3, &e.to_string()))?;
+    let mut browser = if exe.is_file() {
+        Some(Browser::local(&exe, temp.path(), port).map_err(|e| failure(3, &e.to_string()))?)
+    } else {
+        None
+    };
+    let browser_version = browser.as_mut().and_then(|b| b.version().ok());
+    exercise_with_renderer(
+        browser.as_mut().map(|b| b as &mut dyn Renderer),
+        analysis,
+        manifest,
+        manifest.parent(),
+        out,
+        browser_version,
+        false,
+    )
+}
+pub(crate) fn exercise_with_renderer(
+    renderer: Option<&mut dyn Renderer>,
+    analysis: Value,
+    manifest: &Path,
+    project_dir: Option<&Path>,
+    out: &Path,
+    browser_version: Option<Value>,
+    force: bool,
+) -> Reply {
     let spec: Value =
         serde_json::from_slice(&fs::read(manifest).map_err(|_| failure(2, "missing spec"))?)
             .map_err(|_| failure(2, "invalid spec"))?;
@@ -71,15 +100,7 @@ pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16
         return Err(failure(2, "positive widths required"));
     }
     let budget = spec["stateBudget"].as_u64().unwrap_or(32).clamp(1, 512) as usize;
-    let temp = tempfile::tempdir().map_err(|e| failure(3, &e.to_string()))?;
     fs::create_dir_all(out).map_err(|e| failure(3, &e.to_string()))?;
-    let exe = crate::chromium::executable();
-    let mut browser = if exe.is_file() {
-        Some(Browser::local(&exe, temp.path(), port).map_err(|e| failure(3, &e.to_string()))?)
-    } else {
-        None
-    };
-    let browser_version = browser.as_mut().and_then(|b| b.version().ok());
     let mut stored_spec = spec.clone();
     if let Some(base) = manifest.parent() {
         if let Some(packs) = stored_spec["rulePacks"].as_array_mut() {
@@ -99,8 +120,18 @@ pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16
     }
     store(&out.join("manifest.json"), &stored_spec)?;
     let (locales, missing_by_locale) = resolve_locales(&spec, manifest.parent());
+    let force = force || spec["force"] == true;
+    let dui_home = crate::archive::home_dir().ok();
+    let mut cache = CellCache::open(
+        dui_home.as_deref(),
+        project_dir.or_else(|| manifest.parent()),
+        &analysis,
+        &spec,
+        browser_version.as_ref(),
+        force,
+    );
     execute_with_locales(
-        browser.as_mut().map(|b| b as &mut dyn Renderer),
+        renderer,
         &analysis,
         &spec,
         out,
@@ -109,6 +140,7 @@ pub fn exercise_snapshot(analysis: Value, manifest: &Path, out: &Path, port: u16
         browser_version,
         &locales,
         &missing_by_locale,
+        Some(&mut cache),
     )
 }
 
@@ -199,6 +231,7 @@ fn execute_with(
         browser_version,
         &[],
         &BTreeMap::new(),
+        None,
     )
 }
 
@@ -216,6 +249,7 @@ fn execute_with_locales(
     browser_version: Option<Value>,
     locales: &[String],
     missing_by_locale: &BTreeMap<String, Vec<String>>,
+    mut cache: Option<&mut CellCache>,
 ) -> Reply {
     let facts = analysis["facts"]
         .as_array()
@@ -224,6 +258,8 @@ fn execute_with_locales(
     let mut hits = BTreeSet::new();
     let mut verified = 0;
     let mut remaining = 0;
+    let mut cache_hits = 0usize;
+    let mut cache_misses = 0usize;
     let mut seen_slots = BTreeSet::new();
     let mut rounds = Vec::new();
     let mut discovered_routes = Vec::new();
@@ -301,15 +337,72 @@ fn execute_with_locales(
                             .unwrap()
                             .remove("routeSelector");
                     }
+                    let cache_inputs = cache.as_deref().and_then(|c| {
+                        c.build_inputs(&scenario, &capture_spec, &row, *width, *locale)
+                    });
+                    let cached_lookup = match (cache.as_deref_mut(), cache_inputs.as_ref()) {
+                        (Some(c), Some(inputs)) => Some(c.lookup(inputs, out)),
+                        _ => None,
+                    };
+
+                    if let Some(CacheLookup::Hit {
+                        key: cache_key,
+                        image_name,
+                        status: cached_status,
+                        observation: obs,
+                    }) = cached_lookup
+                    {
+                        cache_hits += 1;
+                        if let Some(slots) = obs["slots"].as_object() {
+                            active.extend(slots.keys().cloned());
+                        }
+                        let observed: Vec<_> = obs["hits"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(Value::as_str)
+                            .collect();
+                        hits.extend(observed.iter().map(|s| s.to_string()));
+                        if matches!(cached_status, CellStatus::Verified) {
+                            verified += 1;
+                        }
+                        let mut cell = json!({
+                            "scenario": scenario,
+                            "path": spec["path"],
+                            "width": width,
+                            "input": input,
+                            "state": state_id,
+                            "planIndex": index,
+                            "image": image_name,
+                            "status": cached_status.kind(),
+                            "checks": checks,
+                            "reason": cached_status.reason(),
+                            "observation": obs,
+                            "cache": CacheOutcome::Hit { key: cache_key },
+                        });
+                        if let Some(loc) = locale {
+                            cell["localeAudit"] =
+                                build_locale_audit(loc, &cell["observation"], missing_by_locale);
+                            cell["locale"] = json!(loc);
+                        }
+                        cells.push(cell);
+                        continue;
+                    }
+
+                    let miss_outcome = match cached_lookup {
+                        Some(CacheLookup::Miss { outcome }) => {
+                            cache_misses += 1;
+                            Some(outcome)
+                        }
+                        _ => None,
+                    };
+
                     let reached = browser.capture(&capture_spec, &input, *width, staged.path());
                     let mut cell = match reached {
                         Ok(obs) => {
                             let bytes =
                                 fs::read(staged.path()).map_err(|e| failure(3, &e.to_string()))?;
-                            let name = format!("{:x}-{width}.png", Sha256::digest(bytes));
-                            staged
-                                .persist(out.join(&name))
-                                .map_err(|e| failure(3, &e.to_string()))?;
+                            let name = format!("{:x}-{width}.png", Sha256::digest(&bytes));
                             let slot_values = obs["slots"].as_object();
                             if let Some(slots) = slot_values {
                                 active.extend(slots.keys().cloned());
@@ -345,8 +438,34 @@ fn execute_with_locales(
                                         dui_core::verification::Failure::MissingScreenAssertion,
                                     )
                             });
-                            if reason.is_none() {
-                                verified += 1;
+                            let cell_status = match &reason {
+                                None => {
+                                    verified += 1;
+                                    CellStatus::verified()
+                                }
+                                Some(f) => {
+                                    let r = serde_json::to_value(f)
+                                        .ok()
+                                        .and_then(|v| v.as_str().map(str::to_owned))
+                                        .unwrap_or_else(|| "assert-failed".to_owned());
+                                    CellStatus::unverified(r)
+                                        .unwrap_or_else(|_| CellStatus::verified())
+                                }
+                            };
+                            let target_png = out.join(&name);
+                            if let Some(c) = cache.as_deref_mut() {
+                                c.store_rendered(
+                                    cache_inputs.as_ref(),
+                                    &bytes,
+                                    &target_png,
+                                    &cell_status,
+                                    &obs,
+                                )
+                                .map_err(|e| failure(3, &e))?;
+                            } else {
+                                staged
+                                    .persist(&target_png)
+                                    .map_err(|e| failure(3, &e.to_string()))?;
                             }
                             let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason,"observation":obs});
                             if let Some(loc) = locale {
@@ -356,10 +475,17 @@ fn execute_with_locales(
                                     missing_by_locale,
                                 );
                             }
+                            if let Some(outcome) = miss_outcome {
+                                entry["cache"] = json!(outcome);
+                            }
                             entry
                         }
                         Err(e) => {
-                            json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"status":"unverified","reason":e.to_string()})
+                            let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"status":"unverified","reason":e.to_string()});
+                            if let Some(outcome) = miss_outcome {
+                                entry["cache"] = json!(outcome);
+                            }
+                            entry
                         }
                     };
                     if let Some(loc) = locale {
@@ -473,6 +599,14 @@ fn execute_with_locales(
     let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"budget":budget,"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
     if !locales.is_empty() {
         report["locales"] = summarize_by_locale(&cells, missing_by_locale);
+    }
+    if let Some(c) = cache.as_deref() {
+        report["cache"] = json!({
+            "hits": cache_hits,
+            "misses": cache_misses,
+            "rendered": cache_misses,
+            "forced": c.is_forced(),
+        });
     }
     if let Some(discovery) = spec.get("screenDiscovery") {
         let mut discovered = discovery.clone();

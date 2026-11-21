@@ -82,8 +82,173 @@ impl SqliteStore {
         Ok((Self { conn, blobs_dir }, applied))
     }
 
-    fn blob_path(&self, id: &BlobId) -> PathBuf {
+    pub fn blob_path(&self, id: &BlobId) -> PathBuf {
         self.blobs_dir.join(format!("{}.png", id.as_str()))
+    }
+
+    pub fn link_or_copy_blob(&self, id: &BlobId, target: &Path) -> StoreResult<()> {
+        let source = self.blob_path(id);
+        if target.exists() {
+            let _ = fs::remove_file(target);
+        }
+        match fs::hard_link(&source, target) {
+            Ok(()) => Ok(()),
+            Err(_) => {
+                fs::copy(&source, target).map_err(db_err)?;
+                Ok(())
+            }
+        }
+    }
+
+    /// Finds the most recently hit cached inputs for the same logical cell slot
+    /// (`state_id`, `width`, `locale`) so `evaluate_cache` can report exact changed inputs on a miss.
+    pub fn find_previous_cache_inputs(
+        &self,
+        state_id: &StateId,
+        width: Width,
+        locale: Option<&str>,
+    ) -> StoreResult<Option<CacheInputs>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT inputs_json FROM cache_entries ORDER BY last_hit_at_ms DESC")
+            .map_err(db_err)?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(db_err)?;
+        for row in rows {
+            let raw = row.map_err(db_err)?;
+            let Ok(inputs) = serde_json::from_str::<CacheInputs>(&raw) else {
+                continue;
+            };
+            if inputs.state_id == *state_id
+                && inputs.width == width
+                && inputs.locale.as_deref() == locale
+            {
+                return Ok(Some(inputs));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Removes unreferenced blobs and, when `max_bytes` is specified, evicts oldest
+    /// cache-only entries until total blob storage is within `max_bytes` while keeping
+    /// every blob referenced by a listed run intact.
+    pub fn prune(&mut self, max_bytes: Option<u64>) -> StoreResult<Value> {
+        let mut removed_blobs: u64 = 0;
+        let mut freed_bytes: u64 = 0;
+
+        let unreferenced = self.unreferenced_blobs()?;
+        for id in unreferenced {
+            let size = fs::metadata(self.blob_path(&id))
+                .map(|m| m.len())
+                .unwrap_or(0);
+            self.delete_blob(&id)?;
+            removed_blobs += 1;
+            freed_bytes += size;
+        }
+
+        // Also remove any stray files in `blobs_dir` not tracked in `image_blobs`.
+        if let Ok(entries) = fs::read_dir(&self.blobs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("png") {
+                    continue;
+                }
+                let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                let tracked: Option<i64> = self
+                    .conn
+                    .query_row(
+                        "SELECT 1 FROM image_blobs WHERE id = ?1",
+                        params![stem],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                    .map_err(db_err)?;
+                if tracked.is_none() {
+                    let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                    if fs::remove_file(&path).is_ok() {
+                        removed_blobs += 1;
+                        freed_bytes += size;
+                    }
+                }
+            }
+        }
+
+        if let Some(limit) = max_bytes {
+            let mut total = self.total_blob_bytes()?;
+            if total > limit {
+                let mut stmt = self
+                    .conn
+                    .prepare(
+                        "SELECT cache_key, image_blob_id FROM cache_entries
+                         WHERE image_blob_id IS NOT NULL
+                           AND image_blob_id NOT IN (SELECT image_blob_id FROM cells WHERE image_blob_id IS NOT NULL)
+                         ORDER BY last_hit_at_ms ASC",
+                    )
+                    .map_err(db_err)?;
+                let candidates: Vec<(String, String)> = stmt
+                    .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                    .map_err(db_err)?
+                    .collect::<Result<_, _>>()
+                    .map_err(db_err)?;
+                drop(stmt);
+
+                for (cache_key, _blob_id) in candidates {
+                    if total <= limit {
+                        break;
+                    }
+                    self.conn
+                        .execute(
+                            "DELETE FROM cache_entries WHERE cache_key = ?1",
+                            params![cache_key],
+                        )
+                        .map_err(db_err)?;
+                    for id in self.unreferenced_blobs()? {
+                        let size = fs::metadata(self.blob_path(&id))
+                            .map(|m| m.len())
+                            .unwrap_or(0);
+                        self.delete_blob(&id)?;
+                        removed_blobs += 1;
+                        freed_bytes += size;
+                        total = total.saturating_sub(size);
+                    }
+                }
+            }
+        }
+
+        let remaining_blobs: u64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM image_blobs", [], |r| {
+                r.get::<_, i64>(0)
+            })
+            .map_err(db_err)? as u64;
+        let remaining_bytes = self.total_blob_bytes()?;
+        Ok(json!({
+            "removedBlobs": removed_blobs,
+            "freedBytes": freed_bytes,
+            "remainingBlobs": remaining_blobs,
+            "remainingBytes": remaining_bytes,
+        }))
+    }
+
+    fn total_blob_bytes(&self) -> StoreResult<u64> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM image_blobs")
+            .map_err(db_err)?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(db_err)?;
+        let mut total = 0u64;
+        for row in rows {
+            let id = BlobId::parse(row.map_err(db_err)?).map_err(db_err)?;
+            total += fs::metadata(self.blob_path(&id))
+                .map(|m| m.len())
+                .unwrap_or(0);
+        }
+        Ok(total)
     }
 
     pub fn has_run(&self, id: &RunId) -> StoreResult<bool> {
