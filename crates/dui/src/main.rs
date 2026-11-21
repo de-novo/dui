@@ -34,6 +34,35 @@ fn failure(code: u8, reason: &str) -> (u8, Value) {
     (code, json!({"status":"error","reason":reason}))
 }
 
+fn launch_desktop(tail: &[std::ffi::OsString]) -> Reply {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map(|repo| repo.join("apps/desktop/Cargo.toml"))
+        .filter(|p| p.is_file())
+        .ok_or_else(|| failure(3, "apps/desktop/Cargo.toml not found"))?;
+    let mut cmd = Command::new("cargo");
+    if let Some(tc) = gpui::select_toolchain() {
+        cmd.arg(format!("+{tc}"));
+    }
+    cmd.args(["run", "--quiet", "--manifest-path"])
+        .arg(&manifest_dir)
+        .arg("--");
+    for arg in tail {
+        cmd.arg(arg);
+    }
+    let output = cmd.output().map_err(|e| failure(3, &e.to_string()))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(failure(3, stderr.trim()));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if stdout.is_empty() {
+        return Ok(json!({ "ok": true }));
+    }
+    serde_json::from_str(&stdout).map_err(|e| failure(3, &format!("invalid desktop output: {e}")))
+}
+
 fn scan(root: &Path) -> Reply {
     if !root.is_dir() {
         return Err(failure(2, "project directory does not exist"));
@@ -260,6 +289,11 @@ fn run() -> Reply {
     {
         mcp::serve()?;
         return Ok(Value::Null);
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "desktop"
+    {
+        return launch_desktop(tail);
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "comment"
