@@ -1,14 +1,24 @@
-//! Direct SQLite reader/writer against `~/.dui/dui.db` and `~/.dui/blobs/` for the GPUI desktop viewer.
+//! Direct SQLite reader/writer, synchronous RenderImage PNG cache, audit summary, and capture diff
+//! against `~/.dui/dui.db` and `~/.dui/blobs/` for the GPUI desktop viewer.
 
-use dui_core::model::{
-    Comment, CommentId, CommentStatus, CommentTarget, EdgeEndpoint, ProjectId, RunId, Screen,
+use dui_core::{
+    diff::compute_rgba_diff,
+    model::{
+        CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeEndpoint, EdgeId, ProjectId,
+        RunId, Screen,
+    },
 };
+use gpui_kit::RenderImage;
+use image::{Frame, RgbaImage};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
+use smallvec::smallvec;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
+    fs,
     path::{Path, PathBuf},
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -21,6 +31,7 @@ pub struct CellItem {
     pub locale: Option<String>,
     pub status_kind: String,
     pub reason: Option<String>,
+    pub blob_id: Option<String>,
     pub blob_path: Option<PathBuf>,
 }
 
@@ -67,6 +78,48 @@ pub struct RunItem {
     pub screens: Vec<ScreenItem>,
 }
 
+impl RunItem {
+    pub fn widths(&self) -> Vec<u32> {
+        let mut set = BTreeSet::new();
+        for sc in &self.screens {
+            for c in &sc.cells {
+                if c.width_px > 0 {
+                    set.insert(c.width_px);
+                }
+            }
+        }
+        if set.is_empty() {
+            vec![1280]
+        } else {
+            set.into_iter().collect()
+        }
+    }
+
+    pub fn counts(&self) -> (usize, usize, usize, usize) {
+        let mut total = 0;
+        let mut verified = 0;
+        let mut unverified = 0;
+        let mut unrenderable = 0;
+        for sc in &self.screens {
+            for c in &sc.cells {
+                total += 1;
+                match c.status_kind.as_str() {
+                    "verified" => verified += 1,
+                    "unrenderable" => unrenderable += 1,
+                    _ => unverified += 1,
+                }
+            }
+        }
+        (total, verified, unverified, unrenderable)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ProjectGroup {
+    pub project_name: String,
+    pub run_indices: Vec<usize>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopWorkspace {
@@ -74,6 +127,181 @@ pub struct DesktopWorkspace {
     pub db_path: PathBuf,
     pub runs: Vec<RunItem>,
     pub comments: Vec<CommentItem>,
+}
+
+impl DesktopWorkspace {
+    pub fn project_groups(&self) -> Vec<ProjectGroup> {
+        let mut order: Vec<String> = Vec::new();
+        let mut map: BTreeMap<String, ProjectGroup> = BTreeMap::new();
+        for (idx, run) in self.runs.iter().enumerate() {
+            if !map.contains_key(&run.project_id) {
+                order.push(run.project_id.clone());
+                map.insert(
+                    run.project_id.clone(),
+                    ProjectGroup {
+                        project_name: run.project_name.clone(),
+                        run_indices: Vec::new(),
+                    },
+                );
+            }
+            if let Some(group) = map.get_mut(&run.project_id) {
+                group.run_indices.push(idx);
+            }
+        }
+        order.into_iter().filter_map(|id| map.remove(&id)).collect()
+    }
+
+    pub fn open_comments_by_path(&self, project_id: &str) -> BTreeMap<String, usize> {
+        let mut counts = BTreeMap::new();
+        for c in &self.comments {
+            if c.project_id == project_id
+                && c.status == "open"
+                && let Some(ref p) = c.screen_path
+            {
+                *counts.entry(p.clone()).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DiffCellEntry {
+    pub path: String,
+    pub width_px: u32,
+    pub kind: String,
+    pub before_blob: Option<PathBuf>,
+    pub after_blob: Option<PathBuf>,
+    pub changed_pixels: Option<u64>,
+    pub diff_percent: Option<f64>,
+    pub overlay: Option<Arc<RenderImage>>,
+}
+
+#[derive(Default)]
+pub struct ImageCache {
+    decoded: BTreeMap<PathBuf, Option<Arc<RenderImage>>>,
+}
+
+impl ImageCache {
+    pub fn get_or_decode(&mut self, path: &Path) -> Option<Arc<RenderImage>> {
+        if let Some(cached) = self.decoded.get(path) {
+            return cached.clone();
+        }
+        let img = decode_png_to_render_image(path);
+        self.decoded.insert(path.to_path_buf(), img.clone());
+        img
+    }
+}
+
+pub fn decode_png_to_render_image(path: &Path) -> Option<Arc<RenderImage>> {
+    let bytes = fs::read(path).ok()?;
+    let dyn_img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).ok()?;
+    let mut rgba: RgbaImage = dyn_img.to_rgba8();
+    // GPUI RenderImage expects premultiplied/BGRA channel order on macOS Metal / WGPU.
+    for px in rgba.pixels_mut() {
+        px.0.swap(0, 2);
+    }
+    Some(Arc::new(RenderImage::new(smallvec![Frame::new(rgba)])))
+}
+
+fn rgba_to_render_image(width: u32, height: u32, mut rgba: Vec<u8>) -> Option<Arc<RenderImage>> {
+    for chunk in rgba.as_chunks_mut::<4>().0 {
+        chunk.swap(0, 2);
+    }
+    let buf = RgbaImage::from_raw(width, height, rgba)?;
+    Some(Arc::new(RenderImage::new(smallvec![Frame::new(buf)])))
+}
+
+pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry> {
+    let mut before_map: BTreeMap<(String, u32, usize), &CellItem> = BTreeMap::new();
+    for sc in &before.screens {
+        let mut counts: BTreeMap<u32, usize> = BTreeMap::new();
+        for c in &sc.cells {
+            let ordinal = *counts.entry(c.width_px).or_insert(0);
+            *counts.get_mut(&c.width_px).unwrap() += 1;
+            before_map.insert((sc.path.clone(), c.width_px, ordinal), c);
+        }
+    }
+    let mut after_map: BTreeMap<(String, u32, usize), &CellItem> = BTreeMap::new();
+    for sc in &after.screens {
+        let mut counts: BTreeMap<u32, usize> = BTreeMap::new();
+        for c in &sc.cells {
+            let ordinal = *counts.entry(c.width_px).or_insert(0);
+            *counts.get_mut(&c.width_px).unwrap() += 1;
+            after_map.insert((sc.path.clone(), c.width_px, ordinal), c);
+        }
+    }
+
+    let mut keys: BTreeSet<(String, u32, usize)> = BTreeSet::new();
+    keys.extend(before_map.keys().cloned());
+    keys.extend(after_map.keys().cloned());
+
+    let mut entries = Vec::new();
+    for key in keys {
+        let b = before_map.get(&key).copied();
+        let a = after_map.get(&key).copied();
+        match (b, a) {
+            (None, Some(after_cell)) => entries.push(DiffCellEntry {
+                path: key.0,
+                width_px: key.1,
+                kind: "added".into(),
+                before_blob: None,
+                after_blob: after_cell.blob_path.clone(),
+                changed_pixels: None,
+                diff_percent: None,
+                overlay: None,
+            }),
+            (Some(before_cell), None) => entries.push(DiffCellEntry {
+                path: key.0,
+                width_px: key.1,
+                kind: "removed".into(),
+                before_blob: before_cell.blob_path.clone(),
+                after_blob: None,
+                changed_pixels: None,
+                diff_percent: None,
+                overlay: None,
+            }),
+            (Some(before_cell), Some(after_cell)) => {
+                if before_cell.status_kind == after_cell.status_kind
+                    && before_cell.blob_id == after_cell.blob_id
+                {
+                    continue;
+                }
+                let mut changed_pixels = None;
+                let mut diff_percent = None;
+                let mut overlay = None;
+                if let (Some(bp), Some(ap)) = (&before_cell.blob_path, &after_cell.blob_path)
+                    && let (Ok(b_bytes), Ok(a_bytes)) = (fs::read(bp), fs::read(ap))
+                    && let (Ok(b_img), Ok(a_img)) = (
+                        image::load_from_memory_with_format(&b_bytes, image::ImageFormat::Png),
+                        image::load_from_memory_with_format(&a_bytes, image::ImageFormat::Png),
+                    )
+                {
+                    let br = b_img.to_rgba8();
+                    let ar = a_img.to_rgba8();
+                    let (bw, bh) = br.dimensions();
+                    let (aw, ah) = ar.dimensions();
+                    let (metrics, overlay_rgba) =
+                        compute_rgba_diff(bw, bh, br.as_raw(), aw, ah, ar.as_raw());
+                    changed_pixels = Some(metrics.diff_pixels);
+                    diff_percent = Some((metrics.diff_ratio * 10000.0).round() / 100.0);
+                    overlay = rgba_to_render_image(metrics.width, metrics.height, overlay_rgba);
+                }
+                entries.push(DiffCellEntry {
+                    path: key.0,
+                    width_px: key.1,
+                    kind: "changed".into(),
+                    before_blob: before_cell.blob_path.clone(),
+                    after_blob: after_cell.blob_path.clone(),
+                    changed_pixels,
+                    diff_percent,
+                    overlay,
+                });
+            }
+            (None, None) => {}
+        }
+    }
+    entries
 }
 
 pub fn default_dui_home() -> PathBuf {
@@ -236,7 +464,7 @@ fn load_run_screens(
             .map_err(|e| e.to_string())?;
         for (id, screen_id, state_id, width_px, locale, status_json, blob_id) in rows.flatten() {
             let (status_kind, reason) = parse_status(&status_json);
-            let blob_path = blob_id.and_then(|hash| {
+            let blob_path = blob_id.as_ref().and_then(|hash| {
                 let candidate = dui_home.join("blobs").join(format!("{hash}.png"));
                 candidate.is_file().then_some(candidate)
             });
@@ -258,6 +486,7 @@ fn load_run_screens(
                 locale,
                 status_kind,
                 reason,
+                blob_id,
                 blob_path,
             });
         }
@@ -426,11 +655,25 @@ fn describe_target(
     }
 }
 
-pub fn add_screen_comment(
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NewCommentAnchor {
+    Screen(String),
+    Cell {
+        path: String,
+        cell_id: String,
+        width_px: u32,
+    },
+    Transition {
+        from_path: String,
+        to_path: String,
+    },
+}
+
+pub fn add_comment(
     dui_home: &Path,
     project_id: &str,
     run_id: &str,
-    screen_path: &str,
+    anchor: NewCommentAnchor,
     author: &str,
     body: &str,
 ) -> Result<CommentItem, String> {
@@ -438,14 +681,62 @@ pub fn add_screen_comment(
     let conn = Connection::open(&db_path).map_err(|e| format!("open dui.db: {e}"))?;
     let pid = ProjectId::parse(project_id).map_err(|e| e.to_string())?;
     let rid = RunId::parse(run_id).map_err(|e| e.to_string())?;
-    let screen_id = Screen::derive_id(screen_path);
-    conn.execute(
-        "INSERT OR IGNORE INTO screens (id, path, origin_json) VALUES (?1, ?2, ?3)",
-        params![screen_id.as_str(), screen_path, r#"{"kind":"entry"}"#],
-    )
-    .map_err(|e| e.to_string())?;
 
-    let target = CommentTarget::Screen { screen_id };
+    let (target, screen_path, target_label) = match anchor {
+        NewCommentAnchor::Screen(path) => {
+            let screen_id = Screen::derive_id(&path);
+            conn.execute(
+                "INSERT OR IGNORE INTO screens (id, path, origin_json) VALUES (?1, ?2, ?3)",
+                params![screen_id.as_str(), &path, r#"{"kind":"entry"}"#],
+            )
+            .map_err(|e| e.to_string())?;
+            (
+                CommentTarget::Screen { screen_id },
+                Some(path.clone()),
+                path,
+            )
+        }
+        NewCommentAnchor::Cell {
+            path,
+            cell_id,
+            width_px,
+        } => {
+            let cid = CellId::parse(&cell_id).map_err(|e| e.to_string())?;
+            (
+                CommentTarget::Cell { cell_id: cid },
+                Some(path),
+                format!("{width_px} px"),
+            )
+        }
+        NewCommentAnchor::Transition { from_path, to_path } => {
+            let from_id = Screen::derive_id(&from_path);
+            let to_id = Screen::derive_id(&to_path);
+            conn.execute(
+                "INSERT OR IGNORE INTO screens (id, path, origin_json) VALUES (?1, ?2, ?3)",
+                params![from_id.as_str(), &from_path, r#"{"kind":"entry"}"#],
+            )
+            .map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT OR IGNORE INTO screens (id, path, origin_json) VALUES (?1, ?2, ?3)",
+                params![to_id.as_str(), &to_path, r#"{"kind":"entry"}"#],
+            )
+            .map_err(|e| e.to_string())?;
+            let edge_id = EdgeId::derive(&json!([&rid, &from_id, &to_id]));
+            let from_json = serde_json::to_string(&EdgeEndpoint::Screen { screen_id: from_id })
+                .map_err(|e| e.to_string())?;
+            let to_json = serde_json::to_string(&EdgeEndpoint::Screen { screen_id: to_id })
+                .map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT OR IGNORE INTO edges (id, run_id, from_json, to_json, source, trigger, selector, observed_widths_json)
+                 VALUES (?1, ?2, ?3, ?4, 'extracted', NULL, NULL, '[]')",
+                params![edge_id.as_str(), rid.as_str(), from_json, to_json],
+            )
+            .map_err(|e| e.to_string())?;
+            let label = format!("{from_path} -> {to_path}");
+            (CommentTarget::Edge { edge_id }, Some(from_path), label)
+        }
+    };
+
     let comment =
         Comment::open(pid, rid, target, author, body, now_ms()).map_err(|e| e.to_string())?;
     let target_json = serde_json::to_string(comment.target()).map_err(|e| e.to_string())?;
@@ -473,8 +764,8 @@ pub fn add_screen_comment(
         author: comment.author().to_owned(),
         body: comment.body().to_owned(),
         status: "open".into(),
-        screen_path: Some(screen_path.to_owned()),
-        target_label: screen_path.to_owned(),
+        screen_path,
+        target_label,
         created_at_ms: comment.created_at_ms(),
         updated_at_ms: comment.updated_at_ms(),
     })
@@ -599,11 +890,11 @@ mod tests {
         .expect("insert cell");
         drop(conn);
 
-        let added = add_screen_comment(
+        let added = add_comment(
             dir.path(),
             &project_id,
             "run-1",
-            "/order",
+            NewCommentAnchor::Screen("/order".into()),
             "reviewer",
             "Tighten button spacing on mobile",
         )
@@ -612,6 +903,7 @@ mod tests {
 
         let ws = load_workspace(dir.path()).expect("load workspace");
         assert_eq!(ws.runs.len(), 1);
+        assert_eq!(ws.project_groups().len(), 1);
         assert_eq!(ws.runs[0].screens.len(), 1);
         assert_eq!(ws.runs[0].screens[0].cells.len(), 1);
         assert_eq!(ws.comments.len(), 1);

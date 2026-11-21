@@ -10,10 +10,12 @@ publish = false
 [dependencies]
 dui-core = { path = "../../crates/dui-core" }
 gpui-kit = { version = "0.10.0", features = ["test-support"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 png = "0.18.1"
 rusqlite = { version = "0.43", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+smallvec = "1"
 
 [dev-dependencies]
 tempfile = "3"
