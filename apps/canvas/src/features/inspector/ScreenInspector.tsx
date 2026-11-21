@@ -2,17 +2,11 @@ import { ArrowDownLeft, ArrowUpRight, Play, X } from "lucide-react";
 import type { KeyboardEvent, RefObject } from "react";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
-import type { Cell, Screen, ScreenMap, ScreenOrigin } from "../../data/overview";
+import type { Cell, Screen, ScreenMap } from "../../data/overview";
 import type { Run } from "../../data/run";
 import { canOpenLiveCell } from "../../model/live";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
-
-function originLabel(origin: ScreenOrigin): string {
-  if (origin.kind === "entry") return "Entry screen";
-  if (origin.kind === "router") return origin.file;
-  return `Linked from ${routeName(origin.from)}`;
-}
 
 function cellLabel(cell: Cell, multipleStates: boolean, index: number): string | null {
   if (!multipleStates) return null;
@@ -69,15 +63,7 @@ export function ScreenInspector({
         <div className="panel-heading">
           <h2>{title}</h2>
           {showFullPath && screen && <code className="route-path">{screen.path}</code>}
-          <p className="origin-meta">
-            <span>Archive</span>
-            {screen?.discoveredFrom && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{originLabel(screen.discoveredFrom)}</span>
-              </>
-            )}
-          </p>
+          <p className="origin-meta">Archive</p>
         </div>
         <Button
           aria-label="Back to overview"
@@ -178,35 +164,46 @@ export function ScreenInspector({
       )}
 
       {connections.length > 0 && (
-        <section className="inspector-section" aria-label="Discovered links">
-          <h3>Discovered links</h3>
+        <section className="inspector-section" aria-label="Links">
+          <h3>Links</h3>
           <ul className="link-evidence-list">
-            {connections.map(({ direction, screen: partner, link }) => (
-              <li key={`${direction}-${partner.id}`} className="link-evidence-item">
+            {connections.map(({ direction, screen: partner }) => (
+              <li key={`${direction}-${partner.id}`}>
                 <button
                   type="button"
-                  className="link-target-button"
+                  className="cell-row link-row"
                   onKeyDown={onKeyDown}
                   onClick={() => onSelectScreen(partner.id)}
                 >
-                  {direction === "outgoing" ? (
-                    <ArrowUpRight aria-hidden="true" />
-                  ) : (
-                    <ArrowDownLeft aria-hidden="true" />
-                  )}
-                  <span className="link-route">{partner.path}</span>
+                  <span className="link-row-target">
+                    {direction === "outgoing" ? (
+                      <ArrowUpRight aria-hidden="true" />
+                    ) : (
+                      <ArrowDownLeft aria-hidden="true" />
+                    )}
+                    <span className="link-route">{partner.path}</span>
+                  </span>
+                  <span className="link-row-state">Discovered</span>
                 </button>
-                <div className="link-evidence-meta">
+              </li>
+            ))}
+          </ul>
+          <details className="readonly-disclosure link-details-disclosure">
+            <summary>Link evidence</summary>
+            <ul className="readonly-list">
+              {connections.map(({ direction, screen: partner, link }) => (
+                <li key={`${direction}-${partner.id}`} className="link-evidence-item">
+                  <strong>{partner.path}</strong>
                   <span>
                     {link.origin === "anchor" ? "DOM anchor" : (link.origin ?? "Observed anchor")}
                     {link.observedWidths?.length ? ` · ${link.observedWidths.join(", ")} px` : ""} ·
                     Not replay-verified
                   </span>
                   {link.selector && <code className="selector-evidence">{link.selector}</code>}
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </details>
         </section>
       )}
     </aside>
