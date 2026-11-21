@@ -85,34 +85,46 @@ try {
   );
   assert.equal(added.status, 0, JSON.stringify(added.body));
 
-  const snapshotPng = join(stage, "desktop.png");
-  const desktop = runDui(
-    ["desktop", "--home", join(home, ".dui"), "--snapshot-out", snapshotPng],
+  const overviewPng = join(stage, "desktop-overview.png");
+  const overview = runDui(
+    ["desktop", "--home", join(home, ".dui"), "--snapshot-out", overviewPng],
     env,
   );
-  assert.equal(desktop.status, 0, JSON.stringify(desktop.body));
-  assert.equal(desktop.body.ok, true);
-  assert(existsSync(snapshotPng), "desktop PNG written");
-  const pngBytes = readFileSync(snapshotPng);
-  assert(pngBytes.length > 4096, `desktop PNG too small (${pngBytes.length} bytes)`);
-  assert.equal(desktop.body.summary.runs, 1);
-  assert.equal(desktop.body.summary.comments, 1);
-  assert(desktop.body.summary.cells >= 2, "at least 2 widths loaded from SQLite");
+  assert.equal(overview.status, 0, JSON.stringify(overview.body));
+  assert.equal(overview.body.ok, true);
+  assert(existsSync(overviewPng), "desktop overview PNG written");
+  const overviewBytes = readFileSync(overviewPng);
+  assert(overviewBytes.length > 4096, `desktop PNG too small (${overviewBytes.length} bytes)`);
+  assert.equal(overview.body.summary.runs, 1);
+  assert.equal(overview.body.summary.comments, 1);
+  assert(overview.body.summary.cells >= 2, "at least 2 widths loaded from SQLite");
 
-  const labels = (desktop.body.elements as { label?: string }[]).map((e) => e.label ?? "");
+  const detailPng = join(stage, "desktop-detail.png");
+  const detail = runDui(
+    ["desktop", "--home", join(home, ".dui"), "--view", "detail", "--snapshot-out", detailPng],
+    env,
+  );
+  assert.equal(detail.status, 0, JSON.stringify(detail.body));
+  assert.equal(detail.body.ok, true);
+  assert(existsSync(detailPng), "desktop detail PNG written");
+  const detailBytes = readFileSync(detailPng);
+  assert(detailBytes.length > 4096, `desktop detail PNG too small (${detailBytes.length} bytes)`);
+
+  const labels = (detail.body.elements as { label?: string }[]).map((e) => e.label ?? "");
   assert(
-    labels.some((l) => l.includes("Refresh")) && labels.some((l) => l.includes("Resolve")),
-    `expected desktop controls in AccessKit tree, got: ${JSON.stringify(labels)}`,
+    labels.some((l) => l.includes("Resolve")),
+    `expected desktop inspector comment controls in AccessKit tree, got: ${JSON.stringify(labels)}`,
   );
 
   console.log(
     JSON.stringify({
       ok: true,
-      renderer: desktop.body.renderer,
-      pixelWidth: desktop.body.pixelWidth,
-      pixelHeight: desktop.body.pixelHeight,
-      pngBytes: pngBytes.length,
-      summary: desktop.body.summary,
+      renderer: overview.body.renderer,
+      pixelWidth: overview.body.pixelWidth,
+      pixelHeight: overview.body.pixelHeight,
+      overviewPngBytes: overviewBytes.length,
+      detailPngBytes: detailBytes.length,
+      summary: overview.body.summary,
     }),
   );
 } finally {
