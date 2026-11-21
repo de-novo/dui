@@ -39,7 +39,11 @@ fn scan(root: &Path) -> Reply {
     let root = root
         .canonicalize()
         .map_err(|_| failure(3, "cannot resolve project"))?;
-    let package = root.join("node_modules/typescript");
+    let package = root
+        .ancestors()
+        .map(|dir| dir.join("node_modules/typescript"))
+        .find(|p| p.join("package.json").is_file())
+        .unwrap_or_else(|| root.join("node_modules/typescript"));
     let unsupported = |reason: &str| (4, json!({"status":"unsupported","reason":reason}));
     let manifest = fs::read(package.join("package.json"))
         .map_err(|_| unsupported("typescript package unavailable"))?;

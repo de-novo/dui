@@ -35,6 +35,84 @@ fetch() {
     esac
 }
 
+append_path_line() {
+    rc_file=$1
+    line=$2
+    match=$3
+    mkdir -p "$(dirname "$rc_file")"
+    if [ -f "$rc_file" ] && grep -Fq "$match" "$rc_file" 2>/dev/null; then
+        return 1
+    fi
+    printf '\n# Added by dui installer\n%s\n' "$line" >> "$rc_file"
+    return 0
+}
+
+ensure_on_path() {
+    bin_dir=$1
+    case ":${PATH:-}:" in
+        *":$bin_dir:"*)
+            printf 'Run `dui --version` to verify.\n'
+            return
+            ;;
+    esac
+    if [ "${DUI_NO_MODIFY_PATH:-0}" = 1 ]; then
+        printf 'Add %s to your PATH to run `dui` directly.\n' "$bin_dir"
+        return
+    fi
+
+    updated=''
+    shell_name=$(basename "${SHELL:-sh}")
+    case "$shell_name" in
+        zsh)
+            if append_path_line "$HOME/.zshrc" "export PATH=\"$bin_dir:\$PATH\"" "$bin_dir"; then
+                updated="$HOME/.zshrc"
+            fi
+            ;;
+        bash)
+            if append_path_line "$HOME/.bashrc" "export PATH=\"$bin_dir:\$PATH\"" "$bin_dir"; then
+                updated="$HOME/.bashrc"
+            fi
+            if [ "$(uname -s)" = Darwin ] && [ -f "$HOME/.bash_profile" ]; then
+                append_path_line "$HOME/.bash_profile" "export PATH=\"$bin_dir:\$PATH\"" "$bin_dir" || true
+            fi
+            ;;
+        fish)
+            if append_path_line "$HOME/.config/fish/config.fish" "fish_add_path \"$bin_dir\"" "$bin_dir"; then
+                updated="$HOME/.config/fish/config.fish"
+            fi
+            ;;
+        *)
+            if append_path_line "$HOME/.profile" "export PATH=\"$bin_dir:\$PATH\"" "$bin_dir"; then
+                updated="$HOME/.profile"
+            fi
+            ;;
+    esac
+
+    linked=''
+    for candidate in /opt/homebrew/bin /usr/local/bin; do
+        case ":${PATH:-}:" in
+            *":$candidate:"*)
+                if [ -d "$candidate" ] && [ -w "$candidate" ]; then
+                    if [ ! -e "$candidate/dui" ] || [ -L "$candidate/dui" ]; then
+                        ln -sf "$bin_dir/dui" "$candidate/dui"
+                        linked="$candidate/dui"
+                        break
+                    fi
+                fi
+                ;;
+        esac
+    done
+
+    if [ -n "$updated" ]; then
+        printf 'Updated %s to include %s on PATH.\n' "$updated" "$bin_dir"
+    fi
+    if [ -n "$linked" ]; then
+        printf 'Linked %s -> %s/dui so `dui` works immediately in this shell.\n' "$linked" "$bin_dir"
+    else
+        printf 'Restart your shell or run: export PATH="%s:$PATH"\n' "$bin_dir"
+    fi
+}
+
 main() {
     [ "$#" -le 1 ] || fail "usage: sh install.sh [DIRECTORY | HTTPS_URL]"
     version='@VERSION@'
@@ -81,6 +159,7 @@ main() {
     mv -f "$pending" "$dest/dui"
     pending=''
     printf 'Installed %s at %s/dui\n' "$name" "$dest"
+    ensure_on_path "$dest"
 }
 
 main "$@"

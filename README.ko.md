@@ -14,14 +14,14 @@ macOS와 Linux에서는 아래 명령 하나로 최신 릴리스 태그(`vX.Y.Z`
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ```
 
-Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도구를 사용한다. 설치기는 내 컴퓨터에서 dui를 빌드한다. Rust나 Node.js 26 및 npm이 없으면 빌드에 필요한 도구를 임시로 받아 사용한 뒤 정리한다.
+Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도구를 사용한다. 설치기는 내 컴퓨터에서 dui를 빌드하고, 설치 경로(기본 `~/.local/bin`)를 셸 `PATH`에 자동 등록(원치 않으면 `DUI_NO_MODIFY_PATH=1`)하며 가능하면 현재 `PATH`의 쓰기 가능한 경로에 심볼릭 링크를 만들어 바로 `dui` 명령어를 쓸 수 있게 한다. Rust나 Node.js 26 및 npm이 없으면 빌드에 필요한 도구를 임시로 받아 사용한 뒤 정리한다.
 
 설치된 태그 확인 및 새 릴리스 태그 업데이트 확인은 아래 명령을 사용한다.
 
 ```sh
-~/.local/bin/dui --version
-~/.local/bin/dui update --check
-~/.local/bin/dui update
+dui --version
+dui update --check
+dui update
 ```
 
 **웹 화면을 캡처할 때는** Node.js 26, Chromium 또는 Google Chrome, 대상 앱의 의존성이 필요하다.

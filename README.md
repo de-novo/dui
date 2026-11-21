@@ -14,14 +14,14 @@ On macOS or Linux, run this command to clone the latest release tag (`vX.Y.Z`, f
 curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
 ```
 
-You need Git, curl, and a C toolchain (Xcode Command Line Tools on macOS). The installer builds dui on your machine. If Rust or Node.js 26 with npm is missing, the installer downloads a temporary copy for the build and removes it afterward.
+You need Git, curl, and a C toolchain (Xcode Command Line Tools on macOS). The installer builds dui on your machine, adds the install directory (`~/.local/bin` by default) to your shell `PATH` automatically (set `DUI_NO_MODIFY_PATH=1` to opt out), and symlinks into a writable `PATH` directory when available so `dui` works immediately. If Rust or Node.js 26 with npm is missing, the installer downloads a temporary copy for the build and removes it afterward.
 
 Check the installed tag or check for newer release tags with:
 
 ```sh
-~/.local/bin/dui --version
-~/.local/bin/dui update --check
-~/.local/bin/dui update
+dui --version
+dui update --check
+dui update
 ```
 
 **For web capture**, install Node.js 26, Chromium or Google Chrome, and the target app’s dependencies.
