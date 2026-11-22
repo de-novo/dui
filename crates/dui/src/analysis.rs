@@ -111,6 +111,11 @@ pub(crate) fn exercise_with_renderer(
             spec["readySelector"] = json!("body");
         }
     }
+    if dui_core::surface::resolve_surface_id(&spec) == dui_core::surface::SURFACE_UNIVERSAL_TUI
+        && spec["path"].as_str().is_none()
+    {
+        spec["path"] = json!("/");
+    }
     let widths: BTreeSet<u32> =
         serde_json::from_value(spec["widths"].clone()).map_err(|_| failure(2, "invalid widths"))?;
     if widths.is_empty() || widths.contains(&0) {

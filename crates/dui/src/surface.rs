@@ -120,6 +120,7 @@ impl SurfaceRegistry {
         registry.register(Box::new(ViteWebSurface));
         registry.register(Box::new(crate::universal_web::UniversalWebSurface));
         registry.register(Box::new(GpuiDesktopSurface));
+        registry.register(Box::new(crate::tui::UniversalTuiSurface));
         registry
     }
 
@@ -149,16 +150,22 @@ impl SurfaceRegistry {
         };
         let surface_id = resolve_surface_id(&manifest);
         let Some(adapter) = self.find(surface_id) else {
-            return Ok(unrenderable_reply(
+            let reply = unrenderable_reply(
                 surface_id,
                 &UnrenderableReason::new(
                     "surface-not-registered",
                     format!("surface adapter `{surface_id}` is not registered in this build"),
                 ),
-            ));
+            );
+            let _ = fs::create_dir_all(out);
+            let _ = crate::analysis::store(&out.join("report.json"), &reply);
+            return Ok(reply);
         };
         if let Err(reason) = adapter.check_env() {
-            return Ok(unrenderable_reply(surface_id, &reason));
+            let reply = unrenderable_reply(surface_id, &reason);
+            let _ = fs::create_dir_all(out);
+            let _ = crate::analysis::store(&out.join("report.json"), &reply);
+            return Ok(reply);
         }
         adapter.run(project, spec, out, force)
     }
@@ -208,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn default_registry_contains_vite_web_universal_web_and_gpui_desktop() {
+    fn default_registry_contains_vite_web_universal_web_gpui_and_tui() {
         let registry = SurfaceRegistry::default_registry();
         let ids: Vec<String> = registry.descriptors().into_iter().map(|d| d.id).collect();
         assert_eq!(
@@ -217,6 +224,7 @@ mod tests {
                 SURFACE_VITE_WEB,
                 dui_core::surface::SURFACE_UNIVERSAL_WEB,
                 SURFACE_GPUI_DESKTOP,
+                dui_core::surface::SURFACE_UNIVERSAL_TUI,
             ]
         );
         assert!(registry.find(SURFACE_VITE_WEB).is_some());
@@ -226,6 +234,11 @@ mod tests {
                 .is_some()
         );
         assert!(registry.find(SURFACE_GPUI_DESKTOP).is_some());
+        assert!(
+            registry
+                .find(dui_core::surface::SURFACE_UNIVERSAL_TUI)
+                .is_some()
+        );
     }
 
     #[test]
@@ -256,14 +269,14 @@ mod tests {
     fn unregistered_surface_returns_honest_unrenderable_reply() {
         let dir = tempfile::tempdir().expect("tempdir");
         let spec = dir.path().join("dui.json");
-        fs::write(&spec, r#"{"host":"pty","widths":[80]}"#).expect("write manifest");
+        fs::write(&spec, r#"{"host":"ios","widths":[390]}"#).expect("write manifest");
 
         let registry = SurfaceRegistry::default_registry();
         let reply = registry
             .dispatch(dir.path(), &spec, &dir.path().join("out"), false)
             .expect("unrenderable reply");
         assert_eq!(reply["status"], "unrenderable");
-        assert_eq!(reply["surface"], "universal-tui");
+        assert_eq!(reply["surface"], "ios-mobile");
         assert_eq!(reply["reason"], "surface-not-registered");
     }
 
