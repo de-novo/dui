@@ -69,3 +69,4 @@ jobs:
           npm run check:comments
           npm run check:audit
           npm run check:query-params
+          npm run check:p2-rules

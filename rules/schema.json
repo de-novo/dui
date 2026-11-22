@@ -14,7 +14,9 @@
         "properties": {
           "package": { "type": "string", "minLength": 1 },
           "symbol": { "type": "string", "minLength": 1 },
-          "kind": { "enum": ["slot", "route", "query", "schema"] }
+          "kind": {
+            "enum": ["slot", "store", "machine", "form", "route", "query", "schema", "search"]
+          }
         }
       }
     }
