@@ -511,6 +511,9 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
     if let Some(audit) = obs.get("localeAudit").filter(|v| v.is_object()) {
         assertions.push(json!({"__duiLocaleAudit": audit}));
     }
+    if let Some(tree) = obs.get("renderTree").filter(|v| v.is_array()) {
+        assertions.push(json!({"__duiRenderTree": tree}));
+    }
     Evidence::new(
         obs["path"].as_str().map(str::to_owned),
         obs["width"].as_u64().map(|w| w as u32),
@@ -529,9 +532,12 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
 fn evidence_to_observation(ev: &Evidence) -> Value {
     let mut assertions = Vec::new();
     let mut locale_audit = None;
+    let mut render_tree = None;
     for item in ev.assertions() {
         if let Some(audit) = item.get("__duiLocaleAudit") {
             locale_audit = Some(audit.clone());
+        } else if let Some(tree) = item.get("__duiRenderTree") {
+            render_tree = Some(tree.clone());
         } else {
             assertions.push(item.clone());
         }
@@ -555,6 +561,9 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
     });
     if let Some(audit) = locale_audit {
         obs["localeAudit"] = audit;
+    }
+    if let Some(tree) = render_tree {
+        obs["renderTree"] = tree;
     }
     obs
 }

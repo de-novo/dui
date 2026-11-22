@@ -19,6 +19,7 @@ impl TypeOracle for NoopOracle {
             "tier": "universal",
             "compiler": "none",
             "path": path,
+            "diagnostics": [],
             "facts": [],
             "autoMocks": {},
             "files": []
@@ -117,6 +118,7 @@ impl SurfaceRegistry {
     pub fn default_registry() -> Self {
         let mut registry = Self::new();
         registry.register(Box::new(ViteWebSurface));
+        registry.register(Box::new(crate::universal_web::UniversalWebSurface));
         registry.register(Box::new(GpuiDesktopSurface));
         registry
     }
@@ -206,11 +208,23 @@ mod tests {
     }
 
     #[test]
-    fn default_registry_contains_vite_web_and_gpui_desktop() {
+    fn default_registry_contains_vite_web_universal_web_and_gpui_desktop() {
         let registry = SurfaceRegistry::default_registry();
         let ids: Vec<String> = registry.descriptors().into_iter().map(|d| d.id).collect();
-        assert_eq!(ids, vec![SURFACE_VITE_WEB, SURFACE_GPUI_DESKTOP]);
+        assert_eq!(
+            ids,
+            vec![
+                SURFACE_VITE_WEB,
+                dui_core::surface::SURFACE_UNIVERSAL_WEB,
+                SURFACE_GPUI_DESKTOP,
+            ]
+        );
         assert!(registry.find(SURFACE_VITE_WEB).is_some());
+        assert!(
+            registry
+                .find(dui_core::surface::SURFACE_UNIVERSAL_WEB)
+                .is_some()
+        );
         assert!(registry.find(SURFACE_GPUI_DESKTOP).is_some());
     }
 
