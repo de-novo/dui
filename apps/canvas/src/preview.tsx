@@ -134,7 +134,7 @@ function MapView({
     return fromUrl ?? "";
   });
   const [changedOnly, setChangedOnly] = useState(false);
-  const [diffVisualMode, setDiffVisualMode] = useState<CanvasDiffVisualMode>("overlay");
+  const [diffVisualMode, setDiffVisualMode] = useState<CanvasDiffVisualMode>("render");
   const [canvasDiffState, setCanvasDiffState] = useState<{
     pairKey: string;
     diff: CaptureDiff | null;
@@ -335,6 +335,7 @@ function MapView({
                     <div className="canvas-diff-mode-group">
                       {(
                         [
+                          ["render", t.canvasDiffModeRender],
                           ["after", t.canvasDiffModeAfter],
                           ["before", t.canvasDiffModeBefore],
                           ["overlay", t.canvasDiffModeOverlay],

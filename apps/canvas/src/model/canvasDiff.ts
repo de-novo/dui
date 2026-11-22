@@ -1,7 +1,7 @@
 import type { Screen, ScreenMap } from "../data/overview";
-import type { CaptureDiff, CellDiffEntry } from "./diff";
+import type { CaptureDiff, CellDiffEntry, RenderDiffSummary } from "./diff";
 
-export type CanvasDiffVisualMode = "after" | "before" | "overlay";
+export type CanvasDiffVisualMode = "render" | "after" | "before" | "overlay";
 
 export type ScreenCanvasDiff = {
   path: string;
@@ -11,6 +11,9 @@ export type ScreenCanvasDiff = {
   beforeImage?: string;
   afterImage?: string;
   overlayImage?: string;
+  captureWidth: number;
+  captureHeight: number;
+  renderDiff?: RenderDiffSummary;
   changedFiles: string[];
   entries: CellDiffEntry[];
 };
@@ -33,8 +36,10 @@ export function indexScreenDiffs(
 
     const widthMatches = group.cells.filter((c) => c.width === width);
     const preferred =
+      widthMatches.find((c) => c.renderDiff && c.renderDiff.changes.length > 0) ??
       widthMatches.find((c) => c.pixelDiff?.overlayImage) ??
       widthMatches.find((c) => c.after?.image || c.before?.image) ??
+      group.cells.find((c) => c.renderDiff && c.renderDiff.changes.length > 0) ??
       group.cells.find((c) => c.pixelDiff?.overlayImage) ??
       group.cells[0];
 
@@ -58,6 +63,9 @@ export function indexScreenDiffs(
       beforeImage: preferred?.before?.image,
       afterImage: preferred?.after?.image,
       overlayImage: preferred?.pixelDiff?.overlayImage,
+      captureWidth: preferred?.pixelDiff?.width ?? (preferred?.width || width || 1280),
+      captureHeight: preferred?.pixelDiff?.height ?? 800,
+      renderDiff: preferred?.renderDiff,
       changedFiles: [...files].sort(),
       entries: group.cells,
     };

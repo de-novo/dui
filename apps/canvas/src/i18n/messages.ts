@@ -132,9 +132,12 @@ export type Messages = {
   canvasDiffCompare: string;
   canvasDiffOff: string;
   canvasDiffChangedOnly: string;
+  canvasDiffModeRender: string;
   canvasDiffModeAfter: string;
   canvasDiffModeBefore: string;
   canvasDiffModeOverlay: string;
+  canvasDiffElementsCount: (count: number) => string;
+  canvasDiffVisualOnly: string;
   canvasDiffSummary: (changed: number, added: number, removed: number) => string;
   canvasDiffNoChanges: string;
 };
@@ -251,9 +254,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     canvasDiffCompare: "Compare",
     canvasDiffOff: "No diff",
     canvasDiffChangedOnly: "Changed only",
+    canvasDiffModeRender: "Elements",
     canvasDiffModeAfter: "After",
     canvasDiffModeBefore: "Before",
-    canvasDiffModeOverlay: "Overlay",
+    canvasDiffModeOverlay: "Pixel",
+    canvasDiffElementsCount: (count) => `${count} el`,
+    canvasDiffVisualOnly: "Visual-only change",
     canvasDiffSummary: (changed, added, removed) =>
       `${changed} changed · ${added} added · ${removed} removed`,
     canvasDiffNoChanges: "No UI changes",
@@ -369,9 +375,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     canvasDiffCompare: "对比",
     canvasDiffOff: "关闭对比",
     canvasDiffChangedOnly: "仅看变更界面",
+    canvasDiffModeRender: "元素",
     canvasDiffModeAfter: "变更后",
     canvasDiffModeBefore: "变更前",
-    canvasDiffModeOverlay: "差异叠加",
+    canvasDiffModeOverlay: "像素",
+    canvasDiffElementsCount: (count) => `${count} 处元素`,
+    canvasDiffVisualOnly: "仅视觉变更",
     canvasDiffSummary: (changed, added, removed) =>
       `变更 ${changed} · 新增 ${added} · 删除 ${removed}`,
     canvasDiffNoChanges: "无界面变更",
@@ -487,9 +496,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     canvasDiffCompare: "비교",
     canvasDiffOff: "비교 끄기",
     canvasDiffChangedOnly: "변경된 화면만",
+    canvasDiffModeRender: "요소",
     canvasDiffModeAfter: "이후",
     canvasDiffModeBefore: "이전",
-    canvasDiffModeOverlay: "오버레이",
+    canvasDiffModeOverlay: "픽셀",
+    canvasDiffElementsCount: (count) => `${count}요소`,
+    canvasDiffVisualOnly: "시각 전용 변경",
     canvasDiffSummary: (changed, added, removed) =>
       `변경 ${changed} · 추가 ${added} · 삭제 ${removed}`,
     canvasDiffNoChanges: "UI 변경 없음",

@@ -1,6 +1,72 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderNodeSnapshot {
+    pub id: String,
+    pub tag: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub text: String,
+    pub rect: RenderRect,
+    #[serde(default)]
+    pub style: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RenderChangeKind {
+    Added,
+    Removed,
+    TextChanged,
+    LayoutMoved,
+    StyleChanged,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderElementChange {
+    pub kind: RenderChangeKind,
+    pub id: String,
+    pub tag: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before_rect: Option<RenderRect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after_rect: Option<RenderRect>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub style_changes: BTreeMap<String, (String, String)>,
+    pub summary: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderDiffSummary {
+    pub added: usize,
+    pub removed: usize,
+    pub text_changed: usize,
+    pub layout_moved: usize,
+    pub style_changed: usize,
+    pub visual_only: bool,
+    pub changes: Vec<RenderElementChange>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiffCellSnapshot {
@@ -19,6 +85,8 @@ pub struct DiffCellSnapshot {
     pub cache_key: Option<String>,
     #[serde(default)]
     pub source_files: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub render_tree: Vec<RenderNodeSnapshot>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -103,6 +171,8 @@ pub struct CellDiffEntry {
     pub changed_files: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status_change: Option<StatusChange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub render_diff: Option<RenderDiffSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pixel_diff: Option<PixelDiffMetrics>,
 }
@@ -238,6 +308,7 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
                         after: Some(CellSideSummary::from(*a)),
                         changed_files,
                         status_change: None,
+                        render_diff: None,
                         pixel_diff: None,
                     });
             }
@@ -258,6 +329,7 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
                         after: None,
                         changed_files,
                         status_change: None,
+                        render_diff: None,
                         pixel_diff: None,
                     });
             }
@@ -278,6 +350,15 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
                 } else {
                     None
                 };
+                let render_diff = if !b.render_tree.is_empty() || !a.render_tree.is_empty() {
+                    Some(diff_render_trees(
+                        &b.render_tree,
+                        &a.render_tree,
+                        b.image != a.image,
+                    ))
+                } else {
+                    None
+                };
                 by_screen
                     .entry(a.path.clone())
                     .or_default()
@@ -292,6 +373,7 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
                         after: Some(CellSideSummary::from(*a)),
                         changed_files,
                         status_change,
+                        render_diff,
                         pixel_diff: None,
                     });
             }
@@ -324,6 +406,158 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
             screens_affected,
         },
         screens,
+    }
+}
+
+/// Pure structural render-tree diff comparing rendered DOM/layout/style elements between two
+/// captures. Uses a 2px layout tolerance so subpixel/antialiasing jitter never triggers noise.
+pub fn diff_render_trees(
+    before: &[RenderNodeSnapshot],
+    after: &[RenderNodeSnapshot],
+    images_differ: bool,
+) -> RenderDiffSummary {
+    const LAYOUT_TOLERANCE_PX: i32 = 2;
+
+    let before_map: BTreeMap<&str, &RenderNodeSnapshot> =
+        before.iter().map(|n| (n.id.as_str(), n)).collect();
+    let after_map: BTreeMap<&str, &RenderNodeSnapshot> =
+        after.iter().map(|n| (n.id.as_str(), n)).collect();
+    let mut keys: BTreeSet<&str> = BTreeSet::new();
+    keys.extend(before_map.keys().copied());
+    keys.extend(after_map.keys().copied());
+
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    let mut text_changed = 0usize;
+    let mut layout_moved = 0usize;
+    let mut style_changed = 0usize;
+    let mut changes = Vec::new();
+
+    for id in keys {
+        match (before_map.get(id), after_map.get(id)) {
+            (None, Some(a)) => {
+                added += 1;
+                let label = if a.text.is_empty() {
+                    a.tag.clone()
+                } else {
+                    format!("{} \"{}\"", a.tag, a.text)
+                };
+                changes.push(RenderElementChange {
+                    kind: RenderChangeKind::Added,
+                    id: a.id.clone(),
+                    tag: a.tag.clone(),
+                    role: a.role.clone(),
+                    before_text: None,
+                    after_text: (!a.text.is_empty()).then(|| a.text.clone()),
+                    before_rect: None,
+                    after_rect: Some(a.rect),
+                    style_changes: BTreeMap::new(),
+                    summary: format!("+ {label}"),
+                });
+            }
+            (Some(b), None) => {
+                removed += 1;
+                let label = if b.text.is_empty() {
+                    b.tag.clone()
+                } else {
+                    format!("{} \"{}\"", b.tag, b.text)
+                };
+                changes.push(RenderElementChange {
+                    kind: RenderChangeKind::Removed,
+                    id: b.id.clone(),
+                    tag: b.tag.clone(),
+                    role: b.role.clone(),
+                    before_text: (!b.text.is_empty()).then(|| b.text.clone()),
+                    after_text: None,
+                    before_rect: Some(b.rect),
+                    after_rect: None,
+                    style_changes: BTreeMap::new(),
+                    summary: format!("- {label}"),
+                });
+            }
+            (Some(b), Some(a)) => {
+                let text_diff = b.text != a.text;
+                let dx = a.rect.x - b.rect.x;
+                let dy = a.rect.y - b.rect.y;
+                let dw = a.rect.width - b.rect.width;
+                let dh = a.rect.height - b.rect.height;
+                let layout_diff = dx.abs() > LAYOUT_TOLERANCE_PX
+                    || dy.abs() > LAYOUT_TOLERANCE_PX
+                    || dw.abs() > LAYOUT_TOLERANCE_PX
+                    || dh.abs() > LAYOUT_TOLERANCE_PX;
+                let mut style_changes = BTreeMap::new();
+                let mut style_keys: BTreeSet<&str> = BTreeSet::new();
+                style_keys.extend(b.style.keys().map(String::as_str));
+                style_keys.extend(a.style.keys().map(String::as_str));
+                for prop in style_keys {
+                    let bv = b.style.get(prop).map(String::as_str).unwrap_or("");
+                    let av = a.style.get(prop).map(String::as_str).unwrap_or("");
+                    if bv != av {
+                        style_changes.insert(prop.to_owned(), (bv.to_owned(), av.to_owned()));
+                    }
+                }
+                if !text_diff && !layout_diff && style_changes.is_empty() {
+                    continue;
+                }
+                let (kind, summary) = if text_diff {
+                    text_changed += 1;
+                    (
+                        RenderChangeKind::TextChanged,
+                        format!("{} \"{}\" → \"{}\"", a.tag, b.text, a.text),
+                    )
+                } else if !style_changes.is_empty() {
+                    style_changed += 1;
+                    let props = style_changes.keys().cloned().collect::<Vec<_>>().join(", ");
+                    (
+                        RenderChangeKind::StyleChanged,
+                        format!("{} style ({props})", a.tag),
+                    )
+                } else {
+                    layout_moved += 1;
+                    let mut deltas = Vec::new();
+                    if dx.abs() > LAYOUT_TOLERANCE_PX {
+                        deltas.push(format!("x{dx:+}"));
+                    }
+                    if dy.abs() > LAYOUT_TOLERANCE_PX {
+                        deltas.push(format!("y{dy:+}"));
+                    }
+                    if dw.abs() > LAYOUT_TOLERANCE_PX {
+                        deltas.push(format!("w{dw:+}"));
+                    }
+                    if dh.abs() > LAYOUT_TOLERANCE_PX {
+                        deltas.push(format!("h{dh:+}"));
+                    }
+                    (
+                        RenderChangeKind::LayoutMoved,
+                        format!("{} {}", a.tag, deltas.join(" ")),
+                    )
+                };
+                changes.push(RenderElementChange {
+                    kind,
+                    id: a.id.clone(),
+                    tag: a.tag.clone(),
+                    role: a.role.clone(),
+                    before_text: text_diff.then(|| b.text.clone()),
+                    after_text: text_diff.then(|| a.text.clone()),
+                    before_rect: Some(b.rect),
+                    after_rect: Some(a.rect),
+                    style_changes,
+                    summary,
+                });
+            }
+            (None, None) => {}
+        }
+    }
+
+    let visual_only = changes.is_empty() && images_differ;
+    RenderDiffSummary {
+        added,
+        removed,
+        text_changed,
+        layout_moved,
+        style_changed,
+        visual_only,
+        changes,
     }
 }
 
@@ -476,6 +710,7 @@ mod tests {
                 .iter()
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                 .collect(),
+            render_tree: Vec::new(),
         }
     }
 
@@ -657,5 +892,131 @@ mod tests {
         assert!(affected.contains("App.tsx"));
         assert!(!affected.contains("About.tsx"));
         assert!(!affected.contains("Footer.tsx"));
+    }
+
+    #[test]
+    fn diff_render_trees_tracks_text_layout_style_added_removed_and_ignores_1px_jitter() {
+        let before = vec![
+            RenderNodeSnapshot {
+                id: "h1#0".into(),
+                tag: "h1".into(),
+                role: None,
+                text: "Catalog".into(),
+                rect: RenderRect {
+                    x: 16,
+                    y: 16,
+                    width: 200,
+                    height: 32,
+                },
+                style: BTreeMap::from([("color".into(), "rgb(0, 0, 0)".into())]),
+            },
+            RenderNodeSnapshot {
+                id: "button#0".into(),
+                tag: "button".into(),
+                role: None,
+                text: "Save".into(),
+                rect: RenderRect {
+                    x: 16,
+                    y: 120,
+                    width: 80,
+                    height: 36,
+                },
+                style: BTreeMap::new(),
+            },
+            RenderNodeSnapshot {
+                id: "p#0".into(),
+                tag: "p".into(),
+                role: None,
+                text: "Stable copy".into(),
+                rect: RenderRect {
+                    x: 16,
+                    y: 200,
+                    width: 300,
+                    height: 20,
+                },
+                style: BTreeMap::new(),
+            },
+            RenderNodeSnapshot {
+                id: "aside#0".into(),
+                tag: "aside".into(),
+                role: None,
+                text: "Old banner".into(),
+                rect: RenderRect {
+                    x: 0,
+                    y: 0,
+                    width: 375,
+                    height: 40,
+                },
+                style: BTreeMap::new(),
+            },
+        ];
+        let after = vec![
+            RenderNodeSnapshot {
+                id: "h1#0".into(),
+                tag: "h1".into(),
+                role: None,
+                text: "Updated Catalog".into(),
+                rect: RenderRect {
+                    x: 16,
+                    y: 16,
+                    width: 240,
+                    height: 32,
+                },
+                style: BTreeMap::from([("color".into(), "rgb(0, 0, 0)".into())]),
+            },
+            RenderNodeSnapshot {
+                id: "button#0".into(),
+                tag: "button".into(),
+                role: None,
+                text: "Save".into(),
+                rect: RenderRect {
+                    x: 16,
+                    y: 144,
+                    width: 80,
+                    height: 36,
+                },
+                style: BTreeMap::new(),
+            },
+            RenderNodeSnapshot {
+                id: "p#0".into(),
+                tag: "p".into(),
+                role: None,
+                text: "Stable copy".into(),
+                // 1px subpixel jitter must be ignored.
+                rect: RenderRect {
+                    x: 16,
+                    y: 201,
+                    width: 300,
+                    height: 20,
+                },
+                style: BTreeMap::new(),
+            },
+            RenderNodeSnapshot {
+                id: "section#0".into(),
+                tag: "section".into(),
+                role: None,
+                text: "New promo".into(),
+                rect: RenderRect {
+                    x: 16,
+                    y: 240,
+                    width: 300,
+                    height: 48,
+                },
+                style: BTreeMap::new(),
+            },
+        ];
+        let diff = diff_render_trees(&before, &after, true);
+        assert_eq!(diff.text_changed, 1);
+        assert_eq!(diff.layout_moved, 1);
+        assert_eq!(diff.added, 1);
+        assert_eq!(diff.removed, 1);
+        assert_eq!(diff.style_changed, 0);
+        assert!(!diff.visual_only);
+        assert!(!diff.changes.iter().any(|c| c.id == "p#0"));
+
+        // Identical render trees with differing PNG hashes flag visual_only=true.
+        let visual_only = diff_render_trees(&before, &before, true);
+        assert!(visual_only.visual_only);
+        assert!(visual_only.changes.is_empty());
     }
 }

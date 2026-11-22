@@ -31,6 +31,42 @@ export type PixelDiffMetrics = {
   overlayImage?: string;
 };
 
+export type RenderRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type RenderChangeKind =
+  | "added"
+  | "removed"
+  | "text-changed"
+  | "layout-moved"
+  | "style-changed";
+
+export type RenderElementChange = {
+  kind: RenderChangeKind;
+  id: string;
+  tag: string;
+  role?: string;
+  beforeText?: string;
+  afterText?: string;
+  beforeRect?: RenderRect;
+  afterRect?: RenderRect;
+  summary: string;
+};
+
+export type RenderDiffSummary = {
+  added: number;
+  removed: number;
+  textChanged: number;
+  layoutMoved: number;
+  styleChanged: number;
+  visualOnly: boolean;
+  changes: RenderElementChange[];
+};
+
 export type CellDiffEntry = {
   kind: CellDiffKind;
   path: string;
@@ -42,6 +78,7 @@ export type CellDiffEntry = {
   after?: CellSideSummary;
   changedFiles: string[];
   statusChange?: StatusChange;
+  renderDiff?: RenderDiffSummary;
   pixelDiff?: PixelDiffMetrics;
 };
 
@@ -140,6 +177,60 @@ function decodePixelDiff(raw: unknown): PixelDiffMetrics | undefined {
   };
 }
 
+function decodeRenderRect(raw: unknown): RenderRect | undefined {
+  if (!isRecord(raw)) return undefined;
+  const x = asNumber(raw.x);
+  const y = asNumber(raw.y);
+  const width = asNumber(raw.width);
+  const height = asNumber(raw.height);
+  if (x === undefined || y === undefined || width === undefined || height === undefined) {
+    return undefined;
+  }
+  return { x, y, width, height };
+}
+
+function decodeRenderDiff(raw: unknown): RenderDiffSummary | undefined {
+  if (!isRecord(raw) || !Array.isArray(raw.changes)) return undefined;
+  const changes: RenderElementChange[] = [];
+  for (const item of raw.changes) {
+    if (!isRecord(item)) continue;
+    const kind = item.kind;
+    if (
+      kind !== "added" &&
+      kind !== "removed" &&
+      kind !== "text-changed" &&
+      kind !== "layout-moved" &&
+      kind !== "style-changed"
+    ) {
+      continue;
+    }
+    const id = asString(item.id);
+    const tag = asString(item.tag);
+    const summary = asString(item.summary);
+    if (!id || !tag || !summary) continue;
+    changes.push({
+      kind,
+      id,
+      tag,
+      role: asString(item.role),
+      beforeText: asString(item.beforeText),
+      afterText: asString(item.afterText),
+      beforeRect: decodeRenderRect(item.beforeRect),
+      afterRect: decodeRenderRect(item.afterRect),
+      summary,
+    });
+  }
+  return {
+    added: asNumber(raw.added) ?? 0,
+    removed: asNumber(raw.removed) ?? 0,
+    textChanged: asNumber(raw.textChanged) ?? 0,
+    layoutMoved: asNumber(raw.layoutMoved) ?? 0,
+    styleChanged: asNumber(raw.styleChanged) ?? 0,
+    visualOnly: raw.visualOnly === true,
+    changes,
+  };
+}
+
 export function decodeCaptureDiff(raw: unknown): CaptureDiff {
   if (!isRecord(raw) || !isRecord(raw.summary) || !Array.isArray(raw.screens)) {
     throw Error("Invalid capture diff response");
@@ -179,6 +270,7 @@ export function decodeCaptureDiff(raw: unknown): CaptureDiff {
           ? rawCell.changedFiles.filter((f): f is string => typeof f === "string")
           : [],
         statusChange,
+        renderDiff: decodeRenderDiff(rawCell.renderDiff),
         pixelDiff: canPixelDiff ? decodePixelDiff(rawCell.pixelDiff) : undefined,
       });
     }

@@ -2,7 +2,7 @@
 //! against `~/.dui/dui.db` and `~/.dui/blobs/` for the GPUI desktop viewer.
 
 use dui_core::{
-    diff::compute_rgba_diff,
+    diff::{RenderDiffSummary, RenderNodeSnapshot, compute_rgba_diff, diff_render_trees},
     model::{
         CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeEndpoint, EdgeId, ProjectId,
         RunId, Screen,
@@ -179,6 +179,9 @@ pub struct DiffCellEntry {
     pub changed_pixels: Option<u64>,
     pub diff_percent: Option<f64>,
     pub overlay: Option<Arc<RenderImage>>,
+    pub render_diff: Option<RenderDiffSummary>,
+    pub capture_width: u32,
+    pub capture_height: u32,
 }
 
 #[derive(Default)]
@@ -220,7 +223,47 @@ fn rgba_to_render_image(width: u32, height: u32, mut rgba: Vec<u8>) -> Option<Ar
     Some(Arc::new(RenderImage::new(smallvec![Frame::new(buf)])))
 }
 
+fn load_render_trees_for_run(
+    run: &RunItem,
+) -> BTreeMap<(String, u32, usize), Vec<RenderNodeSnapshot>> {
+    let mut map = BTreeMap::new();
+    let Some(dir) = run.run_dir.as_deref() else {
+        return map;
+    };
+    let Ok(bytes) = fs::read(dir.join("report.json")) else {
+        return map;
+    };
+    let Ok(report) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return map;
+    };
+    let Some(cells) = report["cells"].as_array() else {
+        return map;
+    };
+    let mut counts: BTreeMap<(String, u32), usize> = BTreeMap::new();
+    for cell in cells {
+        let path = cell["path"]
+            .as_str()
+            .or_else(|| report["path"].as_str())
+            .unwrap_or("/")
+            .to_owned();
+        let w = cell["width"].as_u64().unwrap_or(0) as u32;
+        let ordinal = *counts.entry((path.clone(), w)).or_insert(0);
+        *counts.get_mut(&(path.clone(), w)).unwrap() += 1;
+        if let Some(arr) = cell["observation"]["renderTree"].as_array()
+            && let Ok(tree) = serde_json::from_value::<Vec<RenderNodeSnapshot>>(
+                serde_json::Value::Array(arr.clone()),
+            )
+            && !tree.is_empty()
+        {
+            map.insert((path, w, ordinal), tree);
+        }
+    }
+    map
+}
+
 pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry> {
+    let before_trees = load_render_trees_for_run(before);
+    let after_trees = load_render_trees_for_run(after);
     let mut before_map: BTreeMap<(String, u32, usize), &CellItem> = BTreeMap::new();
     for sc in &before.screens {
         let mut counts: BTreeMap<u32, usize> = BTreeMap::new();
@@ -258,6 +301,9 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                 changed_pixels: None,
                 diff_percent: None,
                 overlay: None,
+                render_diff: None,
+                capture_width: key.1.max(1),
+                capture_height: 800,
             }),
             (Some(before_cell), None) => entries.push(DiffCellEntry {
                 path: key.0,
@@ -268,6 +314,9 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                 changed_pixels: None,
                 diff_percent: None,
                 overlay: None,
+                render_diff: None,
+                capture_width: key.1.max(1),
+                capture_height: 800,
             }),
             (Some(before_cell), Some(after_cell)) => {
                 if before_cell.status_kind == after_cell.status_kind
@@ -278,6 +327,8 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                 let mut changed_pixels = None;
                 let mut diff_percent = None;
                 let mut overlay = None;
+                let mut capture_width = key.1.max(1);
+                let mut capture_height = 800u32;
                 if let (Some(bp), Some(ap)) = (&before_cell.blob_path, &after_cell.blob_path)
                     && let (Ok(b_bytes), Ok(a_bytes)) = (fs::read(bp), fs::read(ap))
                     && let (Ok(b_img), Ok(a_img)) = (
@@ -289,12 +340,25 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                     let ar = a_img.to_rgba8();
                     let (bw, bh) = br.dimensions();
                     let (aw, ah) = ar.dimensions();
+                    capture_width = aw.max(bw).max(1);
+                    capture_height = ah.max(bh).max(1);
                     let (metrics, overlay_rgba) =
                         compute_rgba_diff(bw, bh, br.as_raw(), aw, ah, ar.as_raw());
                     changed_pixels = Some(metrics.diff_pixels);
                     diff_percent = Some((metrics.diff_ratio * 10000.0).round() / 100.0);
                     overlay = rgba_to_render_image(metrics.width, metrics.height, overlay_rgba);
                 }
+                let b_tree = before_trees.get(&key);
+                let a_tree = after_trees.get(&key);
+                let render_diff = if b_tree.is_some() || a_tree.is_some() {
+                    Some(diff_render_trees(
+                        b_tree.map(Vec::as_slice).unwrap_or(&[]),
+                        a_tree.map(Vec::as_slice).unwrap_or(&[]),
+                        before_cell.blob_id != after_cell.blob_id,
+                    ))
+                } else {
+                    None
+                };
                 entries.push(DiffCellEntry {
                     path: key.0,
                     width_px: key.1,
@@ -304,6 +368,9 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                     changed_pixels,
                     diff_percent,
                     overlay,
+                    render_diff,
+                    capture_width,
+                    capture_height,
                 });
             }
             (None, None) => {}
