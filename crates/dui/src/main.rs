@@ -35,23 +35,61 @@ fn failure(code: u8, reason: &str) -> (u8, Value) {
     (code, json!({"status":"error","reason":reason}))
 }
 
+fn resolve_desktop_binary() -> Option<std::path::PathBuf> {
+    if let Ok(explicit) = env::var("DUI_DESKTOP_BIN")
+        && !explicit.trim().is_empty()
+    {
+        let path = std::path::PathBuf::from(explicit);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    if let Ok(exe) = env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        let sibling = dir.join(if cfg!(windows) {
+            "dui-desktop.exe"
+        } else {
+            "dui-desktop"
+        });
+        if sibling.is_file() {
+            return Some(sibling);
+        }
+    }
+    None
+}
+
 fn launch_desktop(tail: &[std::ffi::OsString]) -> Reply {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .map(|repo| repo.join("apps/desktop/Cargo.toml"))
-        .filter(|p| p.is_file())
-        .ok_or_else(|| failure(3, "apps/desktop/Cargo.toml not found"))?;
-    let mut cmd = Command::new("cargo");
-    if let Some(tc) = gpui::select_toolchain() {
-        cmd.arg(format!("+{tc}"));
-    }
-    cmd.args(["run", "--quiet", "--manifest-path"])
-        .arg(&manifest_dir)
-        .arg("--");
-    for arg in tail {
-        cmd.arg(arg);
-    }
+    let mut cmd = if let Some(bin) = resolve_desktop_binary() {
+        let mut c = Command::new(bin);
+        for arg in tail {
+            c.arg(arg);
+        }
+        c
+    } else {
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .map(|repo| repo.join("apps/desktop/Cargo.toml"))
+            .filter(|p| p.is_file())
+            .ok_or_else(|| {
+                failure(
+                    3,
+                    "dui-desktop binary not found next to dui and apps/desktop/Cargo.toml unavailable",
+                )
+            })?;
+        let mut c = Command::new("cargo");
+        if let Some(tc) = gpui::select_toolchain() {
+            c.arg(format!("+{tc}"));
+        }
+        c.args(["run", "--quiet", "--manifest-path"])
+            .arg(&manifest_dir)
+            .arg("--");
+        for arg in tail {
+            c.arg(arg);
+        }
+        c
+    };
     let output = cmd.output().map_err(|e| failure(3, &e.to_string()))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

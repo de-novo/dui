@@ -1,7 +1,8 @@
 //! Embedded loopback HTTP server for `apps/canvas` (`dui open`).
 
-use crate::{Reply, archive, audit, comments, diff, failure, live};
+use crate::{Reply, archive, audit, comments, diff, failure, live, sqlite_store::SqliteStore};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use dui_core::storage::{RunFilter, RunRepository};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -96,6 +97,21 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
     if state.cli_paths.is_empty()
         && let Ok(home) = archive::home_dir()
     {
+        if let Ok((store, _)) = SqliteStore::open(&home)
+            && let Ok(summaries) = store.list_runs(&RunFilter::default())
+        {
+            for summary in summaries {
+                let run_dir = home
+                    .join("projects")
+                    .join(summary.run.project_id().as_str())
+                    .join("runs")
+                    .join(summary.run.id().as_str());
+                if run_dir.join("graph.json").is_file() {
+                    paths.push(run_dir);
+                }
+            }
+        }
+        // Include any unindexed disk run directories not yet present in SQLite.
         let mut discovered = Vec::new();
         for project in list_subdirs(&home.join("projects")) {
             for run in list_subdirs(&project.join("runs")) {

@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+## [v0.0.6] - 2026-11-22
+
+### Added
+
+- 99% UI 状态覆盖率审计（`dui audit` / MCP `audit` / 查看器 `/api/audit`）及未解决评审评论徽章 ([#45](https://github.com/de-novo/dui/pull/45))。
+- 基于标准 `URLSearchParams` 与声明式 `kind: "search"` 规则的框架无关 URL 查询参数追踪及 `normalizedQuery` 记录 ([#58](https://github.com/de-novo/dui/pull/58))。
+- GPUI 桌面查看器集成 `dui live` 实时状态编辑、未验证 HTTP 错误诊断卡片与 Figma 快捷键 ([#60](https://github.com/de-novo/dui/pull/60))。
+
+### Changed
+
+- 将 GPUI 桌面查看器的设计令牌、布局与交互与 Web 画布 UI 保持 1:1 一致 ([#47](https://github.com/de-novo/dui/pull/47), [#49](https://github.com/de-novo/dui/pull/49))。
+- 在 Web 与 GPUI 查看器中选中节点时保留完整地图，并将非关联节点和边淡化显示 ([#51](https://github.com/de-novo/dui/pull/51))。
+
+### Fixed
+
+- 修复 GPUI 桌面查看器对 SQLite `cells.status_json`（`status` 标签）的解析以及检查器宽度同步问题 ([#53](https://github.com/de-novo/dui/pull/53), [#55](https://github.com/de-novo/dui/pull/55))。
+
+## [v0.0.5] - 2026-11-21
+
+### Added
+
+- 覆盖 SQLite、CLI（`dui comment`）、MCP（`comment_*`）和查看器（`/api/comments`）的页面/状态/宽度/跳转评审评论 ([#39](https://github.com/de-novo/dui/pull/39))。
+- 直接读取 `~/.dui/dui.db` 的 GPUI + `gpui-kit 0.10.0` 原生桌面查看器（`apps/desktop`、`dui desktop`）([#41](https://github.com/de-novo/dui/pull/41))。
+- 建立 Open-Core 许可证边界（核心 `Apache-2.0` + 商业企业功能 `ee/LICENSE`）([#43](https://github.com/de-novo/dui/pull/43))。
+
 ## [v0.0.4] - 2026-11-21
 
 ### Added
@@ -57,7 +82,9 @@
 - 官方 TypeScript 6/7 编译器分析、类型化 GET 自动模拟、Vite 宿主与多宽度 Chromium CDP 捕获。
 - 按项目、分支与工作树组织在 `~/.dui/` 下的本地归档与源码安装器。
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.6...HEAD
+[v0.0.6]: https://github.com/de-novo/dui/compare/v0.0.5...v0.0.6
+[v0.0.5]: https://github.com/de-novo/dui/compare/v0.0.4...v0.0.5
 [v0.0.4]: https://github.com/de-novo/dui/compare/v0.0.3...v0.0.4
 [v0.0.3]: https://github.com/de-novo/dui/compare/v0.0.2...v0.0.3
 [v0.0.2]: https://github.com/de-novo/dui/compare/v0.0.1...v0.0.2
