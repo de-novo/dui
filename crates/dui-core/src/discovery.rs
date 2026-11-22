@@ -43,8 +43,46 @@ pub fn representatives(shape: &Value) -> Vec<Value> {
     }
 }
 
+fn is_unbounded_primitive(shape: &Value) -> bool {
+    match shape["kind"].as_str() {
+        Some("string" | "number") => true,
+        Some("union") => shape["members"]
+            .as_array()
+            .is_some_and(|members| members.iter().any(is_unbounded_primitive)),
+        _ => false,
+    }
+}
+
+fn slot_values_for_planning(
+    slot: &Value,
+    predicate_bindings: &BTreeSet<(String, u64)>,
+) -> Vec<Value> {
+    let shape = &slot["shape"];
+    if !is_unbounded_primitive(shape) {
+        return representatives(shape);
+    }
+    let bound_to_branch = slot["file"]
+        .as_str()
+        .zip(slot["binding"].as_u64())
+        .is_some_and(|(file, binding)| predicate_bindings.contains(&(file.to_owned(), binding)));
+    if bound_to_branch {
+        representatives(shape)
+    } else {
+        vec![]
+    }
+}
+
 // Each row covers either one value or one pair. Independent owners are planned separately.
 pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<String, Value>> {
+    let predicate_bindings: BTreeSet<(String, u64)> = facts
+        .iter()
+        .filter(|f| f["kind"] == "branch")
+        .filter_map(|f| {
+            let file = f["file"].as_str()?;
+            let binding = f["predicate"]["binding"].as_u64()?;
+            Some((file.to_owned(), binding))
+        })
+        .collect();
     let mut groups = BTreeMap::new();
     for f in facts.iter().filter(|f| {
         f["kind"] == "slot"
@@ -52,10 +90,14 @@ pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<St
             && !f["init"].is_null()
             && !f["after"].is_null()
     }) {
+        let values = slot_values_for_planning(f, &predicate_bindings);
+        if values.is_empty() {
+            continue;
+        }
         groups
             .entry((f["file"].to_string(), f["owner"].to_string()))
             .or_insert_with(Vec::new)
-            .push((key(f), representatives(&f["shape"])));
+            .push((key(f), values));
     }
     let mut singles = Vec::new();
     let mut pairs = Vec::new();
@@ -485,6 +527,49 @@ mod tests {
         assert_ne!(
             route_pattern("/?tab=details"),
             route_pattern("/?tab=billing")
+        );
+    }
+
+    #[test]
+    fn candidates_prune_unreferenced_unbounded_primitives_while_keeping_finite_and_branch_bound_slots()
+     {
+        let mut finite = slot(1, "View");
+        finite["shape"] = json!({"kind": "boolean"});
+        let mut internal_str = slot(10, "View");
+        internal_str["binding"] = json!(100);
+        internal_str["shape"] = json!({"kind": "string"});
+        let mut branch_str = slot(20, "View");
+        branch_str["binding"] = json!(200);
+        branch_str["shape"] = json!({"kind": "string"});
+        let branch = json!({
+            "file": "screen.tsx",
+            "owner": "View",
+            "start": 50,
+            "end": 60,
+            "kind": "branch",
+            "predicate": {"binding": 200, "operator": "truthy"}
+        });
+        let facts = vec![
+            finite.clone(),
+            internal_str.clone(),
+            branch_str.clone(),
+            branch,
+        ];
+        let active: BTreeSet<String> = [key(&finite), key(&internal_str), key(&branch_str)]
+            .into_iter()
+            .collect();
+        let planned = candidates(&facts, &active);
+        assert!(planned.iter().any(|row| row.contains_key(&key(&finite))));
+        assert!(
+            planned
+                .iter()
+                .any(|row| row.contains_key(&key(&branch_str)))
+        );
+        assert!(
+            planned
+                .iter()
+                .all(|row| !row.contains_key(&key(&internal_str))),
+            "unreferenced unbounded string slot must be pruned"
         );
     }
 }
