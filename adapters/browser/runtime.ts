@@ -307,7 +307,12 @@ declare var __duiProbe: {
       "strong",
       "label",
     ]);
+    const pxInt = (raw: string) => {
+      const n = Number.parseFloat(raw);
+      return Number.isFinite(n) ? Math.round(n) : 0;
+    };
     const tagCounts = new Map<string, number>();
+    const elToId = new WeakMap<Element, string>();
     const nodes: {
       id: string;
       tag: string;
@@ -315,6 +320,15 @@ declare var __duiProbe: {
       text: string;
       rect: { x: number; y: number; width: number; height: number };
       style: Record<string, string>;
+      parentId?: string;
+      boxModel?: {
+        margin?: { top: number; right: number; bottom: number; left: number };
+        padding?: { top: number; right: number; bottom: number; left: number };
+        border?: { top: number; right: number; bottom: number; left: number };
+        borderRadius?: string;
+        gap?: string;
+      };
+      attributes?: Record<string, string>;
     }[] = [];
     const root = document.body;
     if (!root) return nodes;
@@ -348,24 +362,100 @@ declare var __duiProbe: {
           : role
             ? `${tag}[role=${role}]#${idx}`
             : `${tag}#${idx}`;
+      elToId.set(el, id);
+      let parentId: string | undefined;
+      let curParent = el.parentElement;
+      while (curParent) {
+        const mapped = elToId.get(curParent);
+        if (mapped) {
+          parentId = mapped;
+          break;
+        }
+        curParent = curParent.parentElement;
+      }
       const text =
         ownText ||
         (el instanceof HTMLElement && el.children.length === 0
           ? (el.innerText ?? "").trim().slice(0, 120)
           : "");
+      const margin = {
+        top: pxInt(cs.marginTop),
+        right: pxInt(cs.marginRight),
+        bottom: pxInt(cs.marginBottom),
+        left: pxInt(cs.marginLeft),
+      };
+      const padding = {
+        top: pxInt(cs.paddingTop),
+        right: pxInt(cs.paddingRight),
+        bottom: pxInt(cs.paddingBottom),
+        left: pxInt(cs.paddingLeft),
+      };
+      const border = {
+        top: pxInt(cs.borderTopWidth),
+        right: pxInt(cs.borderRightWidth),
+        bottom: pxInt(cs.borderBottomWidth),
+        left: pxInt(cs.borderLeftWidth),
+      };
+      const borderRadius =
+        cs.borderRadius && cs.borderRadius !== "0px" ? cs.borderRadius : undefined;
+      const gap = cs.gap && cs.gap !== "normal" && cs.gap !== "0px" ? cs.gap : undefined;
+      const attributes: Record<string, string> = {};
+      for (const attrName of [
+        "id",
+        "type",
+        "name",
+        "href",
+        "aria-label",
+        "placeholder",
+        "data-testid",
+        "alt",
+        "title",
+        "disabled",
+      ]) {
+        const val = el.getAttribute(attrName);
+        if (val !== null && val !== "") {
+          attributes[attrName] = val.slice(0, 120);
+        }
+      }
+      const cls = el.getAttribute("class");
+      if (cls && cls.trim()) {
+        attributes.class = cls.trim().slice(0, 160);
+      }
+      const style: Record<string, string> = {
+        color: cs.color,
+        backgroundColor: cs.backgroundColor,
+        fontSize: cs.fontSize,
+        fontWeight: cs.fontWeight,
+        display: cs.display,
+      };
+      if (cs.lineHeight && cs.lineHeight !== "normal") style.lineHeight = cs.lineHeight;
+      if (cs.fontFamily) style.fontFamily = cs.fontFamily.slice(0, 80);
+      if (cs.position && cs.position !== "static") style.position = cs.position;
+      if (cs.display.includes("flex")) {
+        style.flexDirection = cs.flexDirection;
+        if (cs.justifyContent && cs.justifyContent !== "normal") {
+          style.justifyContent = cs.justifyContent;
+        }
+        if (cs.alignItems && cs.alignItems !== "normal") {
+          style.alignItems = cs.alignItems;
+        }
+      }
       nodes.push({
         id,
         tag,
         ...(role ? { role } : {}),
         text,
         rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: w, height: h },
-        style: {
-          color: cs.color,
-          backgroundColor: cs.backgroundColor,
-          fontSize: cs.fontSize,
-          fontWeight: cs.fontWeight,
-          display: cs.display,
+        style,
+        ...(parentId ? { parentId } : {}),
+        boxModel: {
+          margin,
+          padding,
+          border,
+          ...(borderRadius ? { borderRadius } : {}),
+          ...(gap ? { gap } : {}),
         },
+        ...(Object.keys(attributes).length > 0 ? { attributes } : {}),
       });
     }
     return nodes;

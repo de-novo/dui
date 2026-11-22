@@ -11,6 +11,7 @@ import type { ScreenCanvasDiff } from "../../model/canvasDiff";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
 import { CommentPanel } from "./CommentPanel";
+import { ElementInspector } from "./ElementInspector";
 
 function cellLabel(
   cell: Cell,
@@ -258,6 +259,14 @@ export function ScreenInspector({
             })}
           </ul>
         </section>
+      )}
+
+      {cell?.image && cell.renderTree && cell.renderTree.length > 0 && (
+        <ElementInspector
+          key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
+          cell={cell}
+          imageUrl={`/archive/${encodeURIComponent(cell.image)}?run=${encodeURIComponent(run.key)}`}
+        />
       )}
 
       {designFindings.length > 0 && (

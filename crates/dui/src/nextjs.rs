@@ -175,7 +175,7 @@ impl SurfaceAdapter for NextJsWebSurface {
                 live_edit: false,
                 link_discovery: true,
                 render_tree: true,
-                box_model: false,
+                box_model: true,
                 pixel_capture: true,
             },
         }

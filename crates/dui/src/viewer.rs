@@ -239,6 +239,12 @@ fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
         if let Some(audit) = item.get("localeAudit").filter(|v| v.is_object()) {
             cell["localeAudit"] = audit.clone();
         }
+        if let Some(tree) = item["observation"]
+            .get("renderTree")
+            .filter(|v| v.is_array())
+        {
+            cell["renderTree"] = tree.clone();
+        }
         if let Some(img) = item["image"].as_str()
             && is_safe_png_name(img)
         {

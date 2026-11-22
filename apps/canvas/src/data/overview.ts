@@ -16,6 +16,33 @@ export type LocaleAudit = {
   rtlMismatch: { expected: string; observed: string } | null;
 };
 
+export type BoxSpacing = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+};
+
+export type BoxModel = {
+  margin: BoxSpacing;
+  padding: BoxSpacing;
+  border: BoxSpacing;
+  borderRadius?: string;
+  gap?: string;
+};
+
+export type RenderNode = {
+  id: string;
+  tag: string;
+  role?: string;
+  text: string;
+  rect: { x: number; y: number; width: number; height: number };
+  style: Record<string, string>;
+  parentId?: string;
+  boxModel?: BoxModel;
+  attributes?: Record<string, string>;
+};
+
 export type Cell = {
   path: string;
   width: number;
@@ -26,6 +53,7 @@ export type Cell = {
   scenario?: string;
   locale?: string;
   localeAudit?: LocaleAudit;
+  renderTree?: RenderNode[];
 };
 export type ScreenOrigin =
   | { kind: "entry" }
@@ -77,6 +105,60 @@ function decodeOrigin(raw: unknown): ScreenOrigin | undefined {
     };
   }
   return undefined;
+}
+
+function decodeSpacing(raw: unknown): BoxSpacing {
+  if (!record(raw)) return { top: 0, right: 0, bottom: 0, left: 0 };
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : 0);
+  return { top: n(raw.top), right: n(raw.right), bottom: n(raw.bottom), left: n(raw.left) };
+}
+
+function decodeRenderTree(raw: unknown): RenderNode[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const nodes: RenderNode[] = [];
+  for (const item of raw) {
+    if (!record(item) || typeof item.id !== "string" || typeof item.tag !== "string") continue;
+    if (!record(item.rect)) continue;
+    const r = item.rect;
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    const style: Record<string, string> = {};
+    if (record(item.style)) {
+      for (const [k, v] of Object.entries(item.style)) {
+        if (typeof v === "string") style[k] = v;
+      }
+    }
+    let attributes: Record<string, string> | undefined;
+    if (record(item.attributes)) {
+      const attrs: Record<string, string> = {};
+      for (const [k, v] of Object.entries(item.attributes)) {
+        if (typeof v === "string") attrs[k] = v;
+      }
+      if (Object.keys(attrs).length > 0) attributes = attrs;
+    }
+    let boxModel: BoxModel | undefined;
+    if (record(item.boxModel)) {
+      boxModel = {
+        margin: decodeSpacing(item.boxModel.margin),
+        padding: decodeSpacing(item.boxModel.padding),
+        border: decodeSpacing(item.boxModel.border),
+        borderRadius:
+          typeof item.boxModel.borderRadius === "string" ? item.boxModel.borderRadius : undefined,
+        gap: typeof item.boxModel.gap === "string" ? item.boxModel.gap : undefined,
+      };
+    }
+    nodes.push({
+      id: item.id,
+      tag: item.tag,
+      role: typeof item.role === "string" ? item.role : undefined,
+      text: typeof item.text === "string" ? item.text : "",
+      rect: { x: num(r.x), y: num(r.y), width: num(r.width), height: num(r.height) },
+      style,
+      parentId: typeof item.parentId === "string" ? item.parentId : undefined,
+      boxModel,
+      attributes,
+    });
+  }
+  return nodes.length > 0 ? nodes : undefined;
 }
 
 function decodeLocaleAudit(raw: unknown): LocaleAudit | undefined {
@@ -164,6 +246,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
         reason: typeof cell.reason === "string" ? cell.reason : undefined,
         locale: typeof cell.locale === "string" ? cell.locale : undefined,
         localeAudit: decodeLocaleAudit(cell.localeAudit),
+        renderTree: decodeRenderTree(cell.renderTree),
       });
     }
   }
