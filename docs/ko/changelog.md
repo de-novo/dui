@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+## [v0.0.6] - 2026-11-22
+
+### Added
+
+- 99% UI 상태 커버리지 감사(`dui audit` / MCP `audit` / 뷰어 `/api/audit`) 및 미해결 코멘트 배지 ([#45](https://github.com/de-novo/dui/pull/45)).
+- 표준 `URLSearchParams`와 선언형 `kind: "search"` 룰 기반의 라이브러리 비종속 URL 쿼리 파라미터 추적 및 `normalizedQuery` 기록 ([#58](https://github.com/de-novo/dui/pull/58)).
+- GPUI 데스크톱 뷰어 `dui live` 실시간 상태 조작, 미검증 HTTP 오류 진단 카드, Figma 키보드 단축키 ([#60](https://github.com/de-novo/dui/pull/60)).
+
+### Changed
+
+- GPUI 데스크톱 뷰어의 디자인 토큰·레이아웃·조작을 웹 캔버스 UI와 1:1 일치시킴 ([#47](https://github.com/de-novo/dui/pull/47), [#49](https://github.com/de-novo/dui/pull/49)).
+- 웹·GPUI 뷰어 모두 노드 선택 시 전체 지도를 유지하고 비연관 노드·엣지만 흐리게 처리하도록 개선 ([#51](https://github.com/de-novo/dui/pull/51)).
+
+### Fixed
+
+- GPUI 데스크톱 뷰어의 SQLite `cells.status_json` 파싱(`status` 태그) 및 인스펙터 폭 동기화 오류 수정 ([#53](https://github.com/de-novo/dui/pull/53), [#55](https://github.com/de-novo/dui/pull/55)).
+
+## [v0.0.5] - 2026-11-21
+
+### Added
+
+- SQLite · CLI(`dui comment`) · MCP(`comment_*`) · 뷰어(`/api/comments`) 전반의 화면·상태·폭·전환 리뷰 코멘트 ([#39](https://github.com/de-novo/dui/pull/39)).
+- `~/.dui/dui.db`를 직접 읽는 GPUI + `gpui-kit 0.10.0` 네이티브 데스크톱 뷰어(`apps/desktop`, `dui desktop`) ([#41](https://github.com/de-novo/dui/pull/41)).
+- 오픈코어 라이선스 경계 구축(`Apache-2.0` 코어 + `ee/LICENSE` 상용 엔터프라이즈) ([#43](https://github.com/de-novo/dui/pull/43)).
+
 ## [v0.0.4] - 2026-11-21
 
 ### Added
@@ -57,7 +82,9 @@
 - 공식 TypeScript 6/7 컴파일러 분석, 타입드 GET 자동 목, Vite 호스트 및 다폭 Chromium CDP 캡처.
 - 프로젝트·브랜치·워크트리별 `~/.dui/` 로컬 아카이빙 및 소스 설치기.
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.6...HEAD
+[v0.0.6]: https://github.com/de-novo/dui/compare/v0.0.5...v0.0.6
+[v0.0.5]: https://github.com/de-novo/dui/compare/v0.0.4...v0.0.5
 [v0.0.4]: https://github.com/de-novo/dui/compare/v0.0.3...v0.0.4
 [v0.0.3]: https://github.com/de-novo/dui/compare/v0.0.2...v0.0.3
 [v0.0.2]: https://github.com/de-novo/dui/compare/v0.0.1...v0.0.2

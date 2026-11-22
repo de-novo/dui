@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.0.6] - 2026-11-22
+
+### Added
+
+- 99% UI state coverage audit (`dui audit` / MCP `audit` / viewer `/api/audit`) with verified/renderable counts, gap reasons, and unresolved review comment badges ([#45](https://github.com/de-novo/dui/pull/45)).
+- Framework-agnostic URL query parameter tracking from standard `URLSearchParams` and declarative `kind: "search"` rules, plus `normalizedQuery` tracking ([#58](https://github.com/de-novo/dui/pull/58)).
+- Live state editing (`dui live`), unverified HTTP failure diagnostics, and Figma keyboard shortcuts in the GPUI desktop viewer ([#60](https://github.com/de-novo/dui/pull/60)).
+
+### Changed
+
+- Brought the GPUI desktop viewer to 1:1 visual, token, and interaction parity with the web canvas UI ([#47](https://github.com/de-novo/dui/pull/47), [#49](https://github.com/de-novo/dui/pull/49)).
+- Kept the full screen map visible on node selection and dimmed unrelated nodes and edges in both Web and GPUI viewers ([#51](https://github.com/de-novo/dui/pull/51)).
+
+### Fixed
+
+- Parsed SQLite `cells.status_json` using the `status` tag and synchronized inspector cell width with the active map width in the GPUI desktop viewer ([#53](https://github.com/de-novo/dui/pull/53), [#55](https://github.com/de-novo/dui/pull/55)).
+
+## [v0.0.5] - 2026-11-21
+
+### Added
+
+- Review comments anchored to screens, states, widths, and transitions across SQLite, CLI (`dui comment`), MCP (`comment_*`), and viewer `/api/comments` ([#39](https://github.com/de-novo/dui/pull/39)).
+- Native GPUI + `gpui-kit 0.10.0` desktop viewer (`apps/desktop`, `dui desktop`) reading `~/.dui/dui.db` directly ([#41](https://github.com/de-novo/dui/pull/41)).
+- Open-Core licensing boundary (`Apache-2.0` core + `ee/LICENSE` for commercial enterprise features) ([#43](https://github.com/de-novo/dui/pull/43)).
+
 ## [v0.0.4] - 2026-11-21
 
 ### Added
@@ -57,7 +82,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Official TypeScript 6/7 compiler analysis, typed GET auto-mocks, Vite host, and Chromium CDP capture across viewport widths.
 - Local capture archiving under `~/.dui/` grouped by project, branch, and worktree, plus the source installer.
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.6...HEAD
+[v0.0.6]: https://github.com/de-novo/dui/compare/v0.0.5...v0.0.6
+[v0.0.5]: https://github.com/de-novo/dui/compare/v0.0.4...v0.0.5
 [v0.0.4]: https://github.com/de-novo/dui/compare/v0.0.3...v0.0.4
 [v0.0.3]: https://github.com/de-novo/dui/compare/v0.0.2...v0.0.3
 [v0.0.2]: https://github.com/de-novo/dui/compare/v0.0.1...v0.0.2
