@@ -7,6 +7,11 @@
       "kind": "slot"
     },
     {
+      "package": "react",
+      "symbol": "useReducer",
+      "kind": "slot"
+    },
+    {
       "package": "@tanstack/react-router",
       "symbol": "createFileRoute",
       "kind": "route"
@@ -17,14 +22,104 @@
       "kind": "route"
     },
     {
+      "package": "@tanstack/react-router",
+      "symbol": "useSearch",
+      "kind": "search"
+    },
+    {
+      "package": "@tanstack/react-start",
+      "symbol": "createServerFn",
+      "kind": "query"
+    },
+    {
       "package": "@tanstack/react-query",
       "symbol": "useQuery",
       "kind": "query"
     },
     {
+      "package": "react-router",
+      "symbol": "createBrowserRouter",
+      "kind": "route"
+    },
+    {
+      "package": "react-router",
+      "symbol": "useSearchParams",
+      "kind": "search"
+    },
+    {
       "package": "zod",
       "symbol": "_enum",
       "kind": "schema"
+    },
+    {
+      "package": "zod",
+      "symbol": "object",
+      "kind": "schema"
+    },
+    {
+      "package": "valibot",
+      "symbol": "object",
+      "kind": "schema"
+    },
+    {
+      "package": "valibot",
+      "symbol": "picklist",
+      "kind": "schema"
+    },
+    {
+      "package": "valibot",
+      "symbol": "union",
+      "kind": "schema"
+    },
+    {
+      "package": "zustand",
+      "symbol": "create",
+      "kind": "store"
+    },
+    {
+      "package": "zustand",
+      "symbol": "useStore",
+      "kind": "store"
+    },
+    {
+      "package": "@reduxjs/toolkit",
+      "symbol": "createSlice",
+      "kind": "store"
+    },
+    {
+      "package": "react-redux",
+      "symbol": "useSelector",
+      "kind": "store"
+    },
+    {
+      "package": "jotai",
+      "symbol": "atom",
+      "kind": "store"
+    },
+    {
+      "package": "jotai",
+      "symbol": "useAtom",
+      "kind": "store"
+    },
+    {
+      "package": "xstate",
+      "symbol": "createMachine",
+      "kind": "machine"
+    },
+    {
+      "package": "xstate",
+      "symbol": "setup",
+      "kind": "machine"
+    },
+    {
+      "package": "@xstate/react",
+      "symbol": "useMachine",
+      "kind": "machine"
+    },
+    {
+      "package": "react-hook-form",
+      "symbol": "useForm",
+      "kind": "form"
     }
   ]
 }

@@ -25,7 +25,7 @@ const rules: Rule[] = [
     throw Error("unsupported rule pack: " + path);
   return pack.rules;
 });
-const kinds = new Set(["slot", "route", "query", "schema", "search"]);
+const kinds = new Set(["slot", "store", "machine", "form", "route", "query", "schema", "search"]);
 const entries = new Set();
 for (const rule of rules) {
   const id = JSON.stringify([rule.package, rule.symbol]);
@@ -53,8 +53,16 @@ for (const [name, major] of Object.entries({
   "react-dom": 19,
   vite: 8,
   "@tanstack/react-router": 1,
+  "@tanstack/react-start": 1,
   "@tanstack/react-query": 5,
   zod: 4,
+  zustand: 5,
+  "@reduxjs/toolkit": 2,
+  jotai: 3,
+  xstate: 5,
+  "react-hook-form": 7,
+  valibot: 1,
+  "react-router": 8,
 })) {
   let actual;
   try {
@@ -530,6 +538,33 @@ try {
               kind: rule.kind,
               label: sym.name,
               shape: prop ? shape(checker.getTypeOfSymbolAtLocation(prop, n)) : { kind: "unknown" },
+            });
+          } else if (rule?.kind === "store" || rule?.kind === "machine" || rule?.kind === "form") {
+            const t = checker.getTypeAtLocation(n);
+            const props = t ? checker.getPropertiesOfType(t) : [];
+            const fields = [];
+            if (props.length > 0 && props.length <= 32) {
+              for (const prop of props) {
+                const propType = checker.getTypeOfSymbolAtLocation(prop, n);
+                if (checker.getSignaturesOfType(propType, SignatureKind.Call).length) continue;
+                fields.push({
+                  name: prop.name,
+                  type: propType ? checker.typeToString(propType) : "unknown",
+                  shape: shape(propType),
+                });
+              }
+            }
+            facts.push({
+              ...base,
+              kind: rule.kind,
+              package: rule.package,
+              label:
+                n.parent.kind === K.VariableDeclaration && n.parent.name.kind === K.Identifier
+                  ? n.parent.name.getText()
+                  : sym.name,
+              type: t ? checker.typeToString(t) : "unknown",
+              shape: shape(t),
+              fields,
             });
           } else if (rule?.kind === "search") {
             const t = checker.getTypeAtLocation(n);
