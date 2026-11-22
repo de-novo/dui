@@ -6,7 +6,7 @@ type Diagnostic = { code: number };
 
 // The installed project compiler owns resolution, alias chasing and all type queries.
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve, relative, join, sep, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -48,6 +48,37 @@ function unsupported(reason: string): never {
   process.stderr.write(JSON.stringify({ status: "unsupported", reason }));
   process.exit(4);
 }
+function readInstalledPackageVersion(name: string): string | null {
+  try {
+    return appRequire(name + "/package.json").version ?? null;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "MODULE_NOT_FOUND") return null;
+    if (code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") throw error;
+    let entry: string;
+    try {
+      entry = appRequire.resolve(name);
+    } catch (resolveErr) {
+      if ((resolveErr as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") return null;
+      throw resolveErr;
+    }
+    let dir = dirname(entry);
+    for (let depth = 0; depth < 8; depth++) {
+      const candidate = join(dir, "package.json");
+      if (existsSync(candidate)) {
+        const pkg = JSON.parse(readFileSync(candidate, "utf8")) as {
+          name?: string;
+          version?: string;
+        };
+        if (pkg.name === name && typeof pkg.version === "string") return pkg.version;
+      }
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return null;
+  }
+}
 for (const [name, major] of Object.entries({
   react: 19,
   "react-dom": 19,
@@ -64,13 +95,8 @@ for (const [name, major] of Object.entries({
   valibot: 1,
   "react-router": 8,
 })) {
-  let actual;
-  try {
-    actual = appRequire(name + "/package.json").version;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") continue;
-    throw error;
-  }
+  const actual = readInstalledPackageVersion(name);
+  if (actual === null) continue;
   if (!/^\d+\.\d+\.\d+$/.test(actual) || Number(actual.split(".")[0]) !== major)
     unsupported(name + " requires stable " + major + ".x; found " + actual);
   versions[name] = actual;
