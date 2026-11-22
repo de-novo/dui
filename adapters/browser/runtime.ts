@@ -280,6 +280,15 @@ declare var __duiProbe: {
     const p = globalThis.__duiProbe;
     if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 100)));
     if (!p) return null;
+    const selectOptions = Array.from(document.querySelectorAll("select"))
+      .map((sel) => ({
+        current: sel.value,
+        values: Array.from(sel.options)
+          .map((o) => o.value)
+          .filter((v, idx, arr) => arr.indexOf(v) === idx)
+          .slice(0, 6),
+      }))
+      .filter((entry) => entry.values.length > 1);
     return {
       ready: !!document.querySelector(selector),
       slots: p.slots,
@@ -288,6 +297,7 @@ declare var __duiProbe: {
       text: document.body?.innerText?.slice(0, 4000),
       path: location.pathname + location.search + location.hash,
       width: innerWidth,
+      ...(selectOptions.length > 0 ? { selectOptions } : {}),
     };
   }
   function visibleText(selector: string) {

@@ -172,6 +172,16 @@ fn greedy_covering_pairs(slots: &[(String, Vec<Value>)]) -> Vec<BTreeMap<String,
 // Each row covers either one value or one pair (using a greedy covering array for 3+ slots).
 // Independent owners are planned separately.
 pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<String, Value>> {
+    candidates_with_observed(facts, active, &BTreeMap::new())
+}
+
+/// Deterministic candidate planner that prefers real DOM-observed option values (e.g. from
+/// `<select><option value="...">`) over synthetic placeholders for matching slots.
+pub fn candidates_with_observed(
+    facts: &[Value],
+    active: &BTreeSet<String>,
+    observed_values: &BTreeMap<String, Vec<Value>>,
+) -> Vec<BTreeMap<String, Value>> {
     let mut predicate_ops: BTreeMap<(String, u64), BTreeSet<String>> = BTreeMap::new();
     for f in facts.iter().filter(|f| f["kind"] == "branch") {
         if let (Some(file), Some(binding), Some(op)) = (
@@ -192,14 +202,20 @@ pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<St
             && !f["init"].is_null()
             && !f["after"].is_null()
     }) {
-        let values = slot_values_for_planning(f, &predicate_ops);
+        let slot_key = key(f);
+        let values =
+            if let Some(obs_vals) = observed_values.get(&slot_key).filter(|v| !v.is_empty()) {
+                obs_vals.clone()
+            } else {
+                slot_values_for_planning(f, &predicate_ops)
+            };
         if values.is_empty() {
             continue;
         }
         groups
             .entry((f["file"].to_string(), f["owner"].to_string()))
             .or_insert_with(Vec::new)
-            .push((key(f), values));
+            .push((slot_key, values));
     }
     let mut singles = Vec::new();
     let mut pairs = Vec::new();
@@ -719,5 +735,30 @@ mod tests {
             "expected covering array compression <= 18 rows, got {}",
             planned.len()
         );
+    }
+
+    #[test]
+    fn candidates_with_observed_replaces_synthetic_sample_with_real_select_options() {
+        let mut sel_slot = slot(10, "View");
+        sel_slot["binding"] = json!(100);
+        sel_slot["shape"] = json!({"kind": "string"});
+        let branch = json!({
+            "file": "screen.tsx",
+            "owner": "View",
+            "start": 40,
+            "end": 50,
+            "kind": "branch",
+            "predicate": {"binding": 100, "operator": "truthy"}
+        });
+        let facts = vec![sel_slot.clone(), branch];
+        let sk = key(&sel_slot);
+        let active = BTreeSet::from([sk.clone()]);
+        let observed = BTreeMap::from([(sk.clone(), vec![json!(""), json!("proj/run-001")])]);
+        let planned = candidates_with_observed(&facts, &active, &observed);
+        let vals: Vec<&str> = planned
+            .iter()
+            .filter_map(|row| row.get(&sk).and_then(Value::as_str))
+            .collect();
+        assert_eq!(vals, vec!["", "proj/run-001"]);
     }
 }
