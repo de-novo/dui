@@ -264,10 +264,32 @@ h2 {
     var(--capture-shadow);
   text-align: left;
 }
+.screen-card {
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
 .screen-card.selected {
-  border-color: var(--foreground);
+  border-color: var(--primary);
   border-width: 2px;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent),
+    var(--capture-shadow);
   transform: translateY(-2px);
+}
+.screen-card.related {
+  border-color: var(--foreground);
+  opacity: 1;
+}
+.screen-card.dimmed {
+  opacity: 0.22;
+  filter: saturate(0.45);
+}
+.screen-card.dimmed:hover {
+  opacity: 0.62;
+  filter: saturate(0.8);
 }
 .missing-frame-copy {
   display: grid;

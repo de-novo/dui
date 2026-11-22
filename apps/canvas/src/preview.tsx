@@ -11,7 +11,6 @@ import { ScreenInspector } from "./features/inspector/ScreenInspector";
 import { useLiveSession } from "./features/inspector/useLiveSession";
 import { routeName } from "./features/map/CaptureCard";
 import { ScreenMap } from "./features/map/ScreenMap";
-import { ScreenNeighborhood } from "./features/map/ScreenNeighborhood";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
@@ -205,12 +204,7 @@ function MapView({
   return (
     <section className="workspace" aria-label={t.screenMap}>
       <div className="map" ref={mapArea}>
-        <div
-          ref={overviewLayer}
-          className="overview-layer"
-          aria-hidden={!showOverview}
-          inert={!showOverview}
-        >
+        <div ref={overviewLayer} className="overview-layer" aria-hidden={showLive} inert={showLive}>
           {railInset !== undefined && (
             <ScreenMap
               railInset={railInset}
@@ -218,14 +212,16 @@ function MapView({
               width={width}
               mode={mode}
               selectedId={selectedId}
+              focusActive={showDetails}
               openCommentsByPath={openCommentsByPath(audit)}
               imageUrl={(name) => archiveUrl(name, run)}
               select={select}
+              onClearSelection={returnToOverview}
             />
           )}
         </div>
 
-        {showOverview && audit && (
+        {!showLive && audit && (
           <output
             className="audit-summary-pill glass-panel"
             data-audit-meets-goal={String(audit.meetsGoal)}
@@ -246,18 +242,6 @@ function MapView({
               </span>
             )}
           </output>
-        )}
-
-        {showDetails && screen && (
-          <ScreenNeighborhood
-            key={JSON.stringify([screen.id, width])}
-            archive={archive}
-            screen={screen}
-            cell={cell}
-            width={width}
-            imageUrl={(name) => archiveUrl(name, run)}
-            select={select}
-          />
         )}
 
         {showOverview && screen && (

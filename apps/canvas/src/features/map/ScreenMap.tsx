@@ -25,6 +25,8 @@ type CardNode = Node<
     cardWidth: number;
     frameHeight: number;
     selected: boolean;
+    related: boolean;
+    dimmed: boolean;
     openComments: number;
     imageUrl: (name: string) => string;
   },
@@ -127,6 +129,8 @@ function Card({ data }: NodeProps<CardNode>) {
         cell={cell}
         imageUrl={data.imageUrl}
         selected={data.selected}
+        related={data.related}
+        dimmed={data.dimmed}
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
         openComments={data.openComments}
@@ -143,28 +147,47 @@ export function ScreenMap({
   width,
   mode,
   selectedId,
+  focusActive = false,
   openCommentsByPath,
   imageUrl,
   select,
+  onClearSelection,
 }: {
   railInset: number;
   archive: Archive;
   width: number;
   mode: string;
   selectedId?: string | null;
+  focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
   imageUrl: (name: string) => string;
   select: (id: string, active?: Element | null) => void;
+  onClearSelection?: () => void;
 }) {
   const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
   const { cardWidth, frameHeight } = layout.metrics;
   const strokeWidth = Math.max(2, Math.round(cardWidth / 320));
   const labelFontSize = Math.max(12, Math.round(cardWidth / 48));
+  const dimming = Boolean(focusActive && selectedId);
+  const relatedIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!focusActive || !selectedId) return set;
+    set.add(selectedId);
+    for (const link of layout.links) {
+      if (link.source === selectedId) set.add(link.target);
+      if (link.target === selectedId) set.add(link.source);
+    }
+    return set;
+  }, [focusActive, selectedId, layout.links]);
   const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => {
     const isSelected = screen.id === selectedId;
+    const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
+    const isDimmed = dimming && !relatedIds.has(screen.id);
     const classes = [
       mode === "focus:" + screen.id ? "focus-screen" : "",
       isSelected ? "selected-screen" : "",
+      isRelated ? "related-screen" : "",
+      isDimmed ? "dimmed-screen" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -179,6 +202,8 @@ export function ScreenMap({
         cardWidth,
         frameHeight,
         selected: isSelected,
+        related: isRelated,
+        dimmed: isDimmed,
         openComments: openCommentsByPath?.[screen.path] ?? 0,
         imageUrl,
       },
@@ -200,7 +225,14 @@ export function ScreenMap({
             ? [Position.Right, Position.Left]
             : [Position.Left, Position.Right];
       const originText = origin === "anchor" ? "Discovered anchor" : "Discovered link";
-      const strokeColor = replayVerified ? "var(--primary)" : "var(--map-link)";
+      const isConnectedToSelection = dimming && (source === selectedId || target === selectedId);
+      const isEdgeDimmed = dimming && !isConnectedToSelection;
+      const strokeColor = replayVerified
+        ? "var(--primary)"
+        : isConnectedToSelection
+          ? "var(--foreground)"
+          : "var(--map-link)";
+      const edgeStrokeWidth = isConnectedToSelection ? Math.round(strokeWidth * 1.4) : strokeWidth;
       const strokeDasharray =
         provenance === "verified" ? undefined : provenance === "inferred" ? "2 4" : "5 4";
       const edgeLabel = action?.label
@@ -220,14 +252,28 @@ export function ScreenMap({
         sourceHandle: out,
         targetHandle: into,
         label: edgeLabel,
-        labelStyle: { fill: "var(--foreground)", fontSize: labelFontSize, fontWeight: 500 },
-        labelBgStyle: { fill: "var(--card)", fillOpacity: 0.94, stroke: "var(--border)" },
+        labelStyle: {
+          fill: "var(--foreground)",
+          fontSize: labelFontSize,
+          fontWeight: 500,
+          opacity: isEdgeDimmed ? 0.18 : 1,
+        },
+        labelBgStyle: {
+          fill: "var(--card)",
+          fillOpacity: isEdgeDimmed ? 0.18 : 0.94,
+          stroke: "var(--border)",
+        },
         labelBgPadding: [8, 4] as [number, number],
         labelBgBorderRadius: 6,
         ariaLabel: replayVerified
           ? `Replay-verified transition from ${source} to ${target}`
           : `${originText} (${provenance}) from ${source} to ${target}, not replay-verified`,
-        style: { stroke: strokeColor, strokeWidth, strokeDasharray },
+        style: {
+          stroke: strokeColor,
+          strokeWidth: edgeStrokeWidth,
+          strokeDasharray,
+          opacity: isEdgeDimmed ? 0.14 : 1,
+        },
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 18, height: 18 },
       };
     },
@@ -273,6 +319,9 @@ export function ScreenMap({
       nodesConnectable={false}
       onKeyDown={handleKeyDown}
       onNodeClick={(_, node) => select(node.id)}
+      onPaneClick={() => {
+        if (focusActive) onClearSelection?.();
+      }}
     >
       <Background color="var(--map-grid)" gap={20} size={1} />
       <Controls showInteractive={false}>
