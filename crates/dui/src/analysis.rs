@@ -29,7 +29,11 @@ pub(crate) fn store(path: &Path, data: &Value) -> Result<(), (u8, Value)> {
     Ok(())
 }
 pub fn analyze(project: &Path, spec: &Path) -> Reply {
-    let mut result = TypeScript.facts(project, spec)?;
+    analyze_with_oracle(&TypeScript, project, spec)
+}
+
+pub fn analyze_with_oracle(oracle: &dyn TypeOracle, project: &Path, spec: &Path) -> Reply {
+    let mut result = oracle.facts(project, spec)?;
     let manifest: Value =
         serde_json::from_slice(&fs::read(spec).map_err(|e| failure(2, &e.to_string()))?)
             .map_err(|e| failure(2, &e.to_string()))?;

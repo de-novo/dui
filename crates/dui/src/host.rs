@@ -53,13 +53,16 @@ impl Renderer for LazyViteBrowser<'_> {
 }
 
 pub fn run_with_options(project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
-    if let Ok(bytes) = fs::read(spec)
-        && let Ok(parsed) = serde_json::from_slice::<Value>(&bytes)
-        && crate::gpui::is_gpui_manifest(&parsed)
-    {
-        return crate::gpui::run(project, spec, out);
-    }
-    let facts = analysis::analyze(project, spec)?;
+    crate::surface::SurfaceRegistry::default_registry().dispatch(project, spec, out, force)
+}
+
+pub(crate) fn run_vite_web_with_facts(
+    project: &Path,
+    spec: &Path,
+    facts: Value,
+    out: &Path,
+    force: bool,
+) -> Reply {
     let exe = crate::chromium::executable();
     let browser_version = crate::chromium::version_tag(&exe);
     let mut lazy = LazyViteBrowser {
