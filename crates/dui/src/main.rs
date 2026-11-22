@@ -14,6 +14,7 @@ mod host;
 mod inspect;
 mod live;
 mod mcp;
+mod nextjs;
 mod ports;
 mod reference;
 mod replay;

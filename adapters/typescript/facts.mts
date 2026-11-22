@@ -25,7 +25,17 @@ const rules: Rule[] = [
     throw Error("unsupported rule pack: " + path);
   return pack.rules;
 });
-const kinds = new Set(["slot", "store", "machine", "form", "route", "query", "schema", "search"]);
+const kinds = new Set([
+  "slot",
+  "store",
+  "machine",
+  "form",
+  "route",
+  "query",
+  "schema",
+  "search",
+  "control",
+]);
 const entries = new Set();
 for (const rule of rules) {
   const id = JSON.stringify([rule.package, rule.symbol]);
@@ -94,6 +104,16 @@ for (const [name, major] of Object.entries({
   "react-hook-form": 7,
   valibot: 1,
   "react-router": 8,
+  next: 16,
+  "radix-ui": 1,
+  "@radix-ui/react-dialog": 1,
+  "@radix-ui/react-popover": 1,
+  "@radix-ui/react-tabs": 1,
+  "@radix-ui/react-accordion": 1,
+  "@radix-ui/react-select": 1,
+  "@radix-ui/react-dropdown-menu": 1,
+  "@radix-ui/react-switch": 1,
+  "@radix-ui/react-checkbox": 1,
 })) {
   const actual = readInstalledPackageVersion(name);
   if (actual === null) continue;
@@ -653,6 +673,68 @@ try {
                   ? n.arguments[0].text
                   : sym.name,
             });
+        } else if (n.kind === K.JsxOpeningElement || n.kind === K.JsxSelfClosingElement) {
+          const tagNode = n.tagName;
+          const tagSym = tagNode ? symbol(tagNode.name ?? tagNode) : null;
+          const tagPath = compiler.declarationPath(tagSym?.declarations?.[0]) ?? "";
+          const controlRule = rules.find(
+            (r) =>
+              r.kind === "control" &&
+              tagSym?.name === r.symbol &&
+              (tagPath.includes("/node_modules/" + r.package + "/") ||
+                tagPath.includes("/node_modules/@types/" + r.package + "/")),
+          );
+          if (controlRule) {
+            const stateProps = [
+              "open",
+              "defaultOpen",
+              "value",
+              "defaultValue",
+              "checked",
+              "defaultChecked",
+            ];
+            const fields: { name: string; type: string; shape: Shape }[] = [];
+            const attrNodes = n.attributes?.properties ?? [];
+            const seenProps = new Set<string>();
+            for (const attr of attrNodes) {
+              if (attr.kind !== K.JsxAttribute || !attr.name) continue;
+              const propName = attr.name.getText();
+              if (!stateProps.includes(propName) || seenProps.has(propName)) continue;
+              seenProps.add(propName);
+              const init = attr.initializer;
+              const expr = init?.kind === K.JsxExpression ? init.expression : init;
+              const t = expr ? checker.getTypeAtLocation(expr) : null;
+              fields.push({
+                name: propName,
+                type: t ? checker.typeToString(t) : "boolean",
+                shape: t ? shape(t) : { kind: "boolean" },
+              });
+            }
+            if (fields.length === 0) {
+              // Default to boolean open/checked state for uncontrolled Radix primitives when props omitted
+              const defaultProp =
+                controlRule.package.includes("tabs") ||
+                controlRule.package.includes("select") ||
+                controlRule.package.includes("accordion")
+                  ? "value"
+                  : controlRule.package.includes("switch") ||
+                      controlRule.package.includes("checkbox")
+                    ? "checked"
+                    : "open";
+              fields.push({
+                name: defaultProp,
+                type: defaultProp === "value" ? "string" : "boolean",
+                shape: defaultProp === "value" ? { kind: "string" } : { kind: "boolean" },
+              });
+            }
+            facts.push({
+              ...base,
+              kind: "control",
+              package: controlRule.package,
+              label: tagNode ? tagNode.getText() : controlRule.symbol,
+              fields,
+            });
+          }
         }
         n.forEachChild((child) => {
           walk(child as Syntax, owner);

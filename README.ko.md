@@ -13,12 +13,12 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | 분류 | 현재 지원 | 예정 |
 | --- | --- | --- |
 | 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 19, Vite 8, Nitro SSR, Chromium (CDP) | Next.js 16, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 19, Vite 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | 데스크톱 앱 | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | 모바일 앱 (Android & iOS) | Android (`adb` `screencap` + `uiautomator` → `RenderNodeSnapshot`) | Jetpack Compose / Kotlin 2 컴파일러 심층 분석, iOS (`xcrun simctl` / SwiftUI / Swift 6), React Native 0.88 / Expo 58, Flutter 3 / Dart 3 |
 | 터미널 UI (TUI) | Universal TUI (`pty` + VT100 셀 그리드 → `RenderNodeSnapshot` + 모노스페이스 PNG) | Ratatui (Rust), Ink (TS/React), Bubble Tea (Go) |
-| 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 8, 표준 Web `URLSearchParams` | Next.js App Router, Android 인텐트 및 딥링크 |
-| 상태 · 폼 · 스키마 | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1 | Radix UI 1, shadcn/ui 4 선언형 룰팩 |
+| 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 8, Next.js App Router (`app/**/page.tsx`), 표준 Web `URLSearchParams` | Android 인텐트/딥링크 컴파일러 심층 분석 |
+| 상태 · 폼 · 스키마 | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1, Radix UI 1 / shadcn/ui 4 | — |
 
 ### 분석 및 검증 기능
 
