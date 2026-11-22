@@ -8,6 +8,7 @@ publish = false
 [workspace]
 
 [dependencies]
+base64 = "0.22"
 dui-core = { path = "../../crates/dui-core" }
 gpui-kit = { version = "0.10.0", features = ["test-support"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
