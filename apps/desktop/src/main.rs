@@ -413,15 +413,20 @@ impl DuiDesktopView {
             self.diff_cache_key = None;
             return;
         };
+        let want_pixels = self.view_mode == ViewMode::Diff
+            || self.canvas_diff_mode == CanvasDiffVisualMode::Overlay;
         let key = (before_idx, self.selected_run);
         if self.diff_cache_key == Some(key) {
+            if want_pixels {
+                store::hydrate_pixel_diffs(&mut self.diff_entries);
+            }
             return;
         }
         if let (Some(before), Some(after)) = (
             self.workspace.runs.get(before_idx),
             self.workspace.runs.get(self.selected_run),
         ) {
-            self.diff_entries = store::compute_run_diff(before, after);
+            self.diff_entries = store::compute_run_diff(before, after, want_pixels);
             self.diff_cache_key = Some(key);
         }
     }
@@ -1198,6 +1203,9 @@ impl DuiDesktopView {
                                     cx.listener(move |this, _, _, cx| {
                                         cx.stop_propagation();
                                         this.canvas_diff_mode = target_mode;
+                                        if target_mode == CanvasDiffVisualMode::Overlay {
+                                            this.ensure_diff_loaded();
+                                        }
                                         cx.notify();
                                     }),
                                 )

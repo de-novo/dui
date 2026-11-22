@@ -737,7 +737,11 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             (b, a, dir)
         };
 
-        match diff::compare(&before_root, &after_root, Some(&overlay_dir)) {
+        let include_pixels =
+            !matches!(query.get("pixels").map(String::as_str), Some("0" | "false"));
+        let overlay_target = include_pixels.then_some(overlay_dir.as_path());
+        match diff::compare_with_options(&before_root, &after_root, overlay_target, include_pixels)
+        {
             Ok(parsed) => {
                 send_json(
                     &mut stream,

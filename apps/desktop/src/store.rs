@@ -261,7 +261,42 @@ fn load_render_trees_for_run(
     map
 }
 
-pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry> {
+fn compute_entry_pixel_diff(entry: &mut DiffCellEntry) {
+    if entry.overlay.is_some() || entry.kind != "changed" {
+        return;
+    }
+    if let (Some(bp), Some(ap)) = (&entry.before_blob, &entry.after_blob)
+        && let (Ok(b_bytes), Ok(a_bytes)) = (fs::read(bp), fs::read(ap))
+        && let (Ok(b_img), Ok(a_img)) = (
+            image::load_from_memory_with_format(&b_bytes, image::ImageFormat::Png),
+            image::load_from_memory_with_format(&a_bytes, image::ImageFormat::Png),
+        )
+    {
+        let br = b_img.to_rgba8();
+        let ar = a_img.to_rgba8();
+        let (bw, bh) = br.dimensions();
+        let (aw, ah) = ar.dimensions();
+        entry.capture_width = aw.max(bw).max(1);
+        entry.capture_height = ah.max(bh).max(1);
+        let (metrics, overlay_rgba) = compute_rgba_diff(bw, bh, br.as_raw(), aw, ah, ar.as_raw());
+        entry.changed_pixels = Some(metrics.diff_pixels);
+        entry.diff_percent = Some((metrics.diff_ratio * 10000.0).round() / 100.0);
+        entry.overlay = rgba_to_render_image(metrics.width, metrics.height, overlay_rgba);
+    }
+}
+
+/// Lazily decode PNGs and synthesize pixel-diff overlays only when the user opens Pixel mode.
+pub fn hydrate_pixel_diffs(entries: &mut [DiffCellEntry]) {
+    for entry in entries.iter_mut() {
+        compute_entry_pixel_diff(entry);
+    }
+}
+
+pub fn compute_run_diff(
+    before: &RunItem,
+    after: &RunItem,
+    include_pixels: bool,
+) -> Vec<DiffCellEntry> {
     let before_trees = load_render_trees_for_run(before);
     let after_trees = load_render_trees_for_run(after);
     let mut before_map: BTreeMap<(String, u32, usize), &CellItem> = BTreeMap::new();
@@ -324,30 +359,6 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                 {
                     continue;
                 }
-                let mut changed_pixels = None;
-                let mut diff_percent = None;
-                let mut overlay = None;
-                let mut capture_width = key.1.max(1);
-                let mut capture_height = 800u32;
-                if let (Some(bp), Some(ap)) = (&before_cell.blob_path, &after_cell.blob_path)
-                    && let (Ok(b_bytes), Ok(a_bytes)) = (fs::read(bp), fs::read(ap))
-                    && let (Ok(b_img), Ok(a_img)) = (
-                        image::load_from_memory_with_format(&b_bytes, image::ImageFormat::Png),
-                        image::load_from_memory_with_format(&a_bytes, image::ImageFormat::Png),
-                    )
-                {
-                    let br = b_img.to_rgba8();
-                    let ar = a_img.to_rgba8();
-                    let (bw, bh) = br.dimensions();
-                    let (aw, ah) = ar.dimensions();
-                    capture_width = aw.max(bw).max(1);
-                    capture_height = ah.max(bh).max(1);
-                    let (metrics, overlay_rgba) =
-                        compute_rgba_diff(bw, bh, br.as_raw(), aw, ah, ar.as_raw());
-                    changed_pixels = Some(metrics.diff_pixels);
-                    diff_percent = Some((metrics.diff_ratio * 10000.0).round() / 100.0);
-                    overlay = rgba_to_render_image(metrics.width, metrics.height, overlay_rgba);
-                }
                 let b_tree = before_trees.get(&key);
                 let a_tree = after_trees.get(&key);
                 let render_diff = if b_tree.is_some() || a_tree.is_some() {
@@ -359,19 +370,26 @@ pub fn compute_run_diff(before: &RunItem, after: &RunItem) -> Vec<DiffCellEntry>
                 } else {
                     None
                 };
-                entries.push(DiffCellEntry {
+                let has_render_changes = render_diff
+                    .as_ref()
+                    .is_some_and(|rd| !rd.changes.is_empty());
+                let mut entry = DiffCellEntry {
                     path: key.0,
                     width_px: key.1,
                     kind: "changed".into(),
                     before_blob: before_cell.blob_path.clone(),
                     after_blob: after_cell.blob_path.clone(),
-                    changed_pixels,
-                    diff_percent,
-                    overlay,
+                    changed_pixels: None,
+                    diff_percent: None,
+                    overlay: None,
                     render_diff,
-                    capture_width,
-                    capture_height,
-                });
+                    capture_width: key.1.max(1),
+                    capture_height: 800,
+                };
+                if include_pixels || !has_render_changes {
+                    compute_entry_pixel_diff(&mut entry);
+                }
+                entries.push(entry);
             }
             (None, None) => {}
         }
