@@ -20,6 +20,7 @@ mod screen_map;
 mod sqlite_store;
 mod surface;
 mod transition;
+mod tui;
 mod typescript;
 mod universal_web;
 mod update;

@@ -102,4 +102,5 @@ pub mod model;
 pub mod storage;
 pub mod surface;
 pub mod transition;
+pub mod tui;
 pub mod version;

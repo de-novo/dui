@@ -73,3 +73,4 @@ jobs:
           npm run check:real-api
           npm run check:branch-diff
           npm run check:universal-web
+          npm run check:tui
