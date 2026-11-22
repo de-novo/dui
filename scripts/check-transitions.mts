@@ -160,7 +160,6 @@ try {
         path: "/order",
         widths: [375, 1280],
         readySelector: "[data-testid=order-screen]",
-        stateBudget: 1,
         scenarios: [
           { path: "/confirm", readySelector: "[data-testid=confirm-screen]" },
           { path: "/cancelled", readySelector: "[data-testid=cancelled-screen]" },

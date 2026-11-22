@@ -11,8 +11,7 @@ Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the ta
   "path": "/",
   "widths": [375, 768, 1280],
   "readySelector": "main article",
-  "routeSelector": "nav a[href]",
-  "stateBudget": 12
+  "routeSelector": "nav a[href]"
 }
 ```
 
@@ -21,9 +20,9 @@ Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the ta
 | `path` | Required. Same-origin entry path starting with `/`. Include the query string or hash for routes that use them. |
 | `widths` | Required. One or more positive viewport widths in CSS pixels. |
 | `readySelector` | Required for capture. Choose an element that appears when the intended content has loaded. An app shell can appear before its data. |
-| `routeSelector` | Collect matching same-origin anchors from the entry page’s default state across the requested widths. Discovery follows one level. |
+| `routeSelector` | Collect matching same-origin anchors recursively via loop-free BFS with visited-URL cycle blocking and dynamic ID pattern collapsing (`/orders/:id`). |
 | `scenarios` | Array of overrides for extra cases. For example, `[{"path":"/settings","readySelector":"form"}]` adds a screen with its own readiness check. |
-| `stateBudget` | Maximum states to attempt per scenario, each at every width. Defaults to 32, clamped to 1–512. |
+| `maxNoImprovementRounds` | Optional convergence guard. Stops exploring additional states in a scenario after N consecutive states produce no new branch outcomes or slots; remaining planned cells stay in the denominator as `unverified (not-rendered)`. |
 | `requiredRequests` | Paths that must return a 2xx response. A required request with a generated mock must receive that mock. |
 | `responseChecks` | Compare named fields in a JSON response, for example `{"/api/status":{"ready":true}}`. |
 | `tsconfig` · `appRoot` | Paths relative to `PROJECT`. Defaults are `tsconfig.json` for analysis and `.` for Vite. |

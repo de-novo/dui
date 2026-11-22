@@ -231,7 +231,6 @@ const config = {
   sources: [],
   sourceDirs: [],
   additionalScopes: [],
-  stateBudget: 1,
   ...screen(entry),
   scenarios: paths.slice(1).map(screen),
   screenDiscovery: {

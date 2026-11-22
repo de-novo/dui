@@ -147,7 +147,6 @@ try {
         widths: [375],
         locales: ["en", "de", "ar"],
         readySelector: "[data-testid=settings-screen]",
-        stateBudget: 4,
       },
       null,
       2,

@@ -1,5 +1,5 @@
 // Verify M1 deterministic planning, alias/re-export resolution, CLI/MCP equivalence,
-// insufficient-budget denominator preservation, and fill-in loop termination.
+// convergence termination, and unattempted-cell denominator preservation.
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -32,11 +32,9 @@ type CellReport = {
 
 type RunReport = {
   compiler: string;
-  budget: number | null;
   remainingPlans: number;
   scenarios: {
     scenario: string;
-    stateBudget: number | null;
     plannedStates: number;
     remainingStates: number;
     termination: string;
@@ -88,11 +86,9 @@ function normalizeFacts(facts: Fact[]) {
 
 function normalizeRun(report: RunReport) {
   return {
-    budget: report.budget,
     remainingPlans: report.remainingPlans,
     scenarios: report.scenarios.map((s) => ({
       scenario: s.scenario,
-      stateBudget: s.stateBudget,
       plannedStates: s.plannedStates,
       remainingStates: s.remainingStates,
       termination: s.termination,
@@ -250,68 +246,59 @@ try {
     assert.deepEqual(cliFullReport.runtimeOnlyInstrumentedBranches, []);
     assert.equal(cliFullReport.scenarios[0].termination, "exhausted");
 
-    // 3. Insufficient budget: CLI and MCP agree, every planned cell is preserved in report and graph.
-    const lowBudgetManifest = join(reexportDir, "dui-low-budget.json");
+    // 3. Convergence termination (`maxNoImprovementRounds: 1`): CLI and MCP agree,
+    // fill-in loop stops on no-improvement, and every remaining planned cell is preserved in report and graph.
     const spec = JSON.parse(readFileSync(join(reexportDir, "dui.json"), "utf8")) as Record<
       string,
       unknown
     >;
-    writeFileSync(lowBudgetManifest, JSON.stringify({ ...spec, stateBudget: 2 }, null, 2));
-
-    const cliLowOut = join(stage, "cli-low");
-    const mcpLowOut = join(stage, "mcp-low");
-    const cliLow = runCli(["run", reexportDir, lowBudgetManifest, cliLowOut], home);
-    const mcpLow = await mcp.call("run", {
-      project: reexportDir,
-      manifest: lowBudgetManifest,
-      output: mcpLowOut,
-    });
-    assert.equal(cliLow.status, 5);
-    assert.equal(mcpLow.isError, true);
-    const cliLowReport = cliLow.body as RunReport;
-    const mcpLowReport = mcpLow.body as RunReport;
-    assert.deepEqual(
-      normalizeRun(cliLowReport),
-      normalizeRun(mcpLowReport),
-      "CLI and MCP insufficient-budget plans/verdicts diverged",
-    );
-    assert.equal(cliLowReport.scenarios[0].termination, "budget-limit");
-    assert.equal(cliLowReport.scenarios[0].plannedStates, 2);
-    assert(cliLowReport.remainingPlans > 0);
-    assert.equal(cliLowReport.coverage.attempted, 4);
-    assert(cliLowReport.coverage.renderable > cliLowReport.coverage.attempted);
-    assert.equal(cliLowReport.cells.length, cliLowReport.coverage.renderable);
-    const unattempted = cliLowReport.cells.filter((c) => c.reason === "not-rendered");
-    assert.equal(unattempted.length, cliLowReport.coverage.renderable - 4);
-    const lowGraph = JSON.parse(readFileSync(join(cliLowOut, "graph.json"), "utf8")) as {
-      nodes: { kind: string }[];
-    };
-    assert.equal(
-      lowGraph.nodes.filter((n) => n.kind === "cell").length,
-      cliLowReport.cells.length,
-      "graph.json dropped planned cells under an insufficient budget",
-    );
-
-    // 4. Stagnation termination: fill-in loop stops on no-improvement and preserves remaining cells.
     const stagnantManifest = join(reexportDir, "dui-stagnant.json");
     writeFileSync(
       stagnantManifest,
-      JSON.stringify({ ...spec, stateBudget: 16, maxNoImprovementRounds: 1 }, null, 2),
+      JSON.stringify({ ...spec, maxNoImprovementRounds: 1 }, null, 2),
     );
-    const stagnantOut = join(stage, "cli-stagnant");
-    const stagnant = runCli(["run", reexportDir, stagnantManifest, stagnantOut], home);
+    const cliStagnantOut = join(stage, "cli-stagnant");
+    const mcpStagnantOut = join(stage, "mcp-stagnant");
+    const stagnant = runCli(["run", reexportDir, stagnantManifest, cliStagnantOut], home);
+    const mcpStagnant = await mcp.call("run", {
+      project: reexportDir,
+      manifest: stagnantManifest,
+      output: mcpStagnantOut,
+    });
     assert.equal(stagnant.status, 5);
+    assert.equal(mcpStagnant.isError, true);
     const stagnantReport = stagnant.body as RunReport;
+    const mcpStagnantReport = mcpStagnant.body as RunReport;
+    assert.deepEqual(
+      normalizeRun(stagnantReport),
+      normalizeRun(mcpStagnantReport),
+      "CLI and MCP convergence-guard plans/verdicts diverged",
+    );
     assert.equal(stagnantReport.scenarios[0].termination, "no-improvement");
     assert.equal(stagnantReport.coverage.observedBranchOutcomes, 4);
     assert(stagnantReport.remainingPlans > 0);
+    assert(stagnantReport.coverage.renderable > stagnantReport.coverage.attempted);
+    assert.equal(stagnantReport.cells.length, stagnantReport.coverage.renderable);
+    const unattempted = stagnantReport.cells.filter((c) => c.reason === "not-rendered");
+    assert.equal(
+      unattempted.length,
+      stagnantReport.coverage.renderable - stagnantReport.coverage.attempted,
+    );
+    const stagnantGraph = JSON.parse(readFileSync(join(cliStagnantOut, "graph.json"), "utf8")) as {
+      nodes: { kind: string }[];
+    };
+    assert.equal(
+      stagnantGraph.nodes.filter((n) => n.kind === "cell").length,
+      stagnantReport.cells.length,
+      "graph.json dropped planned cells under convergence termination",
+    );
 
     const summary = {
       fixture: "fixtures/toggle",
       sourceSha256: createHash("sha256").update(baseMain).digest("hex"),
       compiler: scans[0].compiler,
       aliasReexportMatch: true,
-      fullBudget: {
+      fullPlan: {
         cellsVerified: cliFullReport.coverage.verified,
         cellsRenderable: cliFullReport.coverage.renderable,
         branchesObserved: cliFullReport.coverage.observedBranchOutcomes,
@@ -319,19 +306,14 @@ try {
         termination: cliFullReport.scenarios[0].termination,
         cliMcpIdentical: true,
       },
-      insufficientBudget: {
-        budget: 2,
-        attemptedCells: cliLowReport.coverage.attempted,
-        renderableCells: cliLowReport.coverage.renderable,
-        remainingPlans: cliLowReport.remainingPlans,
-        termination: cliLowReport.scenarios[0].termination,
-        cliMcpIdentical: true,
-      },
-      stagnationGuard: {
+      convergenceGuard: {
         plannedStates: stagnantReport.scenarios[0].plannedStates,
+        attemptedCells: stagnantReport.coverage.attempted,
+        renderableCells: stagnantReport.coverage.renderable,
         remainingPlans: stagnantReport.remainingPlans,
         branchesObserved: stagnantReport.coverage.observedBranchOutcomes,
         termination: stagnantReport.scenarios[0].termination,
+        cliMcpIdentical: true,
       },
     };
     console.log(JSON.stringify(summary));

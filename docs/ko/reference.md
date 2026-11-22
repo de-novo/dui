@@ -11,8 +11,7 @@
   "path": "/",
   "widths": [375, 768, 1280],
   "readySelector": "main article",
-  "routeSelector": "nav a[href]",
-  "stateBudget": 12
+  "routeSelector": "nav a[href]"
 }
 ```
 
@@ -21,9 +20,9 @@
 | `path` | 필수. `/`로 시작하는 같은 출처의 진입 경로. 필요하면 쿼리 문자열이나 해시도 포함한다. |
 | `widths` | 필수. 캡처할 화면 폭을 양의 정수로 나열한다. 단위는 CSS 픽셀이다. |
 | `readySelector` | 캡처에 필수. 원하는 콘텐츠가 로드된 뒤 나타나는 요소를 고른다. 앱의 바깥 틀은 데이터보다 먼저 나타날 수 있다. |
-| `routeSelector` | 각 폭에서 시작 화면의 기본 상태를 읽고 선택자에 맞는 같은 출처 링크를 수집한다. 탐색 깊이는 한 단계다. |
+| `routeSelector` | 선택자에 맞는 같은 출처 링크를 사이클 차단과 동적 ID 패턴 축약(`/orders/:id`)이 적용된 다단계 BFS로 재귀 탐색한다. |
 | `scenarios` | 기본 설정에서 달라지는 값만 담은 배열. 예를 들어 `[{"path":"/settings","readySelector":"form"}]`은 폼이 준비될 때까지 기다리는 설정 화면을 추가한다. |
-| `stateBudget` | 시나리오마다 시도할 상태 수. 각 상태는 지정한 모든 폭에서 캡처한다. 기본값은 32이며 1–512 범위로 제한한다. |
+| `maxNoImprovementRounds` | 선택적 수렴 가드. 연속 N개 상태에서 새 분기나 새 슬롯이 관측되지 않으면 시나리오 탐색을 종료하며, 남은 계획 칸은 분모에 `unverified (not-rendered)`로 보존한다. |
 | `requiredRequests` | 2xx 응답을 받아야 할 요청 경로. 생성한 목 응답을 지정한 요청은 실제로 그 응답을 받아야 한다. |
 | `responseChecks` | JSON 응답의 지정 필드를 비교한다. 예를 들어 `{"/api/status":{"ready":true}}`로 준비 상태를 확인한다. |
 | `tsconfig` · `appRoot` | `PROJECT` 기준 경로. 분석에 쓸 설정의 기본값은 `tsconfig.json`, Vite 앱 루트의 기본값은 `.`이다. |
