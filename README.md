@@ -4,7 +4,31 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 dui captures a running web or GPUI app across UI states and viewport widths. It reads the app’s official compiler types, generates mock responses, and checks what was actually rendered. Browse the screen map, live sessions, and diffs in the embedded web viewer (`dui open`) or consume the same results as JSON through the CLI or MCP.
 
-[Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md)
+[Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md) · [Full stack matrix](docs/en/supported-frameworks.md)
+
+## What dui analyzes
+
+### Supported stacks & frameworks
+
+| Category | Supported now | Planned |
+| --- | --- | --- |
+| Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2 |
+| Web UI & hosts | React 19, Vite 8, Nitro SSR, Chromium (CDP) | Next.js 16, Electron 45, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2, Tauri 2 |
+| Native UI | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14, React Native 0.88 / Expo 58, Flutter 3, SwiftUI, Jetpack Compose |
+| Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 8, standard Web `URLSearchParams` | Next.js App Router |
+| State, forms & schemas | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1 | Radix UI 1, shadcn/ui 4 declarative packs |
+
+### Analysis & verification capabilities
+
+| Area | Capabilities | Status |
+| --- | --- | --- |
+| Screen & link discovery | Router file discovery, loop-free multi-hop BFS (`a[href]`), dynamic ID pattern collapsing (`/orders/:id`), `linksTo` screen-map edges | Supported |
+| State planning & verification | Compiler-derived types, greedy pairwise covering array, `<select>` real DOM `<option>` discovery, visual-change witness (`visualWitness`), convergence guard | Supported |
+| Data & API verification | Typed `GET` JSON auto-mocks, CSV mocks, explicit `mockResponses`, `hybrid` / `live` real-API modes with read-only mutation guard & secret redaction | Supported |
+| Diff & change review | 2D canvas inline diff (`Elements` render-tree diff with 2px tolerance, `After`, `Before`, lazy `Pixel` overlay), branch diff (`dui diff --base main`), `--changed-since` | Supported |
+| Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
+| Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
+| Next engine upgrades | Multi-tab parallel capture, automatic layout overlap & a11y audit from `renderTree`, runtime modal/tab trigger exploration, GPUI AccessKit render-tree diff | Planned |
 
 ## Install
 

@@ -4,7 +4,31 @@
 
 dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려진 화면을 검증한다. 사람은 내장 웹 뷰어(`dui open`)에서 화면 지도·라이브 편집·캡처 비교를 보고, 에이전트는 CLI와 MCP로 같은 결과를 JSON으로 읽는다.
 
-[제품 로드맵](docs/ko/roadmap.md) · [변경 이력](docs/ko/changelog.md)
+[제품 로드맵](docs/ko/roadmap.md) · [변경 이력](docs/ko/changelog.md) · [전체 지원 스택 표](docs/ko/supported-frameworks.md)
+
+## 분석 가능한 항목
+
+### 지원 스택 및 프레임워크
+
+| 분류 | 현재 지원 | 예정 |
+| --- | --- | --- |
+| 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2 |
+| 웹 UI · 호스트 | React 19, Vite 8, Nitro SSR, Chromium (CDP) | Next.js 16, Electron 45, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2, Tauri 2 |
+| 네이티브 UI | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14, React Native 0.88 / Expo 58, Flutter 3, SwiftUI, Jetpack Compose |
+| 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 8, 표준 Web `URLSearchParams` | Next.js App Router |
+| 상태 · 폼 · 스키마 | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1 | Radix UI 1, shadcn/ui 4 선언형 룰팩 |
+
+### 분석 및 검증 기능
+
+| 영역 | 기능 | 상태 |
+| --- | --- | --- |
+| 화면 · 링크 탐색 | 라우터 파일 자동 발견, 무한루프 방지 다단계 BFS (`a[href]`), 동적 ID 패턴 축약 (`/orders/:id`), 화면 간 `linksTo` 연결선 | 지원 |
+| 상태 계획 · 검증 | 공식 컴파일러 타입 기반 조합, Greedy Pairwise Covering Array, `<select>` 실옵션 자동 수집, 시각 변화 검증(`visualWitness`), 수렴 가드 | 지원 |
+| 데이터 · API 검증 | 타입 기반 `GET` JSON 자동 목, CSV 목, 명시적 `mockResponses`, `hybrid` / `live` 실서버 API 모드(기본 읽기 전용 가드 · 비밀값 무유출) | 지원 |
+| Diff · 변경 리뷰 | 2D 캔버스 인라인 비교(`요소` 렌더 트리 Diff · 2px 노이즈 허용, `이후`, `이전`, 지연 `픽셀` 오버레이), 브랜치 비교(`dui diff --base main`), `--changed-since` | 지원 |
+| 품질 · 다국어 · 감사 | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱 | 지원 |
+| 라이브 편집 · 뷰어 | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`) | 지원 |
+| 다음 엔진 고도화 | 멀티 탭 병렬 캡처, `renderTree` 기반 자동 레이아웃 겹침·접근성(a11y) 감사, 런타임 클릭 기반 모달/탭 자동 열기, GPUI AccessKit 렌더 트리 Diff | 예정 |
 
 ## 설치
 
