@@ -68,6 +68,7 @@ enum CommentTargetChoice {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum CanvasDiffVisualMode {
+    Render,
     After,
     Before,
     Overlay,
@@ -251,7 +252,7 @@ impl DuiDesktopView {
             diff_entries: Vec::new(),
             canvas_diff_enabled: opts.canvas_diff,
             canvas_diff_changed_only: false,
-            canvas_diff_mode: CanvasDiffVisualMode::Overlay,
+            canvas_diff_mode: CanvasDiffVisualMode::Render,
         };
         this.sync_cell_to_width();
         this.fit_map();
@@ -937,33 +938,43 @@ impl DuiDesktopView {
             return div().id("canvas-diff-bar-single");
         }
 
-        let (lbl_compare, lbl_off, lbl_changed_only, lbl_after, lbl_before, lbl_overlay) =
-            match self.lang {
-                UiLang::Ko => (
-                    "비교",
-                    "비교 끄기",
-                    "변경된 화면만",
-                    "이후",
-                    "이전",
-                    "오버레이",
-                ),
-                UiLang::ZhCn => (
-                    "对比",
-                    "关闭对比",
-                    "仅看变更界面",
-                    "变更后",
-                    "变更前",
-                    "差异叠加",
-                ),
-                UiLang::En => (
-                    "Compare",
-                    "No diff",
-                    "Changed only",
-                    "After",
-                    "Before",
-                    "Overlay",
-                ),
-            };
+        let (
+            lbl_compare,
+            lbl_off,
+            lbl_changed_only,
+            lbl_render,
+            lbl_after,
+            lbl_before,
+            lbl_overlay,
+        ) = match self.lang {
+            UiLang::Ko => (
+                "비교",
+                "비교 끄기",
+                "변경된 화면만",
+                "요소",
+                "이후",
+                "이전",
+                "픽셀",
+            ),
+            UiLang::ZhCn => (
+                "对比",
+                "关闭对比",
+                "仅看变更界面",
+                "元素",
+                "变更后",
+                "变更前",
+                "像素",
+            ),
+            UiLang::En => (
+                "Compare",
+                "No diff",
+                "Changed only",
+                "Elements",
+                "After",
+                "Before",
+                "Pixel",
+            ),
+        };
 
         let same_project_other = self
             .workspace
@@ -1150,6 +1161,11 @@ impl DuiDesktopView {
                     div().flex().items_center().gap_1().children(
                         [
                             (
+                                "canvas-diff-mode-render",
+                                CanvasDiffVisualMode::Render,
+                                lbl_render,
+                            ),
+                            (
                                 "canvas-diff-mode-after",
                                 CanvasDiffVisualMode::After,
                                 lbl_after,
@@ -1292,7 +1308,7 @@ impl DuiDesktopView {
                                 .and_then(|c| c.blob_path.as_deref())
                                 .and_then(|path| self.images.get_or_decode(path))
                         }),
-                    CanvasDiffVisualMode::After => diff_entry
+                    CanvasDiffVisualMode::After | CanvasDiffVisualMode::Render => diff_entry
                         .after_blob
                         .as_deref()
                         .and_then(|path| self.images.get_or_decode(path))
@@ -1503,9 +1519,22 @@ impl DuiDesktopView {
                             UiLang::ZhCn => "已变更",
                             UiLang::En => "Changed",
                         };
-                        let text = match d.diff_percent {
-                            Some(pct) if pct > 0.0 => format!("{base} · {pct:.1}%"),
-                            _ => base.to_owned(),
+                        let el_count = d
+                            .render_diff
+                            .as_ref()
+                            .map(|rd| rd.changes.len())
+                            .unwrap_or(0);
+                        let text = if el_count > 0 {
+                            match self.lang {
+                                UiLang::Ko => format!("{base} · {el_count}요소"),
+                                UiLang::ZhCn => format!("{base} · {el_count} 处元素"),
+                                UiLang::En => format!("{base} · {el_count} el"),
+                            }
+                        } else {
+                            match d.diff_percent {
+                                Some(pct) if pct > 0.0 => format!("{base} · {pct:.1}%"),
+                                _ => base.to_owned(),
+                            }
                         };
                         (p.primary, text)
                     }
@@ -1513,34 +1542,88 @@ impl DuiDesktopView {
                 (badge_bg, badge_label)
             });
 
+            let render_boxes: Vec<(f32, f32, f32, f32, Hsla)> = if canvas_diff_mode
+                == CanvasDiffVisualMode::Render
+                && let Some(d) = screen_diff
+                && let Some(rd) = &d.render_diff
+            {
+                let cw = d.capture_width.max(1) as f32;
+                let ch = d.capture_height.max(1) as f32;
+                rd.changes
+                    .iter()
+                    .take(24)
+                    .filter_map(|chg| {
+                        let rect = chg.after_rect.or(chg.before_rect)?;
+                        if rect.width <= 0 || rect.height <= 0 {
+                            return None;
+                        }
+                        let rx = ((rect.x.max(0) as f32) / cw * inner_w).clamp(0.0, inner_w);
+                        let ry = ((rect.y.max(0) as f32) / ch * frame_h).clamp(0.0, frame_h);
+                        let rw = ((rect.width as f32) / cw * inner_w)
+                            .clamp(2.0, (inner_w - rx).max(2.0));
+                        let rh = ((rect.height as f32) / ch * frame_h)
+                            .clamp(2.0, (frame_h - ry).max(2.0));
+                        let color = match chg.kind {
+                            dui_core::diff::RenderChangeKind::Added => {
+                                Hsla::from(gpui_kit::rgb(0x2f9e66))
+                            }
+                            dui_core::diff::RenderChangeKind::Removed => {
+                                Hsla::from(gpui_kit::rgb(0xd94848))
+                            }
+                            _ => p.primary,
+                        };
+                        Some((rx, ry, rw, rh, color))
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
             let media_el = if let Some(ri) = render_img {
-                div()
+                let mut frame = div()
                     .relative()
                     .w(px(inner_w))
                     .h(px(frame_h))
                     .rounded_sm()
                     .overflow_hidden()
                     .bg(p.background)
-                    .child(img(ImageSource::Render(ri)).w(px(inner_w)).h(px(frame_h)))
-                    .when_some(diff_badge_info.clone(), |el, (badge_bg, badge_label)| {
-                        el.child(
-                            div()
-                                .absolute()
-                                .top(px(6.0))
-                                .right(px(6.0))
-                                .px_2()
-                                .py_0p5()
-                                .rounded_full()
-                                .bg(badge_bg)
-                                .shadow_sm()
-                                .child(
-                                    Label::new(badge_label)
-                                        .text_xs()
-                                        .font_bold()
-                                        .text_color(p.primary_foreground),
-                                ),
-                        )
-                    })
+                    .child(img(ImageSource::Render(ri)).w(px(inner_w)).h(px(frame_h)));
+                for (rx, ry, rw, rh, mut border_col) in render_boxes {
+                    let mut fill_col = border_col;
+                    fill_col.a = 0.18;
+                    border_col.a = 0.95;
+                    frame = frame.child(
+                        div()
+                            .absolute()
+                            .left(px(rx))
+                            .top(px(ry))
+                            .w(px(rw))
+                            .h(px(rh))
+                            .rounded_xs()
+                            .border_2()
+                            .border_color(border_col)
+                            .bg(fill_col),
+                    );
+                }
+                frame.when_some(diff_badge_info.clone(), |el, (badge_bg, badge_label)| {
+                    el.child(
+                        div()
+                            .absolute()
+                            .top(px(6.0))
+                            .right(px(6.0))
+                            .px_2()
+                            .py_0p5()
+                            .rounded_full()
+                            .bg(badge_bg)
+                            .shadow_sm()
+                            .child(
+                                Label::new(badge_label)
+                                    .text_xs()
+                                    .font_bold()
+                                    .text_color(p.primary_foreground),
+                            ),
+                    )
+                })
             } else {
                 div()
                     .relative()
@@ -2576,6 +2659,38 @@ impl DuiDesktopView {
                         ),
                 );
             }
+            let mut render_changes_col = div().flex().flex_col().gap_1();
+            let has_render_changes = d
+                .render_diff
+                .as_ref()
+                .is_some_and(|rd| !rd.changes.is_empty());
+            if let Some(rd) = &d.render_diff {
+                for chg in rd.changes.iter().take(6) {
+                    let accent = match chg.kind {
+                        dui_core::diff::RenderChangeKind::Added => {
+                            Hsla::from(gpui_kit::rgb(0x2f9e66))
+                        }
+                        dui_core::diff::RenderChangeKind::Removed => {
+                            Hsla::from(gpui_kit::rgb(0xd94848))
+                        }
+                        _ => p.primary,
+                    };
+                    render_changes_col = render_changes_col.child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .rounded_sm()
+                            .border_l_2()
+                            .border_color(accent)
+                            .bg(p.background)
+                            .child(
+                                Label::new(chg.summary.clone())
+                                    .text_xs()
+                                    .text_color(p.foreground),
+                            ),
+                    );
+                }
+            }
             div()
                 .id("inspector-inline-diff")
                 .p_2()
@@ -2607,6 +2722,7 @@ impl DuiDesktopView {
                         }),
                 )
                 .child(thumbs)
+                .when(has_render_changes, |el| el.child(render_changes_col))
         });
 
         let diagnostic_box = active_cell.as_ref().and_then(|c| {

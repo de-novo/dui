@@ -171,6 +171,18 @@ export function ScreenInspector({
               </figure>
             )}
           </div>
+          {screenDiff.renderDiff && screenDiff.renderDiff.changes.length > 0 && (
+            <ul className="inspector-render-changes">
+              {screenDiff.renderDiff.changes.slice(0, 8).map((chg) => (
+                <li key={`${chg.kind}:${chg.id}`} className={`render-change-${chg.kind}`}>
+                  <span>{chg.summary}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {screenDiff.renderDiff?.visualOnly && (
+            <p className="inspector-visual-only">{t.canvasDiffVisualOnly}</p>
+          )}
         </section>
       )}
 

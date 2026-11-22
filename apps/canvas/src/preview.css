@@ -1436,6 +1436,57 @@ h2 {
 .capture-frame {
   position: relative;
 }
+.render-diff-box-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.render-diff-box {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 3px;
+}
+.render-diff-box-changed {
+  border: 2px solid #ef803f;
+  background: color-mix(in srgb, #ef803f 18%, transparent);
+}
+.render-diff-box-added {
+  border: 2px solid #2f9e66;
+  background: color-mix(in srgb, #2f9e66 18%, transparent);
+}
+.render-diff-box-removed {
+  border: 2px dashed #d94848;
+  background: color-mix(in srgb, #d94848 15%, transparent);
+}
+.inspector-render-changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.inspector-render-changes li {
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--muted);
+  color: var(--foreground);
+  border-left: 3px solid #ef803f;
+  overflow-wrap: anywhere;
+}
+.inspector-render-changes li.render-change-added {
+  border-left-color: #2f9e66;
+}
+.inspector-render-changes li.render-change-removed {
+  border-left-color: #d94848;
+}
+.inspector-visual-only {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
 .card-diff-pill {
   position: absolute;
   top: 12px;

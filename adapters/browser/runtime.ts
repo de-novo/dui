@@ -276,6 +276,100 @@ declare var __duiProbe: {
       ),
     );
   }
+  function collectRenderTree() {
+    const interesting = new Set([
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "a",
+      "button",
+      "input",
+      "select",
+      "textarea",
+      "img",
+      "canvas",
+      "svg",
+      "section",
+      "article",
+      "aside",
+      "main",
+      "nav",
+      "header",
+      "footer",
+      "form",
+      "dialog",
+      "output",
+      "p",
+      "li",
+      "strong",
+      "label",
+    ]);
+    const tagCounts = new Map<string, number>();
+    const nodes: {
+      id: string;
+      tag: string;
+      role?: string;
+      text: string;
+      rect: { x: number; y: number; width: number; height: number };
+      style: Record<string, string>;
+    }[] = [];
+    const root = document.body;
+    if (!root) return nodes;
+    const all = root.querySelectorAll("*");
+    for (const el of all) {
+      if (nodes.length >= 200) break;
+      if (!(el instanceof HTMLElement || el instanceof SVGElement)) continue;
+      const tag = el.tagName.toLowerCase();
+      const testId = el.getAttribute("data-testid");
+      const role = el.getAttribute("role") ?? undefined;
+      const ownText = Array.from(el.childNodes)
+        .filter((n) => n.nodeType === Node.TEXT_NODE)
+        .map((n) => n.textContent?.trim() ?? "")
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 120);
+      if (!testId && !role && !interesting.has(tag) && !ownText) continue;
+      const rect = el.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+      if (w <= 0 || h <= 0) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      const idx = tagCounts.get(tag) ?? 0;
+      tagCounts.set(tag, idx + 1);
+      const domId = el.getAttribute("id");
+      const id = testId
+        ? `[data-testid=${testId}]`
+        : domId
+          ? `#${domId}`
+          : role
+            ? `${tag}[role=${role}]#${idx}`
+            : `${tag}#${idx}`;
+      const text =
+        ownText ||
+        (el instanceof HTMLElement && el.children.length === 0
+          ? (el.innerText ?? "").trim().slice(0, 120)
+          : "");
+      nodes.push({
+        id,
+        tag,
+        ...(role ? { role } : {}),
+        text,
+        rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: w, height: h },
+        style: {
+          color: cs.color,
+          backgroundColor: cs.backgroundColor,
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          display: cs.display,
+        },
+      });
+    }
+    return nodes;
+  }
   async function observe(selector: string, delayed: boolean) {
     const p = globalThis.__duiProbe;
     if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 100)));
@@ -289,6 +383,7 @@ declare var __duiProbe: {
           .slice(0, 6),
       }))
       .filter((entry) => entry.values.length > 1);
+    const renderTree = collectRenderTree();
     return {
       ready: !!document.querySelector(selector),
       slots: p.slots,
@@ -298,6 +393,7 @@ declare var __duiProbe: {
       path: location.pathname + location.search + location.hash,
       width: innerWidth,
       ...(selectOptions.length > 0 ? { selectOptions } : {}),
+      ...(renderTree.length > 0 ? { renderTree } : {}),
     };
   }
   function visibleText(selector: string) {

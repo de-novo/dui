@@ -2,7 +2,9 @@
 
 use crate::{Reply, archive, failure, sqlite_store::SqliteStore};
 use dui_core::{
-    diff::{DiffCellSnapshot, affected_files, compute_rgba_diff, diff_captures},
+    diff::{
+        DiffCellSnapshot, RenderNodeSnapshot, affected_files, compute_rgba_diff, diff_captures,
+    },
     model::{CacheKey, ProjectId},
     storage::{CacheRepository, RunFilter, RunRepository},
 };
@@ -84,6 +86,11 @@ fn load_cell_snapshots(
             source_files = report_hashes.clone();
         }
 
+        let render_tree: Vec<RenderNodeSnapshot> = cell["observation"]["renderTree"]
+            .as_array()
+            .and_then(|arr| serde_json::from_value(Value::Array(arr.clone())).ok())
+            .unwrap_or_default();
+
         out.push(DiffCellSnapshot {
             path,
             scenario,
@@ -95,6 +102,7 @@ fn load_cell_snapshots(
             image,
             cache_key,
             source_files,
+            render_tree,
         });
     }
     Ok((snapshot, out))

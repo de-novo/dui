@@ -129,6 +129,18 @@ try {
     screens: {
       cells: {
         changedFiles: string[];
+        renderDiff?: {
+          textChanged: number;
+          visualOnly: boolean;
+          changes: {
+            kind: string;
+            tag: string;
+            beforeText?: string;
+            afterText?: string;
+            afterRect?: { width: number; height: number };
+            summary: string;
+          }[];
+        };
         pixelDiff: { diffPixels: number };
       }[];
     }[];
@@ -153,6 +165,25 @@ try {
     changedCell.pixelDiff.diffPixels > 0,
     `expected non-zero pixel diff: ${JSON.stringify(changedCell.pixelDiff)}`,
   );
+  assert(
+    changedCell.renderDiff && changedCell.renderDiff.textChanged >= 1,
+    `expected render-level textChanged >= 1: ${JSON.stringify(changedCell.renderDiff)}`,
+  );
+  const h1Change = changedCell.renderDiff.changes.find(
+    (c) =>
+      c.kind === "text-changed" &&
+      c.tag === "h1" &&
+      c.beforeText === "Catalog" &&
+      c.afterText === "Updated Branch Catalog",
+  );
+  assert(
+    h1Change,
+    `expected h1 Catalog -> Updated Branch Catalog change: ${JSON.stringify(changedCell.renderDiff)}`,
+  );
+  assert(
+    h1Change.afterRect && h1Change.afterRect.width > 0 && h1Change.afterRect.height > 0,
+    `expected valid element bounding box: ${JSON.stringify(h1Change)}`,
+  );
 
   console.log(
     JSON.stringify({
@@ -161,6 +192,7 @@ try {
       afterBranch: diffBody.afterBranch,
       changedCells: diffBody.summary.changed,
       diffPixels: changedCell.pixelDiff.diffPixels,
+      renderDiffSummary: h1Change.summary,
       changedSince,
       cliMcpParity: true,
     }),
