@@ -6,7 +6,6 @@ use std::collections::{BTreeMap, BTreeSet};
 #[serde(rename_all = "kebab-case")]
 pub enum FillTermination {
     Exhausted,
-    BudgetLimit,
     NoImprovement,
 }
 

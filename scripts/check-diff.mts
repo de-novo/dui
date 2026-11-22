@@ -157,7 +157,6 @@ try {
         sourceFile: "Catalog.tsx",
         widths: [375],
         readySelector: "[data-testid=catalog]",
-        stateBudget: 1,
         scenarios: [
           {
             path: "/settings",

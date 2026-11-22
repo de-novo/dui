@@ -73,7 +73,6 @@ try {
         path: "/",
         widths: [375],
         readySelector: "[data-testid=query-screen]",
-        stateBudget: 16,
       },
       null,
       2,

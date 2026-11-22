@@ -99,7 +99,6 @@ pub(crate) fn exercise_with_renderer(
     if widths.is_empty() || widths.contains(&0) {
         return Err(failure(2, "positive widths required"));
     }
-    let budget = spec["stateBudget"].as_u64().map(|n| n.max(1) as usize);
     fs::create_dir_all(out).map_err(|e| failure(3, &e.to_string()))?;
     let mut stored_spec = spec.clone();
     if let Some(base) = manifest.parent() {
@@ -136,7 +135,6 @@ pub(crate) fn exercise_with_renderer(
         &spec,
         out,
         &widths,
-        budget,
         browser_version,
         &locales,
         &missing_by_locale,
@@ -218,7 +216,6 @@ fn execute_with(
     spec: &Value,
     out: &Path,
     widths: &BTreeSet<u32>,
-    budget: usize,
     browser_version: Option<Value>,
 ) -> Reply {
     execute_with_locales(
@@ -227,7 +224,6 @@ fn execute_with(
         spec,
         out,
         widths,
-        Some(budget),
         browser_version,
         &[],
         &BTreeMap::new(),
@@ -245,7 +241,6 @@ fn execute_with_locales(
     spec: &Value,
     out: &Path,
     widths: &BTreeSet<u32>,
-    budget: Option<usize>,
     browser_version: Option<Value>,
     locales: &[String],
     missing_by_locale: &BTreeMap<String, Vec<String>>,
@@ -291,9 +286,10 @@ fn execute_with_locales(
     if spec.get("screenDiscovery").is_none()
         && let Some(base_path) = spec["path"].as_str().filter(|p| !p.is_empty())
     {
-        let discovered_queries = dui_core::discovery::query_candidates(facts);
-        let query_limit = budget.map(|b| b.saturating_sub(1)).unwrap_or(usize::MAX);
-        for (qi, q) in discovered_queries.into_iter().take(query_limit).enumerate() {
+        for (qi, q) in dui_core::discovery::query_candidates(facts)
+            .into_iter()
+            .enumerate()
+        {
             let q_path = dui_core::discovery::with_query(base_path, &q);
             if configured_paths.insert(q_path.clone()) {
                 let mut case = spec.clone();
@@ -305,10 +301,6 @@ fn execute_with_locales(
     }
     while let Some((scenario, mut spec)) = scenarios.pop_front() {
         apply_generated(&mut spec, &analysis["autoMocks"]);
-        let scenario_budget = spec["stateBudget"]
-            .as_u64()
-            .map(|n| n.max(1) as usize)
-            .or(budget);
         let max_stagnant = spec["maxNoImprovementRounds"].as_u64().map(|n| n as usize);
         let mut active = BTreeSet::new();
         let mut done = BTreeSet::new();
@@ -317,12 +309,6 @@ fn execute_with_locales(
         let mut termination = FillTermination::Exhausted;
         while let Some(row) = pending.first().cloned() {
             let index = done.len();
-            if let Some(limit) = scenario_budget
-                && index >= limit
-            {
-                termination = FillTermination::BudgetLimit;
-                break;
-            }
             let prev_hits = hits.len();
             let prev_active = active.len();
             done.insert(serde_json::to_string(&row).map_err(|e| failure(3, &e.to_string()))?);
@@ -634,7 +620,7 @@ fn execute_with_locales(
             }
         }
         seen_slots.extend(active);
-        rounds.push(json!({"scenario":scenario,"name":spec["name"],"stateBudget":scenario_budget,"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
+        rounds.push(json!({"scenario":scenario,"name":spec["name"],"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
         remaining += pending.len();
     }
     let graph = graph(facts, &hits);
@@ -659,7 +645,7 @@ fn execute_with_locales(
         .filter(|c| c["reason"] != "not-rendered" && c["status"] != "unrenderable")
         .count();
     let renderable = cells.len() - unrenderable;
-    let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"budget":budget,"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
+    let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
     if !locales.is_empty() {
         report["locales"] = summarize_by_locale(&cells, missing_by_locale);
     }
@@ -854,7 +840,6 @@ mod tests {
             &json!({"path": "/", "screenDiscovery": {"sources": {}}, "hasScreenAssertion": false}),
             dir.path(),
             &BTreeSet::from([375]),
-            1,
             None,
         )
         .unwrap_err();
@@ -864,21 +849,22 @@ mod tests {
     }
 
     #[test]
-    fn budget_preserves_unattempted_cells_in_the_graph_and_denominator() {
+    fn stagnation_preserves_unattempted_cells_in_the_graph_and_denominator() {
         let dir = tempfile::tempdir().unwrap();
         let facts = json!({"facts":[{"file":"file","start":1,"end":2,"kind":"slot","owner":"Screen","shape":{"kind":"boolean"},"after":3,"init":[1,2]}],"diagnostics":[]});
         let widths = BTreeSet::from([375, 768]);
         let (code, report) = execute_with(
             Some(&mut StaticPage),
             &facts,
-            &json!({"path":"/"}),
+            &json!({"path":"/","maxNoImprovementRounds":1}),
             dir.path(),
             &widths,
-            1,
             None,
         )
         .unwrap_err();
         assert_eq!(code, 5);
+        assert_eq!(report["scenarios"][0]["termination"], "no-improvement");
+        assert_eq!(report["coverage"]["attempted"], 4);
         assert_eq!(report["coverage"]["verified"], 2);
         assert_eq!(report["coverage"]["renderable"], 6);
         assert_eq!(
@@ -888,7 +874,7 @@ mod tests {
                 .iter()
                 .filter(|c| c["reason"] == "not-rendered")
                 .count(),
-            4
+            2
         );
         let graph: Value =
             serde_json::from_slice(&fs::read(dir.path().join("graph.json")).unwrap()).unwrap();
@@ -904,25 +890,20 @@ mod tests {
     }
 
     #[test]
-    fn default_unlimited_budget_exhausts_every_planned_state() {
+    fn default_run_exhausts_every_planned_state() {
         let dir = tempfile::tempdir().unwrap();
         let facts = json!({"facts":[{"file":"file","start":1,"end":2,"kind":"slot","owner":"Screen","shape":{"kind":"boolean"},"after":3,"init":[1,2]}],"diagnostics":[]});
         let widths = BTreeSet::from([375, 768]);
-        let report = match execute_with_locales(
+        let report = match execute_with(
             Some(&mut StaticPage),
             &facts,
             &json!({"path":"/"}),
             dir.path(),
             &widths,
             None,
-            None,
-            &[],
-            &BTreeMap::new(),
-            None,
         ) {
             Ok(body) | Err((_, body)) => body,
         };
-        assert_eq!(report["budget"], Value::Null);
         assert_eq!(report["remainingPlans"], 0);
         assert_eq!(report["scenarios"][0]["termination"], "exhausted");
         assert_eq!(
@@ -964,16 +945,12 @@ mod tests {
             }
         }
         let dir = tempfile::tempdir().unwrap();
-        let report = match execute_with_locales(
+        let report = match execute_with(
             Some(&mut MultiHopSite),
             &json!({"facts": [], "diagnostics": []}),
             &json!({"path": "/", "routeSelector": "a[href]", "hasScreenAssertion": true}),
             dir.path(),
             &BTreeSet::from([1280]),
-            None,
-            None,
-            &[],
-            &BTreeMap::new(),
             None,
         ) {
             Ok(body) | Err((_, body)) => body,
@@ -1013,7 +990,7 @@ mod tests {
         let spec = json!({"path":"/","scenarios":[{"name":"two"},{"name":"three"},{"name":"four"},{"name":"five"}]});
         let widths = BTreeSet::from([375, 768, 1280]);
         let run = |renderer: &mut dyn Renderer| {
-            execute_with(Some(renderer), &facts, &spec, dir.path(), &widths, 5, None)
+            execute_with(Some(renderer), &facts, &spec, dir.path(), &widths, None)
         };
         let ids = |report: &Value| -> BTreeSet<(String, u32)> {
             report["cells"]
@@ -1085,7 +1062,6 @@ mod tests {
             &json!({"path":"/"}),
             dir.path(),
             &BTreeSet::from([375]),
-            1,
             None,
         )
         .unwrap_err();
@@ -1178,7 +1154,6 @@ mod tests {
             &spec,
             dir_fwd.path(),
             &widths,
-            16,
             None,
         )
         .unwrap_err();
@@ -1195,7 +1170,6 @@ mod tests {
             &spec,
             dir_rev.path(),
             &widths,
-            16,
             None,
         )
         .unwrap_err();

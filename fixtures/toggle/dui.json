@@ -2,6 +2,5 @@
   "tsconfig": "tsconfig.json",
   "path": "/",
   "widths": [375, 1280],
-  "readySelector": "[data-testid=catalog]",
-  "stateBudget": 16
+  "readySelector": "[data-testid=catalog]"
 }
