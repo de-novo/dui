@@ -33,15 +33,33 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
             }
             extra.push(screen);
         }
-        if report.get("screenDiscovery").is_some()
-            && let Some(from) = cell["observation"]["path"].as_str()
-            && screen_paths.contains(from)
+        if let Some(obs_path) = cell["observation"]["path"].as_str()
             && let Some(width) = cell["width"].as_u64()
             && let Some(anchors) = cell["observation"]["links"].as_array()
         {
-            for target in anchors.iter().filter_map(Value::as_str) {
-                if from != target && screen_paths.contains(target) {
-                    navigation.entry((from, target)).or_default().insert(width);
+            let from = if screen_paths.contains(obs_path) {
+                Some(obs_path)
+            } else {
+                obs_path
+                    .split('?')
+                    .next()
+                    .filter(|base| screen_paths.contains(*base))
+            };
+            if let Some(from) = from {
+                for raw_target in anchors.iter().filter_map(Value::as_str) {
+                    let target = if screen_paths.contains(raw_target) {
+                        Some(raw_target)
+                    } else {
+                        raw_target
+                            .split('?')
+                            .next()
+                            .filter(|base| screen_paths.contains(*base))
+                    };
+                    if let Some(target) = target
+                        && from != target
+                    {
+                        navigation.entry((from, target)).or_default().insert(width);
+                    }
                 }
             }
         }
