@@ -20,6 +20,60 @@ pub enum Failure {
     AssertFailed,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UrlMatch {
+    pub matched: bool,
+    pub observed_query: BTreeMap<String, String>,
+    pub normalized_query: BTreeMap<String, String>,
+}
+
+pub fn parse_url_parts(raw: &str) -> (&str, BTreeMap<String, String>) {
+    let no_hash = raw.split('#').next().unwrap_or(raw);
+    let (pathname, query_str) = match no_hash.split_once('?') {
+        Some((p, q)) => (p, Some(q)),
+        None => (no_hash, None),
+    };
+    let mut query = BTreeMap::new();
+    if let Some(qs) = query_str {
+        for pair in qs.split('&') {
+            if pair.is_empty() {
+                continue;
+            }
+            let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
+            query.insert(k.to_owned(), v.to_owned());
+        }
+    }
+    (pathname, query)
+}
+
+/// Compare an expected route/query against the observed browser URL.
+/// - Pathname must match strictly (redirects to another screen fail).
+/// - Every explicitly requested query parameter must match identically.
+/// - Extra default query parameters appended by the app on the same pathname are
+///   recorded transparently in `normalized_query` without causing a false mismatch.
+pub fn analyze_url_match(expected: &str, observed: &str) -> UrlMatch {
+    let (exp_path, exp_query) = parse_url_parts(expected);
+    let (obs_path, obs_query) = parse_url_parts(observed);
+    let pathname_matches = exp_path == obs_path;
+    let expected_query_matches = exp_query
+        .iter()
+        .all(|(k, v)| obs_query.get(k).is_some_and(|ov| ov == v));
+    let mut normalized_query = BTreeMap::new();
+    if pathname_matches {
+        for (k, v) in &obs_query {
+            if !exp_query.contains_key(k) {
+                normalized_query.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    UrlMatch {
+        matched: pathname_matches && expected_query_matches,
+        observed_query: obs_query,
+        normalized_query,
+    }
+}
+
 impl Intent<'_> {
     pub fn failure(&self, observed: &Value) -> Option<Failure> {
         self.failure_with(observed, &std::collections::BTreeSet::new())
@@ -63,6 +117,9 @@ impl Intent<'_> {
         let probe_ran = observed["hits"]
             .as_array()
             .is_some_and(|hits| hits.iter().any(Value::is_string));
+        let path_matches = observed["path"]
+            .as_str()
+            .is_some_and(|obs_path| analyze_url_match(self.path, obs_path).matched);
         let matches = self.analyzed
             && values_match
             && targets_match
@@ -70,7 +127,7 @@ impl Intent<'_> {
             && observed["settled"] != false
             && observed["ready"] == true
             && observed["width"] == self.width
-            && observed["path"] == self.path
+            && path_matches
             && (!self.expects_probe || probe_ran);
         (!matches).then_some(Failure::AssertFailed)
     }
@@ -149,5 +206,25 @@ mod tests {
         );
         assert_eq!(slot_witness(&off, Some(&off), "unexpected", "hidden"), None);
         assert_eq!(slot_witness(&on, None, "visible", "hidden"), None);
+    }
+
+    #[test]
+    fn normalizes_extra_default_query_params_while_rejecting_mismatched_routes_or_expected_queries()
+    {
+        let norm = analyze_url_match(
+            "/o/local/b/local-team/generation",
+            "/o/local/b/local-team/generation?project=prj_local-team",
+        );
+        assert!(norm.matched);
+        assert_eq!(
+            norm.normalized_query.get("project").map(String::as_str),
+            Some("prj_local-team")
+        );
+
+        let wrong_query = analyze_url_match("/grid?item=A", "/grid?item=B");
+        assert!(!wrong_query.matched);
+
+        let redirect = analyze_url_match("/admin", "/login?next=%2Fadmin");
+        assert!(!redirect.matched);
     }
 }

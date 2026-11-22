@@ -80,6 +80,111 @@ pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<St
     singles
 }
 
+fn value_to_query_string(v: &Value) -> Option<String> {
+    match v {
+        Value::String(s) if !s.is_empty() => Some(s.clone()),
+        Value::Bool(b) => Some(b.to_string()),
+        Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
+fn literal_values_from_shape(shape: &Value, out: &mut BTreeSet<String>) {
+    match shape["kind"].as_str() {
+        Some("literal") => {
+            if let Some(s) = value_to_query_string(&shape["value"]) {
+                out.insert(s);
+            }
+        }
+        Some("boolean") => {
+            out.insert("false".into());
+            out.insert("true".into());
+        }
+        Some("union") => {
+            for m in shape["members"].as_array().into_iter().flatten() {
+                literal_values_from_shape(m, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Framework-agnostic deterministic URL query parameter state planner.
+/// Extracts candidate values from `searchParam` compiler facts (both typed unions/booleans
+/// and literal equality predicates bound to the same `URLSearchParams.get(...)` declaration).
+pub fn query_candidates(facts: &[Value]) -> Vec<BTreeMap<String, String>> {
+    let mut by_name: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for f in facts.iter().filter(|f| f["kind"] == "searchParam") {
+        let Some(name) = f["label"].as_str().filter(|s| !s.is_empty()) else {
+            continue;
+        };
+        let values = by_name.entry(name.to_owned()).or_default();
+        if f["presence"] == json!(true) {
+            values.insert("1".into());
+            continue;
+        }
+        literal_values_from_shape(&f["shape"], values);
+        // Bind untyped `URLSearchParams.get("key")` variables to branch equality predicates.
+        if f["binding"].is_number() {
+            for b in facts.iter().filter(|b| {
+                b["kind"] == "branch"
+                    && b["file"] == f["file"]
+                    && b["owner"] == f["owner"]
+                    && b["predicate"]["binding"] == f["binding"]
+            }) {
+                if matches!(
+                    b["predicate"]["operator"].as_str(),
+                    Some("equals" | "eq" | "neq")
+                ) && let Some(s) = value_to_query_string(&b["predicate"]["value"])
+                {
+                    values.insert(s);
+                }
+            }
+        }
+    }
+
+    let params: Vec<(String, Vec<String>)> = by_name
+        .into_iter()
+        .filter(|(_, vals)| !vals.is_empty())
+        .map(|(k, vals)| (k, vals.into_iter().collect()))
+        .collect();
+
+    let mut singles = Vec::new();
+    let mut pairs = Vec::new();
+    for (i, (key, vals)) in params.iter().enumerate() {
+        for v in vals {
+            singles.push(BTreeMap::from([(key.clone(), v.clone())]));
+            for (other_k, other_vals) in &params[..i] {
+                for ov in other_vals {
+                    pairs.push(BTreeMap::from([
+                        (key.clone(), v.clone()),
+                        (other_k.clone(), ov.clone()),
+                    ]));
+                }
+            }
+        }
+    }
+    singles.extend(pairs);
+    singles
+}
+
+/// Build a canonical URL path by merging sorted query parameters onto `base_path`.
+pub fn with_query(base_path: &str, query: &BTreeMap<String, String>) -> String {
+    if query.is_empty() {
+        return base_path.to_owned();
+    }
+    let (pathname, mut merged) = crate::verification::parse_url_parts(base_path);
+    for (k, v) in query {
+        merged.insert(k.clone(), v.clone());
+    }
+    let qs = merged
+        .into_iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("{pathname}?{qs}")
+}
+
 pub fn graph(facts: &[Value], hits: &BTreeSet<String>) -> Value {
     let mut nodes = BTreeMap::new();
     let mut edges = BTreeSet::new();
@@ -257,5 +362,55 @@ mod tests {
             assertions(&forward, &row, &json!({})),
             assertions(&reversed, &row, &json!({}))
         );
+    }
+
+    #[test]
+    fn query_candidates_plan_standard_url_search_params_and_typed_unions() {
+        let facts = vec![
+            json!({
+                "file": "app.tsx",
+                "owner": "App",
+                "start": 10,
+                "end": 40,
+                "kind": "searchParam",
+                "label": "tab",
+                "presence": false,
+                "binding": 10,
+                "shape": {"kind": "string"}
+            }),
+            json!({
+                "file": "app.tsx",
+                "owner": "App",
+                "start": 50,
+                "end": 80,
+                "kind": "searchParam",
+                "label": "compact",
+                "presence": true,
+                "binding": 50,
+                "shape": {"kind": "boolean"}
+            }),
+            json!({
+                "file": "app.tsx",
+                "owner": "App",
+                "start": 100,
+                "end": 120,
+                "kind": "branch",
+                "predicate": {"operator": "equals", "binding": 10, "value": "details"}
+            }),
+            json!({
+                "file": "app.tsx",
+                "owner": "App",
+                "start": 130,
+                "end": 150,
+                "kind": "branch",
+                "predicate": {"operator": "equals", "binding": 10, "value": "billing"}
+            }),
+        ];
+        let planned = query_candidates(&facts);
+        let urls: Vec<String> = planned.iter().map(|q| with_query("/", q)).collect();
+        assert!(urls.contains(&"/?tab=details".to_owned()));
+        assert!(urls.contains(&"/?tab=billing".to_owned()));
+        assert!(urls.contains(&"/?compact=1".to_owned()));
+        assert!(urls.contains(&"/?compact=1&tab=details".to_owned()));
     }
 }

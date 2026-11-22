@@ -279,10 +279,27 @@ fn execute_with_locales(
         }
         scenarios.push_back((format!("case-{}", i + 1), case));
     }
-    let configured_paths: BTreeSet<String> = scenarios
+    let mut configured_paths: BTreeSet<String> = scenarios
         .iter()
         .filter_map(|(_, s)| s["path"].as_str().map(str::to_owned))
         .collect();
+    if spec.get("screenDiscovery").is_none()
+        && let Some(base_path) = spec["path"].as_str().filter(|p| !p.is_empty())
+    {
+        for (qi, q) in dui_core::discovery::query_candidates(facts)
+            .into_iter()
+            .take(budget.saturating_sub(1))
+            .enumerate()
+        {
+            let q_path = dui_core::discovery::with_query(base_path, &q);
+            if configured_paths.insert(q_path.clone()) {
+                let mut case = spec.clone();
+                case["path"] = json!(q_path);
+                case["queryParams"] = json!(q);
+                scenarios.push_back((format!("query-{}", qi + 1), case));
+            }
+        }
+    }
     while let Some((scenario, mut spec)) = scenarios.pop_front() {
         apply_generated(&mut spec, &analysis["autoMocks"]);
         let budget = spec["stateBudget"]
@@ -380,6 +397,18 @@ fn execute_with_locales(
                             "observation": obs,
                             "cache": CacheOutcome::Hit { key: cache_key },
                         });
+                        if let Some(expected_p) = spec["path"].as_str()
+                            && let Some(obs_p) = obs["path"].as_str()
+                        {
+                            let url_match =
+                                dui_core::verification::analyze_url_match(expected_p, obs_p);
+                            if !url_match.observed_query.is_empty() {
+                                cell["observedQuery"] = json!(url_match.observed_query);
+                            }
+                            if !url_match.normalized_query.is_empty() {
+                                cell["normalizedQuery"] = json!(url_match.normalized_query);
+                            }
+                        }
                         if let Some(inputs) = cache_inputs.as_ref() {
                             cell["sourceFiles"] =
                                 json!(inputs.source_files.keys().cloned().collect::<Vec<_>>());
@@ -472,6 +501,18 @@ fn execute_with_locales(
                                     .map_err(|e| failure(3, &e.to_string()))?;
                             }
                             let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason,"observation":obs});
+                            if let Some(expected_p) = spec["path"].as_str()
+                                && let Some(obs_p) = entry["observation"]["path"].as_str()
+                            {
+                                let url_match =
+                                    dui_core::verification::analyze_url_match(expected_p, obs_p);
+                                if !url_match.observed_query.is_empty() {
+                                    entry["observedQuery"] = json!(url_match.observed_query);
+                                }
+                                if !url_match.normalized_query.is_empty() {
+                                    entry["normalizedQuery"] = json!(url_match.normalized_query);
+                                }
+                            }
                             if let Some(loc) = locale {
                                 entry["localeAudit"] = build_locale_audit(
                                     loc,

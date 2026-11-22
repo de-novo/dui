@@ -25,7 +25,7 @@ const rules: Rule[] = [
     throw Error("unsupported rule pack: " + path);
   return pack.rules;
 });
-const kinds = new Set(["slot", "route", "query", "schema"]);
+const kinds = new Set(["slot", "route", "query", "schema", "search"]);
 const entries = new Set();
 for (const rule of rules) {
   const id = JSON.stringify([rule.package, rule.symbol]);
@@ -440,6 +440,44 @@ try {
               ...contract,
             });
           const fn = n.expression;
+          // Framework-agnostic standard Web URLSearchParams (.get("key") / .has("key")).
+          if (
+            fn.kind === K.PropertyAccessExpression &&
+            (fn.name?.text === "get" || fn.name?.text === "has") &&
+            n.arguments[0]?.kind === K.StringLiteral &&
+            n.arguments[0].text.length > 0
+          ) {
+            const recvType = checker.getTypeAtLocation(fn.expression);
+            const recvName = recvType?.getSymbol()?.name;
+            if (recvName === "URLSearchParams") {
+              let holder: Syntax | undefined = n.parent;
+              while (
+                holder &&
+                [
+                  K.AsExpression,
+                  K.ParenthesizedExpression,
+                  K.NonNullExpression,
+                  K.BinaryExpression,
+                ].includes(holder.kind)
+              ) {
+                holder = holder.parent;
+              }
+              const varDecl = holder?.kind === K.VariableDeclaration ? holder : undefined;
+              const isPresence = fn.name.text === "has";
+              const targetNode = varDecl?.name ?? n;
+              const t = checker.getTypeAtLocation(targetNode);
+              facts.push({
+                ...base,
+                kind: "searchParam",
+                label: n.arguments[0].text,
+                presence: isPresence,
+                optional: true,
+                binding: varDecl?.name ? binding(varDecl.name) : null,
+                type: t ? checker.typeToString(t) : "unknown",
+                shape: isPresence ? { kind: "boolean" } : shape(t),
+              });
+            }
+          }
           const sym = symbol(fn.name ?? fn);
           const path = compiler.declarationPath(sym?.declarations?.[0]) ?? "";
           const rule = rules.find(
@@ -493,6 +531,25 @@ try {
               label: sym.name,
               shape: prop ? shape(checker.getTypeOfSymbolAtLocation(prop, n)) : { kind: "unknown" },
             });
+          } else if (rule?.kind === "search") {
+            const t = checker.getTypeAtLocation(n);
+            const props = t ? checker.getPropertiesOfType(t) : [];
+            if (props.length > 0 && props.length <= 32) {
+              for (const prop of props) {
+                const propType = checker.getTypeOfSymbolAtLocation(prop, n);
+                if (checker.getSignaturesOfType(propType, SignatureKind.Call).length) continue;
+                facts.push({
+                  ...base,
+                  kind: "searchParam",
+                  label: prop.name,
+                  presence: false,
+                  optional: Boolean(prop.flags & SymbolFlags.Optional),
+                  binding: null,
+                  type: propType ? checker.typeToString(propType) : "unknown",
+                  shape: shape(propType),
+                });
+              }
+            }
           } else if (rule)
             facts.push({
               ...base,
@@ -513,7 +570,10 @@ try {
     allDiagnostics.push(...diagnostics);
   }
   const unique = new Map(
-    allFacts.map((f) => [JSON.stringify([f.file, f.start, f.end, f.kind]), f]),
+    allFacts.map((f) => [
+      JSON.stringify([f.file, f.start, f.end, f.kind, f.kind === "searchParam" ? f.label : ""]),
+      f,
+    ]),
   );
   console.log(
     JSON.stringify({
