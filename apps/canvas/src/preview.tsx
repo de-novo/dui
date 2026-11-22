@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
@@ -15,6 +15,12 @@ import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
 import { type AuditReport, decodeAuditReport, openCommentsByPath } from "./model/audit";
+import {
+  type CanvasDiffVisualMode,
+  filterArchiveForDiff,
+  indexScreenDiffs,
+} from "./model/canvasDiff";
+import { type CaptureDiff, decodeCaptureDiff } from "./model/diff";
 import type { LiveCellRef } from "./model/live";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import "./preview.css";
@@ -123,10 +129,51 @@ function MapView({
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [audit, setAudit] = useState<AuditReport | null>(null);
+  const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
+    const fromUrl = new URLSearchParams(location.search).get("compare");
+    return fromUrl ?? "";
+  });
+  const [changedOnly, setChangedOnly] = useState(false);
+  const [diffVisualMode, setDiffVisualMode] = useState<CanvasDiffVisualMode>("overlay");
+  const [canvasDiffState, setCanvasDiffState] = useState<{
+    pairKey: string;
+    diff: CaptureDiff | null;
+  }>({ pairKey: "", diff: null });
   const optionsButton = useRef<HTMLButtonElement>(null);
   const dismiss = useRef<HTMLButtonElement>(null);
   const origin = useRef<HTMLElement | SVGElement | null>(null);
   const previousView = useRef(view);
+
+  const otherRuns = useMemo(() => runs.filter((r) => r.key !== run.key), [runs, run.key]);
+  const activePairKey = compareBeforeKey ? `${compareBeforeKey}::${run.key}` : "";
+  const activeDiff =
+    activePairKey && canvasDiffState.pairKey === activePairKey ? canvasDiffState.diff : null;
+  const diffActive = Boolean(compareBeforeKey && activeDiff);
+
+  useEffect(() => {
+    if (!compareBeforeKey) return;
+    const pairKey = `${compareBeforeKey}::${run.key}`;
+    const controller = new AbortController();
+    fetch(
+      `/api/diff?before=${encodeURIComponent(compareBeforeKey)}&after=${encodeURIComponent(run.key)}`,
+      { cache: "no-store", signal: controller.signal },
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((raw) => {
+        if (!controller.signal.aborted) {
+          setCanvasDiffState({ pairKey, diff: raw ? decodeCaptureDiff(raw) : null });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCanvasDiffState({ pairKey, diff: null });
+      });
+    return () => controller.abort();
+  }, [compareBeforeKey, run.key]);
+
+  const diffsByPath = indexScreenDiffs(activeDiff, width);
+  const visibleArchive = filterArchiveForDiff(archive, diffsByPath, diffActive, changedOnly);
+  const selectedScreen = visibleArchive.screens.find((s) => s.id === selectedId) ?? screen;
+  const selectedDiff = selectedScreen ? diffsByPath[selectedScreen.path] : undefined;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -208,12 +255,17 @@ function MapView({
           {railInset !== undefined && (
             <ScreenMap
               railInset={railInset}
-              archive={archive}
+              archive={visibleArchive}
               width={width}
               mode={mode}
               selectedId={selectedId}
               focusActive={showDetails}
               openCommentsByPath={openCommentsByPath(audit)}
+              diffsByPath={diffsByPath}
+              diffActive={diffActive}
+              diffVisualMode={diffVisualMode}
+              beforeRunKey={compareBeforeKey || undefined}
+              afterRunKey={run.key}
               imageUrl={(name) => archiveUrl(name, run)}
               select={select}
               onClearSelection={returnToOverview}
@@ -221,27 +273,103 @@ function MapView({
           )}
         </div>
 
-        {!showLive && audit && (
-          <output
-            className="audit-summary-pill glass-panel"
-            data-audit-meets-goal={String(audit.meetsGoal)}
-          >
-            <strong>
-              {t.auditCoverageLabel(audit.summary.verifiedPercent, audit.goalPercent)}
-            </strong>
-            <span>
-              {t.auditCellsLabel(
-                audit.summary.verifiedCells,
-                audit.summary.renderableCells,
-                audit.summary.totalCells,
-              )}
-            </span>
-            {audit.summary.openComments > 0 && (
-              <span className="audit-open-comments">
-                {t.auditOpenCommentsLabel(audit.summary.openComments)}
-              </span>
+        {!showLive && (audit || otherRuns.length > 0) && (
+          <div className="map-top-bar">
+            {audit && (
+              <output
+                className="audit-summary-pill glass-panel"
+                data-audit-meets-goal={String(audit.meetsGoal)}
+              >
+                <strong>
+                  {t.auditCoverageLabel(audit.summary.verifiedPercent, audit.goalPercent)}
+                </strong>
+                <span>
+                  {t.auditCellsLabel(
+                    audit.summary.verifiedCells,
+                    audit.summary.renderableCells,
+                    audit.summary.totalCells,
+                  )}
+                </span>
+                {audit.summary.openComments > 0 && (
+                  <span className="audit-open-comments">
+                    {t.auditOpenCommentsLabel(audit.summary.openComments)}
+                  </span>
+                )}
+              </output>
             )}
-          </output>
+
+            {otherRuns.length > 0 && (
+              <section className="canvas-diff-bar glass-panel" aria-label={t.diffTitle}>
+                <label className="canvas-diff-select-wrap">
+                  <span>{t.canvasDiffCompare}</span>
+                  <select
+                    aria-label={t.canvasDiffCompare}
+                    value={compareBeforeKey}
+                    onChange={(e) => {
+                      const nextKey = e.target.value;
+                      setCompareBeforeKey(nextKey);
+                      update({ compare: nextKey || null });
+                    }}
+                  >
+                    <option value="">{t.canvasDiffOff}</option>
+                    {otherRuns.map((candidate) => (
+                      <option key={candidate.key} value={candidate.key}>
+                        {candidate.project} · {candidate.branch ?? "—"} ·{" "}
+                        {candidate.version.slice(-6)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {compareBeforeKey && (
+                  <>
+                    <button
+                      type="button"
+                      className={"canvas-diff-chip" + (changedOnly ? " active" : "")}
+                      aria-pressed={changedOnly}
+                      onClick={() => setChangedOnly((v) => !v)}
+                    >
+                      {t.canvasDiffChangedOnly}
+                    </button>
+
+                    <div className="canvas-diff-mode-group">
+                      {(
+                        [
+                          ["after", t.canvasDiffModeAfter],
+                          ["before", t.canvasDiffModeBefore],
+                          ["overlay", t.canvasDiffModeOverlay],
+                        ] as const
+                      ).map(([modeKey, label]) => (
+                        <button
+                          key={modeKey}
+                          type="button"
+                          className={
+                            "canvas-diff-mode-btn" + (diffVisualMode === modeKey ? " active" : "")
+                          }
+                          aria-pressed={diffVisualMode === modeKey}
+                          onClick={() => setDiffVisualMode(modeKey)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {activeDiff && (
+                      <span className="canvas-diff-counts">
+                        {activeDiff.summary.totalChanged === 0
+                          ? t.canvasDiffNoChanges
+                          : t.canvasDiffSummary(
+                              activeDiff.summary.changed,
+                              activeDiff.summary.added,
+                              activeDiff.summary.removed,
+                            )}
+                      </span>
+                    )}
+                  </>
+                )}
+              </section>
+            )}
+          </div>
         )}
 
         {showOverview && screen && (
@@ -296,9 +424,9 @@ function MapView({
 
       {showDetails && (
         <ScreenInspector
-          archive={archive}
+          archive={visibleArchive}
           run={run}
-          screen={screen}
+          screen={selectedScreen}
           width={width}
           widths={widths}
           locale={locale}
@@ -325,6 +453,8 @@ function MapView({
               view: "live",
             })
           }
+          screenDiff={selectedDiff}
+          beforeRunKey={compareBeforeKey || undefined}
         />
       )}
 

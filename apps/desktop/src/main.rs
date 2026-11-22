@@ -66,12 +66,20 @@ enum CommentTargetChoice {
     Transition(String),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum CanvasDiffVisualMode {
+    After,
+    Before,
+    Overlay,
+}
+
 struct LaunchOptions {
     dui_home: PathBuf,
     project: Option<String>,
     run_id: Option<String>,
     screen_path: Option<String>,
     view: ViewMode,
+    canvas_diff: bool,
     dark: bool,
     lang: UiLang,
     viewport_width: u32,
@@ -114,6 +122,10 @@ struct DuiDesktopView {
     // Cached diff entries for current (before, after) pair
     diff_cache_key: Option<(usize, usize)>,
     diff_entries: Vec<DiffCellEntry>,
+    // 2D Canvas inline diff controls (matching `apps/canvas`)
+    canvas_diff_enabled: bool,
+    canvas_diff_changed_only: bool,
+    canvas_diff_mode: CanvasDiffVisualMode,
 }
 
 impl Drop for DuiDesktopView {
@@ -237,10 +249,13 @@ impl DuiDesktopView {
             live_session: None,
             diff_cache_key: None,
             diff_entries: Vec::new(),
+            canvas_diff_enabled: opts.canvas_diff,
+            canvas_diff_changed_only: false,
+            canvas_diff_mode: CanvasDiffVisualMode::Overlay,
         };
         this.sync_cell_to_width();
         this.fit_map();
-        if this.view_mode == ViewMode::Diff {
+        if this.view_mode == ViewMode::Diff || this.canvas_diff_enabled {
             this.ensure_diff_loaded();
         }
         this
@@ -898,6 +913,297 @@ impl DuiDesktopView {
             })
     }
 
+    /// Floating inline Canvas Diff Bar next to the audit pill, matching `apps/canvas` `.canvas-diff-bar`.
+    fn render_canvas_diff_bar(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let Some(run) = self.active_run() else {
+            return div().id("canvas-diff-bar-empty");
+        };
+        let other_runs: Vec<(usize, String)> = self
+            .workspace
+            .runs
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx != self.selected_run)
+            .map(|(idx, r)| {
+                let br = r.branch.as_deref().unwrap_or("—");
+                (
+                    idx,
+                    format!("{} · {br} · {}", r.project_name, short_run_id(&r.id)),
+                )
+            })
+            .collect();
+        if other_runs.is_empty() {
+            return div().id("canvas-diff-bar-single");
+        }
+
+        let (lbl_compare, lbl_off, lbl_changed_only, lbl_after, lbl_before, lbl_overlay) =
+            match self.lang {
+                UiLang::Ko => (
+                    "비교",
+                    "비교 끄기",
+                    "변경된 화면만",
+                    "이후",
+                    "이전",
+                    "오버레이",
+                ),
+                UiLang::ZhCn => (
+                    "对比",
+                    "关闭对比",
+                    "仅看变更界面",
+                    "变更后",
+                    "变更前",
+                    "差异叠加",
+                ),
+                UiLang::En => (
+                    "Compare",
+                    "No diff",
+                    "Changed only",
+                    "After",
+                    "Before",
+                    "Overlay",
+                ),
+            };
+
+        let same_project_other = self
+            .workspace
+            .runs
+            .iter()
+            .enumerate()
+            .find(|(idx, r)| *idx != self.selected_run && r.project_id == run.project_id)
+            .map(|(idx, _)| idx);
+        let default_compare_idx = self
+            .compare_run
+            .filter(|idx| *idx != self.selected_run && *idx < self.workspace.runs.len())
+            .or(same_project_other)
+            .unwrap_or(other_runs[0].0);
+
+        let compare_label = if self.canvas_diff_enabled {
+            other_runs
+                .iter()
+                .find(|(idx, _)| *idx == default_compare_idx)
+                .map(|(_, label)| format!("{lbl_compare}: {label}"))
+                .unwrap_or_else(|| lbl_compare.to_owned())
+        } else {
+            format!("{lbl_compare}: {lbl_off}")
+        };
+
+        let changed_count = self
+            .diff_entries
+            .iter()
+            .filter(|e| e.kind == "changed")
+            .count();
+        let added_count = self
+            .diff_entries
+            .iter()
+            .filter(|e| e.kind == "added")
+            .count();
+        let removed_count = self
+            .diff_entries
+            .iter()
+            .filter(|e| e.kind == "removed")
+            .count();
+        let summary_text = if self.diff_entries.is_empty() {
+            match self.lang {
+                UiLang::Ko => "UI 변경 없음".to_owned(),
+                UiLang::ZhCn => "无界面变更".to_owned(),
+                UiLang::En => "No UI changes".to_owned(),
+            }
+        } else {
+            match self.lang {
+                UiLang::Ko => {
+                    format!("변경 {changed_count} · 추가 {added_count} · 삭제 {removed_count}")
+                }
+                UiLang::ZhCn => {
+                    format!("变更 {changed_count} · 新增 {added_count} · 删除 {removed_count}")
+                }
+                UiLang::En => format!(
+                    "{changed_count} changed · {added_count} added · {removed_count} removed"
+                ),
+            }
+        };
+
+        let next_compare_idx = if other_runs.len() > 1 {
+            let pos = other_runs
+                .iter()
+                .position(|(idx, _)| *idx == default_compare_idx)
+                .unwrap_or(0);
+            other_runs[(pos + 1) % other_runs.len()].0
+        } else {
+            default_compare_idx
+        };
+
+        let enabled = self.canvas_diff_enabled;
+        let changed_only = self.canvas_diff_changed_only;
+        let mode = self.canvas_diff_mode;
+
+        div()
+            .id("desktop-canvas-diff-bar")
+            .px_3()
+            .py_1()
+            .rounded_full()
+            .border_1()
+            .border_color(if enabled { p.primary } else { p.glass_line })
+            .bg(p.glass)
+            .shadow_md()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(
+                div()
+                    .id("canvas-diff-toggle-btn")
+                    .px_2()
+                    .py_0p5()
+                    .rounded_full()
+                    .border_1()
+                    .border_color(if enabled { p.primary } else { p.glass_line })
+                    .bg(if enabled { p.primary } else { p.glass_surface })
+                    .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            cx.stop_propagation();
+                            if !this.canvas_diff_enabled {
+                                this.compare_run = Some(default_compare_idx);
+                                this.canvas_diff_enabled = true;
+                                this.ensure_diff_loaded();
+                            } else {
+                                this.canvas_diff_enabled = false;
+                            }
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        Label::new(compare_label)
+                            .text_xs()
+                            .font_semibold()
+                            .text_color(if enabled {
+                                p.primary_foreground
+                            } else {
+                                p.foreground
+                            }),
+                    ),
+            )
+            .when(enabled && other_runs.len() > 1, |el| {
+                el.child(
+                    div()
+                        .id("canvas-diff-cycle-run")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_full()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.compare_run = Some(next_compare_idx);
+                                this.diff_cache_key = None;
+                                this.ensure_diff_loaded();
+                                cx.notify();
+                            }),
+                        )
+                        .child(Label::new("⇄").text_xs().text_color(p.foreground)),
+                )
+            })
+            .when(enabled, |el| {
+                el.child(
+                    div()
+                        .id("canvas-diff-changed-only-btn")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_full()
+                        .border_1()
+                        .border_color(if changed_only {
+                            p.primary
+                        } else {
+                            p.glass_line
+                        })
+                        .bg(if changed_only {
+                            p.primary
+                        } else {
+                            p.glass_surface
+                        })
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.canvas_diff_changed_only = !this.canvas_diff_changed_only;
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(lbl_changed_only)
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(if changed_only {
+                                    p.primary_foreground
+                                } else {
+                                    p.muted_foreground
+                                }),
+                        ),
+                )
+                .child(
+                    div().flex().items_center().gap_1().children(
+                        [
+                            (
+                                "canvas-diff-mode-after",
+                                CanvasDiffVisualMode::After,
+                                lbl_after,
+                            ),
+                            (
+                                "canvas-diff-mode-before",
+                                CanvasDiffVisualMode::Before,
+                                lbl_before,
+                            ),
+                            (
+                                "canvas-diff-mode-overlay",
+                                CanvasDiffVisualMode::Overlay,
+                                lbl_overlay,
+                            ),
+                        ]
+                        .into_iter()
+                        .map(|(id, target_mode, label)| {
+                            let active = mode == target_mode;
+                            div()
+                                .id(id)
+                                .px_2()
+                                .py_0p5()
+                                .rounded_full()
+                                .border_1()
+                                .border_color(if active { p.primary } else { p.glass_line })
+                                .bg(if active { p.primary } else { p.glass_surface })
+                                .cursor_pointer()
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.canvas_diff_mode = target_mode;
+                                        cx.notify();
+                                    }),
+                                )
+                                .child(Label::new(label).text_xs().font_semibold().text_color(
+                                    if active {
+                                        p.primary_foreground
+                                    } else {
+                                        p.muted_foreground
+                                    },
+                                ))
+                        }),
+                    ),
+                )
+                .child(
+                    Label::new(summary_text)
+                        .text_xs()
+                        .font_semibold()
+                        .text_color(p.primary),
+                )
+            })
+    }
+
     /// Full-bleed Overview Screen Map with focus-dimming for unrelated nodes when a screen is selected.
     fn render_overview_stage(
         &mut self,
@@ -933,12 +1239,74 @@ impl DuiDesktopView {
             }
         }
 
+        if self.canvas_diff_enabled {
+            self.ensure_diff_loaded();
+        }
+        let mut diff_by_path: BTreeMap<String, DiffCellEntry> = BTreeMap::new();
+        if self.canvas_diff_enabled {
+            for entry in &self.diff_entries {
+                let replace = match diff_by_path.get(&entry.path) {
+                    None => true,
+                    Some(prev) => {
+                        let prev_w_match = prev.width_px == self.selected_width;
+                        let cur_w_match = entry.width_px == self.selected_width;
+                        (cur_w_match && !prev_w_match)
+                            || (cur_w_match == prev_w_match
+                                && entry.overlay.is_some()
+                                && prev.overlay.is_none())
+                    }
+                };
+                if replace {
+                    diff_by_path.insert(entry.path.clone(), entry.clone());
+                }
+            }
+        }
+        let canvas_diff_active = self.canvas_diff_enabled && !diff_by_path.is_empty();
+        let canvas_diff_changed_only = self.canvas_diff_changed_only;
+        let canvas_diff_mode = self.canvas_diff_mode;
+
         let mut decoded_cards: BTreeMap<usize, Option<Arc<RenderImage>>> = BTreeMap::new();
         for (idx, screen) in run.screens.iter().enumerate() {
-            let img_opt = self
-                .cell_for_width(screen)
-                .and_then(|c| c.blob_path.as_deref())
-                .and_then(|path| self.images.get_or_decode(path));
+            let img_opt = if let Some(diff_entry) = diff_by_path.get(&screen.path) {
+                match canvas_diff_mode {
+                    CanvasDiffVisualMode::Overlay => diff_entry
+                        .overlay
+                        .clone()
+                        .or_else(|| {
+                            diff_entry
+                                .after_blob
+                                .as_deref()
+                                .and_then(|path| self.images.get_or_decode(path))
+                        })
+                        .or_else(|| {
+                            self.cell_for_width(screen)
+                                .and_then(|c| c.blob_path.as_deref())
+                                .and_then(|path| self.images.get_or_decode(path))
+                        }),
+                    CanvasDiffVisualMode::Before => diff_entry
+                        .before_blob
+                        .as_deref()
+                        .and_then(|path| self.images.get_or_decode(path))
+                        .or_else(|| {
+                            self.cell_for_width(screen)
+                                .and_then(|c| c.blob_path.as_deref())
+                                .and_then(|path| self.images.get_or_decode(path))
+                        }),
+                    CanvasDiffVisualMode::After => diff_entry
+                        .after_blob
+                        .as_deref()
+                        .and_then(|path| self.images.get_or_decode(path))
+                        .or_else(|| {
+                            self.cell_for_width(screen)
+                                .and_then(|c| c.blob_path.as_deref())
+                                .and_then(|path| self.images.get_or_decode(path))
+                        }),
+                }
+            } else {
+                self.cell_for_width(screen)
+                    .and_then(|c| c.blob_path.as_deref())
+                    .and_then(|path| self.images.get_or_decode(path))
+            };
             decoded_cards.insert(idx, img_opt);
         }
 
@@ -1094,10 +1462,15 @@ impl DuiDesktopView {
         for node in &layout.nodes {
             let idx = node.screen_idx;
             let screen = &run.screens[idx];
+            let screen_diff = diff_by_path.get(&screen.path);
+            if canvas_diff_active && canvas_diff_changed_only && screen_diff.is_none() {
+                continue;
+            }
             let (left, top) = node_rects[&idx];
             let is_selected = focus_active && idx == selected_idx;
             let is_related = focus_active && !is_selected && related_indices.contains(&idx);
-            let is_dimmed = focus_active && !related_indices.contains(&idx);
+            let is_dimmed = (focus_active && !related_indices.contains(&idx))
+                || (canvas_diff_active && screen_diff.is_none());
             let open_comments = open_by_path.get(&screen.path).copied().unwrap_or(0);
             let unverified = screen
                 .cells
@@ -1106,16 +1479,71 @@ impl DuiDesktopView {
                 .count();
             let render_img = decoded_cards.get(&idx).and_then(|v| v.clone());
 
+            let diff_badge_info = screen_diff.map(|d| {
+                let (badge_bg, badge_label): (Hsla, String) = match d.kind.as_str() {
+                    "added" => (
+                        Hsla::from(gpui_kit::rgb(0x2f9e66)),
+                        match self.lang {
+                            UiLang::Ko => "추가됨".to_owned(),
+                            UiLang::ZhCn => "新增".to_owned(),
+                            UiLang::En => "Added".to_owned(),
+                        },
+                    ),
+                    "removed" => (
+                        Hsla::from(gpui_kit::rgb(0xd94848)),
+                        match self.lang {
+                            UiLang::Ko => "삭제됨".to_owned(),
+                            UiLang::ZhCn => "已删除".to_owned(),
+                            UiLang::En => "Removed".to_owned(),
+                        },
+                    ),
+                    _ => {
+                        let base = match self.lang {
+                            UiLang::Ko => "변경됨",
+                            UiLang::ZhCn => "已变更",
+                            UiLang::En => "Changed",
+                        };
+                        let text = match d.diff_percent {
+                            Some(pct) if pct > 0.0 => format!("{base} · {pct:.1}%"),
+                            _ => base.to_owned(),
+                        };
+                        (p.primary, text)
+                    }
+                };
+                (badge_bg, badge_label)
+            });
+
             let media_el = if let Some(ri) = render_img {
                 div()
+                    .relative()
                     .w(px(inner_w))
                     .h(px(frame_h))
                     .rounded_sm()
                     .overflow_hidden()
                     .bg(p.background)
                     .child(img(ImageSource::Render(ri)).w(px(inner_w)).h(px(frame_h)))
+                    .when_some(diff_badge_info.clone(), |el, (badge_bg, badge_label)| {
+                        el.child(
+                            div()
+                                .absolute()
+                                .top(px(6.0))
+                                .right(px(6.0))
+                                .px_2()
+                                .py_0p5()
+                                .rounded_full()
+                                .bg(badge_bg)
+                                .shadow_sm()
+                                .child(
+                                    Label::new(badge_label)
+                                        .text_xs()
+                                        .font_bold()
+                                        .text_color(p.primary_foreground),
+                                ),
+                        )
+                    })
             } else {
                 div()
+                    .relative()
                     .w(px(inner_w))
                     .h(px(frame_h))
                     .rounded_sm()
@@ -1128,8 +1556,27 @@ impl DuiDesktopView {
                             .text_xs()
                             .text_color(p.muted_foreground),
                     )
+                    .when_some(diff_badge_info.clone(), |el, (badge_bg, badge_label)| {
+                        el.child(
+                            div()
+                                .absolute()
+                                .top(px(6.0))
+                                .right(px(6.0))
+                                .px_2()
+                                .py_0p5()
+                                .rounded_full()
+                                .bg(badge_bg)
+                                .child(
+                                    Label::new(badge_label)
+                                        .text_xs()
+                                        .font_bold()
+                                        .text_color(p.primary_foreground),
+                                ),
+                        )
+                    })
             };
 
+            let diff_border_color = diff_badge_info.as_ref().map(|(c, _)| *c);
             let card = div()
                 .id(format!("map-card-{idx}"))
                 .absolute()
@@ -1143,10 +1590,18 @@ impl DuiDesktopView {
                 .justify_between()
                 .rounded_lg()
                 .when(is_selected, |el| el.border_2().border_color(p.primary))
-                .when(is_related, |el| el.border_1().border_color(p.foreground))
-                .when(!is_selected && !is_related, |el| {
-                    el.border_1().border_color(p.capture_rim)
+                .when(!is_selected && diff_border_color.is_some(), |el| {
+                    el.border_2()
+                        .border_color(diff_border_color.unwrap_or(p.primary))
                 })
+                .when(
+                    !is_selected && diff_border_color.is_none() && is_related,
+                    |el| el.border_1().border_color(p.foreground),
+                )
+                .when(
+                    !is_selected && diff_border_color.is_none() && !is_related,
+                    |el| el.border_1().border_color(p.capture_rim),
+                )
                 .when(is_dimmed, |el| el.opacity(0.22))
                 .bg(p.capture_surface)
                 .shadow_md()
@@ -1296,15 +1751,19 @@ impl DuiDesktopView {
                     .text_color(p.foreground),
             );
 
-        // Top-center floating audit pill
+        // Top-center floating audit pill + inline canvas diff bar (matching `apps/canvas` `.map-top-bar`)
         let top_pill = div()
             .absolute()
             .top(px(12.0))
             .left_0()
             .right_0()
             .flex()
+            .flex_wrap()
+            .items_center()
             .justify_center()
-            .child(self.render_audit_pill());
+            .gap_2()
+            .child(self.render_audit_pill())
+            .child(self.render_canvas_diff_bar(cx));
 
         div()
             .id("desktop-map-viewport")
@@ -2008,6 +2467,148 @@ impl DuiDesktopView {
                 .as_ref()
                 .is_some_and(|c| !c.state_id.is_empty() && c.status_kind != "unrenderable");
 
+        let screen_diff_entry = if self.canvas_diff_enabled {
+            self.diff_entries
+                .iter()
+                .find(|e| e.path == screen.path && e.width_px == self.selected_width)
+                .or_else(|| self.diff_entries.iter().find(|e| e.path == screen.path))
+                .cloned()
+        } else {
+            None
+        };
+        let inspector_diff_box = screen_diff_entry.map(|d| {
+            let before_ri = d
+                .before_blob
+                .as_deref()
+                .and_then(store::decode_png_to_render_image);
+            let after_ri = d
+                .after_blob
+                .as_deref()
+                .and_then(store::decode_png_to_render_image);
+            let overlay_ri = d.overlay.clone();
+            let ratio_text = d
+                .diff_percent
+                .filter(|v| *v > 0.0)
+                .map(|v| format!("{v:.1}% px"))
+                .unwrap_or_default();
+            let kind_text = match (self.lang, d.kind.as_str()) {
+                (UiLang::Ko, "added") => "추가됨",
+                (UiLang::Ko, "removed") => "삭제됨",
+                (UiLang::Ko, _) => "변경됨",
+                (UiLang::ZhCn, "added") => "新增",
+                (UiLang::ZhCn, "removed") => "已删除",
+                (UiLang::ZhCn, _) => "已变更",
+                (UiLang::En, "added") => "Added",
+                (UiLang::En, "removed") => "Removed",
+                (UiLang::En, _) => "Changed",
+            };
+            let mut thumbs = div().flex().items_center().gap_2();
+            if let Some(ri) = before_ri {
+                thumbs = thumbs.child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            Label::new(tr.before)
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                        )
+                        .child(
+                            div()
+                                .h(px(64.0))
+                                .rounded_sm()
+                                .overflow_hidden()
+                                .border_1()
+                                .border_color(p.glass_line)
+                                .child(img(ImageSource::Render(ri)).w_full().h_full()),
+                        ),
+                );
+            }
+            if let Some(ri) = after_ri {
+                thumbs = thumbs.child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            Label::new(tr.after)
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                        )
+                        .child(
+                            div()
+                                .h(px(64.0))
+                                .rounded_sm()
+                                .overflow_hidden()
+                                .border_1()
+                                .border_color(p.glass_line)
+                                .child(img(ImageSource::Render(ri)).w_full().h_full()),
+                        ),
+                );
+            }
+            if let Some(ri) = overlay_ri {
+                thumbs = thumbs.child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            Label::new(match self.lang {
+                                UiLang::Ko => "오버레이",
+                                UiLang::ZhCn => "差异叠加",
+                                UiLang::En => "Overlay",
+                            })
+                            .text_xs()
+                            .text_color(p.muted_foreground),
+                        )
+                        .child(
+                            div()
+                                .h(px(64.0))
+                                .rounded_sm()
+                                .overflow_hidden()
+                                .border_1()
+                                .border_color(p.primary)
+                                .child(img(ImageSource::Render(ri)).w_full().h_full()),
+                        ),
+                );
+            }
+            div()
+                .id("inspector-inline-diff")
+                .p_2()
+                .rounded_md()
+                .border_1()
+                .border_color(p.primary)
+                .bg(p.glass_surface)
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(
+                            Label::new(kind_text)
+                                .text_xs()
+                                .font_bold()
+                                .text_color(p.primary),
+                        )
+                        .when(!ratio_text.is_empty(), |el| {
+                            el.child(
+                                Label::new(ratio_text)
+                                    .text_xs()
+                                    .font_semibold()
+                                    .text_color(p.foreground),
+                            )
+                        }),
+                )
+                .child(thumbs)
+        });
+
         let diagnostic_box = active_cell.as_ref().and_then(|c| {
             let show_reason = c.status_kind != "verified";
             let path_diff = c
@@ -2184,6 +2785,7 @@ impl DuiDesktopView {
                         .text_color(p.muted_foreground),
                     )
                     .child(cells_col)
+                    .when_some(inspector_diff_box, |el, diff_box| el.child(diff_box))
                     .when_some(diagnostic_box, |el, diag| el.child(diag))
                     .child(div().h(px(1.0)).w_full().bg(p.glass_line))
                     .child(
@@ -3175,6 +3777,7 @@ fn main() {
         run_id: None,
         screen_path: None,
         view: ViewMode::Overview,
+        canvas_diff: false,
         dark: true,
         lang: UiLang::En,
         viewport_width: 1440,
@@ -3214,6 +3817,9 @@ fn main() {
                     opts.view = ViewMode::parse(val);
                     i += 1;
                 }
+            }
+            "--canvas-diff" => {
+                opts.canvas_diff = true;
             }
             "--theme" => {
                 if let Some(val) = args.get(i + 1) {

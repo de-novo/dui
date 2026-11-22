@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
+import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
 
 type CardNode = Node<
   {
@@ -29,6 +30,10 @@ type CardNode = Node<
     dimmed: boolean;
     openComments: number;
     imageUrl: (name: string) => string;
+    screenDiff?: ScreenCanvasDiff;
+    diffVisualMode?: CanvasDiffVisualMode;
+    beforeRunKey?: string;
+    afterRunKey?: string;
   },
   "screen"
 >;
@@ -134,6 +139,10 @@ function Card({ data }: NodeProps<CardNode>) {
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
         openComments={data.openComments}
+        screenDiff={data.screenDiff}
+        diffVisualMode={data.diffVisualMode}
+        beforeRunKey={data.beforeRunKey}
+        afterRunKey={data.afterRunKey}
       />
     </>
   );
@@ -149,6 +158,11 @@ export function ScreenMap({
   selectedId,
   focusActive = false,
   openCommentsByPath,
+  diffsByPath,
+  diffActive = false,
+  diffVisualMode = "after",
+  beforeRunKey,
+  afterRunKey,
   imageUrl,
   select,
   onClearSelection,
@@ -160,6 +174,11 @@ export function ScreenMap({
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
+  diffsByPath?: Record<string, ScreenCanvasDiff>;
+  diffActive?: boolean;
+  diffVisualMode?: CanvasDiffVisualMode;
+  beforeRunKey?: string;
+  afterRunKey?: string;
   imageUrl: (name: string) => string;
   select: (id: string, active?: Element | null) => void;
   onClearSelection?: () => void;
@@ -180,14 +199,16 @@ export function ScreenMap({
     return set;
   }, [focusActive, selectedId, layout.links]);
   const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => {
+    const screenDiff = diffsByPath?.[screen.path];
     const isSelected = screen.id === selectedId;
     const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
-    const isDimmed = dimming && !relatedIds.has(screen.id);
+    const isDimmed = (dimming && !relatedIds.has(screen.id)) || (diffActive && !screenDiff);
     const classes = [
       mode === "focus:" + screen.id ? "focus-screen" : "",
       isSelected ? "selected-screen" : "",
       isRelated ? "related-screen" : "",
       isDimmed ? "dimmed-screen" : "",
+      screenDiff ? `diff-node-${screenDiff.kind}` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -206,6 +227,10 @@ export function ScreenMap({
         dimmed: isDimmed,
         openComments: openCommentsByPath?.[screen.path] ?? 0,
         imageUrl,
+        screenDiff,
+        diffVisualMode,
+        beforeRunKey,
+        afterRunKey,
       },
       ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
       className: classes || undefined,
