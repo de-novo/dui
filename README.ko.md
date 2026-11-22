@@ -12,10 +12,12 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 
 | 분류 | 현재 지원 | 예정 |
 | --- | --- | --- |
-| 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2 |
-| 웹 UI · 호스트 | React 19, Vite 8, Nitro SSR, Chromium (CDP) | Next.js 16, Electron 45, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2, Tauri 2 |
-| 네이티브 UI | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14, React Native 0.88 / Expo 58, Flutter 3, SwiftUI, Jetpack Compose |
-| 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 8, 표준 Web `URLSearchParams` | Next.js App Router |
+| 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
+| 웹 (Level 1 & Level 2) | React 19, Vite 8, Nitro SSR, Chromium (CDP) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), Next.js 16, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| 데스크톱 앱 | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Electron 45, Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
+| 모바일 앱 (Android & iOS) | — | Android (`adb` + `uiautomator` / Jetpack Compose / Kotlin 2), iOS (`xcrun simctl` / SwiftUI / Swift 6), React Native 0.88 / Expo 58, Flutter 3 / Dart 3 |
+| 터미널 UI (TUI) | — | Universal TUI (`pty` + VT100 셀 그리드), Ratatui (Rust), Ink (TS/React), Bubble Tea (Go) |
+| 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 8, 표준 Web `URLSearchParams` | Next.js App Router, Android 인텐트 및 딥링크 |
 | 상태 · 폼 · 스키마 | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1 | Radix UI 1, shadcn/ui 4 선언형 룰팩 |
 
 ### 분석 및 검증 기능
@@ -28,7 +30,8 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | Diff · 변경 리뷰 | 2D 캔버스 인라인 비교(`요소` 렌더 트리 Diff · 2px 노이즈 허용, `이후`, `이전`, 지연 `픽셀` 오버레이), 브랜치 비교(`dui diff --base main`), `--changed-since` | 지원 |
 | 품질 · 다국어 · 감사 | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱 | 지원 |
 | 라이브 편집 · 뷰어 | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`) | 지원 |
-| 다음 엔진 고도화 | 멀티 탭 병렬 캡처, `renderTree` 기반 자동 레이아웃 겹침·접근성(a11y) 감사, 런타임 클릭 기반 모달/탭 자동 열기, GPUI AccessKit 렌더 트리 Diff | 예정 |
+| 요소 인스펙터 · 라이브 컴포넌트 | 개발자도구형 요소 속성 확인, 박스 모델 오버레이(너비·높이·마진·패딩·간격 가이드), 정적 캡처에서 캔버스 위 실제 컴포넌트 직접 렌더링으로 진화 | 예정 |
+| 디자인 결함 탐지 · 엔진 확장 | `renderTree` 기반 자동 디자인 결함·접근성 진단(넘침·겹침·잘림·색상 대비·터치 타깃·간격/정렬 불일치 — 사람용 캔버스 오버레이 + AI용 CLI/MCP 정형 JSON), `SurfaceRegistry` 멀티 서피스 플러그인 파이프라인, 멀티 탭 병렬 캡처, GPUI AccessKit 렌더 트리 Diff | 예정 |
 
 ## 설치
 

@@ -12,10 +12,12 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 
 | Category | Supported now | Planned |
 | --- | --- | --- |
-| Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2 |
-| Web UI & hosts | React 19, Vite 8, Nitro SSR, Chromium (CDP) | Next.js 16, Electron 45, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2, Tauri 2 |
-| Native UI | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14, React Native 0.88 / Expo 58, Flutter 3, SwiftUI, Jetpack Compose |
-| Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 8, standard Web `URLSearchParams` | Next.js App Router |
+| Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
+| Web (Level 1 & Level 2) | React 19, Vite 8, Nitro SSR, Chromium (CDP) | Universal Web (`static` / `url` / `command` for any HTML/JS app), Next.js 16, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| Desktop App | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Electron 45, Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
+| Mobile App (Android & iOS) | — | Android (`adb` + `uiautomator` / Jetpack Compose / Kotlin 2), iOS (`xcrun simctl` / SwiftUI / Swift 6), React Native 0.88 / Expo 58, Flutter 3 / Dart 3 |
+| Terminal UI (TUI) | — | Universal TUI (`pty` + VT100 cell grid), Ratatui (Rust), Ink (TS/React), Bubble Tea (Go) |
+| Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 8, standard Web `URLSearchParams` | Next.js App Router, Android intents & deep links |
 | State, forms & schemas | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1 | Radix UI 1, shadcn/ui 4 declarative packs |
 
 ### Analysis & verification capabilities
@@ -28,7 +30,8 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Diff & change review | 2D canvas inline diff (`Elements` render-tree diff with 2px tolerance, `After`, `Before`, lazy `Pixel` overlay), branch diff (`dui diff --base main`), `--changed-since` | Supported |
 | Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
 | Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
-| Next engine upgrades | Multi-tab parallel capture, automatic layout overlap & a11y audit from `renderTree`, runtime modal/tab trigger exploration, GPUI AccessKit render-tree diff | Planned |
+| Element inspector & live components | DevTools-style element attributes, box-model overlay (width, height, margin, padding, gap, spacing redlines), and evolving from capture-based cards to rendering live components directly on the canvas | Planned |
+| Design-defect detection & scale | Automatic visual/design-defect detection from `renderTree` (overflow, overlap, clipping, contrast, touch target size, spacing/alignment drift — visual overlays for humans + structured CLI/MCP JSON for AI), `SurfaceRegistry` multi-surface plugin pipeline, multi-tab parallel capture, GPUI AccessKit render-tree diff | Planned |
 
 ## Install
 
