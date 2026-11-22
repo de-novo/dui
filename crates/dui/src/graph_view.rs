@@ -225,4 +225,50 @@ mod tests {
             })]
         );
     }
+
+    #[test]
+    fn run_without_screen_discovery_still_emits_links_to_edges_and_matches_normalized_queries() {
+        let report = json!({
+            "cells": [
+                {
+                    "path": "/",
+                    "scenario": "default",
+                    "state": "s0",
+                    "width": 1280,
+                    "planIndex": 0,
+                    "status": "verified",
+                    "observation": {
+                        "path": "/?project=prj_1",
+                        "links": ["/settings?project=prj_1", "/unknown"]
+                    }
+                },
+                {
+                    "path": "/settings",
+                    "scenario": "case-1",
+                    "state": "s1",
+                    "width": 1280,
+                    "planIndex": 0,
+                    "status": "verified",
+                    "observation": {
+                        "path": "/settings",
+                        "links": ["/"]
+                    }
+                }
+            ]
+        });
+        let graph = with_cells(json!({"nodes":[],"edges":[]}), &report).unwrap();
+        let links: Vec<_> = graph["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|edge| edge["kind"] == "linksTo")
+            .collect();
+        assert_eq!(
+            links,
+            vec![
+                &json!({"kind":"linksTo","source":"route:/","target":"route:/settings","observedWidths":[1280]}),
+                &json!({"kind":"linksTo","source":"route:/settings","target":"route:/","observedWidths":[1280]}),
+            ]
+        );
+    }
 }
