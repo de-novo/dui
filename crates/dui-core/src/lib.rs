@@ -93,6 +93,7 @@ pub mod mock;
 pub mod tabular;
 pub mod verification;
 
+pub mod android;
 pub mod audit;
 pub mod diff;
 pub mod edit;
