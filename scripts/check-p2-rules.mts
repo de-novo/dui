@@ -13,12 +13,27 @@ const template = join(root, "fixtures/toggle");
 const binary = resolve(process.argv[2] ?? join(root, "target/debug/dui"));
 const stage = mkdtempSync(join(tmpdir(), "dui-p2-rules-check-"));
 
-function writeFakePkg(nodeModules: string, name: string, version: string, dts: string) {
+function writeFakePkg(
+  nodeModules: string,
+  name: string,
+  version: string,
+  dts: string,
+  strictExports = false,
+) {
   const dir = join(nodeModules, ...name.split("/"));
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, "package.json"),
-    JSON.stringify({ name, version, types: "index.d.ts", main: "index.js" }),
+    JSON.stringify({
+      name,
+      version,
+      types: "index.d.ts",
+      main: "index.js",
+      // Regression guard (#90): strict `exports` hiding `./package.json` (like valibot 1.x).
+      ...(strictExports
+        ? { exports: { ".": { types: "./index.d.ts", default: "./index.js" } } }
+        : {}),
+    }),
   );
   writeFileSync(join(dir, "index.d.ts"), dts);
   writeFileSync(join(dir, "index.js"), "export {};\n");
@@ -75,6 +90,7 @@ try {
     "valibot",
     "1.5.0",
     "export declare function picklist<const T extends readonly string[]>(opts: T): { options: T };\n",
+    true,
   );
   writeFakePkg(
     nm,

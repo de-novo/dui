@@ -392,3 +392,78 @@ pub fn changed_since_summary(project: &Path, base_ref: &str, module_graph_val: &
         "affectedFiles": affected.into_iter().collect::<Vec<_>>(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_solid_png(path: &Path, rgba: [u8; 4]) {
+        let pixels = vec![
+            rgba[0], rgba[1], rgba[2], rgba[3], rgba[0], rgba[1], rgba[2], rgba[3], rgba[0],
+            rgba[1], rgba[2], rgba[3], rgba[0], rgba[1], rgba[2], rgba[3],
+        ];
+        write_png_rgba(path, 2, 2, &pixels).expect("write test png");
+    }
+
+    #[test]
+    fn lazy_compare_skips_pixel_diff_when_render_diff_finds_changes_and_hydrates_on_request() {
+        let tmp = tempfile::tempdir().unwrap();
+        let before = tmp.path().join("before");
+        let after = tmp.path().join("after");
+        fs::create_dir_all(&before).unwrap();
+        fs::create_dir_all(&after).unwrap();
+
+        write_solid_png(&before.join("a.png"), [10, 10, 10, 255]);
+        write_solid_png(&after.join("b.png"), [240, 240, 240, 255]);
+
+        let tree_before = json!([{"id":"h1#0","tag":"h1","text":"Old","rect":{"x":0,"y":0,"width":80,"height":24},"style":{}}]);
+        let tree_after = json!([{"id":"h1#0","tag":"h1","text":"New","rect":{"x":0,"y":0,"width":80,"height":24},"style":{}}]);
+
+        fs::write(
+            before.join("report.json"),
+            json!({
+                "path": "/",
+                "cells": [
+                    {"path":"/","scenario":"default","state":"s0","width":375,"status":"verified","image":"a.png","observation":{"renderTree":tree_before}},
+                    {"path":"/canvas","scenario":"case-1","state":"s1","width":375,"status":"verified","image":"a.png","observation":{"renderTree":tree_before}}
+                ]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        fs::write(
+            after.join("report.json"),
+            json!({
+                "path": "/",
+                "cells": [
+                    {"path":"/","scenario":"default","state":"s0","width":375,"status":"verified","image":"b.png","observation":{"renderTree":tree_after}},
+                    {"path":"/canvas","scenario":"case-1","state":"s1","width":375,"status":"verified","image":"b.png","observation":{"renderTree":tree_before}}
+                ]
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        // Lazy mode skips pixelDiff for `/` (renderDiff found h1 text change),
+        // but still computes pixelDiff automatically for visual-only `/canvas`.
+        let lazy = compare_with_options(&before, &after, None, false).expect("lazy compare");
+        let screens = lazy["screens"].as_array().unwrap();
+        let home_cell = &screens.iter().find(|s| s["path"] == "/").unwrap()["cells"][0];
+        assert_eq!(home_cell["renderDiff"]["textChanged"], 1);
+        assert!(home_cell.get("pixelDiff").is_none());
+
+        let canvas_cell = &screens.iter().find(|s| s["path"] == "/canvas").unwrap()["cells"][0];
+        assert_eq!(canvas_cell["renderDiff"]["visualOnly"], true);
+        assert_eq!(canvas_cell["pixelDiff"]["diffPixels"], 4);
+
+        // Eager pixel mode hydrates pixelDiff on `/` as well.
+        let eager = compare_with_options(&before, &after, None, true).expect("eager compare");
+        let home_eager = &eager["screens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["path"] == "/")
+            .unwrap()["cells"][0];
+        assert_eq!(home_eager["pixelDiff"]["diffPixels"], 4);
+    }
+}

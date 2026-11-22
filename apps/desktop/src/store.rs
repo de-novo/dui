@@ -1093,4 +1093,80 @@ mod tests {
         let reopened = toggle_comment_status(dir.path(), &added.id).expect("reopen");
         assert_eq!(reopened, "open");
     }
+
+    #[test]
+    fn lazy_desktop_diff_skips_pixel_overlay_until_hydrated() {
+        let dir = tempfile::tempdir().unwrap();
+        let before_dir = dir.path().join("before");
+        let after_dir = dir.path().join("after");
+        fs::create_dir_all(&before_dir).unwrap();
+        fs::create_dir_all(&after_dir).unwrap();
+
+        let make_png = |path: &Path, rgba: [u8; 4]| {
+            let mut img = RgbaImage::new(2, 2);
+            for px in img.pixels_mut() {
+                *px = image::Rgba(rgba);
+            }
+            img.save_with_format(path, image::ImageFormat::Png).unwrap();
+        };
+        let b_png = before_dir.join("a.png");
+        let a_png = after_dir.join("b.png");
+        make_png(&b_png, [12, 12, 12, 255]);
+        make_png(&a_png, [240, 240, 240, 255]);
+
+        fs::write(
+            before_dir.join("report.json"),
+            json!({"path":"/","cells":[{"path":"/","width":1280,"observation":{"renderTree":[{"id":"h1#0","tag":"h1","text":"Old","rect":{"x":0,"y":0,"width":80,"height":24},"style":{}}]}}]}).to_string(),
+        )
+        .unwrap();
+        fs::write(
+            after_dir.join("report.json"),
+            json!({"path":"/","cells":[{"path":"/","width":1280,"observation":{"renderTree":[{"id":"h1#0","tag":"h1","text":"New","rect":{"x":0,"y":0,"width":80,"height":24},"style":{}}]}}]}).to_string(),
+        )
+        .unwrap();
+
+        let make_run = |id: &str, run_dir: PathBuf, blob_id: &str, blob_path: PathBuf| RunItem {
+            id: id.into(),
+            project_id: "p1".into(),
+            project_name: "demo".into(),
+            branch: Some("main".into()),
+            created_at_ms: 1,
+            project_path: None,
+            run_dir: Some(run_dir),
+            screens: vec![ScreenItem {
+                id: "s1".into(),
+                path: "/".into(),
+                cells: vec![CellItem {
+                    id: "c1".into(),
+                    state_id: "st0".into(),
+                    width_px: 1280,
+                    locale: None,
+                    status_kind: "verified".into(),
+                    reason: None,
+                    observed_path: Some("/".into()),
+                    http_errors: Vec::new(),
+                    blob_id: Some(blob_id.into()),
+                    blob_path: Some(blob_path),
+                }],
+                outgoing: Vec::new(),
+            }],
+        };
+
+        let before = make_run("r1", before_dir, "hash-a", b_png);
+        let after = make_run("r2", after_dir, "hash-b", a_png);
+
+        let mut entries = compute_run_diff(&before, &after, false);
+        assert_eq!(entries.len(), 1);
+        assert!(
+            entries[0]
+                .render_diff
+                .as_ref()
+                .is_some_and(|rd| rd.text_changed == 1)
+        );
+        assert!(entries[0].overlay.is_none());
+
+        hydrate_pixel_diffs(&mut entries);
+        assert!(entries[0].overlay.is_some());
+        assert_eq!(entries[0].changed_pixels, Some(4));
+    }
 }
