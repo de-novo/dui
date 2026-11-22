@@ -329,7 +329,11 @@ fn parse_status(status_json: &str) -> (String, Option<String>) {
     let Ok(val) = serde_json::from_str::<Value>(status_json) else {
         return ("unverified".into(), None);
     };
-    let kind = val["kind"].as_str().unwrap_or("unverified").to_owned();
+    let kind = val["status"]
+        .as_str()
+        .or_else(|| val["kind"].as_str())
+        .unwrap_or("unverified")
+        .to_owned();
     let reason = val["reason"].as_str().map(str::to_owned);
     (kind, reason)
 }
@@ -884,11 +888,24 @@ mod tests {
         .expect("insert state");
         conn.execute(
             "INSERT INTO cells (id, run_id, screen_id, state_id, width_px, locale, status_json, image_blob_id, evidence_id, cache_json)
-             VALUES ('cell-1', 'run-1', ?1, 'st-1', 375, NULL, '{\"kind\":\"verified\"}', NULL, NULL, NULL)",
+             VALUES ('cell-1', 'run-1', ?1, 'st-1', 375, NULL, '{\"status\":\"verified\"}', NULL, NULL, NULL)",
             params![screen_id.as_str()],
         )
         .expect("insert cell");
         drop(conn);
+
+        assert_eq!(
+            parse_status(r#"{"status":"verified"}"#),
+            ("verified".into(), None)
+        );
+        assert_eq!(
+            parse_status(r#"{"status":"unverified","reason":"assert-failed"}"#),
+            ("unverified".into(), Some("assert-failed".into()))
+        );
+        assert_eq!(
+            parse_status(r#"{"status":"unrenderable","reason":"no-render-env"}"#),
+            ("unrenderable".into(), Some("no-render-env".into()))
+        );
 
         let added = add_comment(
             dir.path(),
