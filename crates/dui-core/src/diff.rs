@@ -327,8 +327,9 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
     }
 }
 
-/// Compute per-pixel RGBA difference metrics and a visual highlight overlay buffer.
-/// Unchanged pixels are muted grayscale; changed pixels are marked in high-contrast orange (`#EF803F`).
+/// Compute per-pixel RGBA difference metrics and a readable highlight overlay buffer.
+/// Unchanged pixels are softly desaturated; changed pixels are alpha-blended with brand orange
+/// (`#EF803F` at 58% opacity) over the `after` screenshot so underlying UI text stays legible.
 pub fn compute_rgba_diff(
     before_w: u32,
     before_h: u32,
@@ -367,9 +368,10 @@ pub fn compute_rgba_diff(
                 min_y = min_y.min(y);
                 max_x = max_x.max(x);
                 max_y = max_y.max(y);
-                overlay[dst] = 239;
-                overlay[dst + 1] = 128;
-                overlay[dst + 2] = 63;
+                let base = a_px.or(b_px).unwrap_or([24, 24, 27, 255]);
+                overlay[dst] = ((u16::from(base[0]) * 42 + 239 * 58) / 100) as u8;
+                overlay[dst + 1] = ((u16::from(base[1]) * 42 + 128 * 58) / 100) as u8;
+                overlay[dst + 2] = ((u16::from(base[2]) * 42 + 63 * 58) / 100) as u8;
                 overlay[dst + 3] = 255;
             }
         }
@@ -634,8 +636,8 @@ mod tests {
                 height: 1,
             })
         );
-        // Pixel (1,0) highlighted in #EF803F.
-        assert_eq!(&overlay[4..8], &[239, 128, 63, 255]);
+        // Pixel (1,0) alpha-blended with #EF803F (58% orange over 42% [200, 10, 10]).
+        assert_eq!(&overlay[4..8], &[222, 78, 40, 255]);
     }
 
     #[test]
