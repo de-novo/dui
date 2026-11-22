@@ -98,10 +98,14 @@ pub(crate) fn exercise_with_renderer(
     let mut spec: Value =
         serde_json::from_slice(&fs::read(manifest).map_err(|_| failure(2, "missing spec"))?)
             .map_err(|_| failure(2, "invalid spec"))?;
-    if dui_core::surface::resolve_surface_id(&spec) == dui_core::surface::SURFACE_UNIVERSAL_WEB {
+    if matches!(
+        dui_core::surface::resolve_surface_id(&spec),
+        dui_core::surface::SURFACE_UNIVERSAL_WEB | dui_core::surface::SURFACE_ELECTRON_DESKTOP
+    ) {
         if spec["path"].as_str().is_none() {
-            let default_path = spec["url"]
+            let default_path = spec["rendererUrl"]
                 .as_str()
+                .or_else(|| spec["url"].as_str())
                 .and_then(|raw| crate::universal_web::parse_loopback_url(raw).ok())
                 .map(|(_, path)| path)
                 .unwrap_or_else(|| "/".to_owned());

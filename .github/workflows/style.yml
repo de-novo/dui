@@ -75,3 +75,4 @@ jobs:
           npm run check:universal-web
           npm run check:tui
           npm run check:android
+          npm run check:electron

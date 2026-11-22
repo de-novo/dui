@@ -679,8 +679,12 @@ impl Browser {
         } else {
             String::new()
         };
+        let init_prelude = spec["initScript"]
+            .as_str()
+            .map(|s| format!("{s}\n"))
+            .unwrap_or_default();
         let script = format!(
-            "{locale_prelude}{}\nglobalThis.__duiRuntime.install({input});",
+            "{init_prelude}{locale_prelude}{}\nglobalThis.__duiRuntime.install({input});",
             include_str!(concat!(env!("OUT_DIR"), "/browser/runtime.js"))
         );
         self.call(

@@ -287,9 +287,16 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
         for &width in &widths {
             let staged =
                 tempfile::NamedTempFile::new_in(out).map_err(|e| failure(3, &e.to_string()))?;
-            let obs = renderer
+            let mut obs = renderer
                 .capture(&cell_spec, input, width, staged.path())
                 .map_err(|e| failure(3, &e.to_string()))?;
+
+            if let Some(elements) = obs["elements"].as_array() {
+                let render_tree = dui_core::diff::accesskit_elements_to_render_tree(elements);
+                if !render_tree.is_empty() {
+                    obs["renderTree"] = json!(render_tree);
+                }
+            }
 
             if render_path.is_empty()
                 && let Some(rp) = obs["renderPath"].as_str()

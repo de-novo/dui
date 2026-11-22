@@ -23,6 +23,7 @@
     "check:universal-web": "tsc --project scripts && cargo build --locked && node scripts/check-universal-web.mts",
     "check:tui": "tsc --project scripts && cargo build --locked && node scripts/check-tui.mts",
     "check:android": "tsc --project scripts && cargo build --locked && node scripts/check-android.mts",
+    "check:electron": "tsc --project scripts && cargo build --locked && node scripts/check-electron.mts",
     "check:desktop": "tsc --project scripts && cargo build --locked && node scripts/check-desktop.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "check:gpui-live": "tsc --project scripts && cargo build --locked && node scripts/check-gpui-live.mts",

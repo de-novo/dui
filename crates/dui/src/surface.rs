@@ -92,7 +92,7 @@ impl SurfaceAdapter for GpuiDesktopSurface {
                 state_injection: true,
                 live_edit: true,
                 link_discovery: false,
-                render_tree: false,
+                render_tree: true,
                 box_model: false,
                 pixel_capture: true,
             },
@@ -120,6 +120,7 @@ impl SurfaceRegistry {
         registry.register(Box::new(ViteWebSurface));
         registry.register(Box::new(crate::universal_web::UniversalWebSurface));
         registry.register(Box::new(GpuiDesktopSurface));
+        registry.register(Box::new(crate::electron::ElectronDesktopSurface));
         registry.register(Box::new(crate::tui::UniversalTuiSurface));
         registry.register(Box::new(crate::android::AndroidSurface));
         registry
@@ -225,6 +226,7 @@ mod tests {
                 SURFACE_VITE_WEB,
                 dui_core::surface::SURFACE_UNIVERSAL_WEB,
                 SURFACE_GPUI_DESKTOP,
+                dui_core::surface::SURFACE_ELECTRON_DESKTOP,
                 dui_core::surface::SURFACE_UNIVERSAL_TUI,
                 SURFACE_ANDROID_MOBILE,
             ]
@@ -236,6 +238,11 @@ mod tests {
                 .is_some()
         );
         assert!(registry.find(SURFACE_GPUI_DESKTOP).is_some());
+        assert!(
+            registry
+                .find(dui_core::surface::SURFACE_ELECTRON_DESKTOP)
+                .is_some()
+        );
         assert!(
             registry
                 .find(dui_core::surface::SURFACE_UNIVERSAL_TUI)
