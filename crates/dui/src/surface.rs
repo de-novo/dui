@@ -63,7 +63,7 @@ impl SurfaceAdapter for ViteWebSurface {
                 live_edit: true,
                 link_discovery: true,
                 render_tree: true,
-                box_model: false,
+                box_model: true,
                 pixel_capture: true,
             },
         }

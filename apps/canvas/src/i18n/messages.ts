@@ -131,6 +131,10 @@ export type Messages = {
   auditOpenCommentsLabel: (count: number) => string;
   auditDesignIssuesLabel: (count: number) => string;
   designIssuesTitle: string;
+  elementInspectorTitle: string;
+  boxModelLabel: string;
+  elementAttributesLabel: string;
+  elementTreeLabel: string;
   canvasDiffCompare: string;
   canvasDiffOff: string;
   canvasDiffChangedOnly: string;
@@ -255,6 +259,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
     auditDesignIssuesLabel: (count) => `${count} design ${count === 1 ? "issue" : "issues"}`,
     designIssuesTitle: "Design & a11y checks",
+    elementInspectorTitle: "Element inspector",
+    boxModelLabel: "Box model",
+    elementAttributesLabel: "Attributes",
+    elementTreeLabel: "Rendered elements",
     canvasDiffCompare: "Compare",
     canvasDiffOff: "No diff",
     canvasDiffChangedOnly: "Changed only",
@@ -378,6 +386,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
     auditDesignIssuesLabel: (count) => `${count} 项设计问题`,
     designIssuesTitle: "设计与无障碍检查",
+    elementInspectorTitle: "元素检查器",
+    boxModelLabel: "盒模型",
+    elementAttributesLabel: "元素属性",
+    elementTreeLabel: "已渲染元素",
     canvasDiffCompare: "对比",
     canvasDiffOff: "关闭对比",
     canvasDiffChangedOnly: "仅看变更界面",
@@ -501,6 +513,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
     auditDesignIssuesLabel: (count) => `디자인 결함 ${count}건`,
     designIssuesTitle: "디자인 · 접근성 진단",
+    elementInspectorTitle: "요소 인스펙터",
+    boxModelLabel: "박스 모델",
+    elementAttributesLabel: "요소 속성",
+    elementTreeLabel: "렌더된 요소",
     canvasDiffCompare: "비교",
     canvasDiffOff: "비교 끄기",
     canvasDiffChangedOnly: "변경된 화면만",

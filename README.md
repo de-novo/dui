@@ -30,7 +30,8 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Diff & change review | 2D canvas inline diff (`Elements` render-tree diff with 2px tolerance, `After`, `Before`, lazy `Pixel` overlay), branch diff (`dui diff --base main`), `--changed-since` | Supported |
 | Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
 | Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
-| Element inspector & live components | DevTools-style element attributes, box-model overlay (width, height, margin, padding, gap, spacing redlines), and evolving from capture-based cards to rendering live components directly on the canvas | Planned |
+| Element inspector & box model | DevTools-style element attributes, box-model diagram & overlay (width, height, margin, padding, border, gap, radius), and interactive spacing redline guides between elements | Supported |
+| Live components on canvas | Evolving from capture + interactive spec overlay to mounting and rendering real live components directly on the 2D canvas (`v0.2.0`) | Planned |
 | Design-defect detection & scale | Automatic visual/design-defect & a11y lint from `renderTree` (horizontal overflow, element overlap, WCAG contrast, touch target size, unlabeled controls, spacing drift — visual overlays for humans + structured CLI/MCP `designAudit` JSON for AI), `SurfaceRegistry` multi-surface plugin pipeline, parallel multi-worker capture (`concurrency`), GPUI AccessKit render-tree diff | Supported |
 
 ## Install
