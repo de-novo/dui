@@ -7,7 +7,7 @@ use crate::{
     typescript::TypeScript,
 };
 use dui_core::{
-    discovery::{FillTermination, assertions, candidates, graph, key},
+    discovery::{FillTermination, assertions, candidates_with_observed, graph, key},
     locale::{flatten_message_keys, is_rtl_locale, missing_translation_keys, summarize_by_locale},
     model::{CacheOutcome, CellStatus},
 };
@@ -308,6 +308,7 @@ fn execute_with_locales(
         type BaselineSnapshot = (String, BTreeMap<String, Value>);
         let mut baselines: BTreeMap<(Option<String>, u32), BaselineSnapshot> = BTreeMap::new();
         let mut proven_visual_slots: BTreeSet<String> = BTreeSet::new();
+        let mut observed_slot_values: BTreeMap<String, Vec<Value>> = BTreeMap::new();
         let mut stagnant_rounds = 0usize;
         let mut termination = FillTermination::Exhausted;
         while let Some(row) = pending.first().cloned() {
@@ -378,6 +379,7 @@ fn execute_with_locales(
                                     (locale.map(str::to_owned), *width),
                                     (base_hash, slot_map),
                                 );
+                                collect_select_slot_options(&obs, facts, &mut observed_slot_values);
                             }
                         }
                         if row.len() == 1
@@ -461,6 +463,11 @@ fn execute_with_locales(
                                     baselines.insert(
                                         (locale.map(str::to_owned), *width),
                                         (png_hash.clone(), slot_map),
+                                    );
+                                    collect_select_slot_options(
+                                        &obs,
+                                        facts,
+                                        &mut observed_slot_values,
                                     );
                                 }
                             }
@@ -629,7 +636,7 @@ fn execute_with_locales(
                     cells.push(cell);
                 }
             }
-            pending = candidates(facts, &active)
+            pending = candidates_with_observed(facts, &active, &observed_slot_values)
                 .into_iter()
                 .filter(|r| !done.contains(&json!(r).to_string()))
                 .collect();
@@ -805,6 +812,57 @@ fn execute_with_locales(
         Ok(report)
     } else {
         Err((5, report))
+    }
+}
+
+/// Match active `string` slots whose baseline value matches a rendered `<select>`'s current
+/// value and record real `<option value="...">` values so candidate planning tests real options
+/// instead of synthetic `"sample"` placeholders.
+fn collect_select_slot_options(
+    obs: &Value,
+    facts: &[Value],
+    out: &mut BTreeMap<String, Vec<Value>>,
+) {
+    let Some(selects) = obs["selectOptions"].as_array() else {
+        return;
+    };
+    let Some(obs_slots) = obs["slots"].as_object() else {
+        return;
+    };
+    for fact in facts {
+        if fact["kind"] != "slot" {
+            continue;
+        }
+        let shape_kind = fact["shape"]["kind"].as_str();
+        let is_string_slot = shape_kind == Some("string")
+            || (shape_kind == Some("union")
+                && fact["shape"]["members"]
+                    .as_array()
+                    .is_some_and(|m| m.iter().any(|x| x["kind"] == "string")));
+        if !is_string_slot {
+            continue;
+        }
+        let sk = key(fact);
+        if out.contains_key(&sk) {
+            continue;
+        }
+        let Some(base_str) = obs_slots.get(&sk).and_then(Value::as_str) else {
+            continue;
+        };
+        for sel in selects {
+            if sel["current"].as_str() != Some(base_str) {
+                continue;
+            }
+            if let Some(opts) = sel["values"].as_array()
+                && let Some(first_other) = opts
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .find(|v| !v.is_empty() && *v != base_str)
+            {
+                out.insert(sk.clone(), vec![json!(base_str), json!(first_other)]);
+                break;
+            }
+        }
     }
 }
 
