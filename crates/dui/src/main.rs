@@ -18,6 +18,7 @@ mod replay;
 mod retry;
 mod screen_map;
 mod sqlite_store;
+mod surface;
 mod transition;
 mod typescript;
 mod update;

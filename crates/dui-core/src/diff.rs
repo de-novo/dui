@@ -10,6 +10,40 @@ pub struct RenderRect {
     pub height: i32,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoxSpacing {
+    #[serde(default)]
+    pub top: i32,
+    #[serde(default)]
+    pub right: i32,
+    #[serde(default)]
+    pub bottom: i32,
+    #[serde(default)]
+    pub left: i32,
+}
+
+impl BoxSpacing {
+    pub const fn is_zero(&self) -> bool {
+        self.top == 0 && self.right == 0 && self.bottom == 0 && self.left == 0
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoxModel {
+    #[serde(default, skip_serializing_if = "BoxSpacing::is_zero")]
+    pub margin: BoxSpacing,
+    #[serde(default, skip_serializing_if = "BoxSpacing::is_zero")]
+    pub padding: BoxSpacing,
+    #[serde(default, skip_serializing_if = "BoxSpacing::is_zero")]
+    pub border: BoxSpacing,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border_radius: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gap: Option<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderNodeSnapshot {
@@ -22,6 +56,12 @@ pub struct RenderNodeSnapshot {
     pub rect: RenderRect,
     #[serde(default)]
     pub style: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub box_model: Option<BoxModel>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub attributes: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -894,116 +934,128 @@ mod tests {
         assert!(!affected.contains("Footer.tsx"));
     }
 
+    fn render_node(
+        id: &str,
+        tag: &str,
+        text: &str,
+        rect: RenderRect,
+        style: BTreeMap<String, String>,
+    ) -> RenderNodeSnapshot {
+        RenderNodeSnapshot {
+            id: id.into(),
+            tag: tag.into(),
+            role: None,
+            text: text.into(),
+            rect,
+            style,
+            parent_id: None,
+            box_model: None,
+            attributes: BTreeMap::new(),
+        }
+    }
+
     #[test]
     fn diff_render_trees_tracks_text_layout_style_added_removed_and_ignores_1px_jitter() {
         let before = vec![
-            RenderNodeSnapshot {
-                id: "h1#0".into(),
-                tag: "h1".into(),
-                role: None,
-                text: "Catalog".into(),
-                rect: RenderRect {
+            render_node(
+                "h1#0",
+                "h1",
+                "Catalog",
+                RenderRect {
                     x: 16,
                     y: 16,
                     width: 200,
                     height: 32,
                 },
-                style: BTreeMap::from([("color".into(), "rgb(0, 0, 0)".into())]),
-            },
-            RenderNodeSnapshot {
-                id: "button#0".into(),
-                tag: "button".into(),
-                role: None,
-                text: "Save".into(),
-                rect: RenderRect {
+                BTreeMap::from([("color".into(), "rgb(0, 0, 0)".into())]),
+            ),
+            render_node(
+                "button#0",
+                "button",
+                "Save",
+                RenderRect {
                     x: 16,
                     y: 120,
                     width: 80,
                     height: 36,
                 },
-                style: BTreeMap::new(),
-            },
-            RenderNodeSnapshot {
-                id: "p#0".into(),
-                tag: "p".into(),
-                role: None,
-                text: "Stable copy".into(),
-                rect: RenderRect {
+                BTreeMap::new(),
+            ),
+            render_node(
+                "p#0",
+                "p",
+                "Stable copy",
+                RenderRect {
                     x: 16,
                     y: 200,
                     width: 300,
                     height: 20,
                 },
-                style: BTreeMap::new(),
-            },
-            RenderNodeSnapshot {
-                id: "aside#0".into(),
-                tag: "aside".into(),
-                role: None,
-                text: "Old banner".into(),
-                rect: RenderRect {
+                BTreeMap::new(),
+            ),
+            render_node(
+                "aside#0",
+                "aside",
+                "Old banner",
+                RenderRect {
                     x: 0,
                     y: 0,
                     width: 375,
                     height: 40,
                 },
-                style: BTreeMap::new(),
-            },
+                BTreeMap::new(),
+            ),
         ];
         let after = vec![
-            RenderNodeSnapshot {
-                id: "h1#0".into(),
-                tag: "h1".into(),
-                role: None,
-                text: "Updated Catalog".into(),
-                rect: RenderRect {
+            render_node(
+                "h1#0",
+                "h1",
+                "Updated Catalog",
+                RenderRect {
                     x: 16,
                     y: 16,
                     width: 240,
                     height: 32,
                 },
-                style: BTreeMap::from([("color".into(), "rgb(0, 0, 0)".into())]),
-            },
-            RenderNodeSnapshot {
-                id: "button#0".into(),
-                tag: "button".into(),
-                role: None,
-                text: "Save".into(),
-                rect: RenderRect {
+                BTreeMap::from([("color".into(), "rgb(0, 0, 0)".into())]),
+            ),
+            render_node(
+                "button#0",
+                "button",
+                "Save",
+                RenderRect {
                     x: 16,
                     y: 144,
                     width: 80,
                     height: 36,
                 },
-                style: BTreeMap::new(),
-            },
-            RenderNodeSnapshot {
-                id: "p#0".into(),
-                tag: "p".into(),
-                role: None,
-                text: "Stable copy".into(),
+                BTreeMap::new(),
+            ),
+            render_node(
+                "p#0",
+                "p",
+                "Stable copy",
                 // 1px subpixel jitter must be ignored.
-                rect: RenderRect {
+                RenderRect {
                     x: 16,
                     y: 201,
                     width: 300,
                     height: 20,
                 },
-                style: BTreeMap::new(),
-            },
-            RenderNodeSnapshot {
-                id: "section#0".into(),
-                tag: "section".into(),
-                role: None,
-                text: "New promo".into(),
-                rect: RenderRect {
+                BTreeMap::new(),
+            ),
+            render_node(
+                "section#0",
+                "section",
+                "New promo",
+                RenderRect {
                     x: 16,
                     y: 240,
                     width: 300,
                     height: 48,
                 },
-                style: BTreeMap::new(),
-            },
+                BTreeMap::new(),
+            ),
         ];
         let diff = diff_render_trees(&before, &after, true);
         assert_eq!(diff.text_changed, 1);
@@ -1018,5 +1070,45 @@ mod tests {
         let visual_only = diff_render_trees(&before, &before, true);
         assert!(visual_only.visual_only);
         assert!(visual_only.changes.is_empty());
+    }
+
+    #[test]
+    fn render_node_snapshot_supports_legacy_json_and_box_model_round_trip() {
+        let legacy = r#"{"id":"h1#0","tag":"h1","text":"Title","rect":{"x":0,"y":0,"width":100,"height":24},"style":{}}"#;
+        let parsed: RenderNodeSnapshot =
+            serde_json::from_str(legacy).expect("legacy snapshot parses");
+        assert_eq!(parsed.parent_id, None);
+        assert_eq!(parsed.box_model, None);
+        assert!(parsed.attributes.is_empty());
+
+        let enriched = RenderNodeSnapshot {
+            parent_id: Some("main#0".into()),
+            box_model: Some(BoxModel {
+                margin: BoxSpacing {
+                    top: 0,
+                    right: 0,
+                    bottom: 16,
+                    left: 0,
+                },
+                padding: BoxSpacing {
+                    top: 8,
+                    right: 12,
+                    bottom: 8,
+                    left: 12,
+                },
+                border: BoxSpacing::default(),
+                border_radius: Some("8px".into()),
+                gap: Some("12px".into()),
+            }),
+            attributes: BTreeMap::from([("data-testid".into(), "hero-title".into())]),
+            ..parsed
+        };
+        let encoded = serde_json::to_string(&enriched).expect("serialize enriched node");
+        assert!(encoded.contains("\"boxModel\""));
+        assert!(encoded.contains("\"parentId\":\"main#0\""));
+        assert!(!encoded.contains("\"border\""));
+        let decoded: RenderNodeSnapshot =
+            serde_json::from_str(&encoded).expect("deserialize enriched node");
+        assert_eq!(decoded, enriched);
     }
 }

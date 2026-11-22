@@ -230,7 +230,7 @@ fn state_hash(path: &str, name: &str, input: &Value) -> String {
 }
 
 pub(crate) fn is_gpui_manifest(spec: &Value) -> bool {
-    matches!(spec["runtime"].as_str(), Some("gpui-kit" | "gpui"))
+    dui_core::surface::resolve_surface_id(spec) == dui_core::surface::SURFACE_GPUI_DESKTOP
 }
 
 pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
