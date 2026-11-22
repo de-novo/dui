@@ -121,6 +121,7 @@ impl SurfaceRegistry {
         registry.register(Box::new(crate::universal_web::UniversalWebSurface));
         registry.register(Box::new(GpuiDesktopSurface));
         registry.register(Box::new(crate::tui::UniversalTuiSurface));
+        registry.register(Box::new(crate::android::AndroidSurface));
         registry
     }
 
@@ -215,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn default_registry_contains_vite_web_universal_web_gpui_and_tui() {
+    fn default_registry_contains_web_desktop_tui_and_android_surfaces() {
         let registry = SurfaceRegistry::default_registry();
         let ids: Vec<String> = registry.descriptors().into_iter().map(|d| d.id).collect();
         assert_eq!(
@@ -225,6 +226,7 @@ mod tests {
                 dui_core::surface::SURFACE_UNIVERSAL_WEB,
                 SURFACE_GPUI_DESKTOP,
                 dui_core::surface::SURFACE_UNIVERSAL_TUI,
+                SURFACE_ANDROID_MOBILE,
             ]
         );
         assert!(registry.find(SURFACE_VITE_WEB).is_some());
@@ -239,6 +241,7 @@ mod tests {
                 .find(dui_core::surface::SURFACE_UNIVERSAL_TUI)
                 .is_some()
         );
+        assert!(registry.find(SURFACE_ANDROID_MOBILE).is_some());
     }
 
     #[test]

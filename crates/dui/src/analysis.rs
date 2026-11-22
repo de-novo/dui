@@ -111,8 +111,10 @@ pub(crate) fn exercise_with_renderer(
             spec["readySelector"] = json!("body");
         }
     }
-    if dui_core::surface::resolve_surface_id(&spec) == dui_core::surface::SURFACE_UNIVERSAL_TUI
-        && spec["path"].as_str().is_none()
+    if matches!(
+        dui_core::surface::resolve_surface_id(&spec),
+        dui_core::surface::SURFACE_UNIVERSAL_TUI | dui_core::surface::SURFACE_ANDROID_MOBILE
+    ) && spec["path"].as_str().is_none()
     {
         spec["path"] = json!("/");
     }

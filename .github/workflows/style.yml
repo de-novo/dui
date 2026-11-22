@@ -74,3 +74,4 @@ jobs:
           npm run check:branch-diff
           npm run check:universal-web
           npm run check:tui
+          npm run check:android
