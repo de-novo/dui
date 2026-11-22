@@ -37,6 +37,118 @@ pub fn version_tag(executable: &Path) -> Option<Value> {
     let product = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     (!product.is_empty()).then(|| json!({"product": product}))
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ApiMode {
+    Mock,
+    Hybrid,
+    Live,
+}
+
+impl ApiMode {
+    fn from_spec(spec: &Value) -> Self {
+        match spec["apiMode"].as_str().unwrap_or("mock") {
+            "live" => Self::Live,
+            "hybrid" => Self::Hybrid,
+            _ => Self::Mock,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Mock => "mock",
+            Self::Hybrid => "hybrid",
+            Self::Live => "live",
+        }
+    }
+}
+
+fn forward_live_http(
+    target_url: &str,
+    method: &str,
+    extra_headers: &[(String, String)],
+) -> Result<(u16, String, Vec<u8>)> {
+    let stripped = target_url
+        .strip_prefix("http://")
+        .ok_or("live API proxy currently requires an http:// loopback or local URL")?;
+    let (authority, path) = match stripped.find('/') {
+        Some(idx) => (&stripped[..idx], &stripped[idx..]),
+        None => (stripped, "/"),
+    };
+    let addr = if authority.contains(':') {
+        authority.to_owned()
+    } else {
+        format!("{authority}:80")
+    };
+    let mut stream = std::net::TcpStream::connect(&addr)?;
+    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    let mut req = format!("{method} {path} HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n");
+    for (k, v) in extra_headers {
+        req.push_str(&format!("{k}: {v}\r\n"));
+    }
+    req.push_str("\r\n");
+    stream.write_all(req.as_bytes())?;
+    stream.flush()?;
+    let mut raw = Vec::new();
+    std::io::Read::read_to_end(&mut stream, &mut raw)?;
+    let split = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .ok_or("malformed HTTP response from live API")?;
+    let header_text = String::from_utf8_lossy(&raw[..split]);
+    let mut body = raw[split + 4..].to_vec();
+    let mut lines = header_text.lines();
+    let status_line = lines.next().unwrap_or("HTTP/1.1 502 Bad Gateway");
+    let status: u16 = status_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(502);
+    let mut content_type = "application/json".to_owned();
+    let mut is_chunked = false;
+    for line in lines {
+        if let Some((name, val)) = line.split_once(':') {
+            let lname = name.trim().to_ascii_lowercase();
+            let lval = val.trim();
+            if lname == "content-type" {
+                content_type = lval.to_owned();
+            } else if lname == "transfer-encoding" && lval.to_ascii_lowercase().contains("chunked")
+            {
+                is_chunked = true;
+            }
+        }
+    }
+    if is_chunked {
+        body = decode_chunked(&body);
+    }
+    Ok((status, content_type, body))
+}
+
+fn decode_chunked(input: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut pos = 0;
+    while pos < input.len() {
+        let Some(crlf) = input[pos..].windows(2).position(|w| w == b"\r\n") else {
+            break;
+        };
+        let size_str = String::from_utf8_lossy(&input[pos..pos + crlf]);
+        let hex_part = size_str.split(';').next().unwrap_or("").trim();
+        let Ok(len) = usize::from_str_radix(hex_part, 16) else {
+            break;
+        };
+        pos += crlf + 2;
+        if len == 0 || pos + len > input.len() {
+            break;
+        }
+        out.extend_from_slice(&input[pos..pos + len]);
+        pos += len;
+        if input[pos..].starts_with(b"\r\n") {
+            pos += 2;
+        }
+    }
+    out
+}
+
 pub struct Browser {
     child: Child,
     stream: UnixStream,
@@ -48,6 +160,14 @@ pub struct Browser {
     responses: BTreeMap<String, u16>,
     response_ids: BTreeMap<String, Value>,
     allowed_origin: String,
+    api_mode: ApiMode,
+    api_base_url: Option<String>,
+    api_proxy_prefix: Option<String>,
+    api_headers: Vec<(String, String)>,
+    allow_mutations: bool,
+    live_api_requests: std::collections::BTreeSet<String>,
+    blocked_mutations: std::collections::BTreeSet<String>,
+    api_provenance: BTreeMap<String, &'static str>,
     requests: std::collections::BTreeSet<String>,
 }
 
@@ -101,6 +221,14 @@ impl Browser {
             responses: Default::default(),
             response_ids: Default::default(),
             allowed_origin: format!("http://127.0.0.1:{port}"),
+            api_mode: ApiMode::Mock,
+            api_base_url: None,
+            api_proxy_prefix: None,
+            api_headers: Vec::new(),
+            allow_mutations: false,
+            live_api_requests: Default::default(),
+            blocked_mutations: Default::default(),
+            api_provenance: Default::default(),
             requests: Default::default(),
         })
     }
@@ -142,30 +270,138 @@ impl Browser {
             if msg["method"] == "Fetch.requestPaused" {
                 let p = &msg["params"];
                 let url = p["request"]["url"].as_str().unwrap_or("");
+                let http_method = p["request"]["method"].as_str().unwrap_or("GET");
+                let is_api_resource = matches!(p["resourceType"].as_str(), Some("Fetch" | "XHR"));
                 let session = msg["sessionId"].as_str();
-                if p["request"]["method"] == "GET"
-                    && matches!(p["resourceType"].as_str(), Some("Fetch" | "XHR"))
+                let use_mocks = self.api_mode != ApiMode::Live;
+
+                if use_mocks
+                    && http_method == "GET"
+                    && is_api_resource
                     && let Some((mime, body)) = self.generated_get.get(url)
                 {
                     let reply = json!({"requestId":p["requestId"],"responseCode":200,"responseHeaders":[{"name":"Content-Type","value":mime}],"body":body});
                     self.fulfilled.insert(url.into());
                     self.requests.insert(url.into());
+                    let label = url
+                        .strip_prefix(&self.allowed_origin)
+                        .unwrap_or(url)
+                        .to_owned();
+                    self.api_provenance.insert(label, "mock");
                     self.send(session, "Fetch.fulfillRequest", reply)?;
                     continue;
                 }
-                if let Some(body) = self.mock_responses.get(url) {
+                if use_mocks && let Some(body) = self.mock_responses.get(url) {
                     let reply = json!({"requestId":p["requestId"],"responseCode":200,"responseHeaders":[{"name":"Content-Type","value":"application/json"}],"body":body});
                     self.requests.insert(url.to_owned());
                     self.send(session, "Fetch.fulfillRequest", reply)?;
                     self.fulfilled.insert(url.to_owned());
+                    let label = url
+                        .strip_prefix(&self.allowed_origin)
+                        .unwrap_or(url)
+                        .to_owned();
+                    self.api_provenance.insert(label, "mock");
                     continue;
                 }
 
-                if url
+                let is_same_origin = url
                     .strip_prefix(&self.allowed_origin)
-                    .is_some_and(|rest| rest.starts_with('/'))
+                    .is_some_and(|rest| rest.starts_with('/'));
+                let proxied_target = if self.api_mode != ApiMode::Mock
+                    && is_same_origin
+                    && let (Some(base), Some(prefix)) = (&self.api_base_url, &self.api_proxy_prefix)
+                    && let Some(rel) = url.strip_prefix(&self.allowed_origin)
+                    && rel.starts_with(prefix.as_str())
                 {
+                    Some((format!("{base}{rel}"), rel.to_owned()))
+                } else {
+                    None
+                };
+                let is_live_api_origin = self.api_mode != ApiMode::Mock
+                    && self.api_base_url.as_deref().is_some_and(|base| {
+                        url.strip_prefix(base)
+                            .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+                    });
+
+                if proxied_target.is_some() || is_live_api_origin {
+                    let label = proxied_target
+                        .as_ref()
+                        .map(|(_, rel)| rel.clone())
+                        .or_else(|| {
+                            self.api_base_url
+                                .as_deref()
+                                .and_then(|b| url.strip_prefix(b))
+                                .map(str::to_owned)
+                        })
+                        .unwrap_or_else(|| url.to_owned());
+                    let is_safe_method = matches!(http_method, "GET" | "HEAD" | "OPTIONS");
+                    if is_api_resource && !self.allow_mutations && !is_safe_method {
+                        self.blocked_mutations
+                            .insert(format!("{http_method} {label}"));
+                        self.api_provenance.insert(label, "blocked-mutation");
+                        self.send(
+                            session,
+                            "Fetch.failRequest",
+                            json!({"requestId":p["requestId"],"errorReason":"BlockedByClient"}),
+                        )?;
+                        continue;
+                    }
                     self.requests.insert(url.to_owned());
+                    self.live_api_requests.insert(label.clone());
+                    self.api_provenance.insert(label, "live-api");
+                    if let Some((rewritten, _)) = proxied_target {
+                        match forward_live_http(&rewritten, http_method, &self.api_headers) {
+                            Ok((status, mime, body)) => {
+                                self.responses.insert(url.to_owned(), status);
+                                let reply = json!({
+                                    "requestId": p["requestId"],
+                                    "responseCode": status,
+                                    "responseHeaders": [{"name": "Content-Type", "value": mime}],
+                                    "body": STANDARD.encode(body),
+                                });
+                                self.send(session, "Fetch.fulfillRequest", reply)?;
+                            }
+                            Err(_) => {
+                                self.send(
+                                    session,
+                                    "Fetch.failRequest",
+                                    json!({"requestId":p["requestId"],"errorReason":"ConnectionFailed"}),
+                                )?;
+                            }
+                        }
+                    } else {
+                        let mut cont = json!({"requestId": p["requestId"]});
+                        if !self.api_headers.is_empty() {
+                            let mut merged: BTreeMap<String, String> = BTreeMap::new();
+                            if let Some(orig) = p["request"]["headers"].as_object() {
+                                for (k, v) in orig {
+                                    if let Some(vs) = v.as_str() {
+                                        merged.insert(k.clone(), vs.to_owned());
+                                    }
+                                }
+                            }
+                            for (k, v) in &self.api_headers {
+                                merged.insert(k.clone(), v.clone());
+                            }
+                            cont["headers"] = json!(
+                                merged
+                                    .into_iter()
+                                    .map(|(name, value)| json!({"name": name, "value": value}))
+                                    .collect::<Vec<_>>()
+                            );
+                        }
+                        self.send(session, "Fetch.continueRequest", cont)?;
+                    }
+                } else if is_same_origin {
+                    self.requests.insert(url.to_owned());
+                    if self.api_mode == ApiMode::Live && is_api_resource {
+                        let label = url
+                            .strip_prefix(&self.allowed_origin)
+                            .unwrap_or(url)
+                            .to_owned();
+                        self.live_api_requests.insert(label.clone());
+                        self.api_provenance.insert(label, "live-api");
+                    }
                     self.send(
                         session,
                         "Fetch.continueRequest",
@@ -302,6 +538,37 @@ impl Browser {
         self.fulfilled.clear();
         self.responses.clear();
         self.response_ids.clear();
+        self.live_api_requests.clear();
+        self.blocked_mutations.clear();
+        self.api_provenance.clear();
+        self.api_mode = ApiMode::from_spec(spec);
+        self.allow_mutations = spec["allowMutations"].as_bool().unwrap_or(false);
+        self.api_base_url = spec["apiBaseUrl"]
+            .as_str()
+            .and_then(|raw| {
+                if let Some(var_name) = raw.strip_prefix("env:") {
+                    std::env::var(var_name).ok()
+                } else {
+                    Some(raw.to_owned())
+                }
+            })
+            .map(|s| s.trim_end_matches('/').to_owned())
+            .filter(|s| !s.is_empty());
+        self.api_proxy_prefix = spec["apiProxyPrefix"]
+            .as_str()
+            .filter(|s| s.starts_with('/'))
+            .map(str::to_owned);
+        self.api_headers.clear();
+        if let Some(header_envs) = spec["apiHeaderEnv"].as_object() {
+            for (header_name, env_val) in header_envs {
+                if let Some(var_name) = env_val.as_str()
+                    && let Ok(secret_val) = std::env::var(var_name)
+                    && !secret_val.is_empty()
+                {
+                    self.api_headers.push((header_name.clone(), secret_val));
+                }
+            }
+        }
         let origin = self.allowed_origin.clone();
         let path = spec["path"].as_str().ok_or("missing path")?;
         if !path.starts_with('/') || path.starts_with("//") {
@@ -553,6 +820,12 @@ impl Browser {
                 .filter(|url| !url.starts_with("/assets/"))
                 .collect::<Vec<_>>()
         );
+        if self.api_mode != ApiMode::Mock {
+            v["apiMode"] = json!(self.api_mode.as_str());
+            v["liveApiRequests"] = json!(self.live_api_requests.iter().collect::<Vec<_>>());
+            v["blockedMutations"] = json!(self.blocked_mutations.iter().collect::<Vec<_>>());
+            v["apiProvenance"] = json!(self.api_provenance);
+        }
         Ok(v)
     }
     pub fn version(&mut self) -> Result<Value> {

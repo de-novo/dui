@@ -70,3 +70,4 @@ jobs:
           npm run check:audit
           npm run check:query-params
           npm run check:p2-rules
+          npm run check:real-api

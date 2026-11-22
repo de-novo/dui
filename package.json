@@ -18,6 +18,7 @@
     "check:audit": "tsc --project scripts && cargo build --locked && node scripts/check-audit.mts",
     "check:query-params": "tsc --project scripts && cargo build --locked && node scripts/check-query-params.mts",
     "check:p2-rules": "tsc --project scripts && cargo build --locked && node scripts/check-p2-rules.mts",
+    "check:real-api": "tsc --project scripts && cargo build --locked && node scripts/check-real-api.mts",
     "check:desktop": "tsc --project scripts && cargo build --locked && node scripts/check-desktop.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "check:gpui-live": "tsc --project scripts && cargo build --locked && node scripts/check-gpui-live.mts",
