@@ -14,7 +14,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | --- | --- | --- |
 | Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
 | Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 19, Vite 8, Nitro SSR, Chromium (CDP) | Next.js 16, Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
-| Desktop App | GPUI (`gpui-pre` 0.3.x), `gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Electron 45, Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
+| Desktop App | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator` -> `RenderNodeSnapshot`) | Jetpack Compose / Kotlin 2 compiler analysis, iOS (`xcrun simctl` / SwiftUI / Swift 6), React Native 0.88 / Expo 58, Flutter 3 / Dart 3 |
 | Terminal UI (TUI) | Universal TUI (`pty` + VT100 cell grid -> `RenderNodeSnapshot` + monospace PNG) | Ratatui (Rust), Ink (TS/React), Bubble Tea (Go) |
 | Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 8, standard Web `URLSearchParams` | Next.js App Router, Android intents & deep links |

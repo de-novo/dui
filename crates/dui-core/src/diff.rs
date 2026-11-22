@@ -449,6 +449,81 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
     }
 }
 
+/// Normalize GPUI / native AccessKit element arrays (`role`, `label`, `bounds`, `checked`, `visible`)
+/// into the unified platform-neutral `RenderNodeSnapshot` tree so native desktop apps share the
+/// exact same element-level diff and canvas overlay pipeline as Web, TUI, and Android.
+pub fn accesskit_elements_to_render_tree(
+    elements: &[serde_json::Value],
+) -> Vec<RenderNodeSnapshot> {
+    let mut nodes = Vec::new();
+    let mut id_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for el in elements {
+        if el.get("visible").and_then(serde_json::Value::as_bool) == Some(false) {
+            continue;
+        }
+        let bounds = &el["bounds"];
+        let x = bounds["x"].as_f64().unwrap_or(0.0).round() as i32;
+        let y = bounds["y"].as_f64().unwrap_or(0.0).round() as i32;
+        let width = bounds["width"].as_f64().unwrap_or(0.0).round() as i32;
+        let height = bounds["height"].as_f64().unwrap_or(0.0).round() as i32;
+        if width <= 0 || height <= 0 {
+            continue;
+        }
+        let raw_role = el["role"].as_str().map(str::trim).filter(|s| !s.is_empty());
+        let tag = match raw_role.map(|r| r.to_ascii_lowercase()).as_deref() {
+            Some("button") => "button",
+            Some("checkbox") => "checkbox",
+            Some("label" | "statictext") => "label",
+            Some("textinput" | "textbox") => "input",
+            Some("heading") => "h1",
+            Some("list") => "list",
+            Some("listitem") => "li",
+            Some("dialog") => "dialog",
+            Some("tab") => "tab",
+            Some("switch") => "switch",
+            Some("link") => "a",
+            Some("image" | "img") => "img",
+            _ => "element",
+        };
+        let text = el["label"].as_str().map(str::trim).unwrap_or("").to_owned();
+        if text.is_empty() && raw_role.is_none() {
+            continue;
+        }
+        let count = id_counts.entry(tag.to_owned()).or_insert(0);
+        let id = format!("{tag}#{count}");
+        *count += 1;
+
+        let mut attributes = BTreeMap::new();
+        if let Some(path) = el["path"].as_str().filter(|s| !s.is_empty()) {
+            attributes.insert("accesskitPath".into(), path.to_owned());
+        }
+        if let Some(checked) = el.get("checked").and_then(serde_json::Value::as_bool) {
+            attributes.insert("checked".into(), checked.to_string());
+        }
+        if let Some(role) = raw_role {
+            attributes.insert("accesskitRole".into(), role.to_owned());
+        }
+
+        nodes.push(RenderNodeSnapshot {
+            id,
+            tag: tag.into(),
+            role: raw_role.map(|r| r.to_ascii_lowercase()),
+            text,
+            rect: RenderRect {
+                x,
+                y,
+                width,
+                height,
+            },
+            style: BTreeMap::new(),
+            parent_id: None,
+            box_model: None,
+            attributes,
+        });
+    }
+    nodes
+}
+
 /// Pure structural render-tree diff comparing rendered DOM/layout/style elements between two
 /// captures. Uses a 2px layout tolerance so subpixel/antialiasing jitter never triggers noise.
 pub fn diff_render_trees(
@@ -1110,5 +1185,74 @@ mod tests {
         let decoded: RenderNodeSnapshot =
             serde_json::from_str(&encoded).expect("deserialize enriched node");
         assert_eq!(decoded, enriched);
+    }
+
+    #[test]
+    fn accesskit_elements_convert_to_render_tree_and_diff_cleanly() {
+        let before_els = vec![
+            serde_json::json!({
+                "path": "[0, 1]",
+                "role": "CheckBox",
+                "label": "Primary alerts",
+                "checked": false,
+                "visible": true,
+                "bounds": {"x": 16.0, "y": 48.0, "width": 160.0, "height": 24.0}
+            }),
+            serde_json::json!({
+                "path": "[0, 2]",
+                "role": "Button",
+                "label": "Primary density: compact",
+                "checked": null,
+                "visible": true,
+                "bounds": {"x": 16.0, "y": 84.0, "width": 180.0, "height": 32.0}
+            }),
+            serde_json::json!({
+                "path": "[0, 3]",
+                "role": "Label",
+                "label": "Hidden",
+                "visible": false,
+                "bounds": {"x": 0.0, "y": 0.0, "width": 50.0, "height": 20.0}
+            }),
+        ];
+        let after_els = vec![
+            serde_json::json!({
+                "path": "[0, 1]",
+                "role": "CheckBox",
+                "label": "Primary alerts",
+                "checked": true,
+                "visible": true,
+                "bounds": {"x": 16.0, "y": 48.0, "width": 160.0, "height": 24.0}
+            }),
+            serde_json::json!({
+                "path": "[0, 2]",
+                "role": "Button",
+                "label": "Primary density: expanded",
+                "checked": null,
+                "visible": true,
+                "bounds": {"x": 16.0, "y": 84.0, "width": 200.0, "height": 32.0}
+            }),
+        ];
+
+        let before = accesskit_elements_to_render_tree(&before_els);
+        let after = accesskit_elements_to_render_tree(&after_els);
+        assert_eq!(before.len(), 2);
+        assert_eq!(before[0].tag, "checkbox");
+        assert_eq!(before[1].tag, "button");
+        assert_eq!(
+            before[0].attributes.get("checked").map(String::as_str),
+            Some("false")
+        );
+
+        let diff = diff_render_trees(&before, &after, true);
+        assert_eq!(diff.text_changed, 1);
+        assert_eq!(diff.changes[0].id, "button#0");
+        assert_eq!(
+            diff.changes[0].before_text.as_deref(),
+            Some("Primary density: compact")
+        );
+        assert_eq!(
+            diff.changes[0].after_text.as_deref(),
+            Some("Primary density: expanded")
+        );
     }
 }

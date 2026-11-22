@@ -26,16 +26,7 @@ use std::{
 
 const MAX_STATIC_CACHE_FILES: usize = 500;
 
-struct ManagedChild(Child);
-
-impl Drop for ManagedChild {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-
-struct StaticServer {
+pub(crate) struct StaticServer {
     port: u16,
     stop: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
@@ -51,14 +42,23 @@ impl Drop for StaticServer {
     }
 }
 
-enum UniversalSession {
+pub(crate) struct ManagedChild(Child);
+
+impl Drop for ManagedChild {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+pub(crate) enum UniversalSession {
     Static(StaticServer),
     Url { port: u16 },
     Command { _child: ManagedChild, port: u16 },
 }
 
 impl UniversalSession {
-    fn port(&self) -> u16 {
+    pub(crate) fn port(&self) -> u16 {
         match self {
             Self::Static(server) => server.port,
             Self::Url { port } => *port,
@@ -366,6 +366,30 @@ fn start_command_server(project: &Path, spec: &Value) -> Result<UniversalSession
     })
 }
 
+pub(crate) fn start_universal_session(
+    project: &Path,
+    spec: &Value,
+) -> Result<UniversalSession, (u8, Value)> {
+    match spec["host"].as_str() {
+        Some("static") => Ok(UniversalSession::Static(start_static_server(
+            project, spec,
+        )?)),
+        Some("url") => {
+            let raw = spec["url"]
+                .as_str()
+                .ok_or_else(|| failure(2, "host \"url\" requires a `url` field"))?;
+            let (port, _) = parse_loopback_url(raw).map_err(|msg| failure(2, &msg))?;
+            wait_for_port(port, Duration::from_secs(2), None).map_err(|msg| failure(3, &msg))?;
+            Ok(UniversalSession::Url { port })
+        }
+        Some("command") => start_command_server(project, spec),
+        other => Err(failure(
+            2,
+            &format!("unsupported universal web host `{}`", other.unwrap_or("")),
+        )),
+    }
+}
+
 struct UniversalWebHost;
 
 impl Host for UniversalWebHost {
@@ -380,29 +404,11 @@ impl Host for UniversalWebHost {
         let spec: Value =
             serde_json::from_slice(&fs::read(manifest).map_err(|e| failure(2, &e.to_string()))?)
                 .map_err(|e| failure(2, &e.to_string()))?;
-        match spec["host"].as_str() {
-            Some("static") => Ok(UniversalSession::Static(start_static_server(
-                project, &spec,
-            )?)),
-            Some("url") => {
-                let raw = spec["url"]
-                    .as_str()
-                    .ok_or_else(|| failure(2, "host \"url\" requires a `url` field"))?;
-                let (port, _) = parse_loopback_url(raw).map_err(|msg| failure(2, &msg))?;
-                wait_for_port(port, Duration::from_secs(2), None)
-                    .map_err(|msg| failure(3, &msg))?;
-                Ok(UniversalSession::Url { port })
-            }
-            Some("command") => start_command_server(project, &spec),
-            other => Err(failure(
-                2,
-                &format!("unsupported universal web host `{}`", other.unwrap_or("")),
-            )),
-        }
+        start_universal_session(project, &spec)
     }
 }
 
-fn collect_static_source_files(project: &Path, root_rel: &str) -> Vec<String> {
+pub(crate) fn collect_static_source_files(project: &Path, root_rel: &str) -> Vec<String> {
     let Ok(project_root) = project.canonicalize() else {
         return Vec::new();
     };

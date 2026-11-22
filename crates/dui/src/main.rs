@@ -7,6 +7,7 @@ mod cache;
 mod chromium;
 mod comments;
 mod diff;
+mod electron;
 mod gpui;
 mod graph_view;
 mod host;
