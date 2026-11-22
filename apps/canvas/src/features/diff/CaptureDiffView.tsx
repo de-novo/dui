@@ -61,17 +61,6 @@ function DiffCellCard({
         )}
       </header>
 
-      {cell.changedFiles.length > 0 && (
-        <div className="diff-changed-files" aria-label={t.changedFilesLabel}>
-          <span className="diff-files-label">{t.changedFilesLabel}:</span>
-          {cell.changedFiles.map((file) => (
-            <code key={file} className="diff-file-chip">
-              {file}
-            </code>
-          ))}
-        </div>
-      )}
-
       {cell.statusChange && !cell.pixelDiff && (
         <output className="diff-status-change">
           <strong>{t.statusChangeLabel}:</strong>{" "}

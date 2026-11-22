@@ -185,6 +185,61 @@ pub fn with_query(base_path: &str, query: &BTreeMap<String, String>) -> String {
     format!("{pathname}?{qs}")
 }
 
+fn is_dynamic_id_segment(seg: &str) -> bool {
+    if seg.is_empty() {
+        return false;
+    }
+    if seg.bytes().all(|b| b.is_ascii_digit()) {
+        return true;
+    }
+    let is_uuid = seg.len() == 36
+        && seg.bytes().enumerate().all(|(i, b)| match i {
+            8 | 13 | 18 | 23 => b == b'-',
+            _ => b.is_ascii_hexdigit(),
+        });
+    if is_uuid {
+        return true;
+    }
+    seg.len() >= 12
+        && seg.bytes().all(|b| b.is_ascii_hexdigit())
+        && seg.bytes().any(|b| b.is_ascii_digit())
+}
+
+/// Normalize a route path into a canonical pattern for loop-free BFS discovery.
+/// Collapses numeric, UUID, and hex-ID path segments into `:id` so infinite dynamic
+/// lists (`/orders/1`, `/orders/2`, ...) visit a single representative screen while
+/// preserving distinct static paths and sorted query parameters.
+pub fn route_pattern(path: &str) -> String {
+    let without_hash = path.split('#').next().unwrap_or(path);
+    let (raw_pathname, raw_query) = match without_hash.split_once('?') {
+        Some((p, q)) => (p, Some(q)),
+        None => (without_hash, None),
+    };
+    let segments: Vec<&str> = raw_pathname
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(|seg| {
+            if is_dynamic_id_segment(seg) {
+                ":id"
+            } else {
+                seg
+            }
+        })
+        .collect();
+    let normalized_path = if segments.is_empty() {
+        "/".to_owned()
+    } else {
+        format!("/{}", segments.join("/"))
+    };
+    if let Some(q) = raw_query.filter(|q| !q.is_empty()) {
+        let mut pairs: Vec<&str> = q.split('&').filter(|p| !p.is_empty()).collect();
+        pairs.sort_unstable();
+        format!("{normalized_path}?{}", pairs.join("&"))
+    } else {
+        normalized_path
+    }
+}
+
 pub fn graph(facts: &[Value], hits: &BTreeSet<String>) -> Value {
     let mut nodes = BTreeMap::new();
     let mut edges = BTreeSet::new();
@@ -412,5 +467,25 @@ mod tests {
         assert!(urls.contains(&"/?tab=billing".to_owned()));
         assert!(urls.contains(&"/?compact=1".to_owned()));
         assert!(urls.contains(&"/?compact=1&tab=details".to_owned()));
+    }
+
+    #[test]
+    fn route_pattern_collapses_dynamic_ids_while_keeping_static_routes_and_queries_distinct() {
+        assert_eq!(route_pattern("/orders/101"), "/orders/:id");
+        assert_eq!(route_pattern("/orders/99999/"), "/orders/:id");
+        assert_eq!(
+            route_pattern("/items/550e8400-e29b-41d4-a716-446655440000/edit"),
+            "/items/:id/edit"
+        );
+        assert_eq!(route_pattern("/blobs/abcdef1234567890"), "/blobs/:id");
+        assert_eq!(
+            route_pattern("/settings/api-keys#top"),
+            "/settings/api-keys"
+        );
+        assert_eq!(route_pattern("/?b=2&a=1"), "/?a=1&b=2");
+        assert_ne!(
+            route_pattern("/?tab=details"),
+            route_pattern("/?tab=billing")
+        );
     }
 }
