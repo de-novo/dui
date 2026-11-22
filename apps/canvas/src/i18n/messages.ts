@@ -129,6 +129,14 @@ export type Messages = {
   auditCoverageLabel: (verifiedPct: number, goalPct: number) => string;
   auditCellsLabel: (verified: number, renderable: number, total: number) => string;
   auditOpenCommentsLabel: (count: number) => string;
+  canvasDiffCompare: string;
+  canvasDiffOff: string;
+  canvasDiffChangedOnly: string;
+  canvasDiffModeAfter: string;
+  canvasDiffModeBefore: string;
+  canvasDiffModeOverlay: string;
+  canvasDiffSummary: (changed: number, added: number, removed: number) => string;
+  canvasDiffNoChanges: string;
 };
 
 export const MESSAGES: Record<UiLocale, Messages> = {
@@ -240,6 +248,15 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditCellsLabel: (verified, renderable, total) =>
       `${verified} verified · ${renderable}/${total} renderable`,
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
+    canvasDiffCompare: "Compare",
+    canvasDiffOff: "No diff",
+    canvasDiffChangedOnly: "Changed only",
+    canvasDiffModeAfter: "After",
+    canvasDiffModeBefore: "Before",
+    canvasDiffModeOverlay: "Overlay",
+    canvasDiffSummary: (changed, added, removed) =>
+      `${changed} changed · ${added} added · ${removed} removed`,
+    canvasDiffNoChanges: "No UI changes",
   },
   "zh-CN": {
     workspace: "工作区",
@@ -349,6 +366,15 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditCellsLabel: (verified, renderable, total) =>
       `${verified} 已验证 · ${renderable}/${total} 可渲染`,
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
+    canvasDiffCompare: "对比",
+    canvasDiffOff: "关闭对比",
+    canvasDiffChangedOnly: "仅看变更界面",
+    canvasDiffModeAfter: "变更后",
+    canvasDiffModeBefore: "变更前",
+    canvasDiffModeOverlay: "差异叠加",
+    canvasDiffSummary: (changed, added, removed) =>
+      `变更 ${changed} · 新增 ${added} · 删除 ${removed}`,
+    canvasDiffNoChanges: "无界面变更",
   },
   ko: {
     workspace: "워크스페이스",
@@ -458,5 +484,14 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditCellsLabel: (verified, renderable, total) =>
       `검증 ${verified} · 렌더 가능 ${renderable}/${total}`,
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
+    canvasDiffCompare: "비교",
+    canvasDiffOff: "비교 끄기",
+    canvasDiffChangedOnly: "변경된 화면만",
+    canvasDiffModeAfter: "이후",
+    canvasDiffModeBefore: "이전",
+    canvasDiffModeOverlay: "오버레이",
+    canvasDiffSummary: (changed, added, removed) =>
+      `변경 ${changed} · 추가 ${added} · 삭제 ${removed}`,
+    canvasDiffNoChanges: "UI 변경 없음",
   },
 };

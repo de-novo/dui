@@ -6,6 +6,7 @@ import type { Cell, Screen, ScreenMap } from "../../data/overview";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 import { canOpenLiveCell } from "../../model/live";
+import type { ScreenCanvasDiff } from "../../model/canvasDiff";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
 import { CommentPanel } from "./CommentPanel";
@@ -47,6 +48,8 @@ export function ScreenInspector({
   onSelectState,
   onSelectScreen,
   onOpenLive,
+  screenDiff,
+  beforeRunKey,
 }: {
   archive: ScreenMap;
   run: Run;
@@ -66,6 +69,8 @@ export function ScreenInspector({
   onSelectState: (stateKey: string, width?: number) => void;
   onSelectScreen: (screenId: string) => void;
   onOpenLive: (targetCell: { state: string; width: number }) => void;
+  screenDiff?: ScreenCanvasDiff;
+  beforeRunKey?: string;
 }) {
   const { t } = useI18n();
   const liveGate = canOpenLiveCell(cell, run);
@@ -119,6 +124,64 @@ export function ScreenInspector({
           </Button>
           {!liveGate.ok && <p className="live-unavailable-note">{liveGate.reason}</p>}
         </div>
+      )}
+
+      {screenDiff && (
+        <section className="inspector-diff-section" aria-label={t.diffTitle}>
+          <div className="inspector-diff-header">
+            <span className={`diff-badge diff-badge-${screenDiff.kind}`}>
+              {screenDiff.kind === "added"
+                ? t.diffAdded
+                : screenDiff.kind === "removed"
+                  ? t.diffRemoved
+                  : t.diffChanged}
+            </span>
+            {screenDiff.maxDiffRatio !== null && screenDiff.maxDiffRatio > 0 && (
+              <span className="inspector-diff-ratio">
+                {(screenDiff.maxDiffRatio * 100).toFixed(1)}% px
+              </span>
+            )}
+          </div>
+          <div className="inspector-diff-previews">
+            {screenDiff.beforeImage && beforeRunKey && (
+              <figure>
+                <figcaption>{t.beforeLabel}</figcaption>
+                <img
+                  alt={t.beforeLabel}
+                  src={`/archive/${encodeURIComponent(screenDiff.beforeImage)}?run=${encodeURIComponent(beforeRunKey)}`}
+                />
+              </figure>
+            )}
+            {screenDiff.afterImage && (
+              <figure>
+                <figcaption>{t.afterLabel}</figcaption>
+                <img
+                  alt={t.afterLabel}
+                  src={`/archive/${encodeURIComponent(screenDiff.afterImage)}?run=${encodeURIComponent(run.key)}`}
+                />
+              </figure>
+            )}
+            {screenDiff.overlayImage && (
+              <figure>
+                <figcaption>{t.pixelDiffOverlay}</figcaption>
+                <img
+                  alt={t.pixelDiffOverlay}
+                  src={`/api/diff-overlay?file=${encodeURIComponent(screenDiff.overlayImage)}`}
+                />
+              </figure>
+            )}
+          </div>
+          {screenDiff.changedFiles.length > 0 && (
+            <div className="inspector-diff-files">
+              <span className="inspector-diff-files-label">{t.changedFilesLabel}</span>
+              <div className="inspector-diff-file-chips">
+                {screenDiff.changedFiles.slice(0, 6).map((file) => (
+                  <code key={file}>{file}</code>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       {locales.length > 1 && (
