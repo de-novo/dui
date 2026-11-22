@@ -736,18 +736,17 @@ impl Browser {
                 break;
             }
         }
-        // Route discovery may stop at the entry page. Map evidence comes from every screen.
-        let link_selector = spec["routeSelector"]
-            .as_str()
-            .or_else(|| spec.get("screenDiscovery").map(|_| "a[href]"));
-        if let Some(selector) = link_selector {
-            let selector = serde_json::to_string(selector)?;
-            let links = self.call(s, "Runtime.evaluate", json!({"expression": format!("globalThis.__duiRuntime.links({selector})"), "returnByValue": true}))?;
-            v["links"] = links["result"]["value"]
-                .as_array()
-                .ok_or("could not read navigation links")?
-                .clone()
-                .into();
+        // Always collect same-origin navigation anchors so the 2D screen map renders
+        // connecting edges between captured screens even when BFS crawling is off.
+        let link_selector = spec["routeSelector"].as_str().unwrap_or("a[href]");
+        let selector_json = serde_json::to_string(link_selector)?;
+        if let Ok(links) = self.call(
+            s,
+            "Runtime.evaluate",
+            json!({"expression": format!("globalThis.__duiRuntime.links({selector_json})"), "returnByValue": true}),
+        ) && let Some(arr) = links["result"]["value"].as_array()
+        {
+            v["links"] = arr.clone().into();
         }
         if spec["measureSemantics"] == true {
             let tree = self.call(s, "Runtime.evaluate",json!({"expression":"globalThis.__duiRuntime.semantic()","awaitPromise":true,"returnByValue":true}))?;
