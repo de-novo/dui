@@ -4,7 +4,31 @@
 
 > ⚠️ 本译文可能已过时，请以[英文原文](README.md)为准。
 
-[产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md)
+[产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md) · [完整支持栈列表](docs/zh-CN/supported-frameworks.md)
+
+## 可分析范围
+
+### 支持的技术栈与框架
+
+| 类别 | 当前已支持 | 计划支持 |
+| --- | --- | --- |
+| 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2 |
+| Web UI 与宿主 | React 19、Vite 8、Nitro SSR、Chromium (CDP) | Next.js 16、Electron 45、Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2、Tauri 2 |
+| 原生 UI | GPUI (`gpui-pre` 0.3.x)、`gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14、React Native 0.88 / Expo 58、Flutter 3、SwiftUI、Jetpack Compose |
+| 路由与 URL 状态 | TanStack Router 1、TanStack Start 1、React Router 8、标准 Web `URLSearchParams` | Next.js App Router |
+| 状态、表单与模式 | React `useState`、TanStack Query 5、Zustand 5、Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、zod 4、valibot 1 | Radix UI 1、shadcn/ui 4 声明式规则包 |
+
+### 分析与验证能力
+
+| 领域 | 能力 | 状态 |
+| --- | --- | --- |
+| 界面与链接发现 | 路由文件自动发现、无环多跳 BFS (`a[href]`)、动态 ID 模式折叠 (`/orders/:id`)、界面间 `linksTo` 连线 | 已支持 |
+| 状态规划与验证 | 官方编译器类型推导、贪心成对覆盖数组（Covering Array）、`<select>` 真实 DOM 选项发现、视觉变化佐证 (`visualWitness`)、收敛保护 | 已支持 |
+| 数据与 API 验证 | 类型化 `GET` JSON 自动模拟、CSV 模拟、显式 `mockResponses`、`hybrid` / `live` 真实 API 模式（默认只读保护与密钥脱敏） | 已支持 |
+| Diff 与变更评审 | 2D 画布内联对比（`元素` 渲染树 Diff · 2px 容差、`变更后`、`变更前`、惰性 `像素` 叠加）、分支对比 (`dui diff --base main`)、`--changed-since` | 已支持 |
+| 质量、多语言与审计 | 99% 覆盖率审计 (`dui audit`)、多语言与 RTL 校验、缺译键与文本溢出检测、SQLite 评审评论、基于模块图的内容寻址缓存 | 已支持 |
+| 实时编辑与查看器 | 共享 CLI/MCP 实时会话 (`dui live`)、内置 Web 画布 (`dui open`)、原生 GPUI 桌面查看器 (`dui desktop`) | 已支持 |
+| 下一阶段引擎增强 | 多标签页并行捕获、基于 `renderTree` 的布局重叠与无障碍 (a11y) 自动审计、运行时点击打开弹窗/标签页、GPUI AccessKit 渲染树 Diff | 计划中 |
 
 ## 安装
 
