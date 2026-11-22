@@ -68,6 +68,7 @@ impl UnrenderableReason {
 
 pub const SURFACE_VITE_WEB: &str = "vite-web";
 pub const SURFACE_UNIVERSAL_WEB: &str = "universal-web";
+pub const SURFACE_NEXTJS_WEB: &str = "nextjs-web";
 pub const SURFACE_GPUI_DESKTOP: &str = "gpui-desktop";
 pub const SURFACE_ELECTRON_DESKTOP: &str = "electron-desktop";
 pub const SURFACE_UNIVERSAL_TUI: &str = "universal-tui";
@@ -83,6 +84,7 @@ pub fn resolve_surface_id(manifest: &Value) -> &'static str {
             "android" | "android-mobile" => return SURFACE_ANDROID_MOBILE,
             "ios" | "ios-mobile" => return SURFACE_IOS_MOBILE,
             "universal-web" => return SURFACE_UNIVERSAL_WEB,
+            "next" | "nextjs" | "nextjs-web" => return SURFACE_NEXTJS_WEB,
             "vite" | "vite-web" => return SURFACE_VITE_WEB,
             _ => {}
         }
@@ -98,6 +100,7 @@ pub fn resolve_surface_id(manifest: &Value) -> &'static str {
     if let Some(host) = manifest.get("host").and_then(Value::as_str) {
         match host {
             "static" | "url" | "command" => return SURFACE_UNIVERSAL_WEB,
+            "next" | "nextjs" => return SURFACE_NEXTJS_WEB,
             "pty" => return SURFACE_UNIVERSAL_TUI,
             "android" => return SURFACE_ANDROID_MOBILE,
             "ios" => return SURFACE_IOS_MOBILE,

@@ -76,3 +76,4 @@ jobs:
           npm run check:tui
           npm run check:android
           npm run check:electron
+          npm run check:radix-nextjs

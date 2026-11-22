@@ -100,6 +100,7 @@ pub mod edit;
 pub mod inspect;
 pub mod locale;
 pub mod model;
+pub mod nextjs;
 pub mod storage;
 pub mod surface;
 pub mod transition;

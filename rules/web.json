@@ -120,6 +120,116 @@
       "package": "react-hook-form",
       "symbol": "useForm",
       "kind": "form"
+    },
+    {
+      "package": "@radix-ui/react-dialog",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-dialog",
+      "symbol": "Dialog",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-popover",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-popover",
+      "symbol": "Popover",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-tabs",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-tabs",
+      "symbol": "Tabs",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-accordion",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-accordion",
+      "symbol": "Accordion",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-select",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-select",
+      "symbol": "Select",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-dropdown-menu",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-dropdown-menu",
+      "symbol": "DropdownMenu",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-switch",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "@radix-ui/react-checkbox",
+      "symbol": "Root",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Dialog",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Popover",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Tabs",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Accordion",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Select",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "DropdownMenu",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Switch",
+      "kind": "control"
+    },
+    {
+      "package": "radix-ui",
+      "symbol": "Checkbox",
+      "kind": "control"
     }
   ]
 }

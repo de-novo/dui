@@ -100,7 +100,9 @@ pub(crate) fn exercise_with_renderer(
             .map_err(|_| failure(2, "invalid spec"))?;
     if matches!(
         dui_core::surface::resolve_surface_id(&spec),
-        dui_core::surface::SURFACE_UNIVERSAL_WEB | dui_core::surface::SURFACE_ELECTRON_DESKTOP
+        dui_core::surface::SURFACE_UNIVERSAL_WEB
+            | dui_core::surface::SURFACE_ELECTRON_DESKTOP
+            | dui_core::surface::SURFACE_NEXTJS_WEB
     ) {
         if spec["path"].as_str().is_none() {
             let default_path = spec["rendererUrl"]
