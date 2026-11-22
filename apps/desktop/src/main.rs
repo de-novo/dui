@@ -219,11 +219,32 @@ impl DuiDesktopView {
             diff_cache_key: None,
             diff_entries: Vec::new(),
         };
+        this.sync_cell_to_width();
         this.fit_map();
         if this.view_mode == ViewMode::Diff {
             this.ensure_diff_loaded();
         }
         this
+    }
+
+    fn sync_cell_to_width(&mut self) {
+        let Some(screen) = self.active_screen() else {
+            self.selected_cell = 0;
+            return;
+        };
+        let found = screen
+            .cells
+            .iter()
+            .position(|c| c.width_px == self.selected_width);
+        let fallback_width = screen.cells.first().map(|c| c.width_px);
+        if let Some(idx) = found {
+            self.selected_cell = idx;
+        } else {
+            self.selected_cell = 0;
+            if let Some(w) = fallback_width {
+                self.selected_width = w;
+            }
+        }
     }
 
     fn pal(&self) -> Palette {
@@ -342,6 +363,7 @@ impl DuiDesktopView {
                 .find(|(i, r)| *i != idx && r.project_id == run.project_id)
                 .map(|(i, _)| i);
         }
+        self.sync_cell_to_width();
         self.diff_cache_key = None;
         self.fit_map();
         if self.view_mode == ViewMode::Diff {
@@ -376,16 +398,12 @@ impl DuiDesktopView {
                 if self.selected_run >= self.workspace.runs.len() {
                     self.selected_run = 0;
                 }
-                if let Some(run) = self.workspace.runs.get(self.selected_run) {
-                    if self.selected_screen >= run.screens.len() {
-                        self.selected_screen = 0;
-                    }
-                    if let Some(screen) = run.screens.get(self.selected_screen)
-                        && self.selected_cell >= screen.cells.len()
-                    {
-                        self.selected_cell = 0;
-                    }
+                if let Some(run) = self.workspace.runs.get(self.selected_run)
+                    && self.selected_screen >= run.screens.len()
+                {
+                    self.selected_screen = 0;
                 }
+                self.sync_cell_to_width();
                 self.diff_cache_key = None;
                 if self.view_mode == ViewMode::Diff {
                     self.ensure_diff_loaded();
@@ -1018,7 +1036,7 @@ impl DuiDesktopView {
                     cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
                         this.selected_screen = idx;
-                        this.selected_cell = 0;
+                        this.sync_cell_to_width();
                         this.neighbor_page = 0;
                         this.full_1x_detail = false;
                         this.comment_target = CommentTargetChoice::Screen;
@@ -1461,7 +1479,7 @@ impl DuiDesktopView {
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
                                 this.selected_screen = p_idx;
-                                this.selected_cell = 0;
+                                this.sync_cell_to_width();
                                 this.neighbor_page = 0;
                                 this.comment_target = CommentTargetChoice::Screen;
                                 cx.notify();
@@ -1673,8 +1691,12 @@ impl DuiDesktopView {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
+                            let width_changed = this.selected_width != entry_w;
                             this.selected_cell = c_idx;
                             this.selected_width = entry_w;
+                            if width_changed {
+                                this.fit_map();
+                            }
                             cx.notify();
                         }),
                     )
@@ -1723,7 +1745,7 @@ impl DuiDesktopView {
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
                                 this.selected_screen = t_idx;
-                                this.selected_cell = 0;
+                                this.sync_cell_to_width();
                                 this.neighbor_page = 0;
                                 this.comment_target = CommentTargetChoice::Screen;
                                 cx.notify();
@@ -2425,6 +2447,7 @@ impl DuiDesktopView {
                     .when(!active, |b| b.outline())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.selected_width = w;
+                        this.sync_cell_to_width();
                         this.options_open = false;
                         this.fit_map();
                         cx.notify();
