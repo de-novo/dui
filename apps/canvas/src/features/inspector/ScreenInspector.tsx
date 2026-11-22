@@ -171,16 +171,6 @@ export function ScreenInspector({
               </figure>
             )}
           </div>
-          {screenDiff.changedFiles.length > 0 && (
-            <div className="inspector-diff-files">
-              <span className="inspector-diff-files-label">{t.changedFilesLabel}</span>
-              <div className="inspector-diff-file-chips">
-                {screenDiff.changedFiles.slice(0, 6).map((file) => (
-                  <code key={file}>{file}</code>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
       )}
 

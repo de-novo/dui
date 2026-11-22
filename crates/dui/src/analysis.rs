@@ -283,6 +283,11 @@ fn execute_with_locales(
         .iter()
         .filter_map(|(_, s)| s["path"].as_str().map(str::to_owned))
         .collect();
+    let mut visited_patterns: BTreeSet<String> = configured_paths
+        .iter()
+        .map(|p| dui_core::discovery::route_pattern(p))
+        .collect();
+    let mut discovered_from: BTreeMap<String, String> = BTreeMap::new();
     if spec.get("screenDiscovery").is_none()
         && let Some(base_path) = spec["path"].as_str().filter(|p| !p.is_empty())
     {
@@ -578,10 +583,15 @@ fn execute_with_locales(
                 }
             }
         }
-        if scenario == "default" && spec["routeSelector"].is_string() {
-            let paths: BTreeSet<&str> = cells
+        if spec["routeSelector"].is_string() {
+            let from_path = spec["path"].as_str().unwrap_or("/").to_owned();
+            let paths: BTreeSet<String> = cells
                 .iter()
-                .filter(|cell| cell["planIndex"] == 0 && cell["observation"]["ready"] == true)
+                .filter(|cell| {
+                    cell["scenario"] == scenario
+                        && cell["planIndex"] == 0
+                        && cell["observation"]["ready"] == true
+                })
                 .flat_map(|cell| {
                     cell["observation"]["links"]
                         .as_array()
@@ -589,13 +599,17 @@ fn execute_with_locales(
                         .flatten()
                 })
                 .filter_map(Value::as_str)
-                .filter(|path| !configured_paths.contains(*path))
+                .map(str::to_owned)
                 .collect();
             for path in paths {
-                let next = linked_spec(&spec, path);
-                let index = discovered_routes.len();
-                discovered_routes.push(path.to_owned());
-                scenarios.push_back((format!("link-{index}"), next));
+                let pattern = dui_core::discovery::route_pattern(&path);
+                if configured_paths.insert(path.clone()) && visited_patterns.insert(pattern) {
+                    let next = linked_spec(&spec, &path);
+                    let index = discovered_routes.len();
+                    discovered_from.insert(path.clone(), from_path.clone());
+                    discovered_routes.push(path);
+                    scenarios.push_back((format!("link-{index}"), next));
+                }
             }
         }
         for (offset, row) in pending.iter().enumerate() {
@@ -665,7 +679,11 @@ fn execute_with_locales(
         let mut discovered = discovery.clone();
         if let Some(paths) = report["discoveredRoutes"].as_array() {
             for path in paths.iter().filter_map(Value::as_str) {
-                let mut source = json!({"kind":"anchor","from":spec["path"]});
+                let origin_from = discovered_from
+                    .get(path)
+                    .map(|p| json!(p))
+                    .unwrap_or_else(|| spec["path"].clone());
+                let mut source = json!({"kind":"anchor","from":origin_from});
                 if let Some(selector) = spec["routeSelector"].as_str() {
                     source["selector"] = json!(selector);
                 }
@@ -911,6 +929,65 @@ mod tests {
             report["coverage"]["attempted"],
             report["coverage"]["renderable"]
         );
+    }
+
+    #[test]
+    fn bfs_discovers_multi_hop_routes_without_cycles_or_dynamic_id_explosion() {
+        struct MultiHopSite;
+        impl Renderer for MultiHopSite {
+            fn capture(
+                &mut self,
+                spec: &Value,
+                _inputs: &Value,
+                width: u32,
+                image: &Path,
+            ) -> Result<Value, Box<dyn std::error::Error>> {
+                fs::write(image, [width as u8])?;
+                let path = spec["path"].as_str().unwrap_or("/");
+                let links = match path {
+                    "/" => json!(["/settings", "/orders/1", "/orders/2", "/orders/3"]),
+                    "/settings" => json!(["/", "/settings/keys"]),
+                    "/settings/keys" => json!(["/", "/settings", "/orders/4"]),
+                    _ => json!(["/"]),
+                };
+                Ok(json!({
+                    "ready": true,
+                    "settled": true,
+                    "width": width,
+                    "path": path,
+                    "hits": [],
+                    "assertions": [],
+                    "slots": {},
+                    "instances": {},
+                    "links": links,
+                }))
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let report = match execute_with_locales(
+            Some(&mut MultiHopSite),
+            &json!({"facts": [], "diagnostics": []}),
+            &json!({"path": "/", "routeSelector": "a[href]", "hasScreenAssertion": true}),
+            dir.path(),
+            &BTreeSet::from([1280]),
+            None,
+            None,
+            &[],
+            &BTreeMap::new(),
+            None,
+        ) {
+            Ok(body) | Err((_, body)) => body,
+        };
+        let discovered: Vec<&str> = report["discoveredRoutes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        // Discovers depth-1 (`/settings`, `/orders/1`) AND depth-2 (`/settings/keys`),
+        // ignores cyclic `/` & `/settings`, and collapses `/orders/2`, `/orders/3`, `/orders/4`.
+        assert_eq!(discovered, vec!["/orders/1", "/settings", "/settings/keys"]);
+        assert_eq!(report["cells"].as_array().unwrap().len(), 4);
     }
 
     #[test]

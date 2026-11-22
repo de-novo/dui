@@ -360,7 +360,10 @@ try {
       !changedDom.includes('data-diff-screen="/settings"'),
       "unchanged /settings cell must stay hidden in viewer DOM",
     );
-    assert(changedDom.includes("Catalog.tsx"), "expected changed file Catalog.tsx in viewer DOM");
+    assert(
+      !changedDom.includes("Catalog.tsx"),
+      "human visual diff DOM should not show source code file chips",
+    );
     assert(changedDom.includes("/api/diff/overlay"), "expected pixel diff overlay in viewer DOM");
 
     console.log(
