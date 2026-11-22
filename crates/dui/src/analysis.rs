@@ -305,6 +305,9 @@ fn execute_with_locales(
         let mut active = BTreeSet::new();
         let mut done = BTreeSet::new();
         let mut pending = vec![BTreeMap::new()];
+        type BaselineSnapshot = (String, BTreeMap<String, Value>);
+        let mut baselines: BTreeMap<(Option<String>, u32), BaselineSnapshot> = BTreeMap::new();
+        let mut proven_visual_slots: BTreeSet<String> = BTreeSet::new();
         let mut stagnant_rounds = 0usize;
         let mut termination = FillTermination::Exhausted;
         while let Some(row) = pending.first().cloned() {
@@ -339,7 +342,7 @@ fn execute_with_locales(
 
                     let mut capture_spec = locale_spec.clone();
                     capture_spec["assertions"] = checks.clone();
-                    if scenario != "default" || index != 0 {
+                    if index != 0 {
                         capture_spec
                             .as_object_mut()
                             .unwrap()
@@ -363,6 +366,28 @@ fn execute_with_locales(
                         cache_hits += 1;
                         if let Some(slots) = obs["slots"].as_object() {
                             active.extend(slots.keys().cloned());
+                            if index == 0 {
+                                let base_hash = image_name
+                                    .split('-')
+                                    .next()
+                                    .unwrap_or(&image_name)
+                                    .to_owned();
+                                let slot_map: BTreeMap<String, Value> =
+                                    slots.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                                baselines.insert(
+                                    (locale.map(str::to_owned), *width),
+                                    (base_hash, slot_map),
+                                );
+                            }
+                        }
+                        if row.len() == 1
+                            && let Some(witness_map) = obs["visualWitness"].as_object()
+                        {
+                            for (k, reason) in witness_map {
+                                if reason.as_str() == Some("visible-change") {
+                                    proven_visual_slots.insert(k.clone());
+                                }
+                            }
                         }
                         let observed: Vec<_> = obs["hits"]
                             .as_array()
@@ -423,13 +448,21 @@ fn execute_with_locales(
 
                     let reached = browser.capture(&capture_spec, &input, *width, staged.path());
                     let mut cell = match reached {
-                        Ok(obs) => {
+                        Ok(mut obs) => {
                             let bytes =
                                 fs::read(staged.path()).map_err(|e| failure(3, &e.to_string()))?;
-                            let name = format!("{:x}-{width}.png", Sha256::digest(&bytes));
-                            let slot_values = obs["slots"].as_object();
-                            if let Some(slots) = slot_values {
+                            let png_hash = format!("{:x}", Sha256::digest(&bytes));
+                            let name = format!("{png_hash}-{width}.png");
+                            if let Some(slots) = obs["slots"].as_object() {
                                 active.extend(slots.keys().cloned());
+                                if index == 0 {
+                                    let slot_map: BTreeMap<String, Value> =
+                                        slots.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                                    baselines.insert(
+                                        (locale.map(str::to_owned), *width),
+                                        (png_hash.clone(), slot_map),
+                                    );
+                                }
                             }
                             let observed: Vec<_> = obs["hits"]
                                 .as_array()
@@ -438,6 +471,68 @@ fn execute_with_locales(
                                 .filter_map(Value::as_str)
                                 .collect();
                             hits.extend(observed.iter().map(|s| s.to_string()));
+
+                            // Corroborate non-JSX-branch UI states (e.g., CSS theme / i18n dictionary
+                            // lookups) when changing the slot produces a verified visual pixel change
+                            // relative to the scenario's unmodified baseline capture.
+                            let mut corroborated = BTreeSet::new();
+                            let mut witness_record: BTreeMap<String, &'static str> =
+                                BTreeMap::new();
+                            if index > 0
+                                && let Some((base_hash, base_slots)) =
+                                    baselines.get(&(locale.map(str::to_owned), *width))
+                            {
+                                let checks_slice =
+                                    checks.as_array().map(Vec::as_slice).unwrap_or_default();
+                                if row.len() == 1 {
+                                    for (k, req_val) in &row {
+                                        let has_branch_check =
+                                            checks_slice.iter().any(|c| c["slot"] == *k);
+                                        if !has_branch_check
+                                            && let Some(kind) = dui_core::verification::slot_witness(
+                                                req_val,
+                                                base_slots.get(k),
+                                                &png_hash,
+                                                base_hash,
+                                            )
+                                        {
+                                            corroborated.insert(k.clone());
+                                            witness_record.insert(k.clone(), kind);
+                                            if kind == "visible-change" {
+                                                proven_visual_slots.insert(k.clone());
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    for (k, req_val) in &row {
+                                        let has_branch_check =
+                                            checks_slice.iter().any(|c| c["slot"] == *k);
+                                        if has_branch_check {
+                                            continue;
+                                        }
+                                        if proven_visual_slots.contains(k) {
+                                            corroborated.insert(k.clone());
+                                            witness_record.insert(k.clone(), "proven-visual-slot");
+                                        } else if dui_core::verification::slot_witness(
+                                            req_val,
+                                            base_slots.get(k),
+                                            &png_hash,
+                                            base_hash,
+                                        ) == Some("matches-unmodified-value")
+                                        {
+                                            corroborated.insert(k.clone());
+                                            witness_record
+                                                .insert(k.clone(), "matches-unmodified-value");
+                                        }
+                                    }
+                                }
+                            }
+                            if !witness_record.is_empty()
+                                && let Some(obs_obj) = obs.as_object_mut()
+                            {
+                                obs_obj.insert("visualWitness".into(), json!(witness_record));
+                            }
+
                             let intent = dui_core::verification::Intent {
                                 path: spec["path"].as_str().unwrap_or_default(),
                                 width: *width,
@@ -455,7 +550,7 @@ fn execute_with_locales(
                                     .is_some_and(Vec::is_empty),
                                 expects_probe: facts.iter().any(|f| f["kind"] == "branch"),
                             };
-                            let reason = intent.failure(&obs).or_else(|| {
+                            let reason = intent.failure_with(&obs, &corroborated).or_else(|| {
                                 (spec.get("screenDiscovery").is_some()
                                     && spec["hasScreenAssertion"] == false)
                                     .then_some(
@@ -865,7 +960,7 @@ mod tests {
         assert_eq!(code, 5);
         assert_eq!(report["scenarios"][0]["termination"], "no-improvement");
         assert_eq!(report["coverage"]["attempted"], 4);
-        assert_eq!(report["coverage"]["verified"], 2);
+        assert_eq!(report["coverage"]["verified"], 4);
         assert_eq!(report["coverage"]["renderable"], 6);
         assert_eq!(
             report["cells"]
@@ -965,6 +1060,106 @@ mod tests {
         // ignores cyclic `/` & `/settings`, and collapses `/orders/2`, `/orders/3`, `/orders/4`.
         assert_eq!(discovered, vec!["/orders/1", "/settings", "/settings/keys"]);
         assert_eq!(report["cells"].as_array().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn visual_witness_verifies_non_branch_theme_slot_and_rejects_noop_slot() {
+        let theme_slot = json!({
+            "file": "rail.tsx",
+            "owner": "Rail",
+            "start": 1,
+            "end": 10,
+            "kind": "slot",
+            "binding": 1,
+            "init": [1, 2],
+            "after": 3,
+            "shape": {"kind": "union", "members": [{"kind": "literal", "value": "dark"}, {"kind": "literal", "value": "light"}]}
+        });
+        let noop_slot = json!({
+            "file": "rail.tsx",
+            "owner": "Rail",
+            "start": 20,
+            "end": 30,
+            "kind": "slot",
+            "binding": 2,
+            "init": [20, 21],
+            "after": 22,
+            "shape": {"kind": "boolean"}
+        });
+        let theme_key = key(&theme_slot);
+        let noop_key = key(&noop_slot);
+
+        struct ThemeRenderer {
+            theme_key: String,
+            noop_key: String,
+        }
+        impl Renderer for ThemeRenderer {
+            fn capture(
+                &mut self,
+                _spec: &Value,
+                inputs: &Value,
+                width: u32,
+                image: &Path,
+            ) -> Result<Value, Box<dyn std::error::Error>> {
+                let theme = inputs
+                    .get(&self.theme_key)
+                    .and_then(Value::as_str)
+                    .unwrap_or("dark");
+                let noop = inputs
+                    .get(&self.noop_key)
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                // Changing `theme` visibly changes the rendered pixels; `noop` does not.
+                let pixel_byte = if theme == "light" { 240u8 } else { 20u8 };
+                fs::write(image, [pixel_byte, width as u8])?;
+                Ok(json!({
+                    "ready": true,
+                    "settled": true,
+                    "width": width,
+                    "path": "/",
+                    "hits": [],
+                    "assertions": [],
+                    "responseChecks": {},
+                    "responses": {"/": 200},
+                    "slots": {
+                        &self.theme_key: theme,
+                        &self.noop_key: noop,
+                    },
+                }))
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut renderer = ThemeRenderer {
+            theme_key: theme_key.clone(),
+            noop_key: noop_key.clone(),
+        };
+        let report = match execute_with(
+            Some(&mut renderer),
+            &json!({"facts": [theme_slot, noop_slot], "diagnostics": []}),
+            &json!({"path": "/"}),
+            dir.path(),
+            &BTreeSet::from([1280]),
+            None,
+        ) {
+            Ok(body) | Err((_, body)) => body,
+        };
+        let cells = report["cells"].as_array().unwrap();
+        let theme_light = cells
+            .iter()
+            .find(|c| c["input"] == json!({&theme_key: "light"}))
+            .expect("theme=light cell");
+        assert_eq!(theme_light["status"], "verified");
+        assert_eq!(
+            theme_light["observation"]["visualWitness"][&theme_key],
+            "visible-change"
+        );
+        let noop_true = cells
+            .iter()
+            .find(|c| c["input"] == json!({&noop_key: true}))
+            .expect("noop=true cell");
+        assert_eq!(noop_true["status"], "unverified");
+        assert_eq!(noop_true["reason"], "missing-state-assertion");
     }
 
     #[test]

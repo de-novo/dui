@@ -1650,7 +1650,7 @@ impl DuiDesktopView {
                                 })
                                 .when(unverified > 0, |el| {
                                     el.child(
-                                        Label::new(format!("Unverified {unverified}"))
+                                        Label::new(format!("{} {unverified}", tr.unverified))
                                             .text_xs()
                                             .text_color(p.muted_foreground),
                                     )
