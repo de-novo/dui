@@ -14,7 +14,12 @@ import { ScreenMap } from "./features/map/ScreenMap";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
-import { type AuditReport, decodeAuditReport, openCommentsByPath } from "./model/audit";
+import {
+  type AuditReport,
+  decodeAuditReport,
+  designFindingsByPath,
+  openCommentsByPath,
+} from "./model/audit";
 import {
   type CanvasDiffVisualMode,
   filterArchiveForDiff,
@@ -129,6 +134,7 @@ function MapView({
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [audit, setAudit] = useState<AuditReport | null>(null);
+  const [showDesignOverlay, setShowDesignOverlay] = useState(false);
   const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
     const fromUrl = new URLSearchParams(location.search).get("compare");
     return fromUrl ?? "";
@@ -265,6 +271,8 @@ function MapView({
               selectedId={selectedId}
               focusActive={showDetails}
               openCommentsByPath={openCommentsByPath(audit)}
+              designFindingsByPath={designFindingsByPath(audit, width)}
+              showDesignOverlay={showDesignOverlay}
               diffsByPath={diffsByPath}
               diffActive={diffActive}
               diffVisualMode={diffVisualMode}
@@ -298,6 +306,16 @@ function MapView({
                   <span className="audit-open-comments">
                     {t.auditOpenCommentsLabel(audit.summary.openComments)}
                   </span>
+                )}
+                {audit.designAudit && audit.designAudit.total > 0 && (
+                  <button
+                    type="button"
+                    className={`audit-design-toggle${showDesignOverlay ? " active" : ""}`}
+                    aria-pressed={showDesignOverlay}
+                    onClick={() => setShowDesignOverlay((v) => !v)}
+                  >
+                    {t.auditDesignIssuesLabel(audit.designAudit.total)}
+                  </button>
                 )}
               </output>
             )}
@@ -460,6 +478,9 @@ function MapView({
           }
           screenDiff={selectedDiff}
           beforeRunKey={compareBeforeKey || undefined}
+          designFindings={
+            selectedScreen ? (designFindingsByPath(audit, width)[selectedScreen.path] ?? []) : []
+          }
         />
       )}
 

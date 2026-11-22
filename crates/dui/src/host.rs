@@ -2,15 +2,107 @@ use crate::{
     Reply, analysis,
     chromium::Browser,
     failure,
-    ports::{Host, Renderer},
+    ports::{CaptureBatchJob, Host, Renderer},
 };
 use serde_json::Value;
 use std::{
     fs,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
+
+pub(crate) fn resolve_capture_concurrency(spec: &Value) -> usize {
+    let raw = spec["concurrency"]
+        .as_u64()
+        .or_else(|| {
+            std::env::var("DUI_CONCURRENCY")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+        })
+        .unwrap_or(1);
+    (raw as usize).clamp(1, 4)
+}
+
+pub(crate) fn parallel_chromium_capture(
+    exe: &Path,
+    port: u16,
+    concurrency: usize,
+    jobs: &[CaptureBatchJob<'_>],
+) -> Vec<Result<Value, String>> {
+    let workers = concurrency.clamp(1, 4).min(jobs.len());
+    let next_idx = AtomicUsize::new(0);
+    let results: Mutex<Vec<Option<Result<Value, String>>>> =
+        Mutex::new((0..jobs.len()).map(|_| None).collect());
+
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                let profile = match tempfile::tempdir() {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        let msg = e.to_string();
+                        loop {
+                            let idx = next_idx.fetch_add(1, Ordering::SeqCst);
+                            if idx >= jobs.len() {
+                                break;
+                            }
+                            if let Ok(mut guard) = results.lock() {
+                                guard[idx] = Some(Err(msg.clone()));
+                            }
+                        }
+                        return;
+                    }
+                };
+                let mut browser = match Browser::local(exe, profile.path(), port) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        let msg = e.to_string();
+                        loop {
+                            let idx = next_idx.fetch_add(1, Ordering::SeqCst);
+                            if idx >= jobs.len() {
+                                break;
+                            }
+                            if let Ok(mut guard) = results.lock() {
+                                guard[idx] = Some(Err(msg.clone()));
+                            }
+                        }
+                        return;
+                    }
+                };
+                loop {
+                    let idx = next_idx.fetch_add(1, Ordering::SeqCst);
+                    if idx >= jobs.len() {
+                        break;
+                    }
+                    let job = &jobs[idx];
+                    let outcome = browser
+                        .capture(job.spec, job.input, job.width, job.image)
+                        .map_err(|e| e.to_string());
+                    if let Ok(mut guard) = results.lock() {
+                        guard[idx] = Some(outcome);
+                    }
+                }
+            });
+        }
+    });
+
+    match results.into_inner() {
+        Ok(slots) => slots
+            .into_iter()
+            .map(|entry| {
+                entry.unwrap_or_else(|| Err("parallel worker exited without result".into()))
+            })
+            .collect(),
+        Err(_) => (0..jobs.len())
+            .map(|_| Err("parallel worker mutex poisoned".into()))
+            .collect(),
+    }
+}
 struct Server(Child);
 impl Drop for Server {
     fn drop(&mut self) {
@@ -49,6 +141,37 @@ impl Renderer for LazyViteBrowser<'_> {
         }
         let browser = self.browser.as_mut().ok_or("browser unavailable")?;
         browser.capture(spec, input, width, image)
+    }
+
+    fn capture_batch(&mut self, jobs: &[CaptureBatchJob<'_>]) -> Vec<Result<Value, String>> {
+        let concurrency = jobs
+            .first()
+            .map(|j| resolve_capture_concurrency(j.spec))
+            .unwrap_or(1);
+        if jobs.len() < 2 || concurrency <= 1 {
+            return jobs
+                .iter()
+                .map(|job| {
+                    self.capture(job.spec, job.input, job.width, job.image)
+                        .map_err(|e| e.to_string())
+                })
+                .collect();
+        }
+        if self.host.is_none() {
+            match ViteHost.start(self.project, self.spec, self.facts) {
+                Ok(host) => self.host = Some(host),
+                Err((_, v)) => {
+                    let msg = v.to_string();
+                    return (0..jobs.len()).map(|_| Err(msg.clone())).collect();
+                }
+            }
+        }
+        let Some(host) = self.host.as_ref() else {
+            return (0..jobs.len())
+                .map(|_| Err("host unavailable".into()))
+                .collect();
+        };
+        parallel_chromium_capture(&self.exe, host.port, concurrency, jobs)
     }
 }
 

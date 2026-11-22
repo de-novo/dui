@@ -129,6 +129,8 @@ export type Messages = {
   auditCoverageLabel: (verifiedPct: number, goalPct: number) => string;
   auditCellsLabel: (verified: number, renderable: number, total: number) => string;
   auditOpenCommentsLabel: (count: number) => string;
+  auditDesignIssuesLabel: (count: number) => string;
+  designIssuesTitle: string;
   canvasDiffCompare: string;
   canvasDiffOff: string;
   canvasDiffChangedOnly: string;
@@ -251,6 +253,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditCellsLabel: (verified, renderable, total) =>
       `${verified} verified · ${renderable}/${total} renderable`,
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
+    auditDesignIssuesLabel: (count) => `${count} design ${count === 1 ? "issue" : "issues"}`,
+    designIssuesTitle: "Design & a11y checks",
     canvasDiffCompare: "Compare",
     canvasDiffOff: "No diff",
     canvasDiffChangedOnly: "Changed only",
@@ -372,6 +376,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditCellsLabel: (verified, renderable, total) =>
       `${verified} 已验证 · ${renderable}/${total} 可渲染`,
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
+    auditDesignIssuesLabel: (count) => `${count} 项设计问题`,
+    designIssuesTitle: "设计与无障碍检查",
     canvasDiffCompare: "对比",
     canvasDiffOff: "关闭对比",
     canvasDiffChangedOnly: "仅看变更界面",
@@ -493,6 +499,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     auditCellsLabel: (verified, renderable, total) =>
       `검증 ${verified} · 렌더 가능 ${renderable}/${total}`,
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
+    auditDesignIssuesLabel: (count) => `디자인 결함 ${count}건`,
+    designIssuesTitle: "디자인 · 접근성 진단",
     canvasDiffCompare: "비교",
     canvasDiffOff: "비교 끄기",
     canvasDiffChangedOnly: "변경된 화면만",
