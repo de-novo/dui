@@ -71,3 +71,4 @@ jobs:
           npm run check:query-params
           npm run check:p2-rules
           npm run check:real-api
+          npm run check:branch-diff

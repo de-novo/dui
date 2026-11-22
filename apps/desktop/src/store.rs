@@ -371,18 +371,31 @@ pub fn load_workspace(dui_home: &Path) -> Result<DesktopWorkspace, String> {
         }
     }
 
+    let has_run_branch: bool = conn
+        .prepare("PRAGMA table_info(runs)")
+        .ok()
+        .and_then(|mut s| {
+            s.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.flatten().any(|col| col == "branch"))
+        })
+        .unwrap_or(false);
+    let branch_expr = if has_run_branch {
+        "COALESCE(r.branch, w.branch)"
+    } else {
+        "w.branch"
+    };
     let mut runs = Vec::new();
     {
-        let mut stmt = conn
-            .prepare(
-                "SELECT r.id, r.project_id, p.display_name, w.branch, r.created_at_ms, p.primary_root, w.path, w.app_relative
-                 FROM runs r
-                 JOIN projects p ON p.id = r.project_id
-                 LEFT JOIN worktrees w ON w.id = r.worktree_id
-                 ORDER BY r.created_at_ms DESC, r.id DESC
-                 LIMIT 40",
-            )
-            .map_err(|e| e.to_string())?;
+        let query = format!(
+            "SELECT r.id, r.project_id, p.display_name, {branch_expr}, r.created_at_ms, p.primary_root, w.path, w.app_relative
+             FROM runs r
+             JOIN projects p ON p.id = r.project_id
+             LEFT JOIN worktrees w ON w.id = r.worktree_id
+             ORDER BY r.created_at_ms DESC, r.id DESC
+             LIMIT 40"
+        );
+        let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
         let run_rows = stmt
             .query_map([], |r| {
                 Ok((

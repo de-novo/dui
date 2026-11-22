@@ -25,10 +25,16 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const MIGRATIONS: &[(&str, &str)] = &[(
-    "0001_initial",
-    include_str!("../../../packages/db/migrations/0001_initial.sql"),
-)];
+const MIGRATIONS: &[(&str, &str)] = &[
+    (
+        "0001_initial",
+        include_str!("../../../packages/db/migrations/0001_initial.sql"),
+    ),
+    (
+        "0002_run_branch",
+        include_str!("../../../packages/db/migrations/0002_run_branch.sql"),
+    ),
+];
 
 pub struct SqliteStore {
     conn: Connection,
@@ -941,9 +947,18 @@ impl RunRepository for SqliteStore {
         let kind_json = serde_json::to_string(run.kind()).map_err(db_err)?;
         let env_json = serde_json::to_string(run.environment()).map_err(db_err)?;
         let files_json = serde_json::to_string(run.source_files()).map_err(db_err)?;
+        let run_branch: Option<String> = tx
+            .query_row(
+                "SELECT branch FROM worktrees WHERE id = ?1",
+                params![run.worktree_id().as_str()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(db_err)?
+            .flatten();
         tx.execute(
-            "INSERT INTO runs (id, project_id, worktree_id, commit_id, kind_json, created_at_ms, environment_json, source_files_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO runs (id, project_id, worktree_id, commit_id, kind_json, created_at_ms, environment_json, source_files_json, branch)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 run.id().as_str(),
                 run.project_id().as_str(),
@@ -953,6 +968,7 @@ impl RunRepository for SqliteStore {
                 run.created_at_ms(),
                 env_json,
                 files_json,
+                run_branch,
             ],
         )
         .map_err(db_err)?;
@@ -1258,14 +1274,14 @@ impl RunRepository for SqliteStore {
             .prepare(
                 "SELECT r.id, r.project_id, r.worktree_id, r.commit_id, r.kind_json,
                         r.created_at_ms, r.environment_json, r.source_files_json,
-                        p.display_name, w.branch, c.git_sha, c.dirty
+                        p.display_name, COALESCE(r.branch, w.branch), c.git_sha, c.dirty
                  FROM runs r
                  INNER JOIN projects p ON p.id = r.project_id
                  INNER JOIN worktrees w ON w.id = r.worktree_id
                  INNER JOIN commits c ON c.id = r.commit_id
                  WHERE (?1 IS NULL OR r.project_id = ?1)
                    AND (?2 IS NULL OR r.worktree_id = ?2)
-                   AND (?3 IS NULL OR w.branch = ?3)
+                   AND (?3 IS NULL OR COALESCE(r.branch, w.branch) = ?3)
                  ORDER BY r.created_at_ms DESC, r.id DESC",
             )
             .map_err(db_err)?;
@@ -1874,7 +1890,7 @@ mod tests {
     fn fresh_install_migrates_once_and_second_start_applies_none() {
         let tmp = tempfile::tempdir().unwrap();
         let (_first, applied_first) = SqliteStore::open(tmp.path()).unwrap();
-        assert_eq!(applied_first, vec!["0001_initial"]);
+        assert_eq!(applied_first, vec!["0001_initial", "0002_run_branch"]);
         let (_second, applied_second) = SqliteStore::open(tmp.path()).unwrap();
         assert!(applied_second.is_empty());
     }
@@ -1914,7 +1930,7 @@ mod tests {
             let _ = fs::remove_file(tmp.path().join(file));
         }
         let (mut restored, applied) = SqliteStore::open(tmp.path()).unwrap();
-        assert_eq!(applied, vec!["0001_initial"]);
+        assert_eq!(applied, vec!["0001_initial", "0002_run_branch"]);
         assert_eq!(restored.import_disk_archive(&projects).unwrap(), 2);
         let after = restored.list_runs(&RunFilter::default()).unwrap();
         assert_eq!(after, before);
