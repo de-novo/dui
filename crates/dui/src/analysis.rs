@@ -99,7 +99,7 @@ pub(crate) fn exercise_with_renderer(
     if widths.is_empty() || widths.contains(&0) {
         return Err(failure(2, "positive widths required"));
     }
-    let budget = spec["stateBudget"].as_u64().unwrap_or(32).clamp(1, 512) as usize;
+    let budget = spec["stateBudget"].as_u64().map(|n| n.max(1) as usize);
     fs::create_dir_all(out).map_err(|e| failure(3, &e.to_string()))?;
     let mut stored_spec = spec.clone();
     if let Some(base) = manifest.parent() {
@@ -227,7 +227,7 @@ fn execute_with(
         spec,
         out,
         widths,
-        budget,
+        Some(budget),
         browser_version,
         &[],
         &BTreeMap::new(),
@@ -245,7 +245,7 @@ fn execute_with_locales(
     spec: &Value,
     out: &Path,
     widths: &BTreeSet<u32>,
-    budget: usize,
+    budget: Option<usize>,
     browser_version: Option<Value>,
     locales: &[String],
     missing_by_locale: &BTreeMap<String, Vec<String>>,
@@ -286,11 +286,9 @@ fn execute_with_locales(
     if spec.get("screenDiscovery").is_none()
         && let Some(base_path) = spec["path"].as_str().filter(|p| !p.is_empty())
     {
-        for (qi, q) in dui_core::discovery::query_candidates(facts)
-            .into_iter()
-            .take(budget.saturating_sub(1))
-            .enumerate()
-        {
+        let discovered_queries = dui_core::discovery::query_candidates(facts);
+        let query_limit = budget.map(|b| b.saturating_sub(1)).unwrap_or(usize::MAX);
+        for (qi, q) in discovered_queries.into_iter().take(query_limit).enumerate() {
             let q_path = dui_core::discovery::with_query(base_path, &q);
             if configured_paths.insert(q_path.clone()) {
                 let mut case = spec.clone();
@@ -302,10 +300,10 @@ fn execute_with_locales(
     }
     while let Some((scenario, mut spec)) = scenarios.pop_front() {
         apply_generated(&mut spec, &analysis["autoMocks"]);
-        let budget = spec["stateBudget"]
+        let scenario_budget = spec["stateBudget"]
             .as_u64()
-            .unwrap_or(budget as u64)
-            .clamp(1, 512) as usize;
+            .map(|n| n.max(1) as usize)
+            .or(budget);
         let max_stagnant = spec["maxNoImprovementRounds"].as_u64().map(|n| n as usize);
         let mut active = BTreeSet::new();
         let mut done = BTreeSet::new();
@@ -314,7 +312,9 @@ fn execute_with_locales(
         let mut termination = FillTermination::Exhausted;
         while let Some(row) = pending.first().cloned() {
             let index = done.len();
-            if index >= budget {
+            if let Some(limit) = scenario_budget
+                && index >= limit
+            {
                 termination = FillTermination::BudgetLimit;
                 break;
             }
@@ -620,7 +620,7 @@ fn execute_with_locales(
             }
         }
         seen_slots.extend(active);
-        rounds.push(json!({"scenario":scenario,"name":spec["name"],"stateBudget":budget,"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
+        rounds.push(json!({"scenario":scenario,"name":spec["name"],"stateBudget":scenario_budget,"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
         remaining += pending.len();
     }
     let graph = graph(facts, &hits);
@@ -882,6 +882,34 @@ mod tests {
                 .filter(|n| n["kind"] == "cell")
                 .count(),
             6
+        );
+    }
+
+    #[test]
+    fn default_unlimited_budget_exhausts_every_planned_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let facts = json!({"facts":[{"file":"file","start":1,"end":2,"kind":"slot","owner":"Screen","shape":{"kind":"boolean"},"after":3,"init":[1,2]}],"diagnostics":[]});
+        let widths = BTreeSet::from([375, 768]);
+        let report = match execute_with_locales(
+            Some(&mut StaticPage),
+            &facts,
+            &json!({"path":"/"}),
+            dir.path(),
+            &widths,
+            None,
+            None,
+            &[],
+            &BTreeMap::new(),
+            None,
+        ) {
+            Ok(body) | Err((_, body)) => body,
+        };
+        assert_eq!(report["budget"], Value::Null);
+        assert_eq!(report["remainingPlans"], 0);
+        assert_eq!(report["scenarios"][0]["termination"], "exhausted");
+        assert_eq!(
+            report["coverage"]["attempted"],
+            report["coverage"]["renderable"]
         );
     }
 

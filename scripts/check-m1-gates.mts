@@ -32,11 +32,11 @@ type CellReport = {
 
 type RunReport = {
   compiler: string;
-  budget: number;
+  budget: number | null;
   remainingPlans: number;
   scenarios: {
     scenario: string;
-    stateBudget: number;
+    stateBudget: number | null;
     plannedStates: number;
     remainingStates: number;
     termination: string;
