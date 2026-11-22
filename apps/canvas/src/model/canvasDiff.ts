@@ -79,7 +79,7 @@ export function filterArchiveForDiff(
     syntheticRemoved.push({
       id: `route:${entry.path}`,
       path: entry.path,
-      origin: "entry",
+      discoveredFrom: { kind: "entry" },
       cells: entry.entries.map((c) => ({
         path: entry.path,
         scenario: c.scenario,

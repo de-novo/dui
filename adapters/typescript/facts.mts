@@ -458,32 +458,65 @@ try {
             const recvType = checker.getTypeAtLocation(fn.expression);
             const recvName = recvType?.getSymbol()?.name;
             if (recvName === "URLSearchParams") {
-              let holder: Syntax | undefined = n.parent;
-              while (
-                holder &&
-                [
-                  K.AsExpression,
-                  K.ParenthesizedExpression,
-                  K.NonNullExpression,
-                  K.BinaryExpression,
-                ].includes(holder.kind)
-              ) {
-                holder = holder.parent;
-              }
-              const varDecl = holder?.kind === K.VariableDeclaration ? holder : undefined;
               const isPresence = fn.name.text === "has";
-              const targetNode = varDecl?.name ?? n;
-              const t = checker.getTypeAtLocation(targetNode);
-              facts.push({
-                ...base,
-                kind: "searchParam",
-                label: n.arguments[0].text,
-                presence: isPresence,
-                optional: true,
-                binding: varDecl?.name ? binding(varDecl.name) : null,
-                type: t ? checker.typeToString(t) : "unknown",
-                shape: isPresence ? { kind: "boolean" } : shape(t),
-              });
+              // Recognize inline literal comparisons like `params.get("view") === "diff"`
+              // without attributing the outer boolean comparison result to the query key.
+              const parentBin =
+                !isPresence &&
+                n.parent?.kind === K.BinaryExpression &&
+                (n.parent.operatorToken.kind === K.EqualsEqualsEqualsToken ||
+                  n.parent.operatorToken.kind === K.ExclamationEqualsEqualsToken)
+                  ? n.parent
+                  : undefined;
+              const comparedLit = parentBin
+                ? parentBin.left === n
+                  ? parentBin.right
+                  : parentBin.left
+                : undefined;
+              if (
+                comparedLit &&
+                (comparedLit.kind === K.StringLiteral || comparedLit.kind === K.NumericLiteral)
+              ) {
+                const litType = checker.getTypeAtLocation(comparedLit);
+                const litShape = shape(litType);
+                if (litShape.kind === "literal") {
+                  facts.push({
+                    ...base,
+                    kind: "searchParam",
+                    label: n.arguments[0].text,
+                    presence: false,
+                    optional: true,
+                    binding: null,
+                    type: litType ? checker.typeToString(litType) : "unknown",
+                    shape: litShape,
+                  });
+                }
+              } else {
+                let holder: Syntax | undefined = n.parent;
+                while (
+                  holder &&
+                  ([K.AsExpression, K.ParenthesizedExpression, K.NonNullExpression].includes(
+                    holder.kind,
+                  ) ||
+                    (holder.kind === K.BinaryExpression &&
+                      [K.QuestionQuestionToken, K.BarBarToken].includes(holder.operatorToken.kind)))
+                ) {
+                  holder = holder.parent;
+                }
+                const varDecl = holder?.kind === K.VariableDeclaration ? holder : undefined;
+                const targetNode = varDecl?.name ?? n;
+                const t = checker.getTypeAtLocation(targetNode);
+                facts.push({
+                  ...base,
+                  kind: "searchParam",
+                  label: n.arguments[0].text,
+                  presence: isPresence,
+                  optional: true,
+                  binding: varDecl?.name ? binding(varDecl.name) : null,
+                  type: t ? checker.typeToString(t) : "unknown",
+                  shape: isPresence ? { kind: "boolean" } : shape(t),
+                });
+              }
             }
           }
           const sym = symbol(fn.name ?? fn);

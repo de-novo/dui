@@ -53,36 +53,138 @@ fn is_unbounded_primitive(shape: &Value) -> bool {
     }
 }
 
+fn truthy_representatives(shape: &Value) -> Vec<Value> {
+    let mut out = Vec::new();
+    match shape["kind"].as_str() {
+        Some("string") => {
+            out.push(json!(""));
+            out.push(json!("sample"));
+        }
+        Some("number") => {
+            out.push(json!(0));
+            out.push(json!(1));
+        }
+        Some("literal") => out.push(shape["value"].clone()),
+        Some("boolean") => {
+            out.push(json!(false));
+            out.push(json!(true));
+        }
+        Some("union") => {
+            for m in shape["members"].as_array().into_iter().flatten() {
+                for v in truthy_representatives(m) {
+                    if !out.contains(&v) {
+                        out.push(v);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
 fn slot_values_for_planning(
     slot: &Value,
-    predicate_bindings: &BTreeSet<(String, u64)>,
+    predicate_ops: &BTreeMap<(String, u64), BTreeSet<String>>,
 ) -> Vec<Value> {
     let shape = &slot["shape"];
     if !is_unbounded_primitive(shape) {
         return representatives(shape);
     }
-    let bound_to_branch = slot["file"]
+    let ops = slot["file"]
         .as_str()
         .zip(slot["binding"].as_u64())
-        .is_some_and(|(file, binding)| predicate_bindings.contains(&(file.to_owned(), binding)));
-    if bound_to_branch {
-        representatives(shape)
+        .and_then(|(file, binding)| predicate_ops.get(&(file.to_owned(), binding)));
+    let Some(ops) = ops else {
+        return vec![];
+    };
+    if ops.len() == 1 && ops.contains("truthy") {
+        truthy_representatives(shape)
     } else {
-        vec![]
+        representatives(shape)
     }
 }
 
-// Each row covers either one value or one pair. Independent owners are planned separately.
+/// Deterministic greedy pairwise covering-array builder for owners with 3+ slots.
+/// Covers 100% of value pairs `(slot_i = v_i, slot_j = v_j)` in O(D^2 * log N) rows
+/// instead of emitting O(N^2 * D^2) isolated 2-slot rows.
+fn greedy_covering_pairs(slots: &[(String, Vec<Value>)]) -> Vec<BTreeMap<String, Value>> {
+    let n = slots.len();
+    let mut uncovered: BTreeSet<(usize, usize, usize, usize)> = BTreeSet::new();
+    for i in 0..n {
+        for j in (i + 1)..n {
+            for vi in 0..slots[i].1.len() {
+                for vj in 0..slots[j].1.len() {
+                    uncovered.insert((i, vi, j, vj));
+                }
+            }
+        }
+    }
+    let mut rows = Vec::new();
+    while let Some(&(seed_i, seed_vi, seed_j, seed_vj)) = uncovered.iter().next() {
+        let mut assignment: BTreeMap<usize, usize> = BTreeMap::new();
+        assignment.insert(seed_i, seed_vi);
+        assignment.insert(seed_j, seed_vj);
+        for (slot_idx, (_, slot_vals)) in slots.iter().enumerate() {
+            if assignment.contains_key(&slot_idx) || slot_vals.is_empty() {
+                continue;
+            }
+            let mut best_val = 0usize;
+            let mut best_gain = 0usize;
+            for v_idx in 0..slot_vals.len() {
+                let gain = assignment
+                    .iter()
+                    .filter(|&(&other_idx, &other_v)| {
+                        let pair = if slot_idx < other_idx {
+                            (slot_idx, v_idx, other_idx, other_v)
+                        } else {
+                            (other_idx, other_v, slot_idx, v_idx)
+                        };
+                        uncovered.contains(&pair)
+                    })
+                    .count();
+                if gain > best_gain {
+                    best_gain = gain;
+                    best_val = v_idx;
+                }
+            }
+            if best_gain > 0 {
+                assignment.insert(slot_idx, best_val);
+            }
+        }
+        let assigned_vec: Vec<(usize, usize)> = assignment.iter().map(|(&k, &v)| (k, v)).collect();
+        for a in 0..assigned_vec.len() {
+            for b in (a + 1)..assigned_vec.len() {
+                let (i, vi) = assigned_vec[a];
+                let (j, vj) = assigned_vec[b];
+                uncovered.remove(&(i, vi, j, vj));
+            }
+        }
+        let row: BTreeMap<String, Value> = assignment
+            .into_iter()
+            .map(|(slot_idx, v_idx)| (slots[slot_idx].0.clone(), slots[slot_idx].1[v_idx].clone()))
+            .collect();
+        rows.push(row);
+    }
+    rows
+}
+
+// Each row covers either one value or one pair (using a greedy covering array for 3+ slots).
+// Independent owners are planned separately.
 pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<String, Value>> {
-    let predicate_bindings: BTreeSet<(String, u64)> = facts
-        .iter()
-        .filter(|f| f["kind"] == "branch")
-        .filter_map(|f| {
-            let file = f["file"].as_str()?;
-            let binding = f["predicate"]["binding"].as_u64()?;
-            Some((file.to_owned(), binding))
-        })
-        .collect();
+    let mut predicate_ops: BTreeMap<(String, u64), BTreeSet<String>> = BTreeMap::new();
+    for f in facts.iter().filter(|f| f["kind"] == "branch") {
+        if let (Some(file), Some(binding), Some(op)) = (
+            f["file"].as_str(),
+            f["predicate"]["binding"].as_u64(),
+            f["predicate"]["operator"].as_str(),
+        ) {
+            predicate_ops
+                .entry((file.to_owned(), binding))
+                .or_default()
+                .insert(op.to_owned());
+        }
+    }
     let mut groups = BTreeMap::new();
     for f in facts.iter().filter(|f| {
         f["kind"] == "slot"
@@ -90,7 +192,7 @@ pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<St
             && !f["init"].is_null()
             && !f["after"].is_null()
     }) {
-        let values = slot_values_for_planning(f, &predicate_bindings);
+        let values = slot_values_for_planning(f, &predicate_ops);
         if values.is_empty() {
             continue;
         }
@@ -103,18 +205,22 @@ pub fn candidates(facts: &[Value], active: &BTreeSet<String>) -> Vec<BTreeMap<St
     let mut pairs = Vec::new();
     for slots in groups.values_mut() {
         slots.sort_by(|a, b| a.0.cmp(&b.0));
-        for (i, (key, values)) in slots.iter().enumerate() {
+        for (slot_key, values) in slots.iter() {
             for v in values {
-                singles.push(BTreeMap::from([(key.clone(), v.clone())]));
-                for (other, options) in &slots[..i] {
-                    for option in options {
-                        pairs.push(BTreeMap::from([
-                            (key.clone(), v.clone()),
-                            (other.clone(), option.clone()),
-                        ]));
-                    }
+                singles.push(BTreeMap::from([(slot_key.clone(), v.clone())]));
+            }
+        }
+        if slots.len() == 2 {
+            for v in &slots[1].1 {
+                for option in &slots[0].1 {
+                    pairs.push(BTreeMap::from([
+                        (slots[1].0.clone(), v.clone()),
+                        (slots[0].0.clone(), option.clone()),
+                    ]));
                 }
             }
+        } else if slots.len() >= 3 {
+            pairs.extend(greedy_covering_pairs(slots));
         }
     }
     singles.extend(pairs);
@@ -570,6 +676,48 @@ mod tests {
                 .iter()
                 .all(|row| !row.contains_key(&key(&internal_str))),
             "unreferenced unbounded string slot must be pruned"
+        );
+        // Truthy-only string slot uses 2 minimal values ("" and "sample"), not 3.
+        let str_vals: BTreeSet<String> = planned
+            .iter()
+            .filter_map(|row| row.get(&key(&branch_str)).and_then(Value::as_str))
+            .map(str::to_owned)
+            .collect();
+        assert_eq!(str_vals, BTreeSet::from(["".into(), "sample".into()]));
+    }
+
+    #[test]
+    fn covering_array_covers_every_pair_with_far_fewer_rows_than_quadratic_pairs() {
+        let slots: Vec<Value> = (0..5)
+            .map(|i| {
+                let mut s = slot(i * 10 + 1, "BigView");
+                s["shape"] = json!({"kind": "boolean"});
+                s
+            })
+            .collect();
+        let active: BTreeSet<String> = slots.iter().map(key).collect();
+        let planned = candidates(&slots, &active);
+        let keys: Vec<String> = slots.iter().map(key).collect();
+        // Verify 100% of all C(5,2) * 4 = 40 pairs are covered by `planned`.
+        for i in 0..keys.len() {
+            for j in (i + 1)..keys.len() {
+                for vi in [json!(false), json!(true)] {
+                    for vj in [json!(false), json!(true)] {
+                        assert!(
+                            planned.iter().any(|row| row.get(&keys[i]) == Some(&vi)
+                                && row.get(&keys[j]) == Some(&vj)),
+                            "missing pair ({i}={vi}, {j}={vj})"
+                        );
+                    }
+                }
+            }
+        }
+        // Quadratic enumeration would emit 10 singles + 40 pairs = 50 rows;
+        // greedy covering array packs all 40 pairs into <= 8 rows (<= 18 total).
+        assert!(
+            planned.len() <= 18,
+            "expected covering array compression <= 18 rows, got {}",
+            planned.len()
         );
     }
 }
