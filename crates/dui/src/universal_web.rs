@@ -2,7 +2,7 @@ use crate::{
     Reply, analysis,
     chromium::Browser,
     failure,
-    ports::{Host, Renderer, TypeOracle},
+    ports::{CaptureBatchJob, Host, Renderer, TypeOracle},
     surface::{NoopOracle, SurfaceAdapter},
 };
 use dui_core::surface::{
@@ -497,6 +497,37 @@ impl Renderer for LazyUniversalBrowser<'_> {
         }
         let browser = self.browser.as_mut().ok_or("browser unavailable")?;
         browser.capture(spec, input, width, image)
+    }
+
+    fn capture_batch(&mut self, jobs: &[CaptureBatchJob<'_>]) -> Vec<Result<Value, String>> {
+        let concurrency = jobs
+            .first()
+            .map(|j| crate::host::resolve_capture_concurrency(j.spec))
+            .unwrap_or(1);
+        if jobs.len() < 2 || concurrency <= 1 {
+            return jobs
+                .iter()
+                .map(|job| {
+                    self.capture(job.spec, job.input, job.width, job.image)
+                        .map_err(|e| e.to_string())
+                })
+                .collect();
+        }
+        if self.session.is_none() {
+            match UniversalWebHost.start(self.project, self.spec, self.facts) {
+                Ok(session) => self.session = Some(session),
+                Err((_, v)) => {
+                    let msg = v.to_string();
+                    return (0..jobs.len()).map(|_| Err(msg.clone())).collect();
+                }
+            }
+        }
+        let Some(session) = self.session.as_ref() else {
+            return (0..jobs.len())
+                .map(|_| Err("host unavailable".into()))
+                .collect();
+        };
+        crate::host::parallel_chromium_capture(&self.exe, session.port(), concurrency, jobs)
     }
 }
 

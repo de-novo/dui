@@ -3,7 +3,7 @@ use crate::{
     cache::{CacheLookup, CellCache},
     chromium::Browser,
     failure,
-    ports::{Renderer, TypeOracle},
+    ports::{CaptureBatchJob, Renderer, TypeOracle},
     typescript::TypeScript,
 };
 use dui_core::{
@@ -358,6 +358,56 @@ fn execute_with_locales(
                     locale_spec["locale"] = json!(loc);
                 }
                 let state_id = state_id(&scenario, &locale_spec, &row);
+                let mut pre_rendered: BTreeMap<
+                    u32,
+                    (tempfile::NamedTempFile, Result<Value, String>),
+                > = BTreeMap::new();
+                if widths.len() >= 2
+                    && crate::host::resolve_capture_concurrency(&locale_spec) > 1
+                    && let Some(browser) = renderer.as_deref_mut()
+                {
+                    let input_val = json!(row);
+                    let mut batch_meta: Vec<(u32, Value, tempfile::NamedTempFile)> = Vec::new();
+                    for width in widths {
+                        let mut capture_spec = locale_spec.clone();
+                        capture_spec["assertions"] = checks.clone();
+                        if index != 0
+                            && let Some(obj) = capture_spec.as_object_mut()
+                        {
+                            obj.remove("routeSelector");
+                        }
+                        let is_cached = cache
+                            .as_deref()
+                            .and_then(|c| {
+                                c.build_inputs(&scenario, &capture_spec, &row, *width, *locale)
+                            })
+                            .is_some_and(|inputs| {
+                                cache.as_deref_mut().is_some_and(|c| {
+                                    matches!(c.lookup(&inputs, out), CacheLookup::Hit { .. })
+                                })
+                            });
+                        if !is_cached {
+                            let staged = tempfile::NamedTempFile::new_in(out)
+                                .map_err(|e| failure(3, &e.to_string()))?;
+                            batch_meta.push((*width, capture_spec, staged));
+                        }
+                    }
+                    if batch_meta.len() >= 2 {
+                        let jobs: Vec<CaptureBatchJob<'_>> = batch_meta
+                            .iter()
+                            .map(|(w, cspec, staged)| CaptureBatchJob {
+                                spec: cspec,
+                                input: &input_val,
+                                width: *w,
+                                image: staged.path(),
+                            })
+                            .collect();
+                        let results = browser.capture_batch(&jobs);
+                        for ((w, _, staged), res) in batch_meta.into_iter().zip(results) {
+                            pre_rendered.insert(w, (staged, res));
+                        }
+                    }
+                }
                 for width in widths {
                     let Some(browser) = renderer.as_deref_mut() else {
                         let mut cell = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state_id,"planIndex":index,"status":"unrenderable","reason":"no-render-env"});
@@ -478,7 +528,15 @@ fn execute_with_locales(
                         _ => None,
                     };
 
-                    let reached = browser.capture(&capture_spec, &input, *width, staged.path());
+                    let (staged, reached) =
+                        if let Some((pre_staged, pre_res)) = pre_rendered.remove(width) {
+                            (pre_staged, pre_res)
+                        } else {
+                            let res = browser
+                                .capture(&capture_spec, &input, *width, staged.path())
+                                .map_err(|e| e.to_string());
+                            (staged, res)
+                        };
                     let mut cell = match reached {
                         Ok(mut obs) => {
                             let bytes =

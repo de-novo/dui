@@ -1382,6 +1382,44 @@ h2 {
   color: var(--primary);
   font-weight: 600;
 }
+.audit-design-toggle {
+  appearance: none;
+  border: 1px solid rgba(239, 128, 63, 0.45);
+  background: rgba(239, 128, 63, 0.12);
+  color: #ef803f;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: var(--text-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+.audit-design-toggle.active {
+  background: #ef803f;
+  color: #ffffff;
+  border-color: #ef803f;
+}
+.card-design-badge {
+  color: #ef803f;
+  font-weight: 600;
+}
+.design-lint-box-error {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.16);
+}
+.design-lint-box-warning {
+  border-color: #ef803f;
+  background: rgba(239, 128, 63, 0.16);
+}
+.design-lint-box-info {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.14);
+}
+.design-finding-error {
+  color: #dc2626;
+}
+.design-finding-warning {
+  color: #ef803f;
+}
 .canvas-diff-bar {
   display: inline-flex;
   align-items: center;

@@ -25,6 +25,7 @@
     "check:android": "tsc --project scripts && cargo build --locked && node scripts/check-android.mts",
     "check:electron": "tsc --project scripts && cargo build --locked && node scripts/check-electron.mts",
     "check:radix-nextjs": "tsc --project scripts && cargo build --locked && node scripts/check-radix-nextjs.mts",
+    "check:design-lint": "tsc --project scripts && cargo build --locked && node scripts/check-design-lint.mts",
     "check:desktop": "tsc --project scripts && cargo build --locked && node scripts/check-desktop.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "check:gpui-live": "tsc --project scripts && cargo build --locked && node scripts/check-gpui-live.mts",

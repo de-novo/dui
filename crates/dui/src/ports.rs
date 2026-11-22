@@ -6,6 +6,13 @@ pub trait TypeOracle {
     fn facts(&self, project: &Path, spec: &Path) -> Reply;
 }
 
+pub struct CaptureBatchJob<'a> {
+    pub spec: &'a Value,
+    pub input: &'a Value,
+    pub width: u32,
+    pub image: &'a Path,
+}
+
 pub trait Renderer {
     fn capture(
         &mut self,
@@ -14,6 +21,15 @@ pub trait Renderer {
         width: u32,
         image: &Path,
     ) -> Result<Value, Box<dyn std::error::Error>>;
+
+    fn capture_batch(&mut self, jobs: &[CaptureBatchJob<'_>]) -> Vec<Result<Value, String>> {
+        jobs.iter()
+            .map(|job| {
+                self.capture(job.spec, job.input, job.width, job.image)
+                    .map_err(|e| e.to_string())
+            })
+            .collect()
+    }
 }
 
 pub trait Host {
