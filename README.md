@@ -31,7 +31,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
 | Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
 | Element inspector & live components | DevTools-style element attributes, box-model overlay (width, height, margin, padding, gap, spacing redlines), and evolving from capture-based cards to rendering live components directly on the canvas | Planned |
-| Engine scale & quality | `SurfaceRegistry` multi-surface plugin pipeline, multi-tab parallel capture, automatic layout overlap & a11y audit from `renderTree`, GPUI AccessKit render-tree diff | Planned |
+| Design-defect detection & scale | Automatic visual/design-defect detection from `renderTree` (overflow, overlap, clipping, contrast, touch target size, spacing/alignment drift — visual overlays for humans + structured CLI/MCP JSON for AI), `SurfaceRegistry` multi-surface plugin pipeline, multi-tab parallel capture, GPUI AccessKit render-tree diff | Planned |
 
 ## Install
 
