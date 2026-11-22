@@ -9,6 +9,8 @@ export function CaptureCard({
   cell,
   imageUrl,
   selected = false,
+  related = false,
+  dimmed = false,
   cardWidth,
   frameHeight,
   openComments = 0,
@@ -17,6 +19,8 @@ export function CaptureCard({
   cell?: Cell;
   imageUrl: (name: string) => string;
   selected?: boolean;
+  related?: boolean;
+  dimmed?: boolean;
   cardWidth?: number;
   frameHeight?: number;
   openComments?: number;
@@ -27,10 +31,16 @@ export function CaptureCard({
   return (
     <article
       className={
-        "screen-card" + (selected ? " selected" : "") + (large ? " screen-card-large" : "")
+        "screen-card" +
+        (selected ? " selected" : "") +
+        (related ? " related" : "") +
+        (dimmed ? " dimmed" : "") +
+        (large ? " screen-card-large" : "")
       }
       style={cardWidth ? { width: `${cardWidth}px` } : undefined}
       data-selected={selected ? "true" : undefined}
+      data-related={related ? "true" : undefined}
+      data-dimmed={dimmed ? "true" : undefined}
       data-card-width={cardWidth}
       data-open-comments={openComments > 0 ? openComments : undefined}
       title={screen.path}

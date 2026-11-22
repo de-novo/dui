@@ -25,7 +25,7 @@ use i18n::UiLang;
 use layout::{MapLayout, compute_layout};
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env,
     fs::{self, File},
     io::BufWriter,
@@ -95,6 +95,7 @@ struct DuiDesktopView {
     pan_y: f32,
     zoom: f32,
     dragging: bool,
+    drag_moved: bool,
     drag_last: Point<Pixels>,
     viewport_w: f32,
     viewport_h: f32,
@@ -208,6 +209,7 @@ impl DuiDesktopView {
             pan_y: 32.0,
             zoom: 0.12,
             dragging: false,
+            drag_moved: false,
             drag_last: point(px(0.0), px(0.0)),
             viewport_w: opts.viewport_width.saturating_sub(220).max(400) as f32,
             viewport_h: opts.viewport_height.max(400) as f32,
@@ -758,8 +760,12 @@ impl DuiDesktopView {
             })
     }
 
-    /// Full-bleed Overview Screen Map matching `/tmp/obora-dui-overview.png` 1:1.
-    fn render_overview_stage(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    /// Full-bleed Overview Screen Map with focus-dimming for unrelated nodes when a screen is selected.
+    fn render_overview_stage(
+        &mut self,
+        focus_active: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         let p = self.pal();
         let tr = i18n::strings(self.lang);
         let Some(run) = self.active_run().cloned() else {
@@ -775,6 +781,19 @@ impl DuiDesktopView {
 
         let layout = compute_layout(&run.screens, self.selected_width);
         let open_by_path = self.workspace.open_comments_by_path(&run.project_id);
+        let selected_idx = self.selected_screen;
+        let mut related_indices: BTreeSet<usize> = BTreeSet::new();
+        if focus_active {
+            related_indices.insert(selected_idx);
+            for edge in &layout.edges {
+                if edge.from_idx == selected_idx {
+                    related_indices.insert(edge.to_idx);
+                }
+                if edge.to_idx == selected_idx {
+                    related_indices.insert(edge.from_idx);
+                }
+            }
+        }
 
         let mut decoded_cards: BTreeMap<usize, Option<Arc<RenderImage>>> = BTreeMap::new();
         for (idx, screen) in run.screens.iter().enumerate() {
@@ -808,6 +827,7 @@ impl DuiDesktopView {
         let node_rects_for_paint = node_rects.clone();
         let grid_color = p.map_grid;
         let link_color = p.map_link;
+        let fg_color = p.foreground;
         let primary_color = p.primary;
 
         let edges_and_grid = canvas(
@@ -844,8 +864,8 @@ impl DuiDesktopView {
                     gx += spacing;
                 }
 
-                // 2. Orthogonal smooth-step connector edges matching React Flow in `apps/canvas`
-                let stroke_w = (1.6 * zoom.sqrt()).clamp(1.2, 2.5);
+                // 2. Orthogonal smooth-step connector edges; dim unrelated edges when focus is active
+                let base_stroke_w = (1.6 * zoom.sqrt()).clamp(1.2, 2.5);
                 for edge in &edges_for_paint {
                     let (Some(&(ax, ay)), Some(&(bx, by))) = (
                         node_rects_for_paint.get(&edge.from_idx),
@@ -853,6 +873,15 @@ impl DuiDesktopView {
                     ) else {
                         continue;
                     };
+                    let connected_to_selected = focus_active
+                        && (edge.from_idx == selected_idx || edge.to_idx == selected_idx);
+                    let dimmed_edge = focus_active && !connected_to_selected;
+                    let stroke_w = if connected_to_selected {
+                        base_stroke_w * 1.45
+                    } else {
+                        base_stroke_w
+                    };
+
                     let (sx, sy, tx, ty, horizontal) = if (bx - ax).abs() >= (by - ay).abs() {
                         if bx >= ax {
                             (ax + card_w, ay + card_h * 0.5, bx, by + card_h * 0.5, true)
@@ -883,16 +912,20 @@ impl DuiDesktopView {
                         pb.line_to(point(px(ox + tx), px(oy + mid_y)));
                         pb.line_to(point(px(ox + tx), px(oy + ty)));
                     }
-                    let color: Hsla = if is_verified {
+                    let mut color: Hsla = if is_verified {
                         primary_color
+                    } else if connected_to_selected {
+                        fg_color
                     } else {
                         link_color
                     };
+                    if dimmed_edge {
+                        color.a *= 0.14;
+                    }
                     if let Ok(path) = pb.build() {
                         window.paint_path(path, color);
                     }
 
-                    // Crisp small directional arrowhead
                     let (ang_x, ang_y) = if horizontal {
                         (if tx >= sx { 1.0_f32 } else { -1.0_f32 }, 0.0_f32)
                     } else {
@@ -924,6 +957,9 @@ impl DuiDesktopView {
             let idx = node.screen_idx;
             let screen = &run.screens[idx];
             let (left, top) = node_rects[&idx];
+            let is_selected = focus_active && idx == selected_idx;
+            let is_related = focus_active && !is_selected && related_indices.contains(&idx);
+            let is_dimmed = focus_active && !related_indices.contains(&idx);
             let open_comments = open_by_path.get(&screen.path).copied().unwrap_or(0);
             let unverified = screen
                 .cells
@@ -968,8 +1004,12 @@ impl DuiDesktopView {
                 .flex_col()
                 .justify_between()
                 .rounded_lg()
-                .border_1()
-                .border_color(p.capture_rim)
+                .when(is_selected, |el| el.border_2().border_color(p.primary))
+                .when(is_related, |el| el.border_1().border_color(p.foreground))
+                .when(!is_selected && !is_related, |el| {
+                    el.border_1().border_color(p.capture_rim)
+                })
+                .when(is_dimmed, |el| el.opacity(0.22))
                 .bg(p.capture_surface)
                 .shadow_md()
                 .cursor_pointer()
@@ -1151,6 +1191,7 @@ impl DuiDesktopView {
                 MouseButton::Left,
                 cx.listener(|this, event: &MouseDownEvent, _, _| {
                     this.dragging = true;
+                    this.drag_moved = false;
                     this.drag_last = event.position;
                 }),
             )
@@ -1158,6 +1199,9 @@ impl DuiDesktopView {
                 if this.dragging {
                     let dx = f32::from(event.position.x) - f32::from(this.drag_last.x);
                     let dy = f32::from(event.position.y) - f32::from(this.drag_last.y);
+                    if dx.abs() > 2.0 || dy.abs() > 2.0 {
+                        this.drag_moved = true;
+                    }
                     this.pan_x += dx;
                     this.pan_y += dy;
                     this.drag_last = event.position;
@@ -1166,8 +1210,15 @@ impl DuiDesktopView {
             }))
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|this, _: &MouseUpEvent, _, _| {
+                cx.listener(move |this, _: &MouseUpEvent, _, cx| {
+                    let was_click = this.dragging && !this.drag_moved;
                     this.dragging = false;
+                    this.drag_moved = false;
+                    if was_click && focus_active {
+                        this.full_1x_detail = false;
+                        this.view_mode = ViewMode::Overview;
+                        cx.notify();
+                    }
                 }),
             )
             .child(edges_and_grid)
@@ -2493,8 +2544,20 @@ impl Render for DuiDesktopView {
             .child(rail);
 
         root = match self.view_mode {
-            ViewMode::Overview => root.child(self.render_overview_stage(cx)),
-            ViewMode::Detail => root.child(self.render_detail_stage(cx)),
+            ViewMode::Overview => root.child(self.render_overview_stage(false, cx)),
+            ViewMode::Detail => {
+                if self.full_1x_detail {
+                    root.child(self.render_detail_stage(cx))
+                } else if let (Some(run), Some(screen)) =
+                    (self.active_run().cloned(), self.active_screen().cloned())
+                {
+                    let map = self.render_overview_stage(true, cx);
+                    let insp = self.render_floating_inspector(&run, &screen, cx);
+                    root.child(map).child(insp)
+                } else {
+                    root.child(self.render_overview_stage(false, cx))
+                }
+            }
             ViewMode::Diff => root.child(self.render_diff_stage(cx)),
         };
 
