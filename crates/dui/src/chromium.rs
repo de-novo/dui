@@ -162,7 +162,7 @@ pub struct Browser {
     allowed_origin: String,
     api_mode: ApiMode,
     api_base_url: Option<String>,
-    api_proxy_prefix: Option<String>,
+    api_proxy_prefixes: Vec<String>,
     api_headers: Vec<(String, String)>,
     allow_mutations: bool,
     live_api_requests: std::collections::BTreeSet<String>,
@@ -223,7 +223,7 @@ impl Browser {
             allowed_origin: format!("http://127.0.0.1:{port}"),
             api_mode: ApiMode::Mock,
             api_base_url: None,
-            api_proxy_prefix: None,
+            api_proxy_prefixes: Vec::new(),
             api_headers: Vec::new(),
             allow_mutations: false,
             live_api_requests: Default::default(),
@@ -275,10 +275,14 @@ impl Browser {
                 let session = msg["sessionId"].as_str();
                 let use_mocks = self.api_mode != ApiMode::Live;
 
+                let url_no_query = url.split('?').next().unwrap_or(url);
                 if use_mocks
                     && http_method == "GET"
                     && is_api_resource
-                    && let Some((mime, body)) = self.generated_get.get(url)
+                    && let Some((mime, body)) = self
+                        .generated_get
+                        .get(url)
+                        .or_else(|| self.generated_get.get(url_no_query))
                 {
                     let reply = json!({"requestId":p["requestId"],"responseCode":200,"responseHeaders":[{"name":"Content-Type","value":mime}],"body":body});
                     self.fulfilled.insert(url.into());
@@ -291,7 +295,12 @@ impl Browser {
                     self.send(session, "Fetch.fulfillRequest", reply)?;
                     continue;
                 }
-                if use_mocks && let Some(body) = self.mock_responses.get(url) {
+                if use_mocks
+                    && let Some(body) = self
+                        .mock_responses
+                        .get(url)
+                        .or_else(|| self.mock_responses.get(url_no_query))
+                {
                     let reply = json!({"requestId":p["requestId"],"responseCode":200,"responseHeaders":[{"name":"Content-Type","value":"application/json"}],"body":body});
                     self.requests.insert(url.to_owned());
                     self.send(session, "Fetch.fulfillRequest", reply)?;
@@ -309,9 +318,12 @@ impl Browser {
                     .is_some_and(|rest| rest.starts_with('/'));
                 let proxied_target = if self.api_mode != ApiMode::Mock
                     && is_same_origin
-                    && let (Some(base), Some(prefix)) = (&self.api_base_url, &self.api_proxy_prefix)
+                    && let Some(base) = &self.api_base_url
                     && let Some(rel) = url.strip_prefix(&self.allowed_origin)
-                    && rel.starts_with(prefix.as_str())
+                    && self
+                        .api_proxy_prefixes
+                        .iter()
+                        .any(|prefix| rel.starts_with(prefix.as_str()))
                 {
                     Some((format!("{base}{rel}"), rel.to_owned()))
                 } else {
@@ -554,10 +566,20 @@ impl Browser {
             })
             .map(|s| s.trim_end_matches('/').to_owned())
             .filter(|s| !s.is_empty());
-        self.api_proxy_prefix = spec["apiProxyPrefix"]
+        self.api_proxy_prefixes.clear();
+        if let Some(prefix) = spec["apiProxyPrefix"]
             .as_str()
             .filter(|s| s.starts_with('/'))
-            .map(str::to_owned);
+        {
+            self.api_proxy_prefixes.push(prefix.to_owned());
+        }
+        if let Some(prefixes) = spec["apiProxyPrefixes"].as_array() {
+            for p in prefixes {
+                if let Some(s) = p.as_str().filter(|s| s.starts_with('/')) {
+                    self.api_proxy_prefixes.push(s.to_owned());
+                }
+            }
+        }
         self.api_headers.clear();
         if let Some(header_envs) = spec["apiHeaderEnv"].as_object() {
             for (header_name, env_val) in header_envs {

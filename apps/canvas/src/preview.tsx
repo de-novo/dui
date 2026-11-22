@@ -275,7 +275,7 @@ function MapView({
               <circle cx="10" cy="6" r="2" />
               <circle cx="14" cy="14" r="2" />
             </svg>{" "}
-            Map options
+            {t.mapOptions}
           </Button>
         )}
 
@@ -330,7 +330,7 @@ function MapView({
 
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
         <DialogContent finalFocus={() => (showOverview ? optionsButton.current : dismiss.current)}>
-          <DialogTitle>Map options</DialogTitle>
+          <DialogTitle>{t.mapOptions}</DialogTitle>
           <label>
             Find screen
             <select
@@ -400,7 +400,7 @@ function MapView({
 
 async function json(url: string) {
   const response = await fetch(url);
-  if (!response.ok) throw Error("Could not load the archive");
+  if (!response.ok) throw Error("archive-load-failed");
   return response.json();
 }
 
@@ -415,6 +415,7 @@ function Viewer({
   archive?: Archive;
   error?: string;
 }) {
+  const { t } = useI18n();
   const [runs, setRuns] = useState(initialRuns);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState(location.search);
@@ -476,11 +477,17 @@ function Viewer({
           onRefreshRuns={refreshRuns}
         />
       ) : (
-        <output>{error ?? "No saved screen maps."}</output>
+        <output>
+          {error === "archive-load-failed"
+            ? t.archiveLoadFailed
+            : error === "workspace-unavailable"
+              ? t.workspaceUnavailable
+              : (error ?? t.noSavedMaps)}
+        </output>
       )}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
-          <DialogTitle>Select workspace</DialogTitle>
+          <DialogTitle>{t.selectWorkspace}</DialogTitle>
           <WorkPicker current={run} runs={runs} />
         </DialogContent>
       </Dialog>
@@ -495,7 +502,7 @@ try {
   runs = await json("/archive/runs.json");
   const key = new URLSearchParams(location.search).get("run");
   run = key === null ? runs[0] : runs.find((r) => r.key === key);
-  if (key !== null && !run) throw Error("This workspace is unavailable.");
+  if (key !== null && !run) throw Error("workspace-unavailable");
   const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
   root.render(
     <LocaleProvider>
@@ -503,9 +510,10 @@ try {
     </LocaleProvider>,
   );
 } catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
   root.render(
     <LocaleProvider>
-      <Viewer initialRuns={runs} run={run} error={String(error)} />
+      <Viewer initialRuns={runs} run={run} error={message} />
     </LocaleProvider>,
   );
 }

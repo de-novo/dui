@@ -26,6 +26,9 @@ export function normalizeUiLocale(raw: string | null | undefined): UiLocale {
 export type Messages = {
   workspace: string;
   selectWorkspace: string;
+  noSavedMaps: string;
+  archiveLoadFailed: string;
+  workspaceUnavailable: string;
   theme: string;
   themeSystem: string;
   themeLight: string;
@@ -34,6 +37,7 @@ export type Messages = {
   expandRail: string;
   collapseRail: string;
   screenMap: string;
+  mapOptions: string;
   screenDetails: string;
   screenUnavailable: string;
   archive: string;
@@ -131,6 +135,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
   en: {
     workspace: "Workspace",
     selectWorkspace: "Select workspace",
+    noSavedMaps: "No saved screen maps.",
+    archiveLoadFailed: "Could not load the archive.",
+    workspaceUnavailable: "This workspace is unavailable.",
     theme: "Theme",
     themeSystem: "System theme",
     themeLight: "Light theme",
@@ -139,6 +146,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     expandRail: "Expand rail",
     collapseRail: "Collapse rail",
     screenMap: "Screen map",
+    mapOptions: "Map options",
     screenDetails: "Screen details",
     screenUnavailable: "Screen unavailable",
     archive: "Archive",
@@ -236,6 +244,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
   "zh-CN": {
     workspace: "工作区",
     selectWorkspace: "选择工作区",
+    noSavedMaps: "暂无已保存的界面地图。",
+    archiveLoadFailed: "无法加载归档数据。",
+    workspaceUnavailable: "该工作区不可用。",
     theme: "主题",
     themeSystem: "跟随系统",
     themeLight: "浅色主题",
@@ -244,6 +255,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     expandRail: "展开侧栏",
     collapseRail: "收起侧栏",
     screenMap: "界面地图",
+    mapOptions: "地图选项",
     screenDetails: "界面详情",
     screenUnavailable: "界面不可用",
     archive: "归档",
@@ -341,6 +353,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
   ko: {
     workspace: "워크스페이스",
     selectWorkspace: "워크스페이스 선택",
+    noSavedMaps: "저장된 화면 지도가 없습니다.",
+    archiveLoadFailed: "아카이브를 불러올 수 없습니다.",
+    workspaceUnavailable: "이 워크스페이스를 사용할 수 없습니다.",
     theme: "테마",
     themeSystem: "시스템 테마",
     themeLight: "라이트 테마",
@@ -349,6 +364,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     expandRail: "사이드바 펼치기",
     collapseRail: "사이드바 접기",
     screenMap: "화면 지도",
+    mapOptions: "지도 옵션",
     screenDetails: "화면 상세",
     screenUnavailable: "화면 없음",
     archive: "아카이브",
