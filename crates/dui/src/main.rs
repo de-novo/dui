@@ -21,6 +21,7 @@ mod sqlite_store;
 mod surface;
 mod transition;
 mod typescript;
+mod universal_web;
 mod update;
 mod viewer;
 use serde_json::{Value, json};

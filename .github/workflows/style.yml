@@ -72,3 +72,4 @@ jobs:
           npm run check:p2-rules
           npm run check:real-api
           npm run check:branch-diff
+          npm run check:universal-web

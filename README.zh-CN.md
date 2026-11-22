@@ -13,7 +13,7 @@
 | 类别 | 当前已支持 | 计划支持 |
 | --- | --- | --- |
 | 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2、Go |
-| Web (Level 1 & Level 2) | React 19、Vite 8、Nitro SSR、Chromium (CDP) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、Next.js 16、Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
+| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 19、Vite 8、Nitro SSR、Chromium (CDP) | Next.js 16、Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
 | 桌面应用 | GPUI (`gpui-pre` 0.3.x)、`gpui-kit` / `gpui-component` 0.10.x (macOS Metal + AccessKit) | Electron 45、Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
 | 移动应用 (Android & iOS) | — | Android (`adb` + `uiautomator` / Jetpack Compose / Kotlin 2)、iOS (`xcrun simctl` / SwiftUI / Swift 6)、React Native 0.88 / Expo 58、Flutter 3 / Dart 3 |
 | 终端 UI (TUI) | — | Universal TUI (`pty` + VT100 单元网格)、Ratatui (Rust)、Ink (TS/React)、Bubble Tea (Go) |

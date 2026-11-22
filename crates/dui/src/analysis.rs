@@ -95,9 +95,22 @@ pub(crate) fn exercise_with_renderer(
     browser_version: Option<Value>,
     force: bool,
 ) -> Reply {
-    let spec: Value =
+    let mut spec: Value =
         serde_json::from_slice(&fs::read(manifest).map_err(|_| failure(2, "missing spec"))?)
             .map_err(|_| failure(2, "invalid spec"))?;
+    if dui_core::surface::resolve_surface_id(&spec) == dui_core::surface::SURFACE_UNIVERSAL_WEB {
+        if spec["path"].as_str().is_none() {
+            let default_path = spec["url"]
+                .as_str()
+                .and_then(|raw| crate::universal_web::parse_loopback_url(raw).ok())
+                .map(|(_, path)| path)
+                .unwrap_or_else(|| "/".to_owned());
+            spec["path"] = json!(default_path);
+        }
+        if spec["readySelector"].as_str().is_none() {
+            spec["readySelector"] = json!("body");
+        }
+    }
     let widths: BTreeSet<u32> =
         serde_json::from_value(spec["widths"].clone()).map_err(|_| failure(2, "invalid widths"))?;
     if widths.is_empty() || widths.contains(&0) {
