@@ -145,30 +145,34 @@ function MapView({
   const previousView = useRef(view);
 
   const otherRuns = useMemo(() => runs.filter((r) => r.key !== run.key), [runs, run.key]);
+  const wantPixelOverlay = diffVisualMode === "overlay";
   const activePairKey = compareBeforeKey ? `${compareBeforeKey}::${run.key}` : "";
   const activeDiff =
-    activePairKey && canvasDiffState.pairKey === activePairKey ? canvasDiffState.diff : null;
+    activePairKey && canvasDiffState.pairKey.startsWith(activePairKey)
+      ? canvasDiffState.diff
+      : null;
   const diffActive = Boolean(compareBeforeKey && activeDiff);
 
   useEffect(() => {
     if (!compareBeforeKey) return;
-    const pairKey = `${compareBeforeKey}::${run.key}`;
+    const reqKey = `${compareBeforeKey}::${run.key}:${wantPixelOverlay ? "px" : "rt"}`;
     const controller = new AbortController();
+    const pixelsParam = wantPixelOverlay ? "1" : "0";
     fetch(
-      `/api/diff?before=${encodeURIComponent(compareBeforeKey)}&after=${encodeURIComponent(run.key)}`,
+      `/api/diff?before=${encodeURIComponent(compareBeforeKey)}&after=${encodeURIComponent(run.key)}&pixels=${pixelsParam}`,
       { cache: "no-store", signal: controller.signal },
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((raw) => {
         if (!controller.signal.aborted) {
-          setCanvasDiffState({ pairKey, diff: raw ? decodeCaptureDiff(raw) : null });
+          setCanvasDiffState({ pairKey: reqKey, diff: raw ? decodeCaptureDiff(raw) : null });
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setCanvasDiffState({ pairKey, diff: null });
+        if (!controller.signal.aborted) setCanvasDiffState({ pairKey: reqKey, diff: null });
       });
     return () => controller.abort();
-  }, [compareBeforeKey, run.key]);
+  }, [compareBeforeKey, run.key, wantPixelOverlay]);
 
   const diffsByPath = indexScreenDiffs(activeDiff, width);
   const visibleArchive = filterArchiveForDiff(archive, diffsByPath, diffActive, changedOnly);

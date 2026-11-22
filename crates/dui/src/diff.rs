@@ -173,6 +173,15 @@ fn overlay_filename(before_img: &str, after_img: &str) -> String {
 }
 
 pub fn compare(before: &Path, after: &Path, overlay_dir: Option<&Path>) -> Reply {
+    compare_with_options(before, after, overlay_dir, true)
+}
+
+pub fn compare_with_options(
+    before: &Path,
+    after: &Path,
+    overlay_dir: Option<&Path>,
+    include_pixels: bool,
+) -> Reply {
     let store = crate::archive::home_dir()
         .ok()
         .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
@@ -185,6 +194,16 @@ pub fn compare(before: &Path, after: &Path, overlay_dir: Option<&Path>) -> Reply
     for screen in &mut diff.screens {
         for cell in &mut screen.cells {
             if !cell.supports_pixel_diff() {
+                cell.pixel_diff = None;
+                continue;
+            }
+            // In lazy mode, skip eager PNG decoding whenever render-level diff already
+            // identified concrete element changes (still decode for visual-only or legacy cells).
+            let has_render_changes = cell
+                .render_diff
+                .as_ref()
+                .is_some_and(|rd| !rd.changes.is_empty());
+            if !include_pixels && has_render_changes {
                 cell.pixel_diff = None;
                 continue;
             }
