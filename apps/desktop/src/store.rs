@@ -31,6 +31,8 @@ pub struct CellItem {
     pub locale: Option<String>,
     pub status_kind: String,
     pub reason: Option<String>,
+    pub observed_path: Option<String>,
+    pub http_errors: Vec<String>,
     pub blob_id: Option<String>,
     pub blob_path: Option<PathBuf>,
 }
@@ -74,6 +76,8 @@ pub struct RunItem {
     pub project_id: String,
     pub project_name: String,
     pub branch: Option<String>,
+    pub project_path: Option<PathBuf>,
+    pub run_dir: Option<PathBuf>,
     pub created_at_ms: i64,
     pub screens: Vec<ScreenItem>,
 }
@@ -193,15 +197,19 @@ impl ImageCache {
     }
 }
 
-pub fn decode_png_to_render_image(path: &Path) -> Option<Arc<RenderImage>> {
-    let bytes = fs::read(path).ok()?;
-    let dyn_img = image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).ok()?;
+pub fn decode_png_bytes_to_render_image(bytes: &[u8]) -> Option<Arc<RenderImage>> {
+    let dyn_img = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).ok()?;
     let mut rgba: RgbaImage = dyn_img.to_rgba8();
     // GPUI RenderImage expects premultiplied/BGRA channel order on macOS Metal / WGPU.
     for px in rgba.pixels_mut() {
         px.0.swap(0, 2);
     }
     Some(Arc::new(RenderImage::new(smallvec![Frame::new(rgba)])))
+}
+
+pub fn decode_png_to_render_image(path: &Path) -> Option<Arc<RenderImage>> {
+    let bytes = fs::read(path).ok()?;
+    decode_png_bytes_to_render_image(&bytes)
 }
 
 fn rgba_to_render_image(width: u32, height: u32, mut rgba: Vec<u8>) -> Option<Arc<RenderImage>> {
@@ -367,7 +375,7 @@ pub fn load_workspace(dui_home: &Path) -> Result<DesktopWorkspace, String> {
     {
         let mut stmt = conn
             .prepare(
-                "SELECT r.id, r.project_id, p.display_name, w.branch, r.created_at_ms
+                "SELECT r.id, r.project_id, p.display_name, w.branch, r.created_at_ms, p.primary_root, w.path, w.app_relative
                  FROM runs r
                  JOIN projects p ON p.id = r.project_id
                  LEFT JOIN worktrees w ON w.id = r.worktree_id
@@ -383,17 +391,46 @@ pub fn load_workspace(dui_home: &Path) -> Result<DesktopWorkspace, String> {
                     r.get::<_, String>(2)?,
                     r.get::<_, Option<String>>(3)?,
                     r.get::<_, i64>(4)?,
+                    r.get::<_, String>(5)?,
+                    r.get::<_, Option<String>>(6)?,
+                    r.get::<_, Option<String>>(7)?,
                 ))
             })
             .map_err(|e| e.to_string())?;
         for row in run_rows.flatten() {
-            let (run_id, project_id, project_name, branch, created_at_ms) = row;
+            let (
+                run_id,
+                project_id,
+                project_name,
+                branch,
+                created_at_ms,
+                primary_root,
+                wt_path,
+                app_rel,
+            ) = row;
+            let app_rel_str = app_rel.as_deref().filter(|s| !s.is_empty()).unwrap_or(".");
+            let candidate_wt = wt_path
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .map(|b| Path::new(b).join(app_rel_str));
+            let candidate_root = Path::new(&primary_root).join(app_rel_str);
+            let project_path = candidate_wt
+                .filter(|p| p.exists())
+                .or_else(|| candidate_root.exists().then_some(candidate_root));
+            let candidate_run_dir = dui_home
+                .join("projects")
+                .join(&project_id)
+                .join("runs")
+                .join(&run_id);
+            let run_dir = candidate_run_dir.is_dir().then_some(candidate_run_dir);
             let screens = load_run_screens(&conn, dui_home, &run_id, &screen_paths)?;
             runs.push(RunItem {
                 id: run_id,
                 project_id,
                 project_name,
                 branch,
+                project_path,
+                run_dir,
                 created_at_ms,
                 screens,
             });
@@ -447,10 +484,11 @@ fn load_run_screens(
     {
         let mut stmt = conn
             .prepare(
-                "SELECT id, screen_id, state_id, width_px, locale, status_json, image_blob_id
-                 FROM cells
-                 WHERE run_id = ?1
-                 ORDER BY width_px ASC, id ASC",
+                "SELECT c.id, c.screen_id, c.state_id, c.width_px, c.locale, c.status_json, c.image_blob_id, e.payload_json
+                 FROM cells c
+                 LEFT JOIN evidence e ON e.id = c.evidence_id
+                 WHERE c.run_id = ?1
+                 ORDER BY c.width_px ASC, c.id ASC",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -463,11 +501,35 @@ fn load_run_screens(
                     r.get::<_, Option<String>>(4)?,
                     r.get::<_, String>(5)?,
                     r.get::<_, Option<String>>(6)?,
+                    r.get::<_, Option<String>>(7)?,
                 ))
             })
             .map_err(|e| e.to_string())?;
-        for (id, screen_id, state_id, width_px, locale, status_json, blob_id) in rows.flatten() {
+        for (id, screen_id, state_id, width_px, locale, status_json, blob_id, evidence_json) in
+            rows.flatten()
+        {
             let (status_kind, reason) = parse_status(&status_json);
+            let mut observed_path = None;
+            let mut http_errors = Vec::new();
+            if let Some(raw_ev) = evidence_json
+                && let Ok(ev) = serde_json::from_str::<Value>(&raw_ev)
+            {
+                let obs = if ev["observation"].is_object() {
+                    &ev["observation"]
+                } else {
+                    &ev
+                };
+                observed_path = obs["path"].as_str().map(str::to_owned);
+                if let Some(resps) = obs["responses"].as_object() {
+                    for (url, code) in resps {
+                        if let Some(status_code) = code.as_u64()
+                            && status_code >= 400
+                        {
+                            http_errors.push(format!("HTTP {status_code} {url}"));
+                        }
+                    }
+                }
+            }
             let blob_path = blob_id.as_ref().and_then(|hash| {
                 let candidate = dui_home.join("blobs").join(format!("{hash}.png"));
                 candidate.is_file().then_some(candidate)
@@ -490,6 +552,8 @@ fn load_run_screens(
                 locale,
                 status_kind,
                 reason,
+                observed_path,
+                http_errors,
                 blob_id,
                 blob_path,
             });
