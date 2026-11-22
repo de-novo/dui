@@ -1,11 +1,13 @@
 import { Button } from "../../components/ui/button";
 import { useState } from "react";
 import type { Run } from "../../data/run";
+import { useI18n } from "../../i18n/LocaleContext";
 
 export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
+  const { t } = useI18n();
   const [key, setKey] = useState(current?.key ?? runs[0]?.key);
   const run = runs.find((r) => r.key === key);
-  if (!run) return <p>No saved screen maps.</p>;
+  if (!run) return <p>{t.noSavedMaps}</p>;
   const projects = new Map(runs.map((r) => [r.projectId, r.project]));
   const projectRuns = runs.filter((r) => r.projectId === run.projectId);
   const branches = [...new Set(projectRuns.map((r) => r.branch))];
