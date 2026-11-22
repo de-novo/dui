@@ -406,6 +406,35 @@ pub fn compute_rgba_diff(
     )
 }
 
+/// Compute the transitive closure of source files affected by `changed` using a forward
+/// `module_graph` (`importer -> [imported...]`). Pure and deterministic.
+pub fn affected_files(
+    module_graph: &BTreeMap<String, Vec<String>>,
+    changed: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let mut reverse: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (importer, deps) in module_graph {
+        for dep in deps {
+            reverse
+                .entry(dep.as_str())
+                .or_default()
+                .push(importer.as_str());
+        }
+    }
+    let mut affected: BTreeSet<String> = changed.clone();
+    let mut queue: std::collections::VecDeque<String> = changed.iter().cloned().collect();
+    while let Some(file) = queue.pop_front() {
+        if let Some(importers) = reverse.get(file.as_str()) {
+            for &imp in importers {
+                if affected.insert(imp.to_owned()) {
+                    queue.push_back(imp.to_owned());
+                }
+            }
+        }
+    }
+    affected
+}
+
 fn pixel_at(w: u32, h: u32, buf: &[u8], x: u32, y: u32) -> Option<[u8; 4]> {
     if x >= w || y >= h {
         return None;
@@ -607,5 +636,24 @@ mod tests {
         );
         // Pixel (1,0) highlighted in #EF803F.
         assert_eq!(&overlay[4..8], &[239, 128, 63, 255]);
+    }
+
+    #[test]
+    fn affected_files_propagates_changes_transitively_without_touching_unrelated_screens() {
+        let graph = BTreeMap::from([
+            ("Checkout.tsx".into(), vec!["Button.tsx".into()]),
+            (
+                "App.tsx".into(),
+                vec!["Checkout.tsx".into(), "About.tsx".into()],
+            ),
+            ("About.tsx".into(), vec!["Footer.tsx".into()]),
+        ]);
+        let changed = BTreeSet::from(["Button.tsx".into()]);
+        let affected = affected_files(&graph, &changed);
+        assert!(affected.contains("Button.tsx"));
+        assert!(affected.contains("Checkout.tsx"));
+        assert!(affected.contains("App.tsx"));
+        assert!(!affected.contains("About.tsx"));
+        assert!(!affected.contains("Footer.tsx"));
     }
 }

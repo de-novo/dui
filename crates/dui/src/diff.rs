@@ -1,18 +1,19 @@
 //! Capture-to-capture diff with changed source file attribution and PNG pixel-diff overlays.
 
-use crate::{Reply, failure, sqlite_store::SqliteStore};
+use crate::{Reply, archive, failure, sqlite_store::SqliteStore};
 use dui_core::{
-    diff::{DiffCellSnapshot, compute_rgba_diff, diff_captures},
-    model::CacheKey,
-    storage::CacheRepository,
+    diff::{DiffCellSnapshot, affected_files, compute_rgba_diff, diff_captures},
+    model::{CacheKey, ProjectId},
+    storage::{CacheRepository, RunFilter, RunRepository},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File},
     io::BufWriter,
-    path::Path,
+    path::{Path, PathBuf},
+    process::Command,
 };
 
 fn read_json_file(path: &Path) -> Result<Value, (u8, Value)> {
@@ -217,4 +218,150 @@ pub fn compare(before: &Path, after: &Path, overlay_dir: Option<&Path>) -> Reply
         "summary": diff.summary,
         "screens": diff.screens,
     }))
+}
+
+pub fn compare_branches(
+    project: &Path,
+    base_branch: &str,
+    head_branch: Option<&str>,
+    overlay_dir: Option<&Path>,
+) -> Reply {
+    let prov = archive::provenance(project)?;
+    let project_id_str = prov["projectId"]
+        .as_str()
+        .ok_or_else(|| failure(2, "could not resolve project identity"))?;
+    let resolved_head = head_branch
+        .map(str::to_owned)
+        .or_else(|| prov["branch"].as_str().map(str::to_owned))
+        .ok_or_else(|| {
+            failure(
+                2,
+                "could not determine current git branch; pass --head BRANCH",
+            )
+        })?;
+
+    let home = archive::home_dir()?;
+    let (store, _) = SqliteStore::open(&home).map_err(|e| failure(3, &e.to_string()))?;
+    let pid = ProjectId::parse(project_id_str).map_err(|e| failure(2, &e.to_string()))?;
+
+    let find_latest_run = |branch: &str| -> Result<PathBuf, (u8, Value)> {
+        let runs = store
+            .list_runs(&RunFilter {
+                project_id: Some(pid.clone()),
+                branch: Some(branch.to_owned()),
+                ..RunFilter::default()
+            })
+            .map_err(|e| failure(3, &e.to_string()))?;
+        let summary = runs.first().ok_or_else(|| {
+            failure(
+                2,
+                &format!("no archived capture found for branch '{branch}' in project"),
+            )
+        })?;
+        let dir = home
+            .join("projects")
+            .join(summary.run.project_id().as_str())
+            .join("runs")
+            .join(summary.run.id().as_str());
+        if !dir.is_dir() {
+            return Err(failure(
+                2,
+                &format!("archived run directory missing for branch '{branch}'"),
+            ));
+        }
+        Ok(dir)
+    };
+
+    let before_dir = find_latest_run(base_branch)?;
+    let after_dir = find_latest_run(&resolved_head)?;
+    let mut reply = compare(&before_dir, &after_dir, overlay_dir)?;
+    if let Some(obj) = reply.as_object_mut() {
+        obj.insert("beforeBranch".into(), json!(base_branch));
+        obj.insert("afterBranch".into(), json!(resolved_head));
+    }
+    Ok(reply)
+}
+
+pub fn changed_since_summary(project: &Path, base_ref: &str, module_graph_val: &Value) -> Value {
+    let app_canon = project
+        .canonicalize()
+        .unwrap_or_else(|_| project.to_path_buf());
+    let repo_root = Command::new("git")
+        .args(["--no-optional-locks", "-C"])
+        .arg(&app_canon)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
+        .and_then(|p| p.canonicalize().ok())
+        .unwrap_or_else(|| app_canon.clone());
+    let app_prefix = app_canon
+        .strip_prefix(&repo_root)
+        .ok()
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .filter(|s| !s.is_empty());
+
+    let mut changed = BTreeSet::new();
+    let normalize = |raw: &str| -> Option<String> {
+        let clean = raw.trim().replace('\\', "/");
+        if clean.is_empty() {
+            return None;
+        }
+        if let Some(ref prefix) = app_prefix {
+            clean.strip_prefix(&format!("{prefix}/")).map(str::to_owned)
+        } else {
+            Some(clean)
+        }
+    };
+
+    if let Ok(out) = Command::new("git")
+        .args(["--no-optional-locks", "-C"])
+        .arg(&repo_root)
+        .args(["diff", "--name-only", &format!("{base_ref}...HEAD")])
+        .output()
+        && out.status.success()
+    {
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            if let Some(rel) = normalize(line) {
+                changed.insert(rel);
+            }
+        }
+    }
+    if let Ok(out) = Command::new("git")
+        .args(["--no-optional-locks", "-C"])
+        .arg(&repo_root)
+        .args(["status", "--porcelain"])
+        .output()
+        && out.status.success()
+    {
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            if line.len() > 3
+                && let Some(rel) = normalize(&line[3..])
+            {
+                changed.insert(rel);
+            }
+        }
+    }
+
+    let mut graph: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    if let Some(obj) = module_graph_val.as_object() {
+        for (k, v) in obj {
+            let deps = v
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|d| d.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default();
+            graph.insert(k.clone(), deps);
+        }
+    }
+    let affected = affected_files(&graph, &changed);
+    json!({
+        "baseRef": base_ref,
+        "gitChangedFiles": changed.into_iter().collect::<Vec<_>>(),
+        "affectedFiles": affected.into_iter().collect::<Vec<_>>(),
+    })
 }

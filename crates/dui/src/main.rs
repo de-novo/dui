@@ -407,6 +407,9 @@ fn run() -> Reply {
         && cmd == "diff"
     {
         let mut overlay_dir: Option<&Path> = None;
+        let mut base_branch: Option<&str> = None;
+        let mut head_branch: Option<&str> = None;
+        let mut project_dir: Option<&Path> = None;
         let mut positional = Vec::new();
         let mut iter = tail.iter();
         while let Some(arg) = iter.next() {
@@ -415,14 +418,36 @@ fn run() -> Reply {
                     return Err(failure(2, "missing value for --overlay-dir"));
                 };
                 overlay_dir = Some(Path::new(dir));
+            } else if arg == "--base" {
+                let Some(b) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --base"));
+                };
+                base_branch = Some(b);
+            } else if arg == "--head" {
+                let Some(h) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --head"));
+                };
+                head_branch = Some(h);
+            } else if arg == "--project" {
+                let Some(p) = iter.next() else {
+                    return Err(failure(2, "missing value for --project"));
+                };
+                project_dir = Some(Path::new(p));
             } else {
                 positional.push(arg);
             }
         }
+        if let Some(base) = base_branch {
+            let proj = project_dir.unwrap_or_else(|| Path::new("."));
+            return diff::compare_branches(proj, base, head_branch, overlay_dir);
+        }
         let (before, after) = match positional.as_slice() {
             [before, after] => (Path::new(before), Path::new(after)),
             _ => {
-                return Err(failure(2, "expected diff BEFORE AFTER [--overlay-dir DIR]"));
+                return Err(failure(
+                    2,
+                    "expected diff BEFORE AFTER [--overlay-dir DIR] | diff --base BRANCH [--head BRANCH] [--project DIR]",
+                ));
             }
         };
         return diff::compare(before, after, overlay_dir);
@@ -446,10 +471,17 @@ fn run() -> Reply {
         && cmd == "run"
     {
         let mut force = false;
+        let mut changed_since: Option<String> = None;
         let mut positional = Vec::new();
-        for arg in rest {
+        let mut iter = rest.iter();
+        while let Some(arg) = iter.next() {
             if arg == "--force" || arg == "--no-cache" {
                 force = true;
+            } else if arg == "--changed-since" {
+                let Some(base_ref) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --changed-since"));
+                };
+                changed_since = Some(base_ref.to_owned());
             } else {
                 positional.push(arg);
             }
@@ -460,11 +492,41 @@ fn run() -> Reply {
             _ => {
                 return Err(failure(
                     2,
-                    "expected run [--force] PROJECT MANIFEST [OUTPUT]",
+                    "expected run [--force] [--changed-since REF] PROJECT MANIFEST [OUTPUT]",
                 ));
             }
         };
-        return archive::capture(root, spec, output, Capture::Run { force });
+        let mut result = archive::capture(root, spec, output, Capture::Run { force });
+        if let Some(base_ref) = changed_since {
+            let reply_ref = match &mut result {
+                Ok(body) | Err((5, body)) => Some(body),
+                Err(_) => None,
+            };
+            if let Some(reply) = reply_ref
+                && let Some(out_dir) = reply["output"].as_str().map(str::to_owned)
+            {
+                let facts_json = replay::read(&Path::new(&out_dir).join("facts.json")).ok();
+                let module_graph = facts_json
+                    .as_ref()
+                    .map(|f| &f["moduleGraph"])
+                    .unwrap_or(&Value::Null);
+                let summary = diff::changed_since_summary(root, &base_ref, module_graph);
+                if let Some(obj) = reply.as_object_mut() {
+                    obj.insert("changedSince".into(), summary.clone());
+                }
+                let report_path = Path::new(&out_dir).join("report.json");
+                if let Ok(mut report) = replay::read(&report_path)
+                    && let Some(robj) = report.as_object_mut()
+                {
+                    robj.insert("changedSince".into(), summary);
+                    let _ = fs::write(
+                        &report_path,
+                        serde_json::to_vec_pretty(&report).unwrap_or_default(),
+                    );
+                }
+            }
+        }
+        return result;
     }
     if let [cmd, directory, selection] = args.as_slice()
         && cmd == "inspect"
