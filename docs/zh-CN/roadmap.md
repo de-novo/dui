@@ -50,5 +50,19 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 | v0.0.4 | 沿操作在页面或状态之间移动。每条边标明依据来自代码提取、推断或重放验证。从初始状态重放并确认到达目标后，才将边标记为已验证（[#31](https://github.com/de-novo/dui/issues/31)，`dui transitions` / MCP `transitions`，`npm run check:transitions`）。 |
 | v0.0.5 | 在 GPUI 和 gpui-kit 桌面查看器（`apps/desktop`、`dui desktop`，[#40](https://github.com/de-novo/dui/issues/40)，`npm run check:desktop`）中打开项目地图。评审者可在页面、状态、宽度或转换上留言。AI 通过 MCP 读取位置，评审者在修改后的工作树中回到同一位置，对比修改前后（[#38](https://github.com/de-novo/dui/issues/38)，`dui comment` / MCP `comment_*` / 查看器 `/api/comments`，`npm run check:comments`）。 |
 | v0.0.6 | 在参考页面上测量 99% 覆盖率目标，公布已验证和可渲染格子数、遗漏分支及原因。在对应页面保留尚未解决的评审意见（[#44](https://github.com/de-novo/dui/issues/44)，`dui audit` / MCP `audit` / 查看器 `/api/audit`，`npm run check:audit`）。 |
+| v0.0.7 | Priority 2 声明式规则包（Zustand 5、Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、valibot 1、React Router 8、TanStack Start 1）、可选 `hybrid`/`live` 真实 API 模式（只读保护）、分支对比（`dui diff --base main`）、带动态 ID 折叠（`/orders/:id`）的无环多跳 BFS、贪心成对覆盖数组、`<select>` 真实选项发现、视觉变化佐证（`visualWitness`）、2D 画布内联对比（`元素` 渲染树 Diff + 惰性 `像素` 回退）以及常规运行 `linksTo` 连线（[#56](https://github.com/de-novo/dui/issues/56)、[#63](https://github.com/de-novo/dui/issues/63)、[#66](https://github.com/de-novo/dui/issues/66)、[#70](https://github.com/de-novo/dui/issues/70)、[#74](https://github.com/de-novo/dui/issues/74)、[#76](https://github.com/de-novo/dui/issues/76)、[#80](https://github.com/de-novo/dui/issues/80)、[#82](https://github.com/de-novo/dui/issues/82)、[#84](https://github.com/de-novo/dui/issues/84)、[#86](https://github.com/de-novo/dui/issues/86)、[#88](https://github.com/de-novo/dui/issues/88)）。 |
+| v0.0.8 | **多平台抽象层与通用 Web · TUI。** 固定 `SurfaceRegistry`、`NoopOracle` 与统一的 `RenderNodeSnapshot` 中间表示，使新增平台只需实现单个适配器而不重复缓存、SQLite、Diff 或画布代码（[#99](https://github.com/de-novo/dui/issues/99)）。交付支持任意 HTML/JS 应用的 Universal Web 宿主（`static` / `url` / `command`，[#100](https://github.com/de-novo/dui/issues/100)）与 Universal TUI 适配器（`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG，[#101](https://github.com/de-novo/dui/issues/101)）。 |
+| v0.0.9 | **Android · 桌面扩展与开发者工具级元素检查器。** 新增 Android 适配器（`adb screencap` + `uiautomator`/Semantics → `RenderNodeSnapshot`，[#102](https://github.com/de-novo/dui/issues/102)）、Electron 45 宿主 + GPUI AccessKit 渲染树 Diff（[#103](https://github.com/de-novo/dui/issues/103)）、Radix UI / shadcn 规则包 + Next.js 16 宿主（[#104](https://github.com/de-novo/dui/issues/104)）、多标签页并行捕获 + 自动 `renderTree` 重叠/无障碍审计（[#105](https://github.com/de-novo/dui/issues/105)），以及在画布上查看任意元素属性、宽高、外边距、内边距与间距标尺的开发者工具级元素检查器（[#106](https://github.com/de-novo/dui/issues/106)）。 |
+| v0.1.0 | **跨平台移动端与编译器深度 TUI。** 新增 iOS Simulator（`xcrun simctl`）+ SwiftUI（`swiftc`）、React Native / Expo（Android + iOS）、Flutter / Dart、Kotlin Compose 深度状态分析，以及 Ratatui、Ink、Bubble Tea 的编译器状态枚举。 |
+| v0.2.0 | **画布上直接渲染真实组件。** 从静态截图 + 交互式规格叠加演进为直接在 2D 画布上挂载并渲染真实组件，同时在 Web、Desktop、Mobile 与 TUI 上保持同一套 `RenderNodeSnapshot` 场景图、盒模型检查器、元素 Diff 与评审评论锚点。 |
+
+## 多平台架构与演进路线
+
+dui 面向四大界面形态——**Web**、**Desktop App**、**Mobile App（Android 与 iOS）**、**TUI**——通过统一的抽象架构实现快速扩展与低成本维护：
+
+1. **三端口设计（`TypeOracle` · `Host` · `Renderer`）**：具备官方编译器类型时提供 Level 2 深度状态覆盖；任意应用也可通过 `NoopOracle` 立即获得 Level 1 通用捕获与对比。
+2. **统一 `RenderNodeSnapshot` 中间表示**：DOM、AccessKit、VT100 终端网格、Android `uiautomator`/Semantics 与 iOS `XCUI` 树均归一化为同一平台无关场景图，记录坐标、盒模型（`margin`、`padding`、`border`、`gap`）、排版与属性。
+3. **单一模板方法流水线（`CaptureEngine`）**：缓存、SQLite 存储、渲染级 Diff、惰性像素 Diff、视觉变化佐证、99% 审计与 CLI/MCP 一致性仅在共享核心与外壳实现一次。
+4. **从捕获到实时组件渲染**：先在确定性捕获上提供开发者工具级属性检查与盒模型/间距测量标尺，后续在同一场景图上无缝过渡到画布直接渲染真实组件。
 
 [GitHub 里程碑](https://github.com/de-novo/dui/milestones) · [变更日志](changelog.md)
