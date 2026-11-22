@@ -13,7 +13,7 @@ const sampleArchive: ScreenMap = {
     {
       id: "route:/",
       path: "/",
-      origin: "entry",
+      discoveredFrom: { kind: "entry" },
       cells: [
         {
           path: "/",
@@ -28,7 +28,7 @@ const sampleArchive: ScreenMap = {
     {
       id: "route:/about",
       path: "/about",
-      origin: "entry",
+      discoveredFrom: { kind: "entry" },
       cells: [
         {
           path: "/about",
