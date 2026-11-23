@@ -3,7 +3,7 @@
 use crate::{Reply, archive, failure, replay::read, sqlite_store::SqliteStore};
 use dui_core::{
     audit::{AuditCellInput, AuditCommentInput, AuditInput, DEFAULT_GOAL_PERCENT, evaluate},
-    design_lint::{DesignSeverity, lint_render_tree},
+    design_lint::{ScopedDesignFinding, deduplicate_findings, lint_render_tree},
     diff::RenderNodeSnapshot,
     model::{CommentStatus, ProjectId},
 };
@@ -19,10 +19,7 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
     let default_path = report["path"].as_str().unwrap_or("/").to_owned();
 
     let mut cells = Vec::new();
-    let mut design_findings = Vec::new();
-    let mut design_errors = 0usize;
-    let mut design_warnings = 0usize;
-    let mut design_info = 0usize;
+    let mut scoped_findings = Vec::new();
     if let Some(arr) = report["cells"].as_array() {
         for item in arr {
             let path = item["path"]
@@ -35,6 +32,7 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
             let reason = item["reason"].as_str().map(str::to_owned);
             let state = item["state"].as_str().map(str::to_owned);
             let locale = item["locale"].as_str().map(str::to_owned);
+            let scenario = item["scenario"].as_str().map(str::to_owned);
             if let Some(raw_tree) = item["observation"]["renderTree"].as_array()
                 && let Ok(tree) = serde_json::from_value::<Vec<RenderNodeSnapshot>>(Value::Array(
                     raw_tree.clone(),
@@ -42,30 +40,14 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
                 && !tree.is_empty()
             {
                 let lint = lint_render_tree(&tree, width);
-                design_errors += lint.errors;
-                design_warnings += lint.warnings;
-                design_info += lint.info;
                 for finding in lint.findings {
-                    let mut entry = serde_json::to_value(&finding).unwrap_or_else(|_| json!({}));
-                    if let Some(obj) = entry.as_object_mut() {
-                        obj.insert("path".into(), json!(path));
-                        obj.insert("width".into(), json!(width));
-                        if let Some(st) = &state {
-                            obj.insert("state".into(), json!(st));
-                        }
-                        if let Some(sc) = item["scenario"].as_str() {
-                            obj.insert("scenario".into(), json!(sc));
-                        }
-                        obj.insert(
-                            "severityRank".into(),
-                            json!(match finding.severity {
-                                DesignSeverity::Error => 0,
-                                DesignSeverity::Warning => 1,
-                                DesignSeverity::Info => 2,
-                            }),
-                        );
-                    }
-                    design_findings.push(entry);
+                    scoped_findings.push(ScopedDesignFinding {
+                        path: path.clone(),
+                        width,
+                        state: state.clone(),
+                        scenario: scenario.clone(),
+                        finding,
+                    });
                 }
             }
             cells.push(AuditCellInput {
@@ -78,6 +60,7 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
             });
         }
     }
+    let grouped_design = deduplicate_findings(scoped_findings);
 
     let branch_outcomes = report["coverage"]["branchOutcomes"].as_u64().unwrap_or(0);
     let observed_branch_outcomes = report["coverage"]["observedBranchOutcomes"]
@@ -145,13 +128,7 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
         }
         obj.insert(
             "designAudit".into(),
-            json!({
-                "total": design_findings.len(),
-                "errors": design_errors,
-                "warnings": design_warnings,
-                "info": design_info,
-                "findings": design_findings,
-            }),
+            serde_json::to_value(&grouped_design).unwrap_or_else(|_| json!({})),
         );
     }
     Ok(out)

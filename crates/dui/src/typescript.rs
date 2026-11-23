@@ -1,6 +1,16 @@
 use crate::{Reply, failure, ports::TypeOracle, scan};
 use serde_json::{Value, json};
 use std::{fs, path::Path, process::Command};
+
+pub(crate) fn parse_node_major(version_stdout: &str) -> Option<u32> {
+    let trimmed = version_stdout.trim().strip_prefix('v')?;
+    trimmed.split('.').next()?.parse::<u32>().ok()
+}
+
+pub(crate) fn is_supported_node_version(version_stdout: &str) -> bool {
+    parse_node_major(version_stdout).is_some_and(|major| major >= 22)
+}
+
 pub struct TypeScript;
 impl TypeOracle for TypeScript {
     fn facts(&self, project: &Path, spec: &Path) -> Reply {
@@ -17,11 +27,12 @@ impl TypeOracle for TypeScript {
         let version = Command::new("node")
             .arg("--version")
             .output()
-            .map_err(|_| failure(4, "Node 26 required"))?;
-        if !version.stdout.starts_with(b"v26.") {
+            .map_err(|_| failure(4, "Node 22+ required"))?;
+        let version_str = String::from_utf8_lossy(&version.stdout);
+        if !is_supported_node_version(&version_str) {
             return Err((
                 4,
-                json!({"status":"unsupported","reason":"Node 26 required"}),
+                json!({"status":"unsupported","reason":"Node 22+ required"}),
             ));
         }
         let output = Command::new("node")
@@ -58,5 +69,20 @@ impl TypeOracle for TypeScript {
                 .ok_or_else(|| failure(3, "missing facts"))?,
         );
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_node_22_24_26_and_rejects_older_majors() {
+        assert!(is_supported_node_version("v22.22.0\n"));
+        assert!(is_supported_node_version("v24.10.1\n"));
+        assert!(is_supported_node_version("v26.8.1\n"));
+        assert!(!is_supported_node_version("v20.18.0\n"));
+        assert!(!is_supported_node_version("v18.19.0\n"));
+        assert!(!is_supported_node_version(""));
     }
 }
