@@ -393,41 +393,10 @@ declare var __duiProbe: {
       }
       return "";
     };
-    const isHorizontallyClipped = (el: Element, viewportWidth: number): boolean => {
-      let cur = el.parentElement;
-      while (cur && cur !== document.body && cur !== document.documentElement) {
-        const pcs = getComputedStyle(cur);
-        const ox = pcs.overflowX;
-        if (ox === "auto" || ox === "scroll" || ox === "hidden" || ox === "clip") {
-          const pr = cur.getBoundingClientRect();
-          if (Math.round(pr.x) >= -2 && Math.round(pr.x + pr.width) <= viewportWidth + 2) {
-            return true;
-          }
-        }
-        cur = cur.parentElement;
-      }
-      return false;
-    };
-    const isVerticallyClipped = (el: Element, rect: DOMRect): boolean => {
-      let cur = el.parentElement;
-      while (cur && cur !== document.body && cur !== document.documentElement) {
-        const pcs = getComputedStyle(cur);
-        const oy = pcs.overflowY;
-        if (oy === "auto" || oy === "scroll" || oy === "hidden" || oy === "clip") {
-          const pr = cur.getBoundingClientRect();
-          if (rect.bottom > pr.bottom + 2 || rect.top < pr.top - 2) {
-            return true;
-          }
-        }
-        cur = cur.parentElement;
-      }
-      return false;
-    };
     const tagCounts = new Map<string, number>();
     const elToId = new WeakMap<Element, string>();
     const domParentIds = new WeakMap<Element, string>();
     let nextDomParentId = 0;
-    const viewportW = Math.round(window.innerWidth || 0);
     const nodes: {
       id: string;
       tag: string;
@@ -563,19 +532,6 @@ declare var __duiProbe: {
         }
       }
       const rx = Math.round(rect.x);
-      if (
-        viewportW > 0 &&
-        (rx < -2 || rx + w > viewportW + 2) &&
-        isHorizontallyClipped(el, viewportW)
-      ) {
-        attributes["data-dui-clipped-x"] = "true";
-      }
-      if (isVerticallyClipped(el, rect)) {
-        attributes["data-dui-clipped-y"] = "true";
-      }
-      if (cs.display === "inline" && el.getClientRects().length > 1) {
-        attributes["data-dui-multiline-inline"] = "true";
-      }
       if (el.parentElement) {
         let dp = domParentIds.get(el.parentElement);
         if (!dp) {
@@ -774,12 +730,11 @@ declare var __duiProbe: {
         // Framework-agnostic WAI-ARIA navigation disclosure expansion:
         // safely expand collapsed nav accordions/trees (aria-expanded="false") after capture
         // to uncover submenu <a href> links without relying on any router-specific syntax.
-        const navRoots = document.querySelectorAll(
-          'nav, aside, [role="navigation"], [data-slot="sidebar"]',
-        );
+        const navRoots = document.querySelectorAll('nav, aside, [role="navigation"]');
         const triggers: HTMLElement[] = [];
         const seen = new Set<Element>();
-        const destructiveRe = /\b(logout|log out|sign out|delete|remove|reset|destroy)\b/i;
+        const destructiveRe =
+          /\b(logout|log out|sign out|delete|remove|reset|destroy)\b|로그아웃|삭제|제거|초기화|탈퇴|退出|删除|移除|重置|ログアウト|削除|リセット/i;
         for (const root of navRoots) {
           for (const el of root.querySelectorAll(
             'button[aria-expanded="false"], [role="button"][aria-expanded="false"], [role="treeitem"][aria-expanded="false"]',
@@ -840,7 +795,7 @@ declare var __duiProbe: {
       },
       listOverlayTriggers() {
         const destructiveRe =
-          /\b(logout|log out|sign out|delete|remove|reset|destroy|clear|cancel|close|submit|save|back|next|prev|previous|download|export)\b/i;
+          /\b(logout|log out|sign out|delete|remove|reset|destroy|clear|cancel|close|submit|save|back|next|prev|previous|download|export)\b|로그아웃|삭제|제거|초기화|취소|닫기|저장|탈퇴|다운로드|내보내기|退出|删除|移除|重置|取消|关闭|保存|下载|导出|ログアウト|削除|リセット|キャンセル|閉じる|保存/i;
         const skipRoles = new Set([
           "tab",
           "checkbox",
@@ -857,7 +812,7 @@ declare var __duiProbe: {
           if (triggers.length >= 12 || seen.has(el) || !(el instanceof HTMLElement)) return;
           if (el.hasAttribute("disabled") || el.getAttribute("aria-disabled") === "true") return;
           if (el.closest("form")) return;
-          if (el.closest('nav, aside, [role="navigation"], [data-slot="sidebar"]')) return;
+          if (el.closest('nav, aside, [role="navigation"]')) return;
           const role = (el.getAttribute("role") || "").toLowerCase();
           if (skipRoles.has(role)) return;
           if (el instanceof HTMLButtonElement && (el.type || "").toLowerCase() === "submit") return;
@@ -1015,7 +970,7 @@ declare var __duiProbe: {
               active.close();
             } else {
               const closeBtn = active.querySelector<HTMLElement>(
-                'button[aria-label*="close" i], button[title*="close" i], [data-slot*="close"]',
+                'button[aria-label*="close" i], button[title*="close" i]',
               );
               closeBtn?.click();
             }
@@ -1068,7 +1023,10 @@ declare var __duiProbe: {
             );
             if (!hasDirectText) continue;
             const style = getComputedStyle(el);
-            const horiz = el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1;
+            const horiz =
+              style.textOverflow !== "ellipsis" &&
+              el.clientWidth > 0 &&
+              el.scrollWidth > el.clientWidth + 1;
             const vert =
               el.clientHeight > 0 &&
               el.scrollHeight > el.clientHeight + 1 &&
