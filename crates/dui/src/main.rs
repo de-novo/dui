@@ -417,6 +417,7 @@ fn run() -> Reply {
         let mut base_branch: Option<&str> = None;
         let mut head_branch: Option<&str> = None;
         let mut project_dir: Option<&Path> = None;
+        let mut markdown_mode = false;
         let mut positional = Vec::new();
         let mut iter = tail.iter();
         while let Some(arg) = iter.next() {
@@ -440,24 +441,41 @@ fn run() -> Reply {
                     return Err(failure(2, "missing value for --project"));
                 };
                 project_dir = Some(Path::new(p));
+            } else if arg == "--markdown" {
+                markdown_mode = true;
+            } else if arg == "--format" {
+                let Some(fmt) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --format"));
+                };
+                match fmt {
+                    "markdown" | "md" => markdown_mode = true,
+                    "json" => markdown_mode = false,
+                    _ => return Err(failure(2, "expected --format json|markdown")),
+                }
             } else {
                 positional.push(arg);
             }
         }
-        if let Some(base) = base_branch {
+        let reply = if let Some(base) = base_branch {
             let proj = project_dir.unwrap_or_else(|| Path::new("."));
-            return diff::compare_branches(proj, base, head_branch, overlay_dir);
-        }
-        let (before, after) = match positional.as_slice() {
-            [before, after] => (Path::new(before), Path::new(after)),
-            _ => {
-                return Err(failure(
-                    2,
-                    "expected diff BEFORE AFTER [--overlay-dir DIR] | diff --base BRANCH [--head BRANCH] [--project DIR]",
-                ));
-            }
+            diff::compare_branches(proj, base, head_branch, overlay_dir)?
+        } else {
+            let (before, after) = match positional.as_slice() {
+                [before, after] => (Path::new(before), Path::new(after)),
+                _ => {
+                    return Err(failure(
+                        2,
+                        "expected diff BEFORE AFTER [--overlay-dir DIR] [--markdown] | diff --base BRANCH [--head BRANCH] [--project DIR] [--markdown]",
+                    ));
+                }
+            };
+            diff::compare(before, after, overlay_dir)?
         };
-        return diff::compare(before, after, overlay_dir);
+        if markdown_mode {
+            let md = dui_core::diff::format_diff_markdown(&reply);
+            return Ok(json!({"__rawStdout": md}));
+        }
+        return Ok(reply);
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "prune"
@@ -596,7 +614,9 @@ fn main() -> ExitCode {
         Ok(body) => (0, body),
         Err(err) => err,
     };
-    if !body.is_null() {
+    if let Some(raw) = body.get("__rawStdout").and_then(Value::as_str) {
+        print!("{raw}");
+    } else if !body.is_null() {
         println!("{body}");
     }
     ExitCode::from(code)

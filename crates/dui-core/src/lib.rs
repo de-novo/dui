@@ -95,6 +95,7 @@ pub mod verification;
 
 pub mod android;
 pub mod audit;
+pub mod auth;
 pub mod design_lint;
 pub mod diff;
 pub mod edit;

@@ -379,6 +379,11 @@ impl CellCache {
             "dui:mocks:v1",
             &json!({
                 "cookies": spec["cookies"],
+                "storageState": spec["storageState"],
+                "localStorage": spec["localStorage"],
+                "sessionStorage": spec["sessionStorage"],
+                "authFlow": spec["authFlow"],
+                "extraHeaders": spec["extraHeaders"],
                 "mockResponses": spec["mockResponses"],
                 "generatedGetResponses": spec["generatedGetResponses"],
                 "generatedCsvResponses": spec["generatedCsvResponses"],
