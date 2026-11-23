@@ -1,7 +1,6 @@
 //! Embedded loopback HTTP server for `apps/canvas` (`dui open`).
 
-use crate::{Reply, archive, audit, comments, diff, failure, live, sqlite_store::SqliteStore};
-use base64::{Engine, engine::general_purpose::STANDARD};
+use crate::{Reply, archive, audit, comments, diff, failure, sqlite_store::SqliteStore};
 use dui_core::storage::{RunFilter, RunRepository};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -24,7 +23,6 @@ mod canvas_assets {
 #[derive(Clone)]
 struct ArchiveEntry {
     root: PathBuf,
-    project_path: Option<PathBuf>,
     run: Value,
 }
 
@@ -205,11 +203,7 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
                 "version": version,
                 "liveAvailable": project_path.is_some(),
             });
-            ArchiveEntry {
-                root,
-                project_path,
-                run,
-            }
+            ArchiveEntry { root, run }
         })
         .collect()
 }
@@ -315,10 +309,6 @@ fn is_valid_overlay_name(name: &str) -> bool {
     name.len() == 25
         && name.ends_with("-diff.png")
         && name[..16].bytes().all(|b| b.is_ascii_hexdigit())
-}
-
-fn is_valid_session_id(id: &str) -> bool {
-    id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn percent_decode(raw: &str) -> String {
@@ -956,177 +946,6 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                 send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
             }
         }
-        return;
-    }
-
-    if path == "/api/live" || path == "/api/live/" || path == "/api/live/frame" {
-        if !is_same_origin(&headers) {
-            send_json(
-                &mut stream,
-                403,
-                &json!({"status":"error","reason":"forbidden-origin"}),
-            );
-            return;
-        }
-        if method == "GET" && path == "/api/live/frame" {
-            let session = query.get("session").map(String::as_str).unwrap_or("");
-            let cell_state = query.get("state").map(String::as_str).unwrap_or("");
-            let width: u32 = query.get("width").and_then(|w| w.parse().ok()).unwrap_or(0);
-            if !is_valid_session_id(session) || cell_state.is_empty() || width == 0 {
-                send_json(
-                    &mut stream,
-                    400,
-                    &json!({"status":"error","reason":"invalid-frame-query"}),
-                );
-                return;
-            }
-            match live::command(&json!({
-                "op": "frame",
-                "session": session,
-                "cell": { "state": cell_state, "width": width },
-            })) {
-                Ok(body) => {
-                    if let Some(b64) = body["imageBase64"].as_str()
-                        && let Ok(png) = STANDARD.decode(b64)
-                    {
-                        send_response(&mut stream, 200, "image/png", "no-store", &png);
-                        return;
-                    }
-                    send_json(&mut stream, 500, &body);
-                }
-                Err((code, err)) => {
-                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
-                }
-            }
-            return;
-        }
-        if method != "POST" || (path != "/api/live" && path != "/api/live/") {
-            send_response(&mut stream, 405, "text/plain", "no-store", b"");
-            return;
-        }
-        let Ok(body) = serde_json::from_slice::<Value>(&body_bytes) else {
-            send_json(
-                &mut stream,
-                400,
-                &json!({"status":"error","reason":"invalid-json"}),
-            );
-            return;
-        };
-        if !body.is_object() {
-            send_json(
-                &mut stream,
-                400,
-                &json!({"status":"error","reason":"invalid-json"}),
-            );
-            return;
-        }
-        let op = body["op"].as_str().unwrap_or("");
-        if op == "open" {
-            let run_key = body["run"].as_str().unwrap_or("");
-            let archive = state
-                .lock()
-                .ok()
-                .map(|g| list_archives(&g))
-                .and_then(|list| {
-                    list.into_iter()
-                        .find(|a| a.run["key"].as_str() == Some(run_key))
-                });
-            let Some(entry) = archive else {
-                send_json(
-                    &mut stream,
-                    404,
-                    &json!({"status":"error","reason":"run-not-found"}),
-                );
-                return;
-            };
-            let Some(project_path) = entry.project_path else {
-                send_json(
-                    &mut stream,
-                    400,
-                    &json!({"status":"error","reason":"project-unavailable"}),
-                );
-                return;
-            };
-            let payload = json!({
-                "op": "open",
-                "project": project_path.display().to_string(),
-                "run": entry.root.display().to_string(),
-                "cell": body["cell"],
-                "requestId": body["requestId"],
-            });
-            match live::command(&payload) {
-                Ok(mut reply) => {
-                    if let Some(obj) = reply.as_object_mut() {
-                        obj.remove("provenance");
-                    }
-                    send_json(&mut stream, 200, &reply);
-                }
-                Err((code, err)) => {
-                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
-                }
-            }
-            return;
-        }
-        if matches!(op, "inspect" | "set" | "reset" | "save" | "close") {
-            let session_id = body["session"].as_str().unwrap_or("");
-            if !is_valid_session_id(session_id) {
-                send_json(
-                    &mut stream,
-                    400,
-                    &json!({"status":"error","reason":"invalid-session"}),
-                );
-                return;
-            }
-            let mut forwarded = json!({ "op": op, "session": session_id });
-            if op != "close" {
-                forwarded["cell"] = body["cell"].clone();
-            }
-            if matches!(op, "set" | "reset" | "save") {
-                forwarded["expectedRevision"] = body["expectedRevision"].clone();
-                forwarded["requestId"] = body["requestId"].clone();
-            }
-            if matches!(op, "set" | "reset") {
-                forwarded["slot"] = body["slot"].clone();
-                forwarded["instance"] = body["instance"].clone();
-                if op == "set" {
-                    forwarded["value"] = body["value"].clone();
-                }
-                if let Some(expect) = body.get("expect") {
-                    forwarded["expect"] = expect.clone();
-                }
-            }
-            match live::command(&forwarded) {
-                Ok(mut reply) => {
-                    if op == "save"
-                        && let Some(out) = reply["output"].as_str()
-                    {
-                        let saved_root = Path::new(out)
-                            .canonicalize()
-                            .unwrap_or_else(|_| PathBuf::from(out));
-                        let run_key = sha256_hex(&saved_root.to_string_lossy());
-                        if let Ok(mut guard) = state.lock() {
-                            guard.run_roots.insert(run_key.clone(), saved_root.clone());
-                            guard.extra_saved_paths.insert(saved_root);
-                            guard.audit_cache.clear();
-                        }
-                        if let Some(obj) = reply.as_object_mut() {
-                            obj.remove("output");
-                            obj.insert("runKey".into(), json!(run_key));
-                        }
-                    }
-                    send_json(&mut stream, 200, &reply);
-                }
-                Err((code, err)) => {
-                    send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
-                }
-            }
-            return;
-        }
-        send_json(
-            &mut stream,
-            400,
-            &json!({"status":"error","reason":"unknown-operation"}),
-        );
         return;
     }
 

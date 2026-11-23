@@ -1,14 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
-import { decodeOverview, type Screen, type ScreenMap as Archive } from "./data/overview";
+import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
 import { CaptureDiffView } from "./features/diff/CaptureDiffView";
-import { LiveInspector } from "./features/inspector/LiveInspector";
-import { LiveStage } from "./features/inspector/LiveStage";
 import { ScreenInspector } from "./features/inspector/ScreenInspector";
-import { useLiveSession } from "./features/inspector/useLiveSession";
 import { routeName } from "./features/map/CaptureCard";
 import { ScreenMap } from "./features/map/ScreenMap";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
@@ -21,7 +18,6 @@ import {
   indexScreenDiffs,
 } from "./model/canvasDiff";
 import { type CaptureDiff, decodeCaptureDiff } from "./model/diff";
-import type { LiveCellRef } from "./model/live";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import "./preview.css";
 
@@ -29,72 +25,16 @@ function archiveUrl(name: string, run: Run) {
   return "/archive/" + encodeURIComponent(name) + "?run=" + encodeURIComponent(run.key);
 }
 
-function LiveOverlay({
-  run,
-  screen,
-  cell,
-  dismissRef,
-  onKeyDown,
-  onBackToOverview,
-  onBackToDetails,
-  onRefreshRuns,
-}: {
-  run: Run;
-  screen: Screen;
-  cell: LiveCellRef;
-  dismissRef: React.RefObject<HTMLButtonElement | null>;
-  onKeyDown: (event: React.KeyboardEvent) => void;
-  onBackToOverview: () => void;
-  onBackToDetails: () => void;
-  onRefreshRuns: () => void;
-}) {
-  const { state, mutate, save, reopen, close } = useLiveSession(run.key, cell, onRefreshRuns);
-
-  const leaveToOverview = () => {
-    close();
-    onBackToOverview();
-  };
-  const leaveToDetails = () => {
-    close();
-    onBackToDetails();
-  };
-
-  return (
-    <div className="live-overlay">
-      <LiveStage
-        screen={screen}
-        width={cell.width}
-        session={state}
-        onBackToOverview={leaveToOverview}
-        onBackToDetails={leaveToDetails}
-        onReopen={reopen}
-      />
-      <LiveInspector
-        screen={screen}
-        width={cell.width}
-        session={state}
-        dismissRef={dismissRef}
-        onKeyDown={onKeyDown}
-        onClose={leaveToDetails}
-        onMutate={mutate}
-        onSave={save}
-      />
-    </div>
-  );
-}
-
 function MapView({
   archive,
   run,
   runs,
   onOpenDiff,
-  onRefreshRuns,
 }: {
   archive: Archive;
   run: Run;
   runs: Run[];
   onOpenDiff: () => void;
-  onRefreshRuns: () => void;
 }) {
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
@@ -206,7 +146,7 @@ function MapView({
   useEffect(() => {
     const prev = previousView.current;
     previousView.current = view;
-    if (view === "details" || view === "live") {
+    if (view === "details") {
       if (prev !== view) dismiss.current?.focus();
     } else if (prev !== "overview") {
       const target = selectedId
@@ -232,15 +172,8 @@ function MapView({
     }
   }
 
-  function returnToDetails() {
-    update({ view: null });
-  }
-
   function inspectKey(event: React.KeyboardEvent) {
-    if (event.key === "Escape") {
-      if (view === "live") returnToDetails();
-      else returnToOverview();
-    }
+    if (event.key === "Escape") returnToOverview();
   }
 
   function select(id: string, active: Element | null = document.activeElement) {
@@ -250,14 +183,13 @@ function MapView({
     update({ screen: id, state: null, view: null });
   }
 
-  const showLive = view === "live" && Boolean(screen && cell?.state);
-  const showDetails = view === "details" || (view === "live" && !showLive && selectedId !== null);
-  const showOverview = view === "overview";
+  const showDetails = view === "details" && selectedId !== null;
+  const showOverview = !showDetails;
 
   return (
     <section className="workspace" aria-label={t.screenMap}>
       <div className="map" ref={mapArea}>
-        <div ref={overviewLayer} className="overview-layer" aria-hidden={showLive} inert={showLive}>
+        <div ref={overviewLayer} className="overview-layer">
           {railInset !== undefined && (
             <ScreenMap
               railInset={railInset}
@@ -279,7 +211,7 @@ function MapView({
           )}
         </div>
 
-        {!showLive && (showAuditPill || otherRuns.length > 0) && (
+        {(showAuditPill || otherRuns.length > 0) && (
           <div className="map-top-bar">
             {showAuditPill && (
               <output className="audit-summary-pill glass-panel">
@@ -375,43 +307,27 @@ function MapView({
           </section>
         )}
 
-        {!showLive && (
-          <Button
-            className="map-options"
-            variant="outline"
-            ref={optionsButton}
-            aria-haspopup="dialog"
-            aria-expanded={optionsOpen}
-            onClick={() => setOptionsOpen(true)}
+        <Button
+          className="map-options"
+          variant="outline"
+          ref={optionsButton}
+          aria-haspopup="dialog"
+          aria-expanded={optionsOpen}
+          onClick={() => setOptionsOpen(true)}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
-              <circle cx="10" cy="6" r="2" />
-              <circle cx="14" cy="14" r="2" />
-            </svg>{" "}
-            {t.mapOptions}
-          </Button>
-        )}
-
-        {showLive && screen && cell?.state && (
-          <LiveOverlay
-            key={`${run.key}:${cell.state}:${cell.width}`}
-            run={run}
-            screen={screen}
-            cell={{ state: cell.state, width: cell.width }}
-            dismissRef={dismiss}
-            onKeyDown={inspectKey}
-            onBackToOverview={returnToOverview}
-            onBackToDetails={returnToDetails}
-            onRefreshRuns={onRefreshRuns}
-          />
-        )}
+            <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
+            <circle cx="10" cy="6" r="2" />
+            <circle cx="14" cy="14" r="2" />
+          </svg>{" "}
+          {t.mapOptions}
+        </Button>
       </div>
 
       {showDetails && (
@@ -531,7 +447,7 @@ function Viewer({
   error?: string;
 }) {
   const { t } = useI18n();
-  const [runs, setRuns] = useState(initialRuns);
+  const runs = initialRuns;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState(location.search);
 
@@ -539,12 +455,6 @@ function Viewer({
     const pop = () => setSearch(location.search);
     addEventListener("popstate", pop);
     return () => removeEventListener("popstate", pop);
-  }, []);
-
-  const refreshRuns = useCallback(() => {
-    void json("/archive/runs.json")
-      .then((next: Run[]) => setRuns(next))
-      .catch(() => {});
   }, []);
 
   const params = new URLSearchParams(search);
@@ -584,13 +494,7 @@ function Viewer({
           onClose={closeDiff}
         />
       ) : archive && run ? (
-        <MapView
-          archive={archive}
-          run={run}
-          runs={runs}
-          onOpenDiff={() => openDiff()}
-          onRefreshRuns={refreshRuns}
-        />
+        <MapView archive={archive} run={run} runs={runs} onOpenDiff={() => openDiff()} />
       ) : (
         <output>
           {error === "archive-load-failed"
