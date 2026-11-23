@@ -7,6 +7,7 @@ import {
   liveSurfaceKey,
   mergeLiveRenderTree,
   parseLiveTelemetryMessage,
+  resolveLiveBridgeUrl,
   resolveLiveSurfaceUrl,
 } from "../src/model/liveSurface.ts";
 
@@ -22,6 +23,11 @@ describe("liveSurface protocol (v0.2.0)", () => {
       "http://127.0.0.1:4173/editor?tab=markdown",
     );
     assert.equal(resolveLiveSurfaceUrl("https://evil.example.com", "/editor"), null);
+    assert.equal(
+      resolveLiveBridgeUrl("/live-surface", "/editor?tab=a"),
+      "/live-surface/editor?tab=a",
+    );
+    assert.equal(resolveLiveBridgeUrl("https://evil.example.com", "/editor"), null);
   });
 
   it("computes exact viewport scaling to fit 2D canvas cards 1:1", () => {

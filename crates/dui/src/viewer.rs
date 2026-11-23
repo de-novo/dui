@@ -122,19 +122,229 @@ fn configured_live_base_url() -> Option<String> {
     validate_loopback_live_url(&raw)
 }
 
+const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(() => {
+  if (window.__duiLiveBridgeInstalled) return;
+  window.__duiLiveBridgeInstalled = true;
+  const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n) : 0; };
+  const collect = () => {
+    const out = [];
+    const root = document.body;
+    if (!root) return out;
+    const els = root.querySelectorAll("*");
+    let idx = 0;
+    for (const el of els) {
+      if (out.length >= 200) break;
+      if (!(el instanceof HTMLElement)) continue;
+      const tag = el.localName;
+      if (tag === "script" || tag === "style" || tag === "noscript") continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      const id = el.getAttribute("data-testid")
+        ? `[data-testid=${el.getAttribute("data-testid")}]`
+        : el.id ? `#${el.id}` : `${tag}#${idx++}`;
+      const text = (el.innerText || "").replace(/\s+/g, " ").trim().slice(0, 120);
+      const attrs = {};
+      for (const a of el.attributes) {
+        if (a.name === "role" || a.name === "type" || a.name === "href" || a.name.startsWith("aria-") || a.name.startsWith("data-")) {
+          attrs[a.name] = a.value.slice(0, 120);
+        }
+      }
+      out.push({
+        id,
+        tag,
+        role: el.getAttribute("role") || undefined,
+        text,
+        rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+        style: { color: cs.color, backgroundColor: cs.backgroundColor, fontSize: cs.fontSize, fontWeight: cs.fontWeight, display: cs.display },
+        boxModel: {
+          margin: { top: px(cs.marginTop), right: px(cs.marginRight), bottom: px(cs.marginBottom), left: px(cs.marginLeft) },
+          padding: { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) },
+          border: { top: px(cs.borderTopWidth), right: px(cs.borderRightWidth), bottom: px(cs.borderBottomWidth), left: px(cs.borderLeftWidth) },
+          borderRadius: cs.borderRadius || undefined,
+          gap: cs.gap && cs.gap !== "normal" ? cs.gap : undefined,
+        },
+        attributes: Object.keys(attrs).length ? attrs : undefined,
+      });
+    }
+    return out;
+  };
+  let timer = 0;
+  const emit = () => {
+    try {
+      const rawPath = (location.pathname.replace(/^\/live-surface(?=\/|$)/, "") || "/") + location.search;
+      window.parent.postMessage({
+        type: "dui:live-render-tree",
+        path: rawPath,
+        width: Math.round(window.innerWidth || 1280),
+        renderTree: collect(),
+        capturedAtMs: Date.now(),
+      }, "*");
+    } catch {}
+  };
+  const schedule = () => { clearTimeout(timer); timer = setTimeout(emit, 120); };
+  window.addEventListener("load", schedule);
+  window.addEventListener("resize", schedule);
+  window.addEventListener("popstate", schedule);
+  const mo = new MutationObserver(schedule);
+  if (document.documentElement) mo.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+  schedule();
+})();</script>"#;
+
+fn inject_live_bridge_html(html: &str, upstream_origin: &str) -> String {
+    let base_tag = format!(
+        "<base href=\"{}/\" />",
+        upstream_origin.trim_end_matches('/')
+    );
+    let with_base = if let Some(pos) = html.to_ascii_lowercase().find("<head>") {
+        let insert_at = pos + "<head>".len();
+        format!("{}{}{}", &html[..insert_at], base_tag, &html[insert_at..])
+    } else {
+        format!("{base_tag}{html}")
+    };
+    if let Some(pos) = with_base.to_ascii_lowercase().rfind("</body>") {
+        format!(
+            "{}{}{}",
+            &with_base[..pos],
+            LIVE_TELEMETRY_BRIDGE_SCRIPT,
+            &with_base[pos..]
+        )
+    } else {
+        format!("{with_base}{LIVE_TELEMETRY_BRIDGE_SCRIPT}")
+    }
+}
+
+fn proxy_live_surface(
+    live_base_url: &str,
+    sub_path: &str,
+    raw_query: &str,
+) -> Result<(u16, String, Vec<u8>), String> {
+    let validated = validate_loopback_live_url(live_base_url)
+        .ok_or_else(|| "live surface requires loopback origin".to_owned())?;
+    let authority = validated
+        .strip_prefix("http://")
+        .ok_or_else(|| "live surface proxy requires http:// loopback origin".to_owned())?;
+    let addr = if authority.contains(':') {
+        authority.to_owned()
+    } else {
+        format!("{authority}:80")
+    };
+    let clean_sub = if sub_path.starts_with('/') {
+        sub_path.to_owned()
+    } else {
+        format!("/{sub_path}")
+    };
+    let req_target = if raw_query.is_empty() {
+        clean_sub
+    } else {
+        format!("{clean_sub}?{raw_query}")
+    };
+    let mut upstream = TcpStream::connect(&addr).map_err(|e| format!("upstream connect: {e}"))?;
+    let _ = upstream.set_read_timeout(Some(Duration::from_secs(10)));
+    let _ = upstream.set_write_timeout(Some(Duration::from_secs(10)));
+    let req = format!(
+        "GET {req_target} HTTP/1.1\r\nHost: {authority}\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n"
+    );
+    upstream
+        .write_all(req.as_bytes())
+        .map_err(|e| format!("upstream write: {e}"))?;
+    let _ = upstream.flush();
+    let mut raw = Vec::new();
+    upstream
+        .read_to_end(&mut raw)
+        .map_err(|e| format!("upstream read: {e}"))?;
+    let split = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .ok_or_else(|| "malformed upstream HTTP response".to_owned())?;
+    let head = String::from_utf8_lossy(&raw[..split]);
+    let mut lines = head.lines();
+    let status = lines
+        .next()
+        .and_then(|l| l.split_whitespace().nth(1))
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(502);
+    let mut content_type = "application/octet-stream".to_owned();
+    for line in lines {
+        if let Some((k, v)) = line.split_once(':')
+            && k.trim().eq_ignore_ascii_case("content-type")
+        {
+            content_type = v.trim().to_owned();
+        }
+    }
+    let body = dui_core::auth::decode_http_body(&head, &raw[split + 4..]);
+    if content_type.to_ascii_lowercase().starts_with("text/html") {
+        let html = String::from_utf8_lossy(&body);
+        let bridged = inject_live_bridge_html(&html, &validated);
+        return Ok((status, content_type, bridged.into_bytes()));
+    }
+    Ok((status, content_type, body))
+}
+
 fn start_auto_live_host(run_dirs: &[PathBuf]) -> Option<(UniversalSession, String)> {
     let first = run_dirs.first()?;
     let manifest = read_optional_json(&first.join("manifest.json"))?;
-    let host_kind = manifest["host"].as_str()?;
-    if !matches!(host_kind, "static" | "url" | "command") {
-        return None;
-    }
+    let host_kind = manifest["host"].as_str().unwrap_or("vite");
     let meta = read_optional_json(&first.join("snapshot.json"));
     let project_path =
         resolve_project_path(meta.as_ref()).or_else(|| first.parent().map(Path::to_path_buf))?;
-    let session = universal_web::start_universal_session(&project_path, &manifest).ok()?;
-    let url = format!("http://127.0.0.1:{}", session.port());
-    Some((session, url))
+
+    if matches!(host_kind, "static" | "url" | "command") {
+        let session = universal_web::start_universal_session(&project_path, &manifest).ok()?;
+        let url = format!("http://127.0.0.1:{}", session.port());
+        return Some((session, url));
+    }
+
+    if host_kind == "vite" || host_kind == "nitro" {
+        let vite_bin = project_path.join("node_modules/.bin/vite");
+        if vite_bin.is_file() {
+            let port_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).ok()?;
+            let free_port = port_listener.local_addr().ok()?.port();
+            drop(port_listener);
+            let vite_spec = json!({
+                "host": "command",
+                "port": free_port,
+                "command": [
+                    vite_bin.to_string_lossy().as_ref(),
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    free_port.to_string(),
+                    "--strictPort"
+                ]
+            });
+            let session = universal_web::start_universal_session(&project_path, &vite_spec).ok()?;
+            let url = format!("http://127.0.0.1:{}", session.port());
+            return Some((session, url));
+        }
+    }
+
+    if host_kind == "next" {
+        let next_bin = project_path.join("node_modules/.bin/next");
+        if next_bin.is_file() {
+            let port_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).ok()?;
+            let free_port = port_listener.local_addr().ok()?.port();
+            drop(port_listener);
+            let next_spec = json!({
+                "host": "command",
+                "port": free_port,
+                "command": [
+                    next_bin.to_string_lossy().as_ref(),
+                    "dev",
+                    "-H",
+                    "127.0.0.1",
+                    "-p",
+                    free_port.to_string()
+                ]
+            });
+            let session = universal_web::start_universal_session(&project_path, &next_spec).ok()?;
+            let url = format!("http://127.0.0.1:{}", session.port());
+            return Some((session, url));
+        }
+    }
+
+    None
 }
 
 fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
@@ -253,6 +463,7 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
                 .or_else(configured_live_base_url)
             {
                 run["liveBaseUrl"] = json!(live_url);
+                run["liveBridgePath"] = json!("/live-surface");
                 if state.live_default_mode {
                     run["liveDefaultMode"] = json!("live");
                 }
@@ -995,6 +1206,38 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
 
     if method != "GET" {
         send_response(&mut stream, 405, "text/plain", "no-store", b"");
+        return;
+    }
+
+    if path == "/live-surface" || path.starts_with("/live-surface/") {
+        let sub_path = path.strip_prefix("/live-surface").unwrap_or("/");
+        let upstream_origin = state
+            .lock()
+            .ok()
+            .and_then(|g| g.live_base_url.clone())
+            .or_else(configured_live_base_url);
+        let Some(origin) = upstream_origin else {
+            send_response(
+                &mut stream,
+                404,
+                "text/plain",
+                "no-store",
+                b"Live surface unavailable",
+            );
+            return;
+        };
+        match proxy_live_surface(
+            &origin,
+            if sub_path.is_empty() { "/" } else { sub_path },
+            raw_query,
+        ) {
+            Ok((status, mime, bytes)) => {
+                send_response(&mut stream, status, &mime, "no-store", &bytes);
+            }
+            Err(err) => {
+                send_response(&mut stream, 502, "text/plain", "no-store", err.as_bytes());
+            }
+        }
         return;
     }
 

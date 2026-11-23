@@ -25,6 +25,17 @@ export function isLoopbackOrigin(rawUrl: string): boolean {
   }
 }
 
+export function resolveLiveBridgeUrl(
+  bridgePath: string | undefined,
+  screenPath: string,
+): string | null {
+  if (!bridgePath || !bridgePath.startsWith("/live-surface")) return null;
+  const cleanBridge = bridgePath.replace(/\/+$/, "");
+  const normalizedPath = screenPath.startsWith("/") ? screenPath : `/${screenPath}`;
+  if (normalizedPath.startsWith("//")) return null;
+  return `${cleanBridge}${normalizedPath}`;
+}
+
 export function resolveLiveSurfaceUrl(
   baseUrl: string | undefined,
   screenPath: string,
