@@ -13,7 +13,7 @@
 | 类别 | 当前已支持 | 计划支持 |
 | --- | --- | --- |
 | 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2、Go |
-| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 19、Vite 8、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
+| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 19、Vite 7 / 8、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
 | 桌面应用 | GPUI (`gpui-pre` 0.3.x、`gpui-kit` / `gpui-component` 0.10.x，Metal + AccessKit `renderTree`)、Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
 | 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | Jetpack Compose (`kotlinc` 2)、SwiftUI (`swiftc` 6)、Flutter (`dart` 3) 深度状态计划 |
 | 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG)、Ink 5 (`tsc` 规则包) | Ratatui (`rustc`)、Bubble Tea (`go`) 深度状态计划 |
@@ -70,7 +70,7 @@ dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，
 
 ## 捕获自己的应用
 
-1. 在应用的 `package.json` 和 `tsconfig.json` 所在目录打开终端，用项目的包管理器安装依赖。网页捕获支持 Vite 8 和项目中安装的官方 TypeScript 6.x 或 7.x 编译器。React 项目使用 React 19。
+1. 在应用的 `package.json` 和 `tsconfig.json` 所在目录打开终端，用项目的包管理器安装依赖。网页捕获支持 Vite 7 / 8 和项目中安装的官方 TypeScript 6.x 或 7.x 编译器。React 项目使用 React 19。
 2. 在此目录创建 `dui.json`。下面的配置以 375px 和 1280px 两种宽度捕获首页。将 `main article` 换成页面内容加载完成后才出现的元素的 CSS 选择器，例如设置页的 `main form`。
 
 ```json

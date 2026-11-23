@@ -13,7 +13,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Category | Supported now | Planned |
 | --- | --- | --- |
 | Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 19, Vite 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 19, Vite 7 / 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | Desktop App | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` rules) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) deep state plans |
 | Terminal UI (TUI) | Universal TUI (`pty` + VT100 cell grid -> `RenderNodeSnapshot` + monospace PNG), Ink 5 (`tsc` rules) | Ratatui (`rustc`), Bubble Tea (`go`) deep state plans |
@@ -72,7 +72,7 @@ An optional project-local `dui.json` can supply `appRoot`, mock responses, a sta
 
 ## Use your own app
 
-1. Open a terminal in the app directory containing `package.json` and `tsconfig.json`. Install the app’s dependencies with its usual package manager. Web capture supports Vite 8 and the project’s official TypeScript 6.x or 7.x compiler. React apps use React 19.
+1. Open a terminal in the app directory containing `package.json` and `tsconfig.json`. Install the app’s dependencies with its usual package manager. Web capture supports Vite 7 or 8 and the project’s official TypeScript 6.x or 7.x compiler. React apps use React 19.
 2. Create `dui.json` in that directory. This example captures `/` at two widths. Replace `main article` with a CSS selector that appears when **your screen’s content is ready**. For a settings page, that might be `main form`.
 
 ```json

@@ -31,7 +31,7 @@ On Linux, use `sha256sum -c "$archive.sha256"` to verify the checksum. Add `$HOM
 
 ## Capture an application
 
-Install Node.js 26 and the target app’s dependencies, including Vite 8 and the official TypeScript 6.x or 7.x compiler. Web capture also requires Chromium or Google Chrome. Set `DUI_CHROMIUM` to the executable path if needed.
+Install Node.js 26 and the target app’s dependencies, including Vite 7 or 8 and the official TypeScript 6.x or 7.x compiler. Web capture also requires Chromium or Google Chrome. Set `DUI_CHROMIUM` to the executable path if needed.
 
 Save the following as `dui.json` in the app directory. Replace the selector with an element that appears once your content has loaded.
 

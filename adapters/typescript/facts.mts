@@ -89,10 +89,10 @@ function readInstalledPackageVersion(name: string): string | null {
     return null;
   }
 }
-for (const [name, major] of Object.entries({
+for (const [name, majors] of Object.entries<number | number[]>({
   react: 19,
   "react-dom": 19,
-  vite: 8,
+  vite: [7, 8],
   "@tanstack/react-router": 1,
   "@tanstack/react-start": 1,
   "@tanstack/react-query": 5,
@@ -119,8 +119,11 @@ for (const [name, major] of Object.entries({
 })) {
   const actual = readInstalledPackageVersion(name);
   if (actual === null) continue;
-  if (!/^\d+\.\d+\.\d+$/.test(actual) || Number(actual.split(".")[0]) !== major)
-    unsupported(name + " requires stable " + major + ".x; found " + actual);
+  const allowed = Array.isArray(majors) ? majors : [majors];
+  if (!/^\d+\.\d+\.\d+$/.test(actual) || !allowed.includes(Number(actual.split(".")[0]))) {
+    const label = allowed.map((m) => `${m}.x`).join(" or ");
+    unsupported(name + " requires stable " + label + "; found " + actual);
+  }
   versions[name] = actual;
 }
 async function loadOfficial(part: string) {

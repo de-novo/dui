@@ -13,7 +13,7 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | 분류 | 현재 지원 | 예정 |
 | --- | --- | --- |
 | 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 19, Vite 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 19, Vite 7 / 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | 데스크톱 앱 | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | 모바일 앱 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` 룰팩) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) 심층 상태 계획 |
 | 터미널 UI (TUI) | Universal TUI (`pty` + VT100 셀 그리드 → `RenderNodeSnapshot` + 모노스페이스 PNG), Ink 5 (`tsc` 룰팩) | Ratatui (`rustc`), Bubble Tea (`go`) 심층 상태 계획 |
@@ -72,7 +72,7 @@ dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구
 
 ## 내 앱 캡처하기
 
-1. 앱의 `package.json`과 `tsconfig.json`이 있는 폴더에서 터미널을 연다. 평소 쓰는 패키지 매니저로 앱 의존성을 설치한다. 현재 웹 캡처는 Vite 8과 프로젝트에 설치된 공식 TypeScript 6.x 또는 7.x를 지원한다. React 앱은 19.x를 사용한다.
+1. 앱의 `package.json`과 `tsconfig.json`이 있는 폴더에서 터미널을 연다. 평소 쓰는 패키지 매니저로 앱 의존성을 설치한다. 현재 웹 캡처는 Vite 7·8과 프로젝트에 설치된 공식 TypeScript 6.x 또는 7.x를 지원한다. React 앱은 19.x를 사용한다.
 2. 같은 폴더에 `dui.json`을 만든다. 아래 설정은 첫 화면(`/`)을 375px와 1280px로 캡처한다. `main article`은 **내 화면의 콘텐츠가 준비되면 나타나는 요소**의 CSS 선택자로 바꾼다. 예를 들어 설정 폼이 뜨면 준비된 화면은 `main form`을 쓴다.
 
 ```json
