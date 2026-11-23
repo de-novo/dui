@@ -117,11 +117,25 @@ try {
       'export const statusSchema = picklist(["draft", "published"] as const);',
       'export const router = createBrowserRouter([{ path: "/checkout" }]);',
       "",
+      "export function Drawer(_props: { open: boolean; variant: 'compact' | 'expanded' }) { return null; }",
+      "export function StaticBadge(_props: { variant: 'info' | 'warn' }) { return null; }",
+      "",
       "export function CheckoutForm() {",
       "  const form = useForm<{ email: string }>();",
       "  const [params] = useSearchParams();",
       '  const step = params.get("step");',
-      '  return <div>{form.formState.isSubmitting ? "Saving" : step === "confirm" ? "Confirm" : "Edit"}</div>;',
+      '  const variant: "compact" | "expanded" = form.formState.isSubmitting ? "compact" : "expanded";',
+      "  return (",
+      "    <div>",
+      "      <Drawer open={form.formState.isSubmitting} variant={variant} />",
+      '      <StaticBadge variant="info" />',
+      "      <dialog open={form.formState.isSubmitting} />",
+      '      <button type="button" aria-expanded={form.formState.isSubmitting} disabled={form.formState.isSubmitting}>Save</button>',
+      '      <div role="tabpanel" aria-hidden={!form.formState.isSubmitting}>',
+      '        {form.formState.isSubmitting ? "Saving" : step === "confirm" ? "Confirm" : "Edit"}',
+      "      </div>",
+      "    </div>",
+      "  );",
       "}",
       "",
     ].join("\n"),
@@ -169,6 +183,66 @@ try {
   assert(
     facts.some((f) => f.kind === "searchParam" && f.label === "step"),
     "missing react-router URLSearchParams searchParam fact",
+  );
+
+  // Framework-level React JSX & standard HTML/WAI-ARIA control extraction (zero UI-library coupling).
+  const fullFacts = scan.body.facts as Array<{
+    kind: string;
+    package?: string;
+    label?: string;
+    ariaRole?: string;
+    fields?: Array<{ name: string; type?: string; shape?: { kind: string } }>;
+  }>;
+  const drawerControl = fullFacts.find(
+    (f) => f.kind === "control" && f.package === "react" && f.label === "Drawer",
+  );
+  assert(
+    drawerControl,
+    `expected framework-level React Drawer control: ${JSON.stringify(fullFacts)}`,
+  );
+  assert(
+    drawerControl.fields?.some((fld) => fld.name === "open" && fld.type === "boolean"),
+    "expected boolean open field on Drawer",
+  );
+  assert(
+    drawerControl.fields?.some((fld) => fld.name === "variant" && fld.shape?.kind === "union"),
+    "expected union variant field on Drawer",
+  );
+  assert(
+    !fullFacts.some((f) => f.kind === "control" && f.label === "StaticBadge"),
+    "static literal props must not emit false-positive mutable control facts",
+  );
+  assert(
+    fullFacts.some(
+      (f) =>
+        f.kind === "control" &&
+        f.package === "html-aria" &&
+        f.label === "dialog" &&
+        f.fields?.some((fld) => fld.name === "open"),
+    ),
+    "expected native HTML <dialog open={...}> control",
+  );
+  assert(
+    fullFacts.some(
+      (f) =>
+        f.kind === "control" &&
+        f.package === "html-aria" &&
+        f.label === "button" &&
+        f.fields?.some((fld) => fld.name === "aria-expanded") &&
+        f.fields?.some((fld) => fld.name === "disabled"),
+    ),
+    "expected native <button aria-expanded={...} disabled={...}> control",
+  );
+  assert(
+    fullFacts.some(
+      (f) =>
+        f.kind === "control" &&
+        f.package === "html-aria" &&
+        f.label === "div" &&
+        f.ariaRole === "tabpanel" &&
+        f.fields?.some((fld) => fld.name === "aria-hidden"),
+    ),
+    "expected WAI-ARIA role=tabpanel aria-hidden control",
   );
 
   // Newer ecosystem major check: Radix Select 2.4.1 and Dropdown Menu 2.2.0 must NOT block scanning.
