@@ -276,7 +276,7 @@ declare var __duiProbe: {
       ),
     );
   }
-  function collectRenderTree() {
+  function collectRenderTree(scopeRoot?: Element | null) {
     const interesting = new Set([
       "h1",
       "h2",
@@ -445,9 +445,11 @@ declare var __duiProbe: {
       };
       attributes?: Record<string, string>;
     }[] = [];
-    const root = document.body;
+    const root = scopeRoot ?? document.body;
     if (!root) return nodes;
-    const all = root.querySelectorAll("*");
+    const all: Element[] = scopeRoot
+      ? [scopeRoot, ...Array.from(root.querySelectorAll("*"))]
+      : Array.from(root.querySelectorAll("*"));
     for (const el of all) {
       if (nodes.length >= 200) break;
       if (!(el instanceof HTMLElement || el instanceof SVGElement)) continue;
@@ -941,6 +943,20 @@ declare var __duiProbe: {
 
         const dialog = newlyOpened[newlyOpened.length - 1]!;
         (globalThis as Record<string, unknown>).__duiActiveOverlay = dialog;
+        // Wait for CSS slide-in / fade-in animations on the dialog (e.g. Tailwind duration-500
+        // drawers) to finish before measuring renderTree or taking the screenshot.
+        try {
+          const anims = typeof dialog.getAnimations === "function" ? dialog.getAnimations() : [];
+          if (anims.length > 0) {
+            await Promise.race([
+              Promise.allSettled(anims.map((a) => a.finished)),
+              new Promise((resolve) => setTimeout(resolve, 650)),
+            ]);
+          }
+        } catch {
+          // Ignore animation API errors.
+        }
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         let title = (dialog.getAttribute("aria-label") || "").trim();
         if (!title) {
           const lby = dialog.getAttribute("aria-labelledby");
@@ -964,7 +980,9 @@ declare var __duiProbe: {
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-+|-+$/g, "")
             .slice(0, 40) || `dialog-${index}`;
-        const renderTree = collectRenderTree();
+        // Scope renderTree to the active dialog/overlay subtree so obscured background page
+        // elements behind the modal backdrop do not generate false overlap findings.
+        const renderTree = collectRenderTree(dialog);
         return {
           opened: true,
           slug,

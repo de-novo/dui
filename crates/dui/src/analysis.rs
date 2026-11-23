@@ -856,7 +856,11 @@ fn execute_with_locales(
                 continue;
             };
             let scope = ov["scope"].as_str().unwrap_or("main");
-            if scope == "header" && !seen_header_overlays.insert((slug.to_owned(), width)) {
+            if scope == "header" {
+                if !seen_header_overlays.insert((slug.to_owned(), width)) {
+                    continue;
+                }
+            } else if seen_header_overlays.contains(&(slug.to_owned(), width)) {
                 continue;
             }
             let overlay_path = format!("{parent_path}#overlay:{slug}");
