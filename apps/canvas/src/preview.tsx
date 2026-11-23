@@ -10,9 +10,12 @@ import {
 } from "./data/overview";
 import type { Run } from "./data/run";
 import {
+  auditLiveRenderTree,
+  buildLiveHighlightMessage,
   isLoopbackOrigin,
   liveSurfaceKey,
   mergeLiveRenderTree,
+  parseLiveSelectMessage,
   parseLiveTelemetryMessage,
   type LiveSurfaceMode,
 } from "./model/liveSurface";
@@ -161,6 +164,7 @@ function MapView({
     ? "capture"
     : (liveSurfaceChoice ?? (run.liveDefaultMode === "live" ? "live" : "capture"));
   const [liveTrees, setLiveTrees] = useState<Record<string, RenderNode[]>>({});
+  const [liveSelectedNodeId, setLiveSelectedNodeId] = useState<string | null>(null);
 
   const liveBridgePath =
     liveBaseUrl && run.liveBridgePath?.startsWith("/live-surface") ? run.liveBridgePath : undefined;
@@ -169,6 +173,11 @@ function MapView({
     if (!liveBaseUrl) return;
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin && !isLoopbackOrigin(event.origin)) return;
+      const selectedNode = parseLiveSelectMessage(event.data);
+      if (selectedNode) {
+        setLiveSelectedNodeId(selectedNode.nodeId);
+        return;
+      }
       const telemetry = parseLiveTelemetryMessage(event.data);
       if (!telemetry) return;
       const key = liveSurfaceKey(telemetry.path, telemetry.width);
@@ -178,7 +187,30 @@ function MapView({
     return () => window.removeEventListener("message", onMessage);
   }, [liveBaseUrl]);
 
+  function broadcastLiveHighlight(nodeId: string | null) {
+    if (liveSurfaceMode !== "live") return;
+    const msg = buildLiveHighlightMessage(nodeId);
+    for (const frame of document.querySelectorAll<HTMLIFrameElement>(
+      "iframe.live-surface-iframe",
+    )) {
+      try {
+        frame.contentWindow?.postMessage(msg, "*");
+      } catch {
+        // Ignore cross-origin frame postMessage failures.
+      }
+    }
+  }
+
   const inspectedCell = cell ? mergeLiveRenderTree(cell, liveTrees) : undefined;
+  const mergedDesignFindingsByPath = { ...designFindingsByPath(audit, width) };
+  if (liveSurfaceMode === "live") {
+    for (const sc of archive.screens) {
+      const liveNodes = liveTrees[liveSurfaceKey(sc.path, width)];
+      if (liveNodes && liveNodes.length > 0) {
+        mergedDesignFindingsByPath[sc.path] = auditLiveRenderTree(liveNodes, sc.path, width);
+      }
+    }
+  }
   const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
     const fromUrl = new URLSearchParams(location.search).get("compare");
     return fromUrl ?? "";
@@ -315,7 +347,7 @@ function MapView({
               selectedId={selectedId}
               focusActive={showDetails}
               openCommentsByPath={openCommentsByPath(audit)}
-              designFindingsByPath={designFindingsByPath(audit, width)}
+              designFindingsByPath={mergedDesignFindingsByPath}
               showDesignOverlay={showDesignOverlay}
               diffsByPath={diffsByPath}
               diffActive={diffActive}
@@ -549,8 +581,10 @@ function MapView({
           screenDiff={selectedDiff}
           beforeRunKey={compareBeforeKey || undefined}
           designFindings={
-            selectedScreen ? (designFindingsByPath(audit, width)[selectedScreen.path] ?? []) : []
+            selectedScreen ? (mergedDesignFindingsByPath[selectedScreen.path] ?? []) : []
           }
+          externalSelectedNodeId={liveSelectedNodeId}
+          onHighlightNode={broadcastLiveHighlight}
         />
       )}
 

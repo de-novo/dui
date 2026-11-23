@@ -126,7 +126,47 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
   if (window.__duiLiveBridgeInstalled) return;
   window.__duiLiveBridgeInstalled = true;
   const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n) : 0; };
+  const nodeMap = new Map();
+  let overlayEl = null;
+  const ensureOverlay = () => {
+    if (overlayEl && overlayEl.isConnected) return overlayEl;
+    overlayEl = document.createElement("div");
+    overlayEl.setAttribute("data-dui-live-overlay", "1");
+    Object.assign(overlayEl.style, {
+      position: "fixed",
+      pointerEvents: "none",
+      zIndex: "2147483647",
+      border: "2px solid #ef803f",
+      background: "rgba(239, 128, 63, 0.14)",
+      borderRadius: "4px",
+      display: "none",
+      boxSizing: "border-box",
+    });
+    (document.body || document.documentElement).appendChild(overlayEl);
+    return overlayEl;
+  };
+  const highlightNode = (nodeId) => {
+    const ov = ensureOverlay();
+    if (!nodeId || !nodeMap.has(nodeId)) {
+      ov.style.display = "none";
+      return;
+    }
+    const target = nodeMap.get(nodeId);
+    if (!target || !target.isConnected) {
+      ov.style.display = "none";
+      return;
+    }
+    const r = target.getBoundingClientRect();
+    ov.style.left = `${Math.round(r.left)}px`;
+    ov.style.top = `${Math.round(r.top)}px`;
+    ov.style.width = `${Math.round(r.width)}px`;
+    ov.style.height = `${Math.round(r.height)}px`;
+    ov.style.display = "block";
+  };
+  const currentPath = () =>
+    (location.pathname.replace(/^\/live-surface(?=\/|$)/, "") || "/") + location.search;
   const collect = () => {
+    nodeMap.clear();
     const out = [];
     const root = document.body;
     if (!root) return out;
@@ -135,6 +175,7 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
     for (const el of els) {
       if (out.length >= 200) break;
       if (!(el instanceof HTMLElement)) continue;
+      if (el.hasAttribute("data-dui-live-overlay")) continue;
       const tag = el.localName;
       if (tag === "script" || tag === "style" || tag === "noscript") continue;
       const rect = el.getBoundingClientRect();
@@ -144,10 +185,11 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
       const id = el.getAttribute("data-testid")
         ? `[data-testid=${el.getAttribute("data-testid")}]`
         : el.id ? `#${el.id}` : `${tag}#${idx++}`;
+      nodeMap.set(id, el);
       const text = (el.innerText || "").replace(/\s+/g, " ").trim().slice(0, 120);
       const attrs = {};
       for (const a of el.attributes) {
-        if (a.name === "role" || a.name === "type" || a.name === "href" || a.name.startsWith("aria-") || a.name.startsWith("data-")) {
+        if (a.name === "role" || a.name === "type" || a.name === "href" || a.name === "title" || a.name === "placeholder" || a.name.startsWith("aria-") || a.name.startsWith("data-")) {
           attrs[a.name] = a.value.slice(0, 120);
         }
       }
@@ -173,10 +215,9 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
   let timer = 0;
   const emit = () => {
     try {
-      const rawPath = (location.pathname.replace(/^\/live-surface(?=\/|$)/, "") || "/") + location.search;
       window.parent.postMessage({
         type: "dui:live-render-tree",
-        path: rawPath,
+        path: currentPath(),
         width: Math.round(window.innerWidth || 1280),
         renderTree: collect(),
         capturedAtMs: Date.now(),
@@ -184,6 +225,29 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
     } catch {}
   };
   const schedule = () => { clearTimeout(timer); timer = setTimeout(emit, 120); };
+  window.addEventListener("message", (ev) => {
+    const d = ev.data;
+    if (d && d.type === "dui:live-highlight-node") {
+      highlightNode(typeof d.nodeId === "string" ? d.nodeId : null);
+    }
+  });
+  document.addEventListener("click", (ev) => {
+    if (!ev.altKey || !(ev.target instanceof HTMLElement)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    for (const [id, el] of nodeMap.entries()) {
+      if (el === ev.target || el.contains(ev.target)) {
+        highlightNode(id);
+        window.parent.postMessage({
+          type: "dui:live-select-node",
+          path: currentPath(),
+          width: Math.round(window.innerWidth || 1280),
+          nodeId: id,
+        }, "*");
+        break;
+      }
+    }
+  }, true);
   window.addEventListener("load", schedule);
   window.addEventListener("resize", schedule);
   window.addEventListener("popstate", schedule);

@@ -154,6 +154,11 @@ try {
       bridgedHtml.includes("dui:live-render-tree"),
       "bridged HTML injects zero-modification live telemetry bridge",
     );
+    assert.ok(
+      bridgedHtml.includes("dui:live-highlight-node") &&
+        bridgedHtml.includes("dui:live-select-node"),
+      "bridged HTML supports bidirectional highlight and select messages",
+    );
     bridgeInjected = true;
   } finally {
     viewer4.kill("SIGTERM");

@@ -1,4 +1,5 @@
 import type { BoxModel, BoxSpacing, Cell, RenderNode } from "../data/overview";
+import type { DesignFinding } from "./audit";
 
 export type LiveSurfaceMode = "capture" | "live";
 
@@ -162,4 +163,145 @@ export function mergeLiveRenderTree(cell: Cell, liveTrees: Record<string, Render
   const live = liveTrees[liveSurfaceKey(cell.path, cell.width)];
   if (!live || live.length === 0) return cell;
   return { ...cell, renderTree: live };
+}
+
+export type LiveSelectNodeMessage = {
+  path: string;
+  width: number;
+  nodeId: string;
+};
+
+export function parseLiveSelectMessage(raw: unknown): LiveSelectNodeMessage | null {
+  if (!asRecord(raw) || raw.type !== "dui:live-select-node") return null;
+  if (typeof raw.path !== "string" || !raw.path.startsWith("/")) return null;
+  if (typeof raw.width !== "number" || !Number.isFinite(raw.width) || raw.width <= 0) return null;
+  if (typeof raw.nodeId !== "string" || raw.nodeId.length === 0) return null;
+  return { path: raw.path, width: Math.round(raw.width), nodeId: raw.nodeId };
+}
+
+export function buildLiveHighlightMessage(nodeId: string | null): {
+  type: "dui:live-highlight-node";
+  nodeId: string | null;
+} {
+  return { type: "dui:live-highlight-node", nodeId };
+}
+
+const INTERACTIVE_TAGS = new Set(["button", "a", "input", "select", "textarea"]);
+const INTERACTIVE_ROLES = new Set(["button", "link", "checkbox", "switch", "tab", "combobox"]);
+
+function isInteractiveNode(node: RenderNode): boolean {
+  return (
+    INTERACTIVE_TAGS.has(node.tag.toLowerCase()) ||
+    Boolean(node.role && INTERACTIVE_ROLES.has(node.role.toLowerCase()))
+  );
+}
+
+function rectContains(outer: RenderNode["rect"], inner: RenderNode["rect"]): boolean {
+  return (
+    outer.x <= inner.x + 1 &&
+    outer.y <= inner.y + 1 &&
+    outer.x + outer.width >= inner.x + inner.width - 1 &&
+    outer.y + outer.height >= inner.y + inner.height - 1
+  );
+}
+
+/**
+ * Pure real-time Design & Accessibility lint over live-streamed `RenderNode[]` telemetry,
+ * mirroring `dui-core::design_lint` rules for instant canvas feedback.
+ */
+export function auditLiveRenderTree(
+  nodes: RenderNode[],
+  path: string,
+  width: number,
+): DesignFinding[] {
+  const findings: DesignFinding[] = [];
+  const safeW = Math.max(1, Math.round(width));
+  const interactiveNodes: RenderNode[] = [];
+
+  for (const node of nodes) {
+    const r = node.rect;
+    if (r.width <= 0 || r.height <= 0) continue;
+
+    if (r.x + r.width > safeW + 2) {
+      findings.push({
+        kind: "horizontal-overflow",
+        severity: "error",
+        nodeId: node.id,
+        tag: node.tag,
+        rect: r,
+        summary: `Element ${node.id} overflows viewport width (${r.x + r.width}px > ${safeW}px)`,
+        measured: `${r.x + r.width}px`,
+        expected: `<= ${safeW}px`,
+        path,
+        width: safeW,
+      });
+    }
+
+    if (isInteractiveNode(node)) {
+      interactiveNodes.push(node);
+      if (r.width < 44 || r.height < 44) {
+        findings.push({
+          kind: "small-touch-target",
+          severity: "warning",
+          nodeId: node.id,
+          tag: node.tag,
+          rect: r,
+          summary: `Interactive ${node.tag} (${node.id}) is smaller than 44×44px`,
+          measured: `${r.width}×${r.height}px`,
+          expected: ">= 44×44px",
+          path,
+          width: safeW,
+        });
+      }
+      const attrs = node.attributes ?? {};
+      const hasLabel =
+        node.text.trim().length > 0 ||
+        Boolean(
+          attrs["aria-label"] || attrs["aria-labelledby"] || attrs.title || attrs.placeholder,
+        );
+      if (!hasLabel && node.tag.toLowerCase() !== "select") {
+        findings.push({
+          kind: "unlabeled-control",
+          severity: "error",
+          nodeId: node.id,
+          tag: node.tag,
+          rect: r,
+          summary: `Interactive ${node.tag} (${node.id}) has no accessible label`,
+          measured: "empty label",
+          expected: "visible text or aria-label",
+          path,
+          width: safeW,
+        });
+      }
+    }
+  }
+
+  for (let i = 0; i < interactiveNodes.length; i++) {
+    const a = interactiveNodes[i];
+    for (let j = i + 1; j < interactiveNodes.length; j++) {
+      const b = interactiveNodes[j];
+      if (rectContains(a.rect, b.rect) || rectContains(b.rect, a.rect)) continue;
+      const ix =
+        Math.min(a.rect.x + a.rect.width, b.rect.x + b.rect.width) - Math.max(a.rect.x, b.rect.x);
+      const iy =
+        Math.min(a.rect.y + a.rect.height, b.rect.y + b.rect.height) - Math.max(a.rect.y, b.rect.y);
+      if (ix > 4 && iy > 4) {
+        findings.push({
+          kind: "element-overlap",
+          severity: "warning",
+          nodeId: a.id,
+          relatedNodeId: b.id,
+          tag: a.tag,
+          rect: a.rect,
+          summary: `Interactive elements ${a.id} and ${b.id} overlap (${ix}×${iy}px)`,
+          measured: `${ix}×${iy}px overlap`,
+          expected: "0px overlap",
+          path,
+          width: safeW,
+        });
+      }
+    }
+  }
+
+  return findings;
 }

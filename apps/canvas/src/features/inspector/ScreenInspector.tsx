@@ -53,6 +53,8 @@ export function ScreenInspector({
   screenDiff,
   beforeRunKey,
   designFindings = [],
+  externalSelectedNodeId,
+  onHighlightNode,
 }: {
   archive: ScreenMap;
   run: Run;
@@ -75,6 +77,8 @@ export function ScreenInspector({
   screenDiff?: ScreenCanvasDiff;
   beforeRunKey?: string;
   designFindings?: DesignFinding[];
+  externalSelectedNodeId?: string | null;
+  onHighlightNode?: (nodeId: string | null) => void;
 }) {
   const { t } = useI18n();
   const liveGate = canOpenLiveCell(cell, run);
@@ -266,6 +270,8 @@ export function ScreenInspector({
           key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
           cell={cell}
           imageUrl={`/archive/${encodeURIComponent(cell.image)}?run=${encodeURIComponent(run.key)}`}
+          externalSelectedId={externalSelectedNodeId}
+          onHighlightNode={onHighlightNode}
         />
       )}
 
