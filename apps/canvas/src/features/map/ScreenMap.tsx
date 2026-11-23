@@ -1,17 +1,22 @@
-import { Fragment, useEffect, useMemo, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import { CaptureCard } from "./CaptureCard";
 import { layoutMap } from "./layout";
 import {
   Background,
+  BaseEdge,
   ControlButton,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   PanOnScrollMode,
   Position,
   ReactFlow,
+  getSmoothStepPath,
   useReactFlow,
+  type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
@@ -161,7 +166,119 @@ function Card({ data }: NodeProps<CardNode>) {
   );
 }
 
+type GutterEdgeData = {
+  colGap: number;
+  gutterY?: number;
+  multiColumn: boolean;
+  highlighted: boolean;
+  dimmed: boolean;
+  labelFontSize: number;
+};
+
+type MapEdge = Edge<GutterEdgeData, "gutter">;
+
+function buildRoundedPolyline(pts: { x: number; y: number }[], radius = 24): string {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i += 1) {
+    const prev = pts[i - 1];
+    const curr = pts[i];
+    const next = pts[i + 1];
+    const dx1 = curr.x - prev.x;
+    const dy1 = curr.y - prev.y;
+    const dx2 = next.x - curr.x;
+    const dy2 = next.y - curr.y;
+    const len1 = Math.hypot(dx1, dy1);
+    const len2 = Math.hypot(dx2, dy2);
+    if (len1 < 1 || len2 < 1) {
+      d += ` L ${curr.x} ${curr.y}`;
+      continue;
+    }
+    const r = Math.min(radius, len1 / 2, len2 / 2);
+    const p1x = curr.x - (dx1 / len1) * r;
+    const p1y = curr.y - (dy1 / len1) * r;
+    const p2x = curr.x + (dx2 / len2) * r;
+    const p2y = curr.y + (dy2 / len2) * r;
+    d += ` L ${p1x} ${p1y} Q ${curr.x} ${curr.y} ${p2x} ${p2y}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x} ${last.y}`;
+  return d;
+}
+
+function GutterEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style,
+  markerEnd,
+  label,
+  data,
+}: EdgeProps<MapEdge>) {
+  const colGap = data?.colGap ?? 220;
+  const multiColumn = Boolean(data?.multiColumn);
+  const gutterY = data?.gutterY;
+  let edgePath: string;
+  let labelX: number;
+  let labelY: number;
+
+  if (multiColumn && gutterY !== undefined) {
+    const dir = targetX >= sourceX ? 1 : -1;
+    const stub = Math.min(88, Math.max(44, colGap * 0.34));
+    const exitX = sourceX + dir * stub;
+    const entryX = targetX - dir * stub;
+    edgePath = buildRoundedPolyline(
+      [
+        { x: sourceX, y: sourceY },
+        { x: exitX, y: sourceY },
+        { x: exitX, y: gutterY },
+        { x: entryX, y: gutterY },
+        { x: entryX, y: targetY },
+        { x: targetX, y: targetY },
+      ],
+      28,
+    );
+    labelX = (exitX + entryX) / 2;
+    labelY = gutterY;
+  } else {
+    [edgePath, labelX, labelY] = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      borderRadius: 24,
+      offset: Math.min(80, Math.max(36, colGap * 0.28)),
+    });
+  }
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {label && data?.highlighted && (
+        <EdgeLabelRenderer>
+          <div
+            className="map-edge-label"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              fontSize: `${data.labelFontSize}px`,
+            }}
+          >
+            {label}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
 const nodeTypes = { screen: Card };
+const edgeTypes = { gutter: GutterEdge };
 
 export function ScreenMap({
   railInset,
@@ -207,10 +324,15 @@ export function ScreenMap({
   onClearSelection?: () => void;
 }) {
   const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
-  const { cardWidth, frameHeight } = layout.metrics;
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const { cardWidth, frameHeight, column, row } = layout.metrics;
+  const colGap = column - cardWidth;
+  const rowGap = row - frameHeight;
   const strokeWidth = Math.max(2, Math.round(cardWidth / 320));
   const labelFontSize = Math.max(12, Math.round(cardWidth / 48));
+  const activeFocusId = hoveredId ?? (focusActive ? selectedId : null);
   const dimming = Boolean(focusActive && selectedId);
+  const edgeFocusActive = Boolean(activeFocusId);
   const relatedIds = useMemo(() => {
     const set = new Set<string>();
     if (!focusActive || !selectedId) return set;
@@ -267,10 +389,38 @@ export function ScreenMap({
     },
   );
   const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
-  const edges = layout.links.map(
-    ({ source, target, origin, provenance, replayVerified, action }) => {
+  const cardRects = layout.nodes.map((n) => ({
+    x: n.position.x,
+    y: n.position.y,
+    w: cardWidth,
+    h: n.frameHeight + 96,
+  }));
+  const findClearGutterY = (
+    x1: number,
+    x2: number,
+    preferredY: number,
+    trackIndex: number,
+  ): number => {
+    const loX = Math.min(x1, x2) + 8;
+    const hiX = Math.max(x1, x2) - 8;
+    const blocking = cardRects.filter((r) => r.x + r.w > loX && r.x < hiX);
+    if (blocking.length === 0) return preferredY;
+    const pad = 28;
+    const isClear = (y: number) => blocking.every((r) => y < r.y - pad || y > r.y + r.h + pad);
+    if (isClear(preferredY)) return preferredY;
+    const minTop = Math.min(...blocking.map((r) => r.y));
+    const maxBottom = Math.max(...blocking.map((r) => r.y + r.h));
+    const trackStep = 28;
+    const topBus = minTop - 72 - (trackIndex % 4) * trackStep;
+    const bottomBus = maxBottom + 72 + (trackIndex % 4) * trackStep;
+    return Math.abs(preferredY - topBus) <= Math.abs(preferredY - bottomBus) ? topBus : bottomBus;
+  };
+  const edges: MapEdge[] = layout.links.map(
+    ({ source, target, origin, provenance, replayVerified, action }, edgeIdx) => {
       const a = positions.get(source)!,
         b = positions.get(target)!;
+      const dx = Math.abs(b.x - a.x);
+      const multiColumn = dx > column * 1.1;
       const [out, into] =
         a.x === b.x
           ? a.y < b.y
@@ -279,15 +429,23 @@ export function ScreenMap({
           : a.x < b.x
             ? [Position.Right, Position.Left]
             : [Position.Left, Position.Right];
-      const originText = origin === "anchor" ? "Discovered anchor" : "Discovered link";
-      const isConnectedToSelection = dimming && (source === selectedId || target === selectedId);
-      const isEdgeDimmed = dimming && !isConnectedToSelection;
-      const strokeColor = replayVerified
-        ? "var(--primary)"
-        : isConnectedToSelection
-          ? "var(--foreground)"
-          : "var(--map-link)";
-      const edgeStrokeWidth = isConnectedToSelection ? Math.round(strokeWidth * 1.4) : strokeWidth;
+      const originText =
+        origin === "overlay"
+          ? "Discovered overlay"
+          : origin === "anchor"
+            ? "Discovered anchor"
+            : "Discovered link";
+      const isConnectedToFocus =
+        edgeFocusActive && (source === activeFocusId || target === activeFocusId);
+      const isEdgeDimmed = edgeFocusActive && !isConnectedToFocus;
+      const isOverlayEdge = origin === "overlay";
+      const strokeColor =
+        isOverlayEdge || replayVerified
+          ? "var(--primary)"
+          : isConnectedToFocus
+            ? "var(--foreground)"
+            : "var(--map-link)";
+      const edgeStrokeWidth = isConnectedToFocus ? Math.round(strokeWidth * 1.7) : strokeWidth;
       const strokeDasharray =
         provenance === "verified" ? undefined : provenance === "inferred" ? "2 4" : "5 4";
       const edgeLabel = action?.label
@@ -299,27 +457,34 @@ export function ScreenMap({
             : layout.total === 1
               ? "Extracted"
               : undefined;
+      const trackOffset = ((edgeIdx % 3) - 1) * 18;
+      const preferredGutterY = b.y - Math.max(64, Math.round(rowGap * 0.42)) + trackOffset;
+      const gutterY = multiColumn
+        ? findClearGutterY(
+            a.x + (b.x >= a.x ? cardWidth : 0),
+            b.x + (b.x >= a.x ? 0 : cardWidth),
+            preferredGutterY,
+            edgeIdx,
+          )
+        : preferredGutterY;
+      const baseOpacity = isOverlayEdge ? 0.72 : 0.28;
       return {
         id: JSON.stringify([source, target]),
         source,
         target,
-        type: "smoothstep",
+        type: "gutter",
+        zIndex: isConnectedToFocus ? 10 : 0,
         sourceHandle: out,
         targetHandle: into,
         label: edgeLabel,
-        labelStyle: {
-          fill: "var(--foreground)",
-          fontSize: labelFontSize,
-          fontWeight: 500,
-          opacity: isEdgeDimmed ? 0.18 : 1,
+        data: {
+          colGap,
+          gutterY,
+          multiColumn,
+          highlighted: isConnectedToFocus || layout.total <= 6,
+          dimmed: isEdgeDimmed,
+          labelFontSize,
         },
-        labelBgStyle: {
-          fill: "var(--card)",
-          fillOpacity: isEdgeDimmed ? 0.18 : 0.94,
-          stroke: "var(--border)",
-        },
-        labelBgPadding: [8, 4] as [number, number],
-        labelBgBorderRadius: 6,
         ariaLabel: replayVerified
           ? `Replay-verified transition from ${source} to ${target}`
           : `${originText} (${provenance}) from ${source} to ${target}, not replay-verified`,
@@ -327,9 +492,9 @@ export function ScreenMap({
           stroke: strokeColor,
           strokeWidth: edgeStrokeWidth,
           strokeDasharray,
-          opacity: isEdgeDimmed ? 0.14 : 1,
+          opacity: isEdgeDimmed ? 0.08 : isConnectedToFocus ? 1 : baseOpacity,
         },
-        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 18, height: 18 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 16, height: 16 },
       };
     },
   );
@@ -350,6 +515,7 @@ export function ScreenMap({
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
       minZoom={0.02}
       maxZoom={3}
@@ -373,6 +539,8 @@ export function ScreenMap({
       nodesDraggable={false}
       nodesConnectable={false}
       onKeyDown={handleKeyDown}
+      onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
+      onNodeMouseLeave={() => setHoveredId(null)}
       onNodeClick={(_, node) => select(node.id)}
       onPaneClick={() => {
         if (focusActive) onClearSelection?.();

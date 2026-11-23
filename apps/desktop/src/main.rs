@@ -110,6 +110,7 @@ struct DuiDesktopView {
     selected_run: usize,
     compare_run: Option<usize>,
     selected_screen: usize,
+    hovered_screen: Option<usize>,
     selected_width: u32,
     selected_cell: usize,
     neighbor_page: usize,
@@ -251,6 +252,7 @@ impl DuiDesktopView {
             selected_run,
             compare_run,
             selected_screen,
+            hovered_screen: None,
             selected_width,
             selected_cell: 0,
             neighbor_page: 0,
@@ -1756,6 +1758,12 @@ impl DuiDesktopView {
 
         let edges_for_paint = layout.edges.clone();
         let node_rects_for_paint = node_rects.clone();
+        let col_gap_px = layout.metrics.col_gap * zoom;
+        let row_gap_px = layout.metrics.row_gap * zoom;
+        let step_x_px = (layout.metrics.card_width + layout.metrics.col_gap) * zoom;
+        let active_edge_focus = self
+            .hovered_screen
+            .or_else(|| focus_active.then_some(selected_idx));
         let grid_color = p.map_grid;
         let link_color = p.map_link;
         let fg_color = p.foreground;
@@ -1795,20 +1803,21 @@ impl DuiDesktopView {
                     gx += spacing;
                 }
 
-                // 2. Orthogonal smooth-step connector edges; dim unrelated edges when focus is active
+                // 2. Gutter-routed orthogonal connector edges; calm overview by default,
+                // highlight hovered/selected screen edges cleanly without piercing intermediate cards.
                 let base_stroke_w = (1.6 * zoom.sqrt()).clamp(1.2, 2.5);
-                for edge in &edges_for_paint {
+                for (edge_idx, edge) in edges_for_paint.iter().enumerate() {
                     let (Some(&(ax, ay, _, a_card_h)), Some(&(bx, by, _, b_card_h))) = (
                         node_rects_for_paint.get(&edge.from_idx),
                         node_rects_for_paint.get(&edge.to_idx),
                     ) else {
                         continue;
                     };
-                    let connected_to_selected = focus_active
-                        && (edge.from_idx == selected_idx || edge.to_idx == selected_idx);
-                    let dimmed_edge = focus_active && !connected_to_selected;
-                    let stroke_w = if connected_to_selected {
-                        base_stroke_w * 1.45
+                    let connected_to_focus = active_edge_focus
+                        .is_some_and(|id| edge.from_idx == id || edge.to_idx == id);
+                    let dimmed_edge = active_edge_focus.is_some() && !connected_to_focus;
+                    let stroke_w = if connected_to_focus {
+                        base_stroke_w * 1.6
                     } else {
                         base_stroke_w
                     };
@@ -1833,10 +1842,54 @@ impl DuiDesktopView {
                     }
                     pb.move_to(point(px(ox + sx), px(oy + sy)));
                     if horizontal {
-                        let mid_x = (sx + tx) * 0.5;
-                        pb.line_to(point(px(ox + mid_x), px(oy + sy)));
-                        pb.line_to(point(px(ox + mid_x), px(oy + ty)));
-                        pb.line_to(point(px(ox + tx), px(oy + ty)));
+                        let multi_column = (bx - ax).abs() > step_x_px * 1.1;
+                        if multi_column {
+                            let dir = if tx >= sx { 1.0_f32 } else { -1.0_f32 };
+                            let stub = (col_gap_px * 0.34).clamp(10.0, 40.0);
+                            let exit_x = sx + dir * stub;
+                            let entry_x = tx - dir * stub;
+                            let track_off = ((edge_idx % 3) as f32 - 1.0) * 4.0;
+                            let preferred_y = by - (row_gap_px * 0.42).max(12.0) + track_off;
+                            let lo_x = exit_x.min(entry_x) + 2.0;
+                            let hi_x = exit_x.max(entry_x) - 2.0;
+                            let pad = 6.0_f32;
+                            let mut blocked = false;
+                            let mut min_top = f32::INFINITY;
+                            let mut max_bottom = f32::NEG_INFINITY;
+                            for &(rx, ry, _, rh) in node_rects_for_paint.values() {
+                                if rx + card_w > lo_x && rx < hi_x {
+                                    if preferred_y >= ry - pad && preferred_y <= ry + rh + pad {
+                                        blocked = true;
+                                    }
+                                    min_top = min_top.min(ry);
+                                    max_bottom = max_bottom.max(ry + rh);
+                                }
+                            }
+                            let gutter_y = if !blocked || !min_top.is_finite() {
+                                preferred_y
+                            } else {
+                                let step = 5.0_f32 * ((edge_idx % 4) as f32);
+                                let top_bus = min_top - 14.0 - step;
+                                let bottom_bus = max_bottom + 14.0 + step;
+                                if (preferred_y - top_bus).abs()
+                                    <= (preferred_y - bottom_bus).abs()
+                                {
+                                    top_bus
+                                } else {
+                                    bottom_bus
+                                }
+                            };
+                            pb.line_to(point(px(ox + exit_x), px(oy + sy)));
+                            pb.line_to(point(px(ox + exit_x), px(oy + gutter_y)));
+                            pb.line_to(point(px(ox + entry_x), px(oy + gutter_y)));
+                            pb.line_to(point(px(ox + entry_x), px(oy + ty)));
+                            pb.line_to(point(px(ox + tx), px(oy + ty)));
+                        } else {
+                            let mid_x = (sx + tx) * 0.5;
+                            pb.line_to(point(px(ox + mid_x), px(oy + sy)));
+                            pb.line_to(point(px(ox + mid_x), px(oy + ty)));
+                            pb.line_to(point(px(ox + tx), px(oy + ty)));
+                        }
                     } else {
                         let mid_y = (sy + ty) * 0.5;
                         pb.line_to(point(px(ox + sx), px(oy + mid_y)));
@@ -1845,13 +1898,15 @@ impl DuiDesktopView {
                     }
                     let mut color: Hsla = if is_verified {
                         primary_color
-                    } else if connected_to_selected {
+                    } else if connected_to_focus {
                         fg_color
                     } else {
                         link_color
                     };
                     if dimmed_edge {
-                        color.a *= 0.14;
+                        color.a *= 0.08;
+                    } else if !connected_to_focus {
+                        color.a *= if is_verified { 0.72 } else { 0.28 };
                     }
                     if let Ok(path) = pb.build() {
                         window.paint_path(path, color);
@@ -2134,6 +2189,14 @@ impl DuiDesktopView {
                 .bg(p.capture_surface)
                 .shadow_md()
                 .cursor_pointer()
+                .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                    if *hovered {
+                        this.hovered_screen = Some(idx);
+                    } else if this.hovered_screen == Some(idx) {
+                        this.hovered_screen = None;
+                    }
+                    cx.notify();
+                }))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _, _, cx| {
