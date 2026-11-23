@@ -172,7 +172,13 @@ export const HomeRoute = createFileRoute("/dashboard")({ component: OrdersPage }
   // 2b. React Router 7/8 static route discovery (`createBrowserRouter` + JSX `<Route>`) under BOTH Vite 7 and Vite 8.
   const rrApp = path.join(tmp, "rr-discovery-app");
   makeFakeViteProject(rrApp, "7.3.1");
-  fs.writeFileSync(path.join(rrApp, "dui.json"), JSON.stringify({ routeParams: { id: "42" } }));
+  fs.writeFileSync(
+    path.join(rrApp, "dui.json"),
+    JSON.stringify({
+      routeParams: { id: "42" },
+      scenarios: [{ path: "/extra-standalone", readySelector: "main" }],
+    }),
+  );
   fs.mkdirSync(path.join(rrApp, "src"), { recursive: true });
   fs.writeFileSync(
     path.join(rrApp, "src", "router.tsx"),
@@ -232,6 +238,7 @@ export function AppRoutes() {
   assert.deepEqual(rrParsed7.screenDiscovery.parseFailures, []);
   assert.deepEqual(rrPaths7, [
     "/",
+    "/extra-standalone",
     "/items",
     "/items/42",
     "/login",
@@ -240,6 +247,17 @@ export function AppRoutes() {
     "/settings/profile",
   ]);
   assert.deepEqual(rrParsed7.screenDiscovery.unresolved, ["/items/:missingParam"]);
+
+  // Verify `dui --help` prints grouped CLI guide and exits 0.
+  const helpRes = runDui(["--help"], duiHome);
+  assert.equal(helpRes.status, 0, "dui --help must exit 0");
+  assert.ok(
+    helpRes.stdout.includes("dui map") &&
+      helpRes.stdout.includes("dui run") &&
+      helpRes.stdout.includes("dui auth login") &&
+      helpRes.stdout.includes("dui open"),
+    `expected grouped CLI help output, got:\n${helpRes.stdout}`,
+  );
 
   // Verify identical React Router discovery on Vite 8 (Oxc parser) too.
   fs.rmSync(path.join(rrApp, "node_modules", "vite"), { recursive: true, force: true });

@@ -198,8 +198,69 @@ fn is_supported_ts(version: &str) -> bool {
         })
 }
 
+const CLI_HELP: &str = "\
+dui — real UI state capture, screen map, diff, and design audit
+
+CAPTURE
+  dui map [PROJECT]                       Auto-discover routes & capture (merges optional dui.json)
+  dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
+      --force | --no-cache                Bypass content-addressed cache
+      --changed-since REF                 Report screens affected since Git ref
+  dui scan [PROJECT] [MANIFEST]           Print compiler facts, controls, and auto-mocks (no browser)
+  dui transitions PROJECT MANIFEST [RUN]  Replay actions and verify screen transitions
+
+AUTH
+  dui auth login URL [OPTIONS]            Open Chromium to sign in and save storageState.json
+      --out FILE                          Destination path (default: .dui-auth-state.json, 0600)
+      --wait-url PATTERN                  Auto-save once URL contains PATTERN
+      --timeout SECS                      Wait timeout in seconds (default: 300)
+      --headless                          Run headless for redirect/automated login flows
+
+VIEW & LIVE
+  dui open [RUN_DIR...] [OPTIONS]         Open embedded 2D canvas viewer in browser
+      --live                              Auto-start local dev/static server in Live mount mode
+      --live-url URL                      Connect Live mount to a running loopback URL
+      --port PORT | --no-open             Bind fixed port / print URL without launching browser
+  dui serve [RUN_DIR...] [OPTIONS]        Same as `dui open --no-open`
+  dui desktop [ARGS...]                   Open native GPUI desktop viewer (--live-url, --theme, --lang)
+  dui live REQUEST_JSON                   Drive persistent live state-editing sessions
+
+DIFF & QUALITY
+  dui diff BEFORE AFTER [--markdown]      Compare two runs (element renderDiff + lazy pixel overlay)
+  dui diff --base BRANCH [--markdown]     Compare current worktree run against a base branch
+  dui audit RUN_DIR [--goal PERCENT]      Check coverage goal, gaps, and Design & A11y Audit findings
+  dui comment <add|list|resolve|reopen>   Manage review comments anchored to screens/cells
+
+TOOLS
+  dui history                             List archived runs under ~/.dui/
+  dui prune [--max-bytes BYTES]           Garbage-collect old capture cache entries
+  dui toolchains                          Probe installed official compilers (tsc, rustc, go, swiftc, kotlinc, dart)
+  dui update [--check] [--tag TAG]        Check or apply tagged source updates
+  dui mcp                                 Start MCP stdio server for AI agents
+  dui --version                           Print version and release tag
+";
+
+fn manifest_has_explicit_target(spec_path: &Path) -> bool {
+    let Ok(raw) = fs::read(spec_path) else {
+        return false;
+    };
+    let Ok(val) = serde_json::from_slice::<Value>(&raw) else {
+        return false;
+    };
+    val["path"].as_str().is_some_and(|s| !s.is_empty())
+        || val["host"].as_str().is_some_and(|s| !s.is_empty())
+}
+
 fn run() -> Reply {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.is_empty()
+        || matches!(
+            args.as_slice(),
+            [flag] if flag == "--help" || flag == "-h" || flag == "help"
+        )
+    {
+        return Ok(json!({ "__rawStdout": CLI_HELP }));
+    }
     if let [cmd] = args.as_slice()
         && cmd == "toolchains"
     {
@@ -219,10 +280,14 @@ fn run() -> Reply {
             .ok_or_else(|| failure(2, "expected live REQUEST_JSON"))?;
         return live::command(&request);
     }
-    if let [cmd, root] = args.as_slice()
+    if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "map"
     {
-        return screen_map::capture(Path::new(root));
+        return match rest {
+            [] => screen_map::capture(Path::new(".")),
+            [root] => screen_map::capture(Path::new(root)),
+            _ => Err(failure(2, "expected map [PROJECT]")),
+        };
     }
     if let [flag] = args.as_slice()
         && (flag == "--version" || flag == "-V")
@@ -613,16 +678,51 @@ fn run() -> Reply {
                 positional.push(arg);
             }
         }
-        let (root, spec, output) = match positional.as_slice() {
-            [root, spec] => (Path::new(root), Path::new(spec), None),
-            [root, spec, out] => (Path::new(root), Path::new(spec), Some(Path::new(out))),
+        let (root_buf, spec_buf, output_buf) = match positional.as_slice() {
+            [] => {
+                let root = std::path::PathBuf::from(".");
+                let default_spec = root.join("dui.json");
+                if !force && changed_since.is_none() && !manifest_has_explicit_target(&default_spec)
+                {
+                    return screen_map::capture(&root);
+                }
+                if !default_spec.is_file() {
+                    return screen_map::capture(&root);
+                }
+                (root, default_spec, None)
+            }
+            [root_arg] => {
+                let root = std::path::PathBuf::from(root_arg);
+                let default_spec = root.join("dui.json");
+                if !force && changed_since.is_none() && !manifest_has_explicit_target(&default_spec)
+                {
+                    return screen_map::capture(&root);
+                }
+                if !default_spec.is_file() {
+                    return screen_map::capture(&root);
+                }
+                (root, default_spec, None)
+            }
+            [root_arg, spec_arg] => (
+                std::path::PathBuf::from(root_arg),
+                std::path::PathBuf::from(spec_arg),
+                None,
+            ),
+            [root_arg, spec_arg, out_arg] => (
+                std::path::PathBuf::from(root_arg),
+                std::path::PathBuf::from(spec_arg),
+                Some(std::path::PathBuf::from(out_arg)),
+            ),
             _ => {
                 return Err(failure(
                     2,
-                    "expected run [--force] [--changed-since REF] PROJECT MANIFEST [OUTPUT]",
+                    "expected run [--force] [--changed-since REF] [PROJECT] [MANIFEST] [OUTPUT]",
                 ));
             }
         };
+        let root = root_buf.as_path();
+        let spec = spec_buf.as_path();
+        let output = output_buf.as_deref();
         let mut result = archive::capture(root, spec, output, Capture::Run { force });
         if let Some(base_ref) = changed_since {
             let reply_ref = match &mut result {
@@ -664,10 +764,18 @@ fn run() -> Reply {
             .ok_or_else(|| failure(2, "expected inspect RUN_DIRECTORY SELECTION_JSON"))?;
         return inspect::archive(Path::new(directory), selection);
     }
-    if let [cmd, root, spec] = args.as_slice()
+    if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "scan"
     {
-        return analysis::analyze(Path::new(root), Path::new(spec));
+        return match rest {
+            [] => analysis::analyze(Path::new("."), Path::new("dui.json")),
+            [root] => {
+                let p = Path::new(root);
+                analysis::analyze(p, &p.join("dui.json"))
+            }
+            [root, spec] => analysis::analyze(Path::new(root), Path::new(spec)),
+            _ => Err(failure(2, "expected scan [PROJECT] [MANIFEST]")),
+        };
     }
     if let [cmd, root, spec, rest @ ..] = args.as_slice()
         && cmd == "exercise"

@@ -346,6 +346,27 @@ function screen(path: string) {
     hasScreenAssertion: Boolean(override?.readySelector || profile.readySelector),
   };
 }
+const discoveredPaths = new Set([entry, ...paths]);
+const extraScenarios: Record<string, unknown>[] = [];
+const discoverySources: Record<string, unknown> = paths.length
+  ? Object.fromEntries(screens)
+  : { [entry]: { kind: "entry" } };
+if (Array.isArray(profile.scenarios)) {
+  for (const extra of profile.scenarios) {
+    if (!extra || typeof extra !== "object" || typeof extra.path !== "string") continue;
+    const p = extra.path;
+    if (!isLocalPath(p.split(/[?#]/)[0]) || discoveredPaths.has(p)) continue;
+    discoveredPaths.add(p);
+    extraScenarios.push({
+      ...screen(p),
+      ...extra,
+      hasScreenAssertion: Boolean(
+        extra.readySelector || profile.routeOptions?.[p]?.readySelector || profile.readySelector,
+      ),
+    });
+    discoverySources[p] = "dui.json";
+  }
+}
 const config = {
   ...profile,
   appRoot: rel || ".",
@@ -360,9 +381,9 @@ const config = {
   sourceDirs: [],
   additionalScopes: [],
   ...screen(entry),
-  scenarios: paths.slice(1).map(screen),
+  scenarios: [...paths.slice(1).map(screen), ...extraScenarios],
   screenDiscovery: {
-    sources: paths.length ? Object.fromEntries(screens) : { [entry]: { kind: "entry" } },
+    sources: discoverySources,
     unresolved: [...unresolved].sort(),
     parseFailures,
     mode: paths.length ? "router" : "links",
