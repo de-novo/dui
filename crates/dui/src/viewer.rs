@@ -42,6 +42,11 @@ struct ViewerState {
     cli_paths: Vec<PathBuf>,
     extra_saved_paths: BTreeSet<PathBuf>,
     diff_overlay_dirs: BTreeMap<String, PathBuf>,
+    run_roots: BTreeMap<String, PathBuf>,
+    default_run_key: Option<String>,
+    archive_images: BTreeMap<String, Arc<BTreeSet<String>>>,
+    archive_graphs: BTreeMap<String, Arc<Vec<u8>>>,
+    audit_cache: BTreeMap<String, Value>,
     live_base_url: Option<String>,
     live_default_mode: bool,
     _live_host: Option<UniversalSession>,
@@ -775,31 +780,117 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             send_response(&mut stream, 405, "text/plain", "no-store", b"");
             return;
         }
-        let archives = match state.lock() {
-            Ok(guard) => list_archives(&guard),
-            Err(_) => {
-                send_json(&mut stream, 500, &json!({"status":"error"}));
-                return;
-            }
-        };
         if archive_name == "runs.json" {
+            let archives = match state.lock() {
+                Ok(mut guard) => {
+                    let listed = list_archives(&guard);
+                    guard.default_run_key = listed
+                        .first()
+                        .and_then(|a| a.run["key"].as_str())
+                        .map(str::to_owned);
+                    for a in &listed {
+                        if let Some(k) = a.run["key"].as_str() {
+                            guard.run_roots.insert(k.to_owned(), a.root.clone());
+                        }
+                    }
+                    listed
+                }
+                Err(_) => {
+                    send_json(&mut stream, 500, &json!({"status":"error"}));
+                    return;
+                }
+            };
             let runs: Vec<Value> = archives.into_iter().map(|a| a.run).collect();
             send_json(&mut stream, 200, &Value::Array(runs));
             return;
         }
-        let key = query.get("run").map(String::as_str);
-        let selected = match key {
-            None => archives.first(),
-            Some(k) => archives.iter().find(|a| a.run["key"].as_str() == Some(k)),
+
+        struct ResolvedArchive {
+            run_key: String,
+            root: PathBuf,
+            cached_graph: Option<Arc<Vec<u8>>>,
+            cached_images: Option<Arc<BTreeSet<String>>>,
+        }
+        let requested_key = query.get("run").map(String::as_str);
+        // Fast O(1) lookup for cached run root + image manifest without holding the mutex during disk I/O.
+        let resolved: Option<ResolvedArchive> = {
+            let Ok(mut guard) = state.lock() else {
+                send_json(&mut stream, 500, &json!({"status":"error"}));
+                return;
+            };
+            let key_opt = match requested_key {
+                Some(k) => Some(k.to_owned()),
+                None => guard.default_run_key.clone(),
+            };
+            let mut root_opt = key_opt
+                .as_deref()
+                .and_then(|k| guard.run_roots.get(k).cloned());
+            let mut final_key = key_opt;
+            if root_opt.is_none() {
+                let listed = list_archives(&guard);
+                guard.default_run_key = listed
+                    .first()
+                    .and_then(|a| a.run["key"].as_str())
+                    .map(str::to_owned);
+                for a in &listed {
+                    if let Some(k) = a.run["key"].as_str() {
+                        guard.run_roots.insert(k.to_owned(), a.root.clone());
+                    }
+                }
+                let picked = match requested_key {
+                    None => listed.first(),
+                    Some(k) => listed.iter().find(|a| a.run["key"].as_str() == Some(k)),
+                };
+                if let Some(entry) = picked
+                    && let Some(k) = entry.run["key"].as_str()
+                {
+                    final_key = Some(k.to_owned());
+                    root_opt = Some(entry.root.clone());
+                }
+            }
+            match (final_key, root_opt) {
+                (Some(run_key), Some(root)) => {
+                    let cached_graph = guard.archive_graphs.get(&run_key).cloned();
+                    let cached_images = guard.archive_images.get(&run_key).cloned();
+                    Some(ResolvedArchive {
+                        run_key,
+                        root,
+                        cached_graph,
+                        cached_images,
+                    })
+                }
+                _ => None,
+            }
         };
-        let Some(entry) = selected else {
+
+        let Some(ResolvedArchive {
+            run_key,
+            root,
+            cached_graph,
+            cached_images,
+        }) = resolved
+        else {
             send_response(&mut stream, 404, "text/plain", "no-store", b"");
             return;
         };
-        let Ok((graph_bytes, images)) = open_archive(&entry.root) else {
-            send_response(&mut stream, 404, "text/plain", "no-store", b"");
-            return;
+
+        let (graph_bytes, images) = match (cached_graph, cached_images) {
+            (Some(g), Some(imgs)) => (g, imgs),
+            _ => {
+                let Ok((g, imgs)) = open_archive(&root) else {
+                    send_response(&mut stream, 404, "text/plain", "no-store", b"");
+                    return;
+                };
+                let g = Arc::new(g);
+                let imgs = Arc::new(imgs);
+                if let Ok(mut guard) = state.lock() {
+                    guard.archive_graphs.insert(run_key.clone(), Arc::clone(&g));
+                    guard.archive_images.insert(run_key, Arc::clone(&imgs));
+                }
+                (g, imgs)
+            }
         };
+
         if archive_name == "graph.json" {
             send_response(
                 &mut stream,
@@ -811,11 +902,18 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             return;
         }
         if images.contains(archive_name)
-            && let Ok(img_path) = entry.root.join(archive_name).canonicalize()
-            && img_path.parent() == Some(entry.root.as_path())
+            && let Ok(img_path) = root.join(archive_name).canonicalize()
+            && img_path.parent() == Some(root.as_path())
             && let Ok(png) = fs::read(&img_path)
         {
-            send_response(&mut stream, 200, "image/png", "no-store", &png);
+            // Saved archive PNGs are content-immutable per run directory.
+            send_response(
+                &mut stream,
+                200,
+                "image/png",
+                "public, max-age=31536000, immutable",
+                &png,
+            );
             return;
         }
         send_response(&mut stream, 404, "text/plain", "no-store", b"");
@@ -836,31 +934,80 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             return;
         }
         let run_key = query.get("run").map(String::as_str);
-        let archives = match state.lock() {
-            Ok(guard) => list_archives(&guard),
-            Err(_) => {
+        let goal = query.get("goal").and_then(|g| g.parse::<f64>().ok());
+        let (resolved_key, root, cached_audit) = {
+            let Ok(mut guard) = state.lock() else {
                 send_json(&mut stream, 500, &json!({"status":"error"}));
                 return;
+            };
+            let requested = run_key.filter(|s| !s.is_empty());
+            let mut key_opt = requested
+                .map(str::to_owned)
+                .or_else(|| guard.default_run_key.clone());
+            let mut root_opt = key_opt
+                .as_deref()
+                .and_then(|k| guard.run_roots.get(k).cloned());
+            if root_opt.is_none() {
+                let listed = list_archives(&guard);
+                guard.default_run_key = listed
+                    .first()
+                    .and_then(|a| a.run["key"].as_str())
+                    .map(str::to_owned);
+                for a in &listed {
+                    if let Some(k) = a.run["key"].as_str() {
+                        guard.run_roots.insert(k.to_owned(), a.root.clone());
+                    }
+                }
+                let picked = match requested {
+                    None => listed.first(),
+                    Some(k) => listed.iter().find(|a| a.run["key"].as_str() == Some(k)),
+                };
+                if let Some(entry) = picked
+                    && let Some(k) = entry.run["key"].as_str()
+                {
+                    key_opt = Some(k.to_owned());
+                    root_opt = Some(entry.root.clone());
+                }
             }
-        };
-        let selected = match run_key {
-            None | Some("") => archives.first(),
-            Some(k) => archives.iter().find(|a| a.run["key"].as_str() == Some(k)),
-        };
-        let Some(entry) = selected else {
-            send_json(
-                &mut stream,
-                404,
-                &json!({"status":"error","reason":"run-not-found"}),
+            let Some(k) = key_opt else {
+                send_json(
+                    &mut stream,
+                    404,
+                    &json!({"status":"error","reason":"run-not-found"}),
+                );
+                return;
+            };
+            let Some(r) = root_opt else {
+                send_json(
+                    &mut stream,
+                    404,
+                    &json!({"status":"error","reason":"run-not-found"}),
+                );
+                return;
+            };
+            let cache_k = format!(
+                "{k}:{}",
+                goal.map_or("default".to_owned(), |g| format!("{g:.2}"))
             );
-            return;
+            let cached = guard.audit_cache.get(&cache_k).cloned();
+            (k, r, cached)
         };
-        let goal = query.get("goal").and_then(|g| g.parse::<f64>().ok());
-        match audit::audit_run(&entry.root, goal) {
+        if let Some(reply) = cached_audit {
+            send_json(&mut stream, 200, &reply);
+            return;
+        }
+        match audit::audit_run(&root, goal) {
             Ok(mut reply) => {
                 if let Some(obj) = reply.as_object_mut() {
                     obj.remove("run");
-                    obj.insert("runKey".into(), entry.run["key"].clone());
+                    obj.insert("runKey".into(), json!(resolved_key));
+                }
+                let cache_k = format!(
+                    "{resolved_key}:{}",
+                    goal.map_or("default".to_owned(), |g| format!("{g:.2}"))
+                );
+                if let Ok(mut guard) = state.lock() {
+                    guard.audit_cache.insert(cache_k, reply.clone());
                 }
                 send_json(&mut stream, 200, &reply);
             }
@@ -954,7 +1101,12 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                 }
             }
             match comments::add(&body) {
-                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Ok(reply) => {
+                    if let Ok(mut guard) = state.lock() {
+                        guard.audit_cache.clear();
+                    }
+                    send_json(&mut stream, 200, &reply);
+                }
                 Err((code, err)) => {
                     send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
                 }
@@ -963,7 +1115,12 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         }
         if op == "resolve" {
             match comments::resolve(&body) {
-                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Ok(reply) => {
+                    if let Ok(mut guard) = state.lock() {
+                        guard.audit_cache.clear();
+                    }
+                    send_json(&mut stream, 200, &reply);
+                }
                 Err((code, err)) => {
                     send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
                 }
@@ -972,7 +1129,12 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         }
         if op == "reopen" {
             match comments::reopen(&body) {
-                Ok(reply) => send_json(&mut stream, 200, &reply),
+                Ok(reply) => {
+                    if let Ok(mut guard) = state.lock() {
+                        guard.audit_cache.clear();
+                    }
+                    send_json(&mut stream, 200, &reply);
+                }
                 Err((code, err)) => {
                     send_json(&mut stream, if code == 2 { 400 } else { 500 }, &err);
                 }
@@ -1245,7 +1407,9 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                             .unwrap_or_else(|_| PathBuf::from(out));
                         let run_key = sha256_hex(&saved_root.to_string_lossy());
                         if let Ok(mut guard) = state.lock() {
+                            guard.run_roots.insert(run_key.clone(), saved_root.clone());
                             guard.extra_saved_paths.insert(saved_root);
+                            guard.audit_cache.clear();
                         }
                         if let Some(obj) = reply.as_object_mut() {
                             obj.remove("output");
@@ -1376,6 +1540,11 @@ pub fn serve(
         cli_paths: run_dirs,
         extra_saved_paths: BTreeSet::new(),
         diff_overlay_dirs: BTreeMap::new(),
+        run_roots: BTreeMap::new(),
+        default_run_key: None,
+        archive_images: BTreeMap::new(),
+        archive_graphs: BTreeMap::new(),
+        audit_cache: BTreeMap::new(),
         live_base_url,
         live_default_mode,
         _live_host: live_host,
