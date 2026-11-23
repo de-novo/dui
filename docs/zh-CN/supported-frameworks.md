@@ -50,7 +50,7 @@
 | **React Hook Form** | 状态/数据 | 7.x | 7.92.0 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/react-hook-form) | 表单校验/提交中/错误状态。 | — | — |
 | **valibot** | 状态/数据 | 1.x | 1.5.0 | 2026-09-09 | [www.npmjs.com](https://www.npmjs.com/package/valibot) | 在示例数据方面与 zod 作用相同。 | — | — |
 | **Next.js** | 元框架 | 16.x | 16.4.6 | 2026-11-09 | [www.npmjs.com](https://www.npmjs.com/package/next) | 使用最多的 React 元框架。 | Server Components 在服务端渲染；在那里注入状态的方式未确认。 | 是 |
-| **React Router** | 元框架 | 8.x | 8.5.2 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/react-router) | 常见路由；framework 模式是 Remix 的后继。 | 新主版本 8.0.0 于 2026-06-17 发布。 | — |
+| **React Router** | 元框架 | 7.x / 8.x | 8.5.2 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/react-router) | 常见路由；framework 模式是 Remix 的后继。 | 新主版本 8.0.0 于 2026-06-17 发布；7.x 共享相同的声明式路由与查询参数 API。 | — |
 | **TanStack Start** | 元框架 | 1.x | 1.169.7 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-start) | 基于 MVP 已支持的 TanStack Router。 | — | — |
 | **Electron** | 桌面外壳 | 45.x | 45.4.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/electron) | UI 为 Web 的桌面应用；走同一条 Chromium 渲染路径。 | 大约每 8 周一个新主版本，基线变化频繁。 | 是 |
 | **Radix UI** | UI 组件库 | 1.x | 1.8.1 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/radix-ui) | 许多 React 组件库背后的无样式原语；开/关状态。 | — | — |
