@@ -6,7 +6,6 @@ import type { Cell, Screen, ScreenMap } from "../../data/overview";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 import { canOpenLiveCell } from "../../model/live";
-import type { DesignFinding } from "../../model/audit";
 import type { ScreenCanvasDiff } from "../../model/canvasDiff";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
@@ -52,7 +51,6 @@ export function ScreenInspector({
   onOpenLive,
   screenDiff,
   beforeRunKey,
-  designFindings = [],
   externalSelectedNodeId,
   onHighlightNode,
 }: {
@@ -76,7 +74,6 @@ export function ScreenInspector({
   onOpenLive: (targetCell: { state: string; width: number }) => void;
   screenDiff?: ScreenCanvasDiff;
   beforeRunKey?: string;
-  designFindings?: DesignFinding[];
   externalSelectedNodeId?: string | null;
   onHighlightNode?: (nodeId: string | null) => void;
 }) {
@@ -273,26 +270,6 @@ export function ScreenInspector({
           externalSelectedId={externalSelectedNodeId}
           onHighlightNode={onHighlightNode}
         />
-      )}
-
-      {designFindings.length > 0 && (
-        <details className="readonly-disclosure link-details-disclosure" open>
-          <summary>
-            {t.designIssuesTitle} ({designFindings.length})
-          </summary>
-          <ul className="readonly-list">
-            {designFindings.slice(0, 12).map((finding, idx) => (
-              <li key={`${finding.kind}:${finding.nodeId}:${idx}`} className="link-evidence-item">
-                <span className={`design-finding-sev design-finding-${finding.severity}`}>
-                  {finding.summary}
-                </span>
-                <code className="selector-evidence">
-                  {finding.measured} · {finding.expected}
-                </code>
-              </li>
-            ))}
-          </ul>
-        </details>
       )}
 
       {hasLocaleIssues && audit && (

@@ -97,7 +97,6 @@ pub mod android;
 pub mod audit;
 pub mod auth;
 pub mod compiler_oracle;
-pub mod design_lint;
 pub mod diff;
 pub mod edit;
 pub mod inspect;

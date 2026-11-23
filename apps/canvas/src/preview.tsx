@@ -10,7 +10,6 @@ import {
 } from "./data/overview";
 import type { Run } from "./data/run";
 import {
-  auditLiveRenderTree,
   buildLiveHighlightMessage,
   isLoopbackOrigin,
   liveSurfaceKey,
@@ -29,12 +28,7 @@ import { ScreenMap } from "./features/map/ScreenMap";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
-import {
-  type AuditReport,
-  decodeAuditReport,
-  designFindingsByPath,
-  openCommentsByPath,
-} from "./model/audit";
+import { type AuditReport, decodeAuditReport, openCommentsByPath } from "./model/audit";
 import {
   type CanvasDiffVisualMode,
   filterArchiveForDiff,
@@ -149,7 +143,6 @@ function MapView({
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [audit, setAudit] = useState<AuditReport | null>(null);
-  const [showDesignOverlay, setShowDesignOverlay] = useState(false);
   const liveBaseUrl = useMemo(() => {
     const queryUrl = new URLSearchParams(location.search).get("liveUrl");
     if (queryUrl && isLoopbackOrigin(queryUrl)) return queryUrl;
@@ -202,21 +195,8 @@ function MapView({
   }
 
   const inspectedCell = cell ? mergeLiveRenderTree(cell, liveTrees) : undefined;
-  const mergedDesignFindingsByPath = { ...designFindingsByPath(audit, width) };
-  if (liveSurfaceMode === "live") {
-    for (const sc of archive.screens) {
-      const liveNodes = liveTrees[liveSurfaceKey(sc.path, width)];
-      if (liveNodes && liveNodes.length > 0) {
-        mergedDesignFindingsByPath[sc.path] = auditLiveRenderTree(liveNodes, sc.path, width);
-      }
-    }
-  }
-  const activeDesignIssueCount = Object.values(mergedDesignFindingsByPath).reduce(
-    (sum, list) => sum + list.length,
-    0,
-  );
   const openCommentCount = audit?.summary.openComments ?? 0;
-  const showAuditPill = openCommentCount > 0 || activeDesignIssueCount > 0;
+  const showAuditPill = openCommentCount > 0;
   const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
     const fromUrl = new URLSearchParams(location.search).get("compare");
     return fromUrl ?? "";
@@ -353,8 +333,6 @@ function MapView({
               selectedId={selectedId}
               focusActive={showDetails}
               openCommentsByPath={openCommentsByPath(audit)}
-              designFindingsByPath={mergedDesignFindingsByPath}
-              showDesignOverlay={showDesignOverlay}
               diffsByPath={diffsByPath}
               diffActive={diffActive}
               diffVisualMode={diffVisualMode}
@@ -397,21 +375,9 @@ function MapView({
             )}
             {showAuditPill && (
               <output className="audit-summary-pill glass-panel">
-                {openCommentCount > 0 && (
-                  <span className="audit-open-comments">
-                    {t.auditOpenCommentsLabel(openCommentCount)}
-                  </span>
-                )}
-                {activeDesignIssueCount > 0 && (
-                  <button
-                    type="button"
-                    className={`audit-design-toggle${showDesignOverlay ? " active" : ""}`}
-                    aria-pressed={showDesignOverlay}
-                    onClick={() => setShowDesignOverlay((v) => !v)}
-                  >
-                    {t.auditDesignIssuesLabel(activeDesignIssueCount)}
-                  </button>
-                )}
+                <span className="audit-open-comments">
+                  {t.auditOpenCommentsLabel(openCommentCount)}
+                </span>
               </output>
             )}
 
@@ -573,9 +539,6 @@ function MapView({
           }
           screenDiff={selectedDiff}
           beforeRunKey={compareBeforeKey || undefined}
-          designFindings={
-            selectedScreen ? (mergedDesignFindingsByPath[selectedScreen.path] ?? []) : []
-          }
           externalSelectedNodeId={liveSelectedNodeId}
           onHighlightNode={broadcastLiveHighlight}
         />

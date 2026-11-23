@@ -78,7 +78,6 @@ jobs:
           npm run check:ios
           npm run check:electron
           npm run check:radix-nextjs
-          npm run check:design-lint
           npm run check:box-model
           npm run check:compiler-oracles
           npm run check:reliability

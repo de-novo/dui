@@ -3,8 +3,6 @@
 use crate::{Reply, archive, failure, replay::read, sqlite_store::SqliteStore};
 use dui_core::{
     audit::{AuditCellInput, AuditCommentInput, AuditInput, DEFAULT_GOAL_PERCENT, evaluate},
-    design_lint::{ScopedDesignFinding, deduplicate_findings, lint_render_tree},
-    diff::RenderNodeSnapshot,
     model::{CommentStatus, ProjectId},
 };
 use serde_json::{Value, json};
@@ -19,7 +17,6 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
     let default_path = report["path"].as_str().unwrap_or("/").to_owned();
 
     let mut cells = Vec::new();
-    let mut scoped_findings = Vec::new();
     if let Some(arr) = report["cells"].as_array() {
         for item in arr {
             let path = item["path"]
@@ -32,24 +29,6 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
             let reason = item["reason"].as_str().map(str::to_owned);
             let state = item["state"].as_str().map(str::to_owned);
             let locale = item["locale"].as_str().map(str::to_owned);
-            let scenario = item["scenario"].as_str().map(str::to_owned);
-            if let Some(raw_tree) = item["observation"]["renderTree"].as_array()
-                && let Ok(tree) = serde_json::from_value::<Vec<RenderNodeSnapshot>>(Value::Array(
-                    raw_tree.clone(),
-                ))
-                && !tree.is_empty()
-            {
-                let lint = lint_render_tree(&tree, width);
-                for finding in lint.findings {
-                    scoped_findings.push(ScopedDesignFinding {
-                        path: path.clone(),
-                        width,
-                        state: state.clone(),
-                        scenario: scenario.clone(),
-                        finding,
-                    });
-                }
-            }
             cells.push(AuditCellInput {
                 path,
                 state,
@@ -60,7 +39,6 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
             });
         }
     }
-    let grouped_design = deduplicate_findings(scoped_findings);
 
     let branch_outcomes = report["coverage"]["branchOutcomes"].as_u64().unwrap_or(0);
     let observed_branch_outcomes = report["coverage"]["observedBranchOutcomes"]
@@ -126,10 +104,6 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
         if let Some(pid) = snapshot.as_ref().and_then(|s| s["projectId"].as_str()) {
             obj.insert("projectId".into(), json!(pid));
         }
-        obj.insert(
-            "designAudit".into(),
-            serde_json::to_value(&grouped_design).unwrap_or_else(|_| json!({})),
-        );
     }
     Ok(out)
 }

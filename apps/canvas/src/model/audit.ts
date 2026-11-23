@@ -34,37 +34,12 @@ export type ScreenAudit = {
   openComments: number;
 };
 
-export type DesignFinding = {
-  kind: string;
-  severity: "error" | "warning" | "info";
-  nodeId: string;
-  tag: string;
-  rect: { x: number; y: number; width: number; height: number };
-  relatedNodeId?: string;
-  summary: string;
-  measured: string;
-  expected: string;
-  path: string;
-  width: number;
-  occurrences?: number;
-};
-
-export type DesignAudit = {
-  total: number;
-  rawTotal?: number;
-  errors: number;
-  warnings: number;
-  info: number;
-  findings: DesignFinding[];
-};
-
 export type AuditReport = {
   goalPercent: number;
   meetsGoal: boolean;
   summary: AuditSummary;
   gaps: AuditGap[];
   screens: ScreenAudit[];
-  designAudit?: DesignAudit;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -100,43 +75,6 @@ export function decodeAuditReport(raw: unknown): AuditReport | null {
         locale: typeof g.locale === "string" ? g.locale : undefined,
       }))
     : [];
-  const rawDesign = isRecord(raw.designAudit) ? raw.designAudit : null;
-  const designFindings: DesignFinding[] =
-    rawDesign && Array.isArray(rawDesign.findings)
-      ? rawDesign.findings.filter(isRecord).map((f) => {
-          const r = isRecord(f.rect) ? f.rect : {};
-          const sev = f.severity === "error" || f.severity === "warning" ? f.severity : "info";
-          return {
-            kind: typeof f.kind === "string" ? f.kind : "unknown",
-            severity: sev,
-            nodeId: typeof f.nodeId === "string" ? f.nodeId : "",
-            tag: typeof f.tag === "string" ? f.tag : "",
-            rect: {
-              x: num(r.x),
-              y: num(r.y),
-              width: num(r.width),
-              height: num(r.height),
-            },
-            relatedNodeId: typeof f.relatedNodeId === "string" ? f.relatedNodeId : undefined,
-            summary: typeof f.summary === "string" ? f.summary : "",
-            measured: typeof f.measured === "string" ? f.measured : "",
-            expected: typeof f.expected === "string" ? f.expected : "",
-            path: typeof f.path === "string" ? f.path : "/",
-            width: num(f.width),
-            occurrences: typeof f.occurrences === "number" ? f.occurrences : undefined,
-          };
-        })
-      : [];
-  const designAudit: DesignAudit | undefined = rawDesign
-    ? {
-        total: num(rawDesign.total),
-        rawTotal: typeof rawDesign.rawTotal === "number" ? rawDesign.rawTotal : undefined,
-        errors: num(rawDesign.errors),
-        warnings: num(rawDesign.warnings),
-        info: num(rawDesign.info),
-        findings: designFindings,
-      }
-    : undefined;
   return {
     goalPercent: num(raw.goalPercent) || 99,
     meetsGoal: Boolean(raw.meetsGoal),
@@ -157,7 +95,6 @@ export function decodeAuditReport(raw: unknown): AuditReport | null {
     },
     gaps,
     screens,
-    designAudit,
   };
 }
 
@@ -170,17 +107,4 @@ export function openCommentsByPath(report: AuditReport | null): Record<string, n
     }
   }
   return counts;
-}
-
-export function designFindingsByPath(
-  report: AuditReport | null,
-  width?: number,
-): Record<string, DesignFinding[]> {
-  const grouped: Record<string, DesignFinding[]> = {};
-  if (!report?.designAudit) return grouped;
-  for (const f of report.designAudit.findings) {
-    if (width && f.width && f.width !== width) continue;
-    (grouped[f.path] ??= []).push(f);
-  }
-  return grouped;
 }

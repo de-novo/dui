@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
-import type { DesignFinding } from "../../model/audit";
 import {
   resolveCardDiffImageUrl,
   type CanvasDiffVisualMode,
@@ -37,8 +36,6 @@ export function CaptureCard({
   cardWidth,
   frameHeight,
   openComments = 0,
-  designFindings = [],
-  showDesignOverlay = false,
   screenDiff,
   diffVisualMode = "after",
   beforeRunKey,
@@ -56,8 +53,6 @@ export function CaptureCard({
   cardWidth?: number;
   frameHeight?: number;
   openComments?: number;
-  designFindings?: DesignFinding[];
-  showDesignOverlay?: boolean;
   screenDiff?: ScreenCanvasDiff;
   diffVisualMode?: CanvasDiffVisualMode;
   beforeRunKey?: string;
@@ -209,33 +204,6 @@ export function CaptureCard({
             })}
           </div>
         )}
-        {showDesignOverlay && designFindings.length > 0 && (
-          <div className="render-diff-box-layer" aria-hidden="true">
-            {designFindings.slice(0, 24).map((finding, idx) => {
-              const rect = finding.rect;
-              if (rect.width <= 0 || rect.height <= 0) return null;
-              const baseW = Math.max(1, naturalW ?? cell?.width ?? capW);
-              const baseH = Math.max(1, naturalH ?? effectiveFrameHeight ?? capH);
-              const leftPct = Math.max(0, Math.min(100, (rect.x / baseW) * 100));
-              const topPct = Math.max(0, Math.min(100, (rect.y / baseH) * 100));
-              const wPct = Math.max(1, Math.min(100 - leftPct, (rect.width / baseW) * 100));
-              const hPct = Math.max(1, Math.min(100 - topPct, (rect.height / baseH) * 100));
-              return (
-                <span
-                  key={`${finding.kind}:${finding.nodeId}:${idx}`}
-                  className={`render-diff-box design-lint-box-${finding.severity}`}
-                  title={finding.summary}
-                  style={{
-                    left: `${leftPct}%`,
-                    top: `${topPct}%`,
-                    width: `${wPct}%`,
-                    height: `${hPct}%`,
-                  }}
-                />
-              );
-            })}
-          </div>
-        )}
         {diffBadgeText && screenDiff && (
           <span className={`card-diff-pill card-diff-pill-${screenDiff.kind}`}>
             {diffBadgeText}
@@ -244,14 +212,6 @@ export function CaptureCard({
       </div>
       <div className="card-caption">
         <strong>{routeName(screen.path)}</strong>
-        {designFindings.length > 0 && (
-          <small
-            className="card-design-badge"
-            title={t.auditDesignIssuesLabel(designFindings.length)}
-          >
-            {t.auditDesignIssuesLabel(designFindings.length)}
-          </small>
-        )}
         {openComments > 0 && (
           <small className="card-comment-badge" title={openComments + " unresolved comments"}>
             {t.comments} {openComments}

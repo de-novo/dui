@@ -2,7 +2,6 @@
 //! against `~/.dui/dui.db` and `~/.dui/blobs/` for the GPUI desktop viewer.
 
 use dui_core::{
-    design_lint::{DesignFinding, DesignSeverity, lint_render_tree},
     diff::{RenderDiffSummary, RenderNodeSnapshot, compute_rgba_diff, diff_render_trees},
     model::{
         CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeEndpoint, EdgeId, ProjectId,
@@ -309,51 +308,19 @@ pub fn hydrate_pixel_diffs(entries: &mut [DiffCellEntry]) {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct RunDesignAudit {
-    pub total: usize,
-    pub errors: usize,
-    pub warnings: usize,
-    pub info: usize,
-    pub findings_by_screen_width: BTreeMap<(String, u32), Vec<DesignFinding>>,
+pub struct RunRenderTrees {
     pub trees_by_screen_width: BTreeMap<(String, u32), Vec<RenderNodeSnapshot>>,
 }
 
-pub fn compute_run_design_audit(run: &RunItem) -> RunDesignAudit {
-    let mut out = RunDesignAudit::default();
+pub fn load_run_render_trees(run: &RunItem) -> RunRenderTrees {
+    let mut out = RunRenderTrees::default();
     let trees = load_render_trees_for_run(run);
-    let mut seen: BTreeSet<(dui_core::design_lint::DesignDefectKind, String, u32, String)> =
-        BTreeSet::new();
     for ((path, width, _ordinal), tree) in trees {
-        let lint = lint_render_tree(&tree, width);
-        for finding in lint.findings {
-            let key = (finding.kind, path.clone(), width, finding.node_id.clone());
-            if !seen.insert(key) {
-                continue;
-            }
-            out.total += 1;
-            match finding.severity {
-                DesignSeverity::Error => out.errors += 1,
-                DesignSeverity::Warning => out.warnings += 1,
-                DesignSeverity::Info => out.info += 1,
-            }
-            out.findings_by_screen_width
-                .entry((path.clone(), width))
-                .or_default()
-                .push(finding);
-        }
         out.trees_by_screen_width
             .entry((path, width))
             .or_insert(tree);
     }
     out
-}
-
-pub fn design_severity_color_hex(sev: DesignSeverity) -> u32 {
-    match sev {
-        DesignSeverity::Error => 0xdc2626,
-        DesignSeverity::Warning => 0xef803f,
-        DesignSeverity::Info => 0x2563eb,
-    }
 }
 
 pub fn compute_run_diff(
@@ -1295,13 +1262,8 @@ mod tests {
             screens: vec![],
         };
 
-        let audit = compute_run_design_audit(&run);
-        assert!(
-            audit.total >= 3,
-            "expected overflow + small target + unlabeled"
-        );
-        assert!(audit.errors >= 2);
-        let nodes = audit
+        let loaded = load_run_render_trees(&run);
+        let nodes = loaded
             .trees_by_screen_width
             .get(&("/".into(), 375))
             .expect("render tree loaded");
