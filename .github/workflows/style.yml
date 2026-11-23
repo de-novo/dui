@@ -82,5 +82,4 @@ jobs:
           npm run check:compiler-oracles
           npm run check:reliability
           npm run check:auth-pr-diff
-          npm run check:live-canvas
           npm run check:vite7

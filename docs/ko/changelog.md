@@ -11,19 +11,28 @@
 
 ### Added
 
-- 2D 캔버스 직접 라이브 컴포넌트 렌더링 완성 (`Static | Live mount`, 루프백 검증, static/url/command/Vite/Next.js 호스트를 자동 기동하는 원커맨드 `dui open --live` / `--live-url`, 무수정 `/live-surface/*` DOM 텔레메트리 브리지, 실시간 라이브 Design Audit, `ElementInspector` ↔ 라이브 카드 양방향 요소 하이라이트/선택 및 GPUI 데스크톱 패리티) ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138), [#141](https://github.com/de-novo/dui/pull/141), [#142](https://github.com/de-novo/dui/pull/142)).
+- 중첩 스크롤 셸을 포함한 풀페이지 전체 높이 캡처 및 웹 캔버스·GPUI 데스크톱 실제 비율 카드 배치 ([#148](https://github.com/de-novo/dui/pull/148), [#150](https://github.com/de-novo/dui/pull/150)).
+- WAI-ARIA 네비게이션 메뉴 펼침, 공식 컴파일러 라우트 레지스트리 조회(`routeTree.gen.ts` `FileRoutesByTo`, React Router 생성 타입), zero-config `dui scan .`, Vite·Next.js·정적 HTML 자동 감지 `dui map .` ([#150](https://github.com/de-novo/dui/pull/150), [#154](https://github.com/de-novo/dui/pull/154)).
+- 프레임워크 비종속 HTML/WAI-ARIA 모달·다이얼로그·드로어·팝오버 자동 캡처 및 2D 캔버스 자식 오버레이 노드(`<path>#overlay:<slug>`)·CSS 애니메이션 안정화·콘텐츠 해시 블롭 캐싱 ([#158](https://github.com/de-novo/dui/pull/158), [#162](https://github.com/de-novo/dui/pull/162)).
+- GPUI 데스크톱 UX 웹 1:1 정렬: 풀-블리드 캔버스, 플로팅 글래스 레일·인스펙터, 커서 기준 연속 줌, 네이티브 투명 macOS `TitleBar`, 장애물 회피 거터 연결선 및 호버/선택 하이라이트 ([#156](https://github.com/de-novo/dui/pull/156), [#160](https://github.com/de-novo/dui/pull/160)).
 - 특정 UI 컴포넌트 라이브러리에 의존하지 않는 프레임워크 단 React 제어 props 및 네이티브 HTML/WAI-ARIA 컨트롤 상태 추출 (`package: "react"`, `package: "html-aria"`) ([#140](https://github.com/de-novo/dui/pull/140)).
 - 공식 TypeScript 6/7 AST 폴백(`adapters/vite/parser.mts`, `npm run check:vite7`)으로 Vite 7 정식(Level 2) 지원 추가 ([#133](https://github.com/de-novo/dui/pull/133)).
 - Vite 7·8 양쪽에서 동작하는 React Router 7/8 정적 라우트 자동 발견(`createBrowserRouter`, `createHashRouter`, `createMemoryRouter`, 중첩 JSX `<Route>`, `index`, `:param`, `*` splat) 추가 ([#134](https://github.com/de-novo/dui/pull/134), [#135](https://github.com/de-novo/dui/pull/135)).
 - 대화형 브라우저 로그인 세션 캡처(`dui auth login <URL> --out FILE`) 추가 — `HttpOnly` 쿠키·`localStorage`·`sessionStorage`를 `0600` 권한의 Playwright 호환 `storageState.json`으로 저장 ([#137](https://github.com/de-novo/dui/pull/137)).
-- 모바일·TUI 컴파일러 심층 상태 추출 룰팩(Ink 5 · React Native · Expo Router 5), 공용 컴파일러 오라클 IR 및 공식 6개 툴체인 진단(`dui toolchains`) 추가 ([#124](https://github.com/de-novo/dui/pull/124)).
+- 공용 컴파일러 오라클 IR, Ink 5 · React Native · Expo Router 5 `tsc` 룰팩 및 공식 6개 툴체인 진단(`dui toolchains`) 추가 ([#124](https://github.com/de-novo/dui/pull/124)).
 - SemVer 및 3개 언어 `CHANGELOG` 버전 동기화 CI 가드(`npm run check:version`)를 `check:style`에 연동 ([#131](https://github.com/de-novo/dui/pull/131)).
 - 뷰어 UI 설계·검수용 에이전트 스킬(`anti-ui-slop`, `web-design-guidelines`) 등록 ([#132](https://github.com/de-novo/dui/pull/132)).
 
 ### Changed
 
+- `dui map` / `dui run` CLI 기본값 단순화, 불변 PNG 캐시 및 카드별 GPU 블러 제거로 캔버스 즉시 렌더링 개선 ([#144](https://github.com/de-novo/dui/pull/144), [#145](https://github.com/de-novo/dui/pull/145), [#152](https://github.com/de-novo/dui/pull/152)).
 - 생태계·룰팩 라이브러리를 하드 버전 게이트에서 분리: 하드 `>=` 기준선 검사는 핵심 컴파일러·호스트·UI 런타임(`tsc`, `vite` 7+, `react` 18+, `host: "next"` 시 `next` 16+)에만 적용하고, 더 새로운 안정 메이저는 항상 허용하며 룰팩 라이브러리 버전 차이는 스캔 중단 없이 비치명적 `versionNotes`로 기록 ([#136](https://github.com/de-novo/dui/pull/136)).
 - 워크스페이스 및 데스크톱 크레이트 버전을 `0.2.0`으로 동기화.
+
+### Removed
+
+- 디자인 다양성을 저해하는 하드코딩 전역 디자인 결함 휴리스틱(`design_lint.rs`, `designAudit`, 라이브 린트, 미사용 합성 DOM 속성)을 제거하고 객관적 렌더 증거 + 향후 `DESIGN.md`/플러그인 검증(`v0.3.0`, [#167](https://github.com/de-novo/dui/issues/167)) 방향으로 전환 ([#164](https://github.com/de-novo/dui/pull/164), [#166](https://github.com/de-novo/dui/pull/166)).
+- 실제 코드 기반 렌더링과 성격이 다른 임시 iframe 라이브 마운트(`dui open --live` / `--live-url`, `/live-surface/*`) 및 뷰어 `라이브 열기` 버튼을 제거 ([#169](https://github.com/de-novo/dui/issues/169)).
 
 ## [v0.1.0] - 2026-11-23
 

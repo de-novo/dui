@@ -6,12 +6,6 @@ import {
   type CanvasDiffVisualMode,
   type ScreenCanvasDiff,
 } from "../../model/canvasDiff";
-import {
-  computeLiveFrameTransform,
-  resolveLiveBridgeUrl,
-  resolveLiveSurfaceUrl,
-  type LiveSurfaceMode,
-} from "../../model/liveSurface";
 
 export function isOverlayPath(path: string): boolean {
   return path.includes("#overlay:");
@@ -40,9 +34,6 @@ export function CaptureCard({
   diffVisualMode = "after",
   beforeRunKey,
   afterRunKey,
-  liveBaseUrl,
-  liveBridgePath,
-  liveSurfaceMode = "capture",
 }: {
   screen: Screen;
   cell?: Cell;
@@ -57,18 +48,9 @@ export function CaptureCard({
   diffVisualMode?: CanvasDiffVisualMode;
   beforeRunKey?: string;
   afterRunKey?: string;
-  liveBaseUrl?: string;
-  liveBridgePath?: string;
-  liveSurfaceMode?: LiveSurfaceMode;
 }) {
   const { t } = useI18n();
-  const [liveFallback, setLiveFallback] = useState(false);
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
-  const liveUrl =
-    liveSurfaceMode === "live" && !liveFallback
-      ? (resolveLiveBridgeUrl(liveBridgePath, screen.path) ??
-        resolveLiveSurfaceUrl(liveBaseUrl, screen.path))
-      : null;
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
   const large = Boolean(cardWidth && cardWidth >= 800);
@@ -84,13 +66,9 @@ export function CaptureCard({
   const naturalW = cell?.imageWidth ?? activeLoaded?.w;
   const naturalH = cell?.imageHeight ?? activeLoaded?.h;
   const effectiveFrameHeight =
-    !liveUrl && cardWidth && naturalW && naturalH
+    cardWidth && naturalW && naturalH
       ? Math.max(240, Math.round(cardWidth * (naturalH / naturalW)))
       : frameHeight;
-  const liveTransform =
-    liveUrl && cardWidth && effectiveFrameHeight
-      ? computeLiveFrameTransform(cell?.width ?? 1280, cardWidth, effectiveFrameHeight)
-      : null;
   const diffClass = screenDiff ? ` diff-${screenDiff.kind}` : "";
   const renderChangeCount = screenDiff?.renderDiff?.changes.length ?? 0;
   const diffBadgeText = screenDiff
@@ -137,20 +115,7 @@ export function CaptureCard({
               : undefined
         }
       >
-        {liveUrl && liveTransform ? (
-          <iframe
-            className="live-surface-iframe"
-            src={liveUrl}
-            title={`Live ${screen.path}`}
-            sandbox="allow-scripts allow-same-origin allow-forms"
-            onError={() => setLiveFallback(true)}
-            style={{
-              width: `${liveTransform.viewportWidth}px`,
-              height: `${liveTransform.viewportHeight}px`,
-              transform: `scale(${liveTransform.scale})`,
-            }}
-          />
-        ) : resolvedSrc ? (
+        {resolvedSrc ? (
           <img
             alt=""
             src={resolvedSrc}
@@ -171,8 +136,7 @@ export function CaptureCard({
             {cell?.reason && <small>{cell.reason}</small>}
           </div>
         )}
-        {liveUrl && <span className="card-live-pill">LIVE</span>}
-        {!liveUrl && isOverlayPath(screen.path) && <span className="card-overlay-pill">MODAL</span>}
+        {isOverlayPath(screen.path) && <span className="card-overlay-pill">MODAL</span>}
         {showRenderBoxes && screenDiff?.renderDiff && (
           <div className="render-diff-box-layer" aria-hidden="true">
             {screenDiff.renderDiff.changes.slice(0, 24).map((chg) => {

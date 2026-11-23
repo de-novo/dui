@@ -2,22 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createRoot } from "react-dom/client";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
-import {
-  decodeOverview,
-  type RenderNode,
-  type Screen,
-  type ScreenMap as Archive,
-} from "./data/overview";
+import { decodeOverview, type Screen, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
-import {
-  buildLiveHighlightMessage,
-  isLoopbackOrigin,
-  liveSurfaceKey,
-  mergeLiveRenderTree,
-  parseLiveSelectMessage,
-  parseLiveTelemetryMessage,
-  type LiveSurfaceMode,
-} from "./model/liveSurface";
 import { CaptureDiffView } from "./features/diff/CaptureDiffView";
 import { LiveInspector } from "./features/inspector/LiveInspector";
 import { LiveStage } from "./features/inspector/LiveStage";
@@ -143,58 +129,6 @@ function MapView({
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [audit, setAudit] = useState<AuditReport | null>(null);
-  const liveBaseUrl = useMemo(() => {
-    const queryUrl = new URLSearchParams(location.search).get("liveUrl");
-    if (queryUrl && isLoopbackOrigin(queryUrl)) return queryUrl;
-    if (run.liveBaseUrl && isLoopbackOrigin(run.liveBaseUrl)) return run.liveBaseUrl;
-    return undefined;
-  }, [run.liveBaseUrl]);
-  const [liveSurfaceChoice, setLiveSurfaceChoice] = useState<LiveSurfaceMode | null>(() => {
-    const queryMode = new URLSearchParams(location.search).get("surface");
-    return queryMode === "live" || queryMode === "capture" ? queryMode : null;
-  });
-  const liveSurfaceMode: LiveSurfaceMode = !liveBaseUrl
-    ? "capture"
-    : (liveSurfaceChoice ?? (run.liveDefaultMode === "live" ? "live" : "capture"));
-  const [liveTrees, setLiveTrees] = useState<Record<string, RenderNode[]>>({});
-  const [liveSelectedNodeId, setLiveSelectedNodeId] = useState<string | null>(null);
-
-  const liveBridgePath =
-    liveBaseUrl && run.liveBridgePath?.startsWith("/live-surface") ? run.liveBridgePath : undefined;
-
-  useEffect(() => {
-    if (!liveBaseUrl) return;
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin && !isLoopbackOrigin(event.origin)) return;
-      const selectedNode = parseLiveSelectMessage(event.data);
-      if (selectedNode) {
-        setLiveSelectedNodeId(selectedNode.nodeId);
-        return;
-      }
-      const telemetry = parseLiveTelemetryMessage(event.data);
-      if (!telemetry) return;
-      const key = liveSurfaceKey(telemetry.path, telemetry.width);
-      setLiveTrees((prev) => ({ ...prev, [key]: telemetry.renderTree }));
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [liveBaseUrl]);
-
-  function broadcastLiveHighlight(nodeId: string | null) {
-    if (liveSurfaceMode !== "live") return;
-    const msg = buildLiveHighlightMessage(nodeId);
-    for (const frame of document.querySelectorAll<HTMLIFrameElement>(
-      "iframe.live-surface-iframe",
-    )) {
-      try {
-        frame.contentWindow?.postMessage(msg, "*");
-      } catch {
-        // Ignore cross-origin frame postMessage failures.
-      }
-    }
-  }
-
-  const inspectedCell = cell ? mergeLiveRenderTree(cell, liveTrees) : undefined;
   const openCommentCount = audit?.summary.openComments ?? 0;
   const showAuditPill = openCommentCount > 0;
   const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
@@ -338,9 +272,6 @@ function MapView({
               diffVisualMode={diffVisualMode}
               beforeRunKey={compareBeforeKey || undefined}
               afterRunKey={run.key}
-              liveBaseUrl={liveBaseUrl}
-              liveBridgePath={liveBridgePath}
-              liveSurfaceMode={liveSurfaceMode}
               imageUrl={(name) => archiveUrl(name, run)}
               select={select}
               onClearSelection={returnToOverview}
@@ -348,31 +279,8 @@ function MapView({
           )}
         </div>
 
-        {!showLive && (showAuditPill || otherRuns.length > 0 || liveBaseUrl) && (
+        {!showLive && (showAuditPill || otherRuns.length > 0) && (
           <div className="map-top-bar">
-            {liveBaseUrl && (
-              <fieldset
-                className="live-surface-toggle glass-panel"
-                aria-label={t.canvasSurfaceLive}
-              >
-                <button
-                  type="button"
-                  className={liveSurfaceMode === "capture" ? "active" : ""}
-                  aria-pressed={liveSurfaceMode === "capture"}
-                  onClick={() => setLiveSurfaceChoice("capture")}
-                >
-                  {t.canvasSurfaceStatic}
-                </button>
-                <button
-                  type="button"
-                  className={liveSurfaceMode === "live" ? "active" : ""}
-                  aria-pressed={liveSurfaceMode === "live"}
-                  onClick={() => setLiveSurfaceChoice("live")}
-                >
-                  {t.canvasSurfaceLive}
-                </button>
-              </fieldset>
-            )}
             {showAuditPill && (
               <output className="audit-summary-pill glass-panel">
                 <span className="audit-open-comments">
@@ -516,7 +424,7 @@ function MapView({
           locale={locale}
           locales={locales}
           cells={cells}
-          cell={inspectedCell}
+          cell={cell}
           stateParam={state}
           dismissRef={dismiss}
           onKeyDown={inspectKey}
@@ -530,17 +438,8 @@ function MapView({
             })
           }
           onSelectScreen={(id) => select(id)}
-          onOpenLive={(targetCell) =>
-            update({
-              width: String(targetCell.width),
-              state: targetCell.state,
-              view: "live",
-            })
-          }
           screenDiff={selectedDiff}
           beforeRunKey={compareBeforeKey || undefined}
-          externalSelectedNodeId={liveSelectedNodeId}
-          onHighlightNode={broadcastLiveHighlight}
         />
       )}
 

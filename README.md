@@ -15,7 +15,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
 | Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 18 / 19+, Vite 7 / 8+, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | Desktop App | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
-| Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` rules) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) deep state plans |
+| Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` rules) | Native compiler probes (`dui toolchains`); SwiftUI / Compose / Flutter adapters planned (see [supported-frameworks](docs/en/supported-frameworks.md)) |
 | Terminal UI (TUI) | Universal TUI (`pty` + VT100 cell grid -> `RenderNodeSnapshot` + monospace PNG), Ink 5 (`tsc` rules) | Ratatui (`rustc`), Bubble Tea (`go`) deep state plans |
 | Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 7 / 8, Next.js App Router (`app/**/page.tsx`), standard Web `URLSearchParams` | Android intents & deep links compiler analysis |
 | State, forms & schemas | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1, Radix UI 1 / shadcn/ui 4 | — |
@@ -31,8 +31,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
 | Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
 | Element inspector & box model | DevTools-style element attributes, box-model diagram & overlay (width, height, margin, padding, border, gap, radius), and interactive spacing redline guides between elements | Supported |
-| Live components on canvas | Mount real loopback components directly on 2D canvas cards (`dui open --live` / `--live-url`) with zero-modification DOM telemetry and bidirectional `ElementInspector` highlight (`v0.2.0`) | Supported |
-| Multi-surface engine & scale | `SurfaceRegistry` multi-surface plugin pipeline, parallel multi-worker capture (`concurrency`), WAI-ARIA modal/drawer auto-capture, obstacle-free gutter edge routing, GPUI AccessKit render-tree diff | Supported |
+| Universal routing, modals & canvas | Full-page true-aspect captures, WAI-ARIA navigation disclosure & modal/drawer auto-capture, obstacle-free gutter edge routing, native macOS TitleBar (`apps/desktop`), parallel multi-worker capture (`concurrency`), `SurfaceRegistry` pipeline | Supported |
 
 ## Install
 
@@ -67,11 +66,11 @@ dui map
 # 2. (Optional) Capture an authenticated browser session (form / MFA / OAuth)
 dui auth login http://localhost:5173/login --out auth-state.json
 
-# 3. Inspect on the 2D canvas (add --live to mount real loopback components)
+# 3. Inspect on the 2D canvas or native desktop viewer
 dui open
-dui open --live
+dui desktop
 
-# 4. Compare branches and generate a PR Markdown summary / audit report
+# 4. Compare branches and generate a PR Markdown summary / coverage audit
 dui diff --base main --markdown
 dui audit <run-dir>
 ```
@@ -80,15 +79,15 @@ dui audit <run-dir>
 
 | Command | When to use |
 | --- | --- |
-| `dui map [PROJECT]` | **Default for apps with a router** (TanStack Router, React Router 7/8, or links). Automatically discovers screens, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and captures everything. |
+| `dui map [PROJECT]` | **Default for apps with a router** (TanStack Router, React Router 7/8, Next.js, or links). Automatically discovers screens & modals, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and captures everything. |
 | `dui run [PROJECT] [MANIFEST]` | **Explicit manifest capture.** Runs `dui.json` directly (omitting arguments defaults to `.` / `dui.json`, and falls back to `dui map` if no explicit `path` or `host` is set). |
 
 | Group | Command | Purpose |
 | --- | --- | --- |
-| Capture | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | Discover/capture screens or print compiler facts without launching a browser |
+| Capture | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | Discover/capture screens & modals or print compiler facts without launching a browser |
 | Auth | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | Save Playwright-compatible `storageState.json` (`0600`) for authenticated routes |
-| View & Live | `dui open [--live \| --live-url URL]` · `dui desktop` · `dui live JSON` | Embedded 2D web canvas (with live component mount & `Alt+Click` inspect) or native GPUI viewer |
-| Diff & Quality | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage + 6-rule Design & A11y Audit, review comments |
+| View | `dui open [RUN_DIR]` · `dui desktop` | Embedded 2D web canvas or native GPUI desktop viewer |
+| Diff & Quality | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage audit, review comments |
 | Tools | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | Official compiler probes, archive history, cache GC, self-update, MCP stdio server |
 
 ## Discover screens

@@ -80,10 +80,10 @@ The commands assume `dui` is on your `PATH`. With the default installation you c
 | `dui run [PROJECT] [MANIFEST] [OUTPUT]` | `run(project, manifest, output?)` | Capture using `dui.json` directly (defaults to `.` / `dui.json`, or auto-discovers via `map` when omitted). |
 | `dui scan [PROJECT] [MANIFEST]` | `scan(project, manifest)` | Print compiler facts, framework controls, and generated mocks without launching a browser. |
 | `dui auth login URL [--out FILE]` | — | Launch Chromium to sign in (form / MFA / OAuth) and save Playwright-compatible `storageState.json` (`0600`). |
-| `dui open [RUN_DIR] [--live \| --live-url URL]` | — | Open the embedded 2D canvas viewer (`--live` auto-starts static/command/Vite/Next.js in Live mount mode). |
-| `dui desktop [--live-url URL]` | — | Open the native GPUI desktop viewer over `~/.dui/dui.db`. |
+| `dui open [RUN_DIR]` | — | Open the embedded 2D canvas viewer in the browser. |
+| `dui desktop` | — | Open the native GPUI desktop viewer over `~/.dui/dui.db`. |
 | `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | Compare two runs (element `renderDiff`, lazy pixel overlay, or `--base BRANCH --markdown` for PR comments). |
-| `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | Compute coverage percentage, gaps, unresolved comments, and Design & A11y Audit findings. |
+| `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | Compute coverage percentage, gaps, and unresolved review comments. |
 | `dui comment <add\|list\|resolve\|reopen>` | `comment_*` | Manage review comments anchored to screens, states, widths, or transitions. |
 | `dui transitions PROJECT MANIFEST [RUN]` | `transitions(...)` | Replay actions and verify extracted/inferred screen transitions. |
 | `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | Attempt every cell in a saved plan, including pending states. |

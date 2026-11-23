@@ -15,7 +15,7 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
 | 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 18 / 19+, Vite 7 / 8+, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | 데스크톱 앱 | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
-| 모바일 앱 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` 룰팩) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) 심층 상태 계획 |
+| 모바일 앱 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` 룰팩) | 공식 컴파일러 진단 (`dui toolchains`); SwiftUI / Compose / Flutter 어댑터 예정 ([지원 프레임워크](docs/ko/supported-frameworks.md)) |
 | 터미널 UI (TUI) | Universal TUI (`pty` + VT100 셀 그리드 → `RenderNodeSnapshot` + 모노스페이스 PNG), Ink 5 (`tsc` 룰팩) | Ratatui (`rustc`), Bubble Tea (`go`) 심층 상태 계획 |
 | 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 7 / 8, Next.js App Router (`app/**/page.tsx`), 표준 Web `URLSearchParams` | Android 인텐트/딥링크 컴파일러 심층 분석 |
 | 상태 · 폼 · 스키마 | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1, Radix UI 1 / shadcn/ui 4 | — |
@@ -31,8 +31,7 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | 품질 · 다국어 · 감사 | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱 | 지원 |
 | 라이브 편집 · 뷰어 | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`) | 지원 |
 | 요소 인스펙터 · 박스 모델 | 개발자도구형 요소 속성 확인, 박스 모델 다이어그램·오버레이(너비·높이·마진·패딩·테두리·gap·radius), 요소 간 간격 레드라인 측정 가이드 | 지원 |
-| 캔버스 실제 컴포넌트 렌더링 | 2D 캔버스 카드 위에 실제 루프백 컴포넌트를 직접 마운트(`dui open --live` / `--live-url`), 무수정 DOM 텔레메트리 브리지 및 `ElementInspector` 양방향 하이라이트 (`v0.2.0`) | 지원 |
-| 멀티 서피스 엔진 · 확장 | `SurfaceRegistry` 멀티 서피스 플러그인 파이프라인, 병렬 멀티 워커 캡처(`concurrency`), WAI-ARIA 모달/드로어 자동 캡처, 장애물 회피 거터 연결선, GPUI AccessKit 렌더 트리 Diff | 지원 |
+| 범용 라우팅 · 모달 · 캔버스 | 풀페이지 실제 비율 캡처, WAI-ARIA 네비게이션 펼침·모달/드로어 자동 캡처, 장애물 회피 거터 연결선, macOS 통합 `TitleBar`(`apps/desktop`), 병렬 멀티 워커 캡처(`concurrency`), `SurfaceRegistry` 파이프라인 | 지원 |
 
 ## 설치
 
@@ -67,11 +66,11 @@ dui map
 # 2. (선택) 로그인이 필요한 앱 세션 캡처 (폼·MFA·OAuth 지원)
 dui auth login http://localhost:5173/login --out auth-state.json
 
-# 3. 2D 캔버스에서 확인 (--live를 붙이면 실제 루프백 컴포넌트를 직접 마운트)
+# 3. 2D 캔버스 또는 네이티브 데스크톱 뷰어에서 확인
 dui open
-dui open --live
+dui desktop
 
-# 4. 브랜치 비교 PR 마크다운 요약 및 커버리지·디자인 결함 감사
+# 4. 브랜치 비교 PR 마크다운 요약 및 커버리지 감사
 dui diff --base main --markdown
 dui audit <run-dir>
 ```
@@ -80,15 +79,15 @@ dui audit <run-dir>
 
 | 명령어 | 언제 쓰나 |
 | --- | --- |
-| `dui map [PROJECT]` | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · 링크). 화면을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 한 번에 캡처한다. |
+| `dui map [PROJECT]` | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · Next.js · 링크). 화면과 모달을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 한 번에 캡처한다. |
 | `dui run [PROJECT] [MANIFEST]` | **명시적 매니페스트 직접 캡처.** `dui.json` 설정 그대로 실행한다(인자를 생략하면 `.` / `dui.json`을 사용하며, 명시적 `path`/`host`가 없으면 `dui map`으로 자동 발견). |
 
 | 분류 | 명령어 | 역할 |
 | --- | --- | --- |
-| 캡처 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 화면 자동 발견·캡처 또는 브라우저 없이 컴파일러 사실/목 출력 |
+| 캡처 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 화면·모달 자동 발견·캡처 또는 브라우저 없이 컴파일러 사실/목 출력 |
 | 인증 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 인증된 화면 캡처용 `storageState.json` 저장(`0600`) |
-| 뷰어 · 라이브 | `dui open [--live \| --live-url URL]` · `dui desktop` · `dui live JSON` | 내장 2D 웹 캔버스(라이브 마운트·`Alt+클릭` 요소 선택) 또는 네이티브 GPUI 뷰어 |
-| 비교 · 품질 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 요소/픽셀 Diff, 99% 커버리지·6종 디자인 결함 감사, 리뷰 코멘트 |
+| 뷰어 | `dui open [RUN_DIR]` · `dui desktop` | 내장 2D 웹 캔버스 또는 네이티브 GPUI 데스크톱 뷰어 |
+| 비교 · 품질 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 요소/픽셀 Diff, 99% 커버리지 감사, 리뷰 코멘트 |
 | 도구 | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | 공식 컴파일러 진단, 아카이브 목록, 캐시 정리, 업데이트, MCP 서버 |
 
 ## 화면 자동 발견

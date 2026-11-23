@@ -216,19 +216,16 @@ AUTH
       --timeout SECS                      Wait timeout in seconds (default: 300)
       --headless                          Run headless for redirect/automated login flows
 
-VIEW & LIVE
+VIEW
   dui open [RUN_DIR...] [OPTIONS]         Open embedded 2D canvas viewer in browser
-      --live                              Auto-start local dev/static server in Live mount mode
-      --live-url URL                      Connect Live mount to a running loopback URL
       --port PORT | --no-open             Bind fixed port / print URL without launching browser
   dui serve [RUN_DIR...] [OPTIONS]        Same as `dui open --no-open`
-  dui desktop [ARGS...]                   Open native GPUI desktop viewer (--live-url, --theme, --lang)
-  dui live REQUEST_JSON                   Drive persistent live state-editing sessions
+  dui desktop [ARGS...]                   Open native GPUI desktop viewer (--theme, --lang)
 
 DIFF & QUALITY
   dui diff BEFORE AFTER [--markdown]      Compare two runs (element renderDiff + lazy pixel overlay)
   dui diff --base BRANCH [--markdown]     Compare current worktree run against a base branch
-  dui audit RUN_DIR [--goal PERCENT]      Check coverage goal, gaps, and Design & A11y Audit findings
+  dui audit RUN_DIR [--goal PERCENT]      Check coverage goal, gaps, and unresolved review comments
   dui comment <add|list|resolve|reopen>   Manage review comments anchored to screens/cells
 
 TOOLS
@@ -349,18 +346,10 @@ fn run() -> Reply {
         let mut port: u16 = 0;
         let mut open_browser = cmd == "open";
         let mut run_dirs = Vec::new();
-        let mut live_opts = viewer::LiveViewerOptions::default();
         let mut iter = tail.iter();
         while let Some(arg) = iter.next() {
             if arg == "--no-open" {
                 open_browser = false;
-            } else if arg == "--live" {
-                live_opts.auto_live = true;
-            } else if arg == "--live-url" {
-                let Some(val) = iter.next().and_then(|v| v.to_str()) else {
-                    return Err(failure(2, "missing value for --live-url"));
-                };
-                live_opts.live_url = Some(val.to_owned());
             } else if arg == "--port" {
                 let Some(val) = iter.next() else {
                     return Err(failure(2, "missing value for --port"));
@@ -373,7 +362,7 @@ fn run() -> Reply {
                 run_dirs.push(std::path::PathBuf::from(arg));
             }
         }
-        return viewer::serve(run_dirs, port, open_browser, live_opts);
+        return viewer::serve(run_dirs, port, open_browser);
     }
     if let [cmd, manifest, plan, out] = args.as_slice()
         && cmd == "replay-report"

@@ -224,12 +224,12 @@ try {
     });
 
     const chrome = chromeExecutable();
-    const expectedOpenLive: Record<string, string> = {
-      en: "Open live",
-      "zh-CN": "打开实时会话",
-      ko: "라이브 열기",
+    const expectedArchiveLabel: Record<string, string> = {
+      en: "Archive",
+      "zh-CN": "归档",
+      ko: "아카이브",
     };
-    for (const [uiLang, expectedLabel] of Object.entries(expectedOpenLive)) {
+    for (const [uiLang, expectedLabel] of Object.entries(expectedArchiveLabel)) {
       const dom = execFileSync(
         chrome,
         [
