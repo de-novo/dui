@@ -49,6 +49,8 @@ export type Cell = {
   status: "verified" | "unverified" | "unrenderable";
   reason?: string;
   image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   state?: string;
   scenario?: string;
   locale?: string;
@@ -243,6 +245,18 @@ export function decodeOverview(raw: unknown): ScreenMap {
         width: cell.width,
         status: cell.status,
         image: typeof cell.image === "string" ? cell.image : undefined,
+        imageWidth:
+          typeof cell.imageWidth === "number" &&
+          Number.isFinite(cell.imageWidth) &&
+          cell.imageWidth > 0
+            ? Math.round(cell.imageWidth)
+            : undefined,
+        imageHeight:
+          typeof cell.imageHeight === "number" &&
+          Number.isFinite(cell.imageHeight) &&
+          cell.imageHeight > 0
+            ? Math.round(cell.imageHeight)
+            : undefined,
         reason: typeof cell.reason === "string" ? cell.reason : undefined,
         locale: typeof cell.locale === "string" ? cell.locale : undefined,
         localeAudit: decodeLocaleAudit(cell.localeAudit),

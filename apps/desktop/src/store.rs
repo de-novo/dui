@@ -36,6 +36,21 @@ pub struct CellItem {
     pub http_errors: Vec<String>,
     pub blob_id: Option<String>,
     pub blob_path: Option<PathBuf>,
+    pub image_width: Option<u32>,
+    pub image_height: Option<u32>,
+}
+
+fn read_png_dimensions(path: &Path) -> Option<(u32, u32)> {
+    use std::io::Read;
+    let mut file = fs::File::open(path).ok()?;
+    let mut header = [0u8; 24];
+    file.read_exact(&mut header).ok()?;
+    if &header[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return None;
+    }
+    let width = u32::from_be_bytes([header[16], header[17], header[18], header[19]]);
+    let height = u32::from_be_bytes([header[20], header[21], header[22], header[23]]);
+    (width > 0 && height > 0).then_some((width, height))
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -692,6 +707,10 @@ fn load_run_screens(
                     cells: Vec::new(),
                     outgoing: Vec::new(),
                 });
+            let (image_width, image_height) = blob_path
+                .as_deref()
+                .and_then(read_png_dimensions)
+                .map_or((None, None), |(w, h)| (Some(w), Some(h)));
             entry.cells.push(CellItem {
                 id,
                 state_id,
@@ -703,6 +722,8 @@ fn load_run_screens(
                 http_errors,
                 blob_id,
                 blob_path,
+                image_width,
+                image_height,
             });
         }
     }
@@ -1196,6 +1217,8 @@ mod tests {
                     http_errors: Vec::new(),
                     blob_id: Some(blob_id.into()),
                     blob_path: Some(blob_path),
+                    image_width: Some(2),
+                    image_height: Some(2),
                 }],
                 outgoing: Vec::new(),
             }],
