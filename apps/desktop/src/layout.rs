@@ -43,8 +43,8 @@ pub fn node_metrics(capture_width: u32) -> NodeMetrics {
     let frame_height = (w * aspect).round();
     let caption_height = (w * 0.085).clamp(44.0, 96.0).round();
     let card_height = frame_height + caption_height;
-    let col_gap = (w * 0.24).max(120.0).round();
-    let row_gap = (card_height * 0.16).max(96.0).round();
+    let col_gap = (w * 0.24).max(160.0).round();
+    let row_gap = (card_height * 0.26).max(260.0).round();
     NodeMetrics {
         card_width: w,
         frame_height,
@@ -105,7 +105,7 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
 
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); screens.len()];
     let mut undirected: Vec<Vec<usize>> = vec![Vec::new(); screens.len()];
-    let mut edges = Vec::new();
+    let mut edge_source: BTreeMap<(usize, usize), String> = BTreeMap::new();
     let mut seen_edges: BTreeSet<(usize, usize)> = BTreeSet::new();
     for (i, sc) in screens.iter().enumerate() {
         for edge in &sc.outgoing {
@@ -116,14 +116,11 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
                 adj[i].push(target);
                 undirected[i].push(target);
                 undirected[target].push(i);
-                edges.push(LayoutEdge {
-                    from_idx: i,
-                    to_idx: target,
-                    source: edge.source.clone(),
-                });
+                edge_source.insert((i, target), edge.source.clone());
             }
         }
     }
+    let mut edges = Vec::new();
 
     // Separate connected groups (size >= 2) from isolated screens for clean grid packing.
     let mut visited = vec![false; screens.len()];
@@ -175,6 +172,15 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
                 if let std::collections::btree_map::Entry::Vacant(e) = depth_map.entry(v) {
                     e.insert(d + 1);
                     q.push_back(v);
+                    // Emit clean spanning-tree forest edges matching `apps/canvas/src/features/map/layout.ts`.
+                    edges.push(LayoutEdge {
+                        from_idx: u,
+                        to_idx: v,
+                        source: edge_source
+                            .get(&(u, v))
+                            .cloned()
+                            .unwrap_or_else(|| "extracted".into()),
+                    });
                 }
             }
         }
