@@ -1,15 +1,22 @@
 import { ArrowLeft, GitCompareArrows } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
+import {
+  archiveFileUrl,
+  diffApiUrl,
+  diffOverlayUrl,
+  isStaticArchiveMode,
+} from "../../data/archiveUrls";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 import { decodeCaptureDiff, type CaptureDiff, type CellDiffEntry } from "../../model/diff";
 
 function archiveImageUrl(name: string, runKey: string) {
-  return "/archive/" + encodeURIComponent(name) + "?run=" + encodeURIComponent(runKey);
+  return archiveFileUrl(name, runKey);
 }
 
 function overlayImageUrl(beforeKey: string, afterKey: string, file: string) {
+  if (isStaticArchiveMode()) return diffOverlayUrl(file);
   return (
     "/api/diff/overlay?before=" +
     encodeURIComponent(beforeKey) +
@@ -191,11 +198,7 @@ export function CaptureDiffView({
 
   useEffect(() => {
     let cancelled = false;
-    const url =
-      "/api/diff?before=" +
-      encodeURIComponent(beforeKey) +
-      "&after=" +
-      encodeURIComponent(afterKey);
+    const url = diffApiUrl(beforeKey, afterKey, true);
     void fetch(url)
       .then(async (res) => {
         if (!res.ok) throw Error(t.diffFailed);

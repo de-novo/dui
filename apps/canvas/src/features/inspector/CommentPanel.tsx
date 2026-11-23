@@ -1,6 +1,7 @@
 import { Check, MessageSquare, RotateCcw } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
+import { isStaticArchiveMode } from "../../data/archiveUrls";
 import type { Cell, Screen } from "../../data/overview";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -34,9 +35,11 @@ export function CommentPanel({
   const [body, setBody] = useState("");
   const [targetChoice, setTargetChoice] = useState<TargetChoice>("screen");
   const currentKey = `${run.projectId}:${screen.path}`;
-  const loading = loadedKey !== currentKey;
+  const staticDemo = isStaticArchiveMode();
+  const loading = !staticDemo && loadedKey !== currentKey;
 
   useEffect(() => {
+    if (staticDemo) return;
     const controller = new AbortController();
     const params = new URLSearchParams({
       projectId: run.projectId,
@@ -62,7 +65,7 @@ export function CommentPanel({
         setLoadedKey(currentKey);
       });
     return () => controller.abort();
-  }, [currentKey, run.projectId, screen.path, t.commentFailed]);
+  }, [currentKey, run.projectId, screen.path, staticDemo, t.commentFailed]);
 
   async function handleAdd(event: FormEvent) {
     event.preventDefault();
@@ -144,45 +147,47 @@ export function CommentPanel({
         )}
       </div>
 
-      <form className="comment-form" onSubmit={handleAdd}>
-        <label className="comment-target-label">
-          <span>{t.commentTarget}</span>
-          <select
-            aria-label={t.commentTarget}
-            value={targetChoice}
-            onKeyDown={onKeyDown}
-            onChange={(e) => setTargetChoice(e.target.value as TargetChoice)}
-          >
-            <option value="screen">
-              {t.commentTargetScreen} ({screen.path})
-            </option>
-            {cell && (
-              <option value="cell">
-                {t.commentTargetWidth} ({cell.width} px)
+      {!staticDemo && (
+        <form className="comment-form" onSubmit={handleAdd}>
+          <label className="comment-target-label">
+            <span>{t.commentTarget}</span>
+            <select
+              aria-label={t.commentTarget}
+              value={targetChoice}
+              onKeyDown={onKeyDown}
+              onChange={(e) => setTargetChoice(e.target.value as TargetChoice)}
+            >
+              <option value="screen">
+                {t.commentTargetScreen} ({screen.path})
               </option>
-            )}
-            {outgoingTargets.map((to) => (
-              <option key={to} value={`transition:${to}`}>
-                {t.commentTargetTransition} ({screen.path} → {to})
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="comment-input-row">
-          <input
-            type="text"
-            className="comment-input"
-            value={body}
-            placeholder={t.commentPlaceholder}
-            aria-label={t.commentPlaceholder}
-            disabled={submitting}
-            onChange={(e) => setBody(e.target.value)}
-          />
-          <Button type="submit" size="sm" disabled={submitting || body.trim().length === 0}>
-            {t.addComment}
-          </Button>
-        </div>
-      </form>
+              {cell && (
+                <option value="cell">
+                  {t.commentTargetWidth} ({cell.width} px)
+                </option>
+              )}
+              {outgoingTargets.map((to) => (
+                <option key={to} value={`transition:${to}`}>
+                  {t.commentTargetTransition} ({screen.path} → {to})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="comment-input-row">
+            <input
+              type="text"
+              className="comment-input"
+              value={body}
+              placeholder={t.commentPlaceholder}
+              aria-label={t.commentPlaceholder}
+              disabled={submitting}
+              onChange={(e) => setBody(e.target.value)}
+            />
+            <Button type="submit" size="sm" disabled={submitting || body.trim().length === 0}>
+              {t.addComment}
+            </Button>
+          </div>
+        </form>
+      )}
 
       {error && (
         <p className="live-unavailable-note" role="alert">

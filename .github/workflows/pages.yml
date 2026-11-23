@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "examples/**"
+      - "apps/canvas/**"
+      - "scripts/build-pages-demo.mts"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -18,20 +21,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+          cache: npm
+      - name: Enable pnpm via corepack
+        run: |
+          npm install -g pnpm@10
+      - name: Install JS dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/canvas
+      - name: Build dui binary and 6-project interactive canvas demo
+        run: |
+          export DUI_CHROMIUM="$(command -v google-chrome)"
+          npm run build --prefix apps/canvas
+          cargo build --release --locked
+          npm run build:pages-demo
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

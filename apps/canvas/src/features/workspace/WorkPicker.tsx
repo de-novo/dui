@@ -1,5 +1,6 @@
 import { Button } from "../../components/ui/button";
 import { useState } from "react";
+import { isStaticArchiveMode } from "../../data/archiveUrls";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 
@@ -13,7 +14,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
   const branches = [...new Set(projectRuns.map((r) => r.branch))];
   const versions = projectRuns.filter((r) => r.branch === run.branch);
   return (
-    <form action="/" method="get" className="work-picker">
+    <form action={isStaticArchiveMode() ? "./" : "/"} method="get" className="work-picker">
       <label>
         Project
         <select

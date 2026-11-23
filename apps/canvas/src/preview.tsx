@@ -2,6 +2,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
+import {
+  archiveFileUrl,
+  auditApiUrl,
+  diffApiUrl,
+  isStaticArchiveMode,
+  runsIndexUrl,
+} from "./data/archiveUrls";
 import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
 import { CaptureDiffView } from "./features/diff/CaptureDiffView";
@@ -22,7 +29,7 @@ import { parseSelection, resolveCell, withSearchChanges } from "./model/selectio
 import "./preview.css";
 
 function archiveUrl(name: string, run: Run) {
-  return "/archive/" + encodeURIComponent(name) + "?run=" + encodeURIComponent(run.key);
+  return archiveFileUrl(name, run.key);
 }
 
 function MapView({
@@ -86,7 +93,11 @@ function MapView({
   const origin = useRef<HTMLElement | SVGElement | null>(null);
   const previousView = useRef(view);
 
-  const otherRuns = useMemo(() => runs.filter((r) => r.key !== run.key), [runs, run.key]);
+  const staticDemo = isStaticArchiveMode();
+  const otherRuns = useMemo(
+    () => runs.filter((r) => r.key !== run.key && r.projectId === run.projectId),
+    [runs, run.key, run.projectId],
+  );
   const wantPixelOverlay = diffVisualMode === "overlay";
   const activePairKey = compareBeforeKey ? `${compareBeforeKey}::${run.key}` : "";
   const activeDiff =
@@ -99,11 +110,10 @@ function MapView({
     if (!compareBeforeKey) return;
     const reqKey = `${compareBeforeKey}::${run.key}:${wantPixelOverlay ? "px" : "rt"}`;
     const controller = new AbortController();
-    const pixelsParam = wantPixelOverlay ? "1" : "0";
-    fetch(
-      `/api/diff?before=${encodeURIComponent(compareBeforeKey)}&after=${encodeURIComponent(run.key)}&pixels=${pixelsParam}`,
-      { cache: "no-store", signal: controller.signal },
-    )
+    fetch(diffApiUrl(compareBeforeKey, run.key, wantPixelOverlay), {
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((raw) => {
         if (!controller.signal.aborted) {
@@ -123,7 +133,7 @@ function MapView({
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/audit?run=${encodeURIComponent(run.key)}`, {
+    fetch(auditApiUrl(run.key), {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -211,8 +221,32 @@ function MapView({
           )}
         </div>
 
-        {(showAuditPill || otherRuns.length > 0) && (
+        {(showAuditPill || otherRuns.length > 0 || (staticDemo && runs.length > 1)) && (
           <div className="map-top-bar">
+            {staticDemo && runs.length > 1 && (
+              <section className="canvas-diff-bar glass-panel" aria-label="Showcase projects">
+                <label className="canvas-diff-select-wrap">
+                  <span>Project</span>
+                  <select
+                    aria-label="Showcase project"
+                    value={run.key}
+                    onChange={(e) => {
+                      location.href = `./?run=${encodeURIComponent(e.target.value)}`;
+                    }}
+                  >
+                    {runs.map((candidate) => (
+                      <option key={candidate.key} value={candidate.key}>
+                        {candidate.project} · {candidate.branch ?? candidate.version}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <a className="canvas-diff-chip" href="../" style={{ textDecoration: "none" }}>
+                  ← dui.sh
+                </a>
+              </section>
+            )}
+
             {showAuditPill && (
               <output className="audit-summary-pill glass-panel">
                 <span className="audit-open-comments">
@@ -518,7 +552,7 @@ const root = createRoot(document.getElementById("root")!);
 let runs: Run[] = [],
   run: Run | undefined;
 try {
-  runs = await json("/archive/runs.json");
+  runs = await json(runsIndexUrl());
   const key = new URLSearchParams(location.search).get("run");
   run = key === null ? runs[0] : runs.find((r) => r.key === key);
   if (key !== null && !run) throw Error("workspace-unavailable");

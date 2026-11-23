@@ -1,6 +1,13 @@
 import type { Screen, ScreenMap } from "../data/overview";
 import type { CaptureDiff, CellDiffEntry, RenderDiffSummary } from "./diff";
 
+function staticArchiveBase(): string | null {
+  if (typeof document === "undefined") return null;
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="dui-static-archive"]');
+  const value = meta?.content?.trim();
+  return value ? value.replace(/\/+$/, "") : null;
+}
+
 export type CanvasDiffVisualMode = "render" | "after" | "before" | "overlay";
 
 export type ScreenCanvasDiff = {
@@ -124,11 +131,16 @@ export function resolveCardDiffImageUrl(
   fallbackImageUrl?: string,
 ): string | undefined {
   if (!screenDiff) return fallbackImageUrl;
+  const base = staticArchiveBase();
   const archiveUrl = (name: string, runKey: string) =>
-    `/archive/${encodeURIComponent(name)}?run=${encodeURIComponent(runKey)}`;
+    base
+      ? `${base}/${encodeURIComponent(runKey)}/${encodeURIComponent(name)}`
+      : `/archive/${encodeURIComponent(name)}?run=${encodeURIComponent(runKey)}`;
 
   if (mode === "overlay" && screenDiff.overlayImage) {
-    return `/api/diff-overlay?file=${encodeURIComponent(screenDiff.overlayImage)}`;
+    return base
+      ? `${base}/diffs/${encodeURIComponent(screenDiff.overlayImage)}`
+      : `/api/diff-overlay?file=${encodeURIComponent(screenDiff.overlayImage)}`;
   }
   if (mode === "before" && screenDiff.beforeImage && beforeRunKey) {
     return archiveUrl(screenDiff.beforeImage, beforeRunKey);

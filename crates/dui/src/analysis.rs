@@ -796,7 +796,11 @@ fn execute_with_locales(
                 .filter_map(Value::as_str)
                 .map(str::to_owned)
                 .collect();
+            let max_routes = spec["maxRoutes"].as_u64().map(|n| n as usize);
             for path in paths {
+                if max_routes.is_some_and(|limit| configured_paths.len() >= limit) {
+                    break;
+                }
                 let pattern = dui_core::discovery::route_pattern(&path);
                 if configured_paths.insert(path.clone()) && visited_patterns.insert(pattern) {
                     let next = linked_spec(&spec, &path);
