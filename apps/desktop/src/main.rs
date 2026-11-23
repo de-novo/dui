@@ -13,7 +13,7 @@ use gpui_kit::{
     base::StyledExt,
     canvas,
     component::{
-        Theme, ThemeMode,
+        Theme, ThemeMode, TitleBar,
         button::{Button, ButtonVariants as _},
         input::{Input, InputState},
         label::Label,
@@ -374,7 +374,7 @@ impl DuiDesktopView {
         let layout = self.current_layout();
         let left_inset = self.rail_width() + 56.0;
         let right_inset = self.inspector_width() + 28.0;
-        let top_inset = 64.0;
+        let top_inset = 24.0;
         let bottom_inset = 28.0;
         if layout.nodes.is_empty() || layout.content_width <= 0.0 || layout.content_height <= 0.0 {
             self.zoom = 0.2;
@@ -670,6 +670,243 @@ impl DuiDesktopView {
             }
             _ => {}
         }
+    }
+
+    /// Unified native macOS/desktop TitleBar (traffic-light strip) hosting workspace switcher,
+    /// live/audit/diff status pills, and 1-click capture width controls.
+    fn render_title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let tr = i18n::strings(self.lang);
+        let collapsed = self.rail_collapsed;
+
+        let left_group = {
+            let mut row = div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    div()
+                        .id("titlebar-rail-toggle")
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .rounded_md()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.rail_collapsed = !this.rail_collapsed;
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(if collapsed { "▸" } else { "◧" })
+                                .text_xs()
+                                .text_color(p.sidebar_muted),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_baseline()
+                        .child(
+                            Label::new("dui")
+                                .text_sm()
+                                .font_bold()
+                                .text_color(p.sidebar_foreground),
+                        )
+                        .child(Label::new(".").text_sm().font_bold().text_color(p.primary)),
+                );
+
+            if let Some(run) = self.active_run() {
+                let short_ver = short_run_id(&run.id);
+                let label_text = match run.branch.as_deref() {
+                    Some(b) if !b.is_empty() && b != "main" => {
+                        format!("{} · {b} · {short_ver}", run.project_name)
+                    }
+                    _ => format!("{} · {short_ver}", run.project_name),
+                };
+                row = row.child(
+                    div()
+                        .id("titlebar-workspace-btn")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.picker_open = !this.picker_open;
+                                this.options_open = false;
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(label_text)
+                                .text_xs()
+                                .font_medium()
+                                .text_color(p.foreground),
+                        )
+                        .child(Label::new("↕").text_xs().text_color(p.muted_foreground)),
+                );
+            }
+            row
+        };
+
+        let center_group = div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                cx.stop_propagation();
+            })
+            .child(self.render_live_surface_pill(cx))
+            .child(self.render_audit_pill(cx))
+            .child(self.render_canvas_diff_bar(cx));
+
+        let right_group = {
+            let mut row = div()
+                .flex()
+                .items_center()
+                .gap_1p5()
+                .pr_2()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                    cx.stop_propagation();
+                });
+
+            if let Some(run) = self.active_run() {
+                let widths = run.widths();
+                if !widths.is_empty() {
+                    let mut seg = div()
+                        .flex()
+                        .items_center()
+                        .gap_0p5()
+                        .p_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface);
+                    for w in widths.into_iter().take(4) {
+                        let active = w == self.selected_width;
+                        seg = seg.child(
+                            div()
+                                .id(format!("titlebar-width-{w}"))
+                                .px_1p5()
+                                .py_0p5()
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .when(active, |el| el.bg(p.foreground))
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.selected_width = w;
+                                        this.sync_cell_to_width();
+                                        this.fit_map();
+                                        cx.notify();
+                                    }),
+                                )
+                                .child(
+                                    Label::new(format!("{w}px"))
+                                        .text_xs()
+                                        .font_medium()
+                                        .text_color(if active {
+                                            p.background
+                                        } else {
+                                            p.muted_foreground
+                                        }),
+                                ),
+                        );
+                    }
+                    row = row.child(seg);
+                }
+            }
+
+            row = row
+                .child(
+                    div()
+                        .id("titlebar-theme-btn")
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, window, cx| {
+                                cx.stop_propagation();
+                                this.dark_mode = !this.dark_mode;
+                                Theme::change(
+                                    if this.dark_mode {
+                                        ThemeMode::Dark
+                                    } else {
+                                        ThemeMode::Light
+                                    },
+                                    Some(window),
+                                    cx,
+                                );
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(if self.dark_mode { "☾" } else { "☀" })
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                        ),
+                )
+                .child(
+                    div()
+                        .id("titlebar-options-btn")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.options_open = !this.options_open;
+                                this.picker_open = false;
+                                cx.notify();
+                            }),
+                        )
+                        .child(Label::new("⊶").text_xs().text_color(p.muted_foreground))
+                        .child(
+                            Label::new(tr.map_options)
+                                .text_xs()
+                                .text_color(p.foreground),
+                        ),
+                );
+            row
+        };
+
+        TitleBar::new()
+            .bg(p.sidebar)
+            .border_color(p.sidebar_line)
+            .child(left_group)
+            .child(center_group)
+            .child(right_group)
     }
 
     /// Floating rounded glass left WorkspaceRail matching `apps/canvas/src/features/workspace/WorkspaceRail.tsx` 1:1.
@@ -2014,55 +2251,6 @@ impl DuiDesktopView {
                 }),
             ));
 
-        // Bottom-right floating `Map options` pill matching `apps/canvas` (shifts cleanly beside floating inspector)
-        let options_right = if focus_active { 348.0 } else { 16.0 };
-        let map_options_btn = div()
-            .id("map-options-btn")
-            .absolute()
-            .right(px(options_right))
-            .bottom(px(14.0))
-            .px_3()
-            .py_2()
-            .rounded_lg()
-            .border_1()
-            .border_color(p.glass_line)
-            .bg(p.glass)
-            .shadow_md()
-            .cursor_pointer()
-            .flex()
-            .items_center()
-            .gap_2()
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, _, cx| {
-                    cx.stop_propagation();
-                    this.options_open = !this.options_open;
-                    this.picker_open = false;
-                    cx.notify();
-                }),
-            )
-            .child(Label::new("⊶").text_xs().text_color(p.muted_foreground))
-            .child(
-                Label::new(tr.map_options)
-                    .text_xs()
-                    .text_color(p.foreground),
-            );
-
-        // Top-center floating audit pill + inline canvas diff bar (matching `apps/canvas` `.map-top-bar`)
-        let top_pill = div()
-            .absolute()
-            .top(px(12.0))
-            .left(px(rail_w))
-            .right(px(if focus_active { 332.0 } else { 0.0 }))
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .justify_center()
-            .gap_2()
-            .child(self.render_live_surface_pill(cx))
-            .child(self.render_audit_pill(cx))
-            .child(self.render_canvas_diff_bar(cx));
-
         div()
             .id("desktop-map-viewport")
             .relative()
@@ -2122,9 +2310,7 @@ impl DuiDesktopView {
             )
             .child(edges_and_grid)
             .child(cards_layer)
-            .child(top_pill)
             .child(zoom_stack)
-            .child(map_options_btn)
     }
 
     /// Screen Neighborhood + Floating Glass Right Inspector matching `/tmp/obora-dui-detail.png` 1:1.
@@ -4209,8 +4395,9 @@ impl Render for DuiDesktopView {
         let p = self.pal();
         let win_bounds = window.viewport_size();
         self.viewport_w = f32::from(win_bounds.width).max(320.0);
-        self.viewport_h = f32::from(win_bounds.height).max(320.0);
+        self.viewport_h = (f32::from(win_bounds.height) - 34.0).max(320.0);
 
+        let title_bar = self.render_title_bar(cx);
         let rail = self.render_workspace_rail(cx);
         let picker_modal = self.picker_open.then(|| self.render_work_picker_modal(cx));
         let options_modal = self.options_open.then(|| self.render_map_options_modal(cx));
@@ -4218,14 +4405,7 @@ impl Render for DuiDesktopView {
         let is_full_bleed_map = matches!(self.view_mode, ViewMode::Overview)
             || (self.view_mode == ViewMode::Detail && !self.full_1x_detail);
 
-        let mut root = div()
-            .id("dui-desktop-root")
-            .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(Self::handle_key_down))
-            .relative()
-            .size_full()
-            .bg(p.background)
-            .text_color(p.foreground);
+        let mut body = div().relative().flex_1().w_full().overflow_hidden();
 
         if is_full_bleed_map {
             let focus_active = self.view_mode == ViewMode::Detail;
@@ -4236,23 +4416,36 @@ impl Render for DuiDesktopView {
                 .bottom_0()
                 .left_0()
                 .child(rail);
-            root = root.child(map).child(floating_rail);
+            body = body.child(map).child(floating_rail);
             if focus_active
                 && let (Some(run), Some(screen)) =
                     (self.active_run().cloned(), self.active_screen().cloned())
             {
                 let insp = self.render_floating_inspector(&run, &screen, cx);
-                root = root.child(div().absolute().top_0().bottom_0().right_0().child(insp));
+                body = body.child(div().absolute().top_0().bottom_0().right_0().child(insp));
             }
         } else {
-            root = root.flex().flex_row().child(rail);
-            root = match self.view_mode {
-                ViewMode::Detail => root.child(self.render_detail_stage(cx)),
-                ViewMode::Live => root.child(self.render_live_stage(cx)),
-                ViewMode::Diff => root.child(self.render_diff_stage(cx)),
-                ViewMode::Overview => root.child(self.render_overview_stage(false, cx)),
+            body = body.flex().flex_row().child(rail);
+            body = match self.view_mode {
+                ViewMode::Detail => body.child(self.render_detail_stage(cx)),
+                ViewMode::Live => body.child(self.render_live_stage(cx)),
+                ViewMode::Diff => body.child(self.render_diff_stage(cx)),
+                ViewMode::Overview => body.child(self.render_overview_stage(false, cx)),
             };
         }
+
+        let mut root = div()
+            .id("dui-desktop-root")
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(Self::handle_key_down))
+            .relative()
+            .size_full()
+            .flex()
+            .flex_col()
+            .bg(p.background)
+            .text_color(p.foreground)
+            .child(title_bar)
+            .child(body);
 
         if let Some(modal) = picker_modal {
             root = root.child(modal);
@@ -4336,7 +4529,7 @@ fn run_snapshot(opts: LaunchOptions, snapshot_out: PathBuf) -> Result<Value, Str
                     })),
                     focus: false,
                     show: false,
-                    ..Default::default()
+                    ..TitleBar::window_options()
                 },
                 cx,
                 |window, cx| cx.new(|cx| DuiDesktopView::new(opts, window, cx)),
@@ -4514,7 +4707,7 @@ fn main() {
         let _ = gpui_kit::open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
+                ..TitleBar::window_options()
             },
             cx,
             move |window, cx| cx.new(|cx| DuiDesktopView::new(opts, window, cx)),
