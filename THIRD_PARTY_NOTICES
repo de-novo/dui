@@ -10,3 +10,12 @@ shadcn/ui agent skill (development tooling)
 Source: https://github.com/shadcn-ui/ui/tree/f50887ae68d0fdcbfbe86b57be08af94a4c88a68/skills/shadcn
 License: MIT, Copyright (c) 2023 shadcn
 License text: .agents/skills/shadcn/LICENSE.md
+
+Uizze anti-ui-slop 1.4.0 (development tooling)
+Source: https://uizze.com/.well-known/skills/anti-ui-slop/SKILL.md
+License: Apache-2.0
+License and attributions: .agents/skills/anti-ui-slop/LICENSE and NOTICE in the same directory
+
+Vercel Web Interface Guidelines agent skill (development tooling)
+Source: https://github.com/vercel-labs/agent-skills/tree/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/skills/web-design-guidelines
+License: MIT, declared in the upstream README.md

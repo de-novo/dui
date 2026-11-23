@@ -46,7 +46,13 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 
 ## Code rules
 
-Use the official [shadcn/ui skill](.agents/skills/shadcn/SKILL.md) for viewer design system and component work. Keep archive evidence, keyboard navigation and map behavior consistent with the [viewer contract](docs/en/web-viewer.md).
+For viewer UI changes, choose the skill for the stage of work:
+
+- **Design** with [Uizze anti-ui-slop](.agents/skills/anti-ui-slop/SKILL.md). Use real dui captures to decide layout, hierarchy and empty states.
+- **Implement** with [shadcn/ui](.agents/skills/shadcn/SKILL.md). Reuse viewer tokens and shared controls.
+- **Review** with [Vercel Web Interface Guidelines](.agents/skills/web-design-guidelines/SKILL.md). Check keyboard access, focus, navigation, responsive layout and themes.
+
+The [viewer contract](docs/en/web-viewer.md) defines archive evidence, capture status and map behavior.
 
 1. Rust, edition 2024. One binary, `dui`.
 2. **Functional core, imperative shell.** `dui-core` has no I/O, no async, no clock, no randomness; same input, same output.
