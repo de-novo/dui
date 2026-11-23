@@ -1,0 +1,16 @@
+[package]
+name = "dui-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+dui-core.workspace = true
+dui-ports.workspace = true
+png.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

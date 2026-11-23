@@ -1,13 +1,10 @@
-//! Content-addressed per-cell capture cache backed by `SqliteStore` (`~/.dui/dui.db` + `~/.dui/blobs/`).
+//! Content-addressed per-cell capture cache backed by any `dui_ports::AppStore`.
 
-use crate::sqlite_store::SqliteStore;
-use dui_core::{
-    model::{
-        CacheEntry, CacheInputs, CacheKey, CacheOutcome, CellStatus, ContentHash, Evidence,
-        ImageBlob, Screen, StateId, Width, evaluate_cache,
-    },
-    storage::{ArtifactStore, CacheRepository},
+use dui_core::model::{
+    CacheEntry, CacheInputs, CacheKey, CacheOutcome, CellStatus, ContentHash, Evidence, ImageBlob,
+    Screen, StateId, Width, evaluate_cache,
 };
+use dui_ports::AppStore;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -16,7 +13,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub(crate) enum CacheLookup {
+pub enum CacheLookup {
     Hit {
         key: CacheKey,
         image_name: String,
@@ -28,8 +25,8 @@ pub(crate) enum CacheLookup {
     },
 }
 
-pub(crate) struct CellCache {
-    store: Option<SqliteStore>,
+pub struct CellCache<S: AppStore> {
+    store: Option<S>,
     source_files: BTreeMap<String, ContentHash>,
     module_graph: BTreeMap<String, Vec<String>>,
     route_files: BTreeMap<String, BTreeSet<String>>,
@@ -87,16 +84,15 @@ fn transitive_closure(
     visited
 }
 
-impl CellCache {
-    pub(crate) fn open(
-        dui_home: Option<&Path>,
+impl<S: AppStore> CellCache<S> {
+    pub fn with_store(
+        store: Option<S>,
         project_dir: Option<&Path>,
         analysis: &Value,
         spec: &Value,
         browser_version: Option<&Value>,
         force: bool,
     ) -> Self {
-        let store = dui_home.and_then(|home| SqliteStore::open(home).ok().map(|(s, _)| s));
 
         let mut source_files = BTreeMap::new();
         let mut locale_files = BTreeMap::new();
@@ -294,11 +290,11 @@ impl CellCache {
         }
     }
 
-    pub(crate) fn is_forced(&self) -> bool {
+    pub fn is_forced(&self) -> bool {
         self.force
     }
 
-    pub(crate) fn source_file_hashes(&self) -> BTreeMap<String, String> {
+    pub fn source_file_hashes(&self) -> BTreeMap<String, String> {
         let mut map: BTreeMap<String, String> = self
             .source_files
             .iter()
@@ -329,7 +325,7 @@ impl CellCache {
         Some(scoped)
     }
 
-    pub(crate) fn build_inputs(
+    pub fn build_inputs(
         &self,
         scenario: &str,
         spec: &Value,
@@ -408,7 +404,7 @@ impl CellCache {
         })
     }
 
-    pub(crate) fn lookup(&mut self, inputs: &CacheInputs, out: &Path) -> CacheLookup {
+    pub fn lookup(&mut self, inputs: &CacheInputs, out: &Path) -> CacheLookup {
         let key = inputs.key();
         let Some(store) = self.store.as_mut() else {
             return CacheLookup::Miss {
@@ -465,7 +461,7 @@ impl CellCache {
         }
     }
 
-    pub(crate) fn store_rendered(
+    pub fn store_rendered(
         &mut self,
         inputs: Option<&CacheInputs>,
         bytes: &[u8],

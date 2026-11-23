@@ -3,12 +3,12 @@ use serde_json::{Value, json};
 use std::process::Command;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ToolchainProbe {
-    pub(crate) kind: ToolchainKind,
-    pub(crate) binary: &'static str,
-    pub(crate) available: bool,
-    pub(crate) version: Option<String>,
-    pub(crate) support: ToolchainSupport,
+pub struct ToolchainProbe {
+    pub kind: ToolchainKind,
+    pub binary: &'static str,
+    pub available: bool,
+    pub version: Option<String>,
+    pub support: ToolchainSupport,
 }
 
 fn toolchain_command(kind: ToolchainKind) -> (&'static str, &'static str) {
@@ -22,7 +22,7 @@ fn toolchain_command(kind: ToolchainKind) -> (&'static str, &'static str) {
     }
 }
 
-pub(crate) fn probe_toolchain(kind: ToolchainKind) -> ToolchainProbe {
+pub fn probe_toolchain(kind: ToolchainKind) -> ToolchainProbe {
     let (binary, arg) = toolchain_command(kind);
     let output = Command::new(binary).arg(arg).output();
     match output {
@@ -52,7 +52,7 @@ pub(crate) fn probe_toolchain(kind: ToolchainKind) -> ToolchainProbe {
     }
 }
 
-pub(crate) fn probe_all_toolchains_json() -> Value {
+pub fn probe_all_toolchains_json() -> Value {
     let kinds = [
         ToolchainKind::TypeScript,
         ToolchainKind::Rustc,

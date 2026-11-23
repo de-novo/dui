@@ -1,19 +1,24 @@
-//! Coverage audit shell (`dui audit` / MCP `audit` / viewer `/api/audit`).
+//! Coverage audit use case (`dui audit` / MCP `audit` / viewer `/api/audit`).
 
-use crate::{Reply, archive, failure, replay::read, sqlite_store::SqliteStore};
+use crate::read_json;
 use dui_core::{
     audit::{AuditCellInput, AuditCommentInput, AuditInput, DEFAULT_GOAL_PERCENT, evaluate},
     model::{CommentStatus, ProjectId},
 };
+use dui_ports::{AppStore, Reply, failure};
 use serde_json::{Value, json};
 use std::path::Path;
 
-pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
+pub fn audit_run<S: AppStore>(
+    store: Option<&mut S>,
+    run_dir: &Path,
+    goal_percent: Option<f64>,
+) -> Reply {
     if !run_dir.is_dir() {
         return Err(failure(2, "run directory does not exist"));
     }
-    let report = read(&run_dir.join("report.json"))?;
-    let snapshot = read(&run_dir.join("snapshot.json")).ok();
+    let report = read_json(&run_dir.join("report.json"))?;
+    let snapshot = read_json(&run_dir.join("snapshot.json")).ok();
     let default_path = report["path"].as_str().unwrap_or("/").to_owned();
 
     let mut cells = Vec::new();
@@ -56,8 +61,7 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
     let mut comments = Vec::new();
     if let Some(pid_str) = snapshot.as_ref().and_then(|s| s["projectId"].as_str())
         && let Ok(pid) = ProjectId::parse(pid_str)
-        && let Ok(home) = archive::home_dir()
-        && let Ok((mut store, _)) = SqliteStore::open(&home)
+        && let Some(store) = store
     {
         let _ = store.import_run_dir(run_dir);
         if let Ok(found) = store.list_comments_by_project(&pid) {
@@ -108,11 +112,11 @@ pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
     Ok(out)
 }
 
-pub fn command(args: &Value) -> Reply {
+pub fn command<S: AppStore>(store: Option<&mut S>, args: &Value) -> Reply {
     let run = args["run"]
         .as_str()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| failure(2, "missing run directory"))?;
     let goal = args["goal"].as_f64();
-    audit_run(Path::new(run), goal)
+    audit_run(store, Path::new(run), goal)
 }

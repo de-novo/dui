@@ -1798,6 +1798,65 @@ impl SqliteStore {
     }
 }
 
+impl dui_ports::AppStore for SqliteStore {
+    fn blob_path(&self, id: &BlobId) -> PathBuf {
+        SqliteStore::blob_path(self, id)
+    }
+
+    fn link_or_copy_blob(&self, id: &BlobId, target: &Path) -> StoreResult<()> {
+        SqliteStore::link_or_copy_blob(self, id, target)
+    }
+
+    fn find_previous_cache_inputs(
+        &self,
+        state_id: &StateId,
+        width: Width,
+        locale: Option<&str>,
+    ) -> StoreResult<Option<CacheInputs>> {
+        SqliteStore::find_previous_cache_inputs(self, state_id, width, locale)
+    }
+
+    fn import_run_dir(&mut self, run_dir: &Path) -> StoreResult<bool> {
+        SqliteStore::import_run_dir(self, run_dir)
+    }
+
+    fn ensure_screen_record(&self, screen_id: &ScreenId, path: &str) -> StoreResult<()> {
+        SqliteStore::ensure_screen_record(self, screen_id, path)
+    }
+
+    fn ensure_edge_record(
+        &self,
+        edge_id: &EdgeId,
+        run_id: &RunId,
+        from_screen_id: &ScreenId,
+        to_screen_id: &ScreenId,
+    ) -> StoreResult<()> {
+        SqliteStore::ensure_edge_record(self, edge_id, run_id, from_screen_id, to_screen_id)
+    }
+
+    fn find_cell_id(
+        &self,
+        run_id: &RunId,
+        path: &str,
+        state: Option<&str>,
+        width: u32,
+    ) -> StoreResult<Option<CellId>> {
+        SqliteStore::find_cell_id(self, run_id, path, state, width)
+    }
+
+    fn describe_comment_target(&self, target: &dui_core::model::CommentTarget) -> Value {
+        SqliteStore::describe_comment_target(self, target)
+    }
+
+    fn list_comments_by_project(&self, project_id: &ProjectId) -> StoreResult<Vec<Comment>> {
+        SqliteStore::list_comments_by_project(self, project_id)
+    }
+
+    fn list_all_comments(&self) -> StoreResult<Vec<Comment>> {
+        SqliteStore::list_all_comments(self)
+    }
+}
+
 fn decode_comment(row: CommentRow) -> StoreResult<Comment> {
     let mut comment = Comment::open(
         ProjectId::parse(row.pid).map_err(db_err)?,

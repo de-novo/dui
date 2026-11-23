@@ -109,9 +109,24 @@ name = "dui"
 version = "0.2.0"
 dependencies = [
  "base64",
+ "dui-app",
  "dui-core",
+ "dui-ports",
+ "dui-storage",
  "png",
  "rusqlite",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "dui-app"
+version = "0.2.0"
+dependencies = [
+ "dui-core",
+ "dui-ports",
+ "png",
  "serde_json",
  "sha2",
  "tempfile",
@@ -125,6 +140,25 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "dui-ports"
+version = "0.2.0"
+dependencies = [
+ "dui-core",
+ "serde_json",
+]
+
+[[package]]
+name = "dui-storage"
+version = "0.2.0"
+dependencies = [
+ "dui-core",
+ "dui-ports",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

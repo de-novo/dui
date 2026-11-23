@@ -35,6 +35,7 @@ jobs:
                               raise SystemExit(f"{path}: inherit {name} from workspace.dependencies")
           PYTHON
       - run: npm run deps:check
+      - run: npm run check:deps
       - run: npm ci
       - run: npm run check:style
       - run: npm ci --prefix apps/canvas

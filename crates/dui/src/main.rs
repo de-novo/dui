@@ -2,27 +2,18 @@ mod analysis;
 mod android;
 mod archive;
 use archive::Capture;
-mod audit;
-mod cache;
 mod chromium;
-mod comments;
-mod compiler_oracle;
-mod diff;
 mod electron;
 mod gpui;
-mod graph_view;
 mod host;
-mod inspect;
 mod ios;
 mod live;
 mod mcp;
 mod nextjs;
-mod ports;
 mod reference;
 mod replay;
 mod retry;
 mod screen_map;
-mod sqlite_store;
 mod surface;
 mod transition;
 mod tui;
@@ -30,18 +21,160 @@ mod typescript;
 mod universal_web;
 mod update;
 mod viewer;
+
+pub(crate) use dui_app::{compiler_oracle, graph_view, inspect};
+pub(crate) use dui_ports::{self as ports, Reply, failure};
+pub(crate) use dui_storage as sqlite_store;
+
+/// Composition-root adapters wiring `dui_storage::SqliteStore` into `dui_app` use cases.
+mod audit {
+    use crate::{archive, sqlite_store::SqliteStore};
+    use dui_ports::Reply;
+    use serde_json::Value;
+    use std::path::Path;
+
+    pub fn audit_run(run_dir: &Path, goal_percent: Option<f64>) -> Reply {
+        let mut store = archive::home_dir()
+            .ok()
+            .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
+        dui_app::audit::audit_run(store.as_mut(), run_dir, goal_percent)
+    }
+
+    pub fn command(args: &Value) -> Reply {
+        let mut store = archive::home_dir()
+            .ok()
+            .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
+        dui_app::audit::command(store.as_mut(), args)
+    }
+}
+
+mod comments {
+    use crate::{archive, sqlite_store::SqliteStore};
+    use dui_ports::{Reply, failure};
+    use serde_json::Value;
+
+    fn open_store() -> Result<SqliteStore, (u8, Value)> {
+        let home = archive::home_dir()?;
+        let (store, _) = SqliteStore::open(&home).map_err(|e| failure(3, &e.to_string()))?;
+        Ok(store)
+    }
+
+    pub fn add(args: &Value) -> Reply {
+        let mut store = open_store()?;
+        dui_app::comments::add(&mut store, args)
+    }
+
+    pub fn list(args: &Value) -> Reply {
+        let mut store = open_store()?;
+        dui_app::comments::list(&mut store, args)
+    }
+
+    pub fn resolve(args: &Value) -> Reply {
+        let mut store = open_store()?;
+        dui_app::comments::resolve(&mut store, args)
+    }
+
+    pub fn reopen(args: &Value) -> Reply {
+        let mut store = open_store()?;
+        dui_app::comments::reopen(&mut store, args)
+    }
+}
+
+mod diff {
+    use crate::{archive, sqlite_store::SqliteStore};
+    use dui_ports::{Reply, failure};
+    use std::path::Path;
+
+    pub use dui_app::diff::changed_since_summary;
+
+    pub fn compare(before: &Path, after: &Path, overlay_dir: Option<&Path>) -> Reply {
+        compare_with_options(before, after, overlay_dir, true)
+    }
+
+    pub fn compare_with_options(
+        before: &Path,
+        after: &Path,
+        overlay_dir: Option<&Path>,
+        include_pixels: bool,
+    ) -> Reply {
+        let store = archive::home_dir()
+            .ok()
+            .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
+        dui_app::diff::compare_with_options(
+            store.as_ref(),
+            before,
+            after,
+            overlay_dir,
+            include_pixels,
+        )
+    }
+
+    pub fn compare_branches(
+        project: &Path,
+        base_branch: &str,
+        head_branch: Option<&str>,
+        overlay_dir: Option<&Path>,
+    ) -> Reply {
+        let prov = archive::provenance(project)?;
+        let project_id_str = prov["projectId"]
+            .as_str()
+            .ok_or_else(|| failure(2, "could not resolve project identity"))?;
+        let resolved_head = head_branch
+            .map(str::to_owned)
+            .or_else(|| prov["branch"].as_str().map(str::to_owned))
+            .ok_or_else(|| {
+                failure(
+                    2,
+                    "could not determine current git branch; pass --head BRANCH",
+                )
+            })?;
+        let home = archive::home_dir()?;
+        let (store, _) = SqliteStore::open(&home).map_err(|e| failure(3, &e.to_string()))?;
+        dui_app::diff::compare_branches_with_store(
+            &store,
+            &home,
+            project_id_str,
+            base_branch,
+            &resolved_head,
+            overlay_dir,
+        )
+    }
+}
+
+mod cache {
+    use crate::sqlite_store::SqliteStore;
+    use serde_json::Value;
+    use std::path::Path;
+
+    pub(crate) use dui_app::cache::CacheLookup;
+    pub(crate) type CellCache = dui_app::cache::CellCache<SqliteStore>;
+
+    pub(crate) fn open(
+        dui_home: Option<&Path>,
+        project_dir: Option<&Path>,
+        analysis: &Value,
+        spec: &Value,
+        browser_version: Option<&Value>,
+        force: bool,
+    ) -> CellCache {
+        let store = dui_home.and_then(|home| SqliteStore::open(home).ok().map(|(s, _)| s));
+        dui_app::cache::CellCache::with_store(
+            store,
+            project_dir,
+            analysis,
+            spec,
+            browser_version,
+            force,
+        )
+    }
+}
+
 use serde_json::{Value, json};
 use std::{
     env, fs,
     path::Path,
     process::{Command, ExitCode},
 };
-
-type Reply = Result<Value, (u8, Value)>;
-
-fn failure(code: u8, reason: &str) -> (u8, Value) {
-    (code, json!({"status":"error","reason":reason}))
-}
 
 fn resolve_desktop_binary() -> Option<std::path::PathBuf> {
     if let Ok(explicit) = env::var("DUI_DESKTOP_BIN")

@@ -170,7 +170,7 @@ pub(crate) fn exercise_with_renderer(
     let (locales, missing_by_locale) = resolve_locales(&spec, manifest.parent());
     let force = force || spec["force"] == true;
     let dui_home = crate::archive::home_dir().ok();
-    let mut cache = CellCache::open(
+    let mut cache = crate::cache::open(
         dui_home.as_deref(),
         project_dir.or_else(|| manifest.parent()),
         &analysis,

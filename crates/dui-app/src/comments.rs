@@ -1,13 +1,11 @@
 //! Review comments anchored to screens, states, widths (cells), and transitions (`v0.0.5`).
 
-use crate::{Reply, archive, failure, replay::read, sqlite_store::SqliteStore};
-use dui_core::{
-    model::{
-        CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeId, ProjectId, RunId, Screen,
-        StateId,
-    },
-    storage::CommentRepository,
+use crate::read_json;
+use dui_core::model::{
+    CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeId, ProjectId, RunId, Screen,
+    StateId,
 };
+use dui_ports::{AppStore, Reply, failure};
 use serde_json::{Value, json};
 use std::{
     path::Path,
@@ -21,13 +19,7 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn open_store() -> Result<SqliteStore, (u8, Value)> {
-    let home = archive::home_dir()?;
-    let (store, _) = SqliteStore::open(&home).map_err(|e| failure(3, &e.to_string()))?;
-    Ok(store)
-}
-
-fn serialize_comment(store: &SqliteStore, comment: &Comment) -> Value {
+fn serialize_comment<S: AppStore>(store: &S, comment: &Comment) -> Value {
     let status = match comment.status() {
         CommentStatus::Open => "open",
         CommentStatus::Resolved => "resolved",
@@ -46,14 +38,14 @@ fn serialize_comment(store: &SqliteStore, comment: &Comment) -> Value {
     })
 }
 
-fn resolve_run_identity(
-    store: &mut SqliteStore,
+fn resolve_run_identity<S: AppStore>(
+    store: &mut S,
     args: &Value,
 ) -> Result<(ProjectId, RunId), (u8, Value)> {
     if let Some(run_dir) = args["run"].as_str().filter(|s| !s.is_empty()) {
         let dir = Path::new(run_dir);
         let _ = store.import_run_dir(dir);
-        let snap = read(&dir.join("snapshot.json"))?;
+        let snap = read_json(&dir.join("snapshot.json"))?;
         let pid = snap["projectId"]
             .as_str()
             .ok_or_else(|| failure(2, "snapshot missing projectId"))?;
@@ -77,8 +69,8 @@ fn resolve_run_identity(
     Ok((project_id, run_id))
 }
 
-fn build_target(
-    store: &SqliteStore,
+fn build_target<S: AppStore>(
+    store: &S,
     run_id: &RunId,
     target_val: &Value,
 ) -> Result<CommentTarget, (u8, Value)> {
@@ -167,9 +159,8 @@ fn build_target(
     }
 }
 
-pub fn add(args: &Value) -> Reply {
-    let mut store = open_store()?;
-    let (project_id, run_id) = resolve_run_identity(&mut store, args)?;
+pub fn add<S: AppStore>(store: &mut S, args: &Value) -> Reply {
+    let (project_id, run_id) = resolve_run_identity(store, args)?;
     let body = args["body"]
         .as_str()
         .map(str::trim)
@@ -180,17 +171,16 @@ pub fn add(args: &Value) -> Reply {
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .unwrap_or("reviewer");
-    let target = build_target(&store, &run_id, &args["target"])?;
+    let target = build_target(store, &run_id, &args["target"])?;
     let comment = Comment::open(project_id, run_id, target, author, body, now_ms())
         .map_err(|e| failure(2, &e.to_string()))?;
     store
         .upsert_comment(&comment)
         .map_err(|e| failure(3, &e.to_string()))?;
-    Ok(json!({ "comment": serialize_comment(&store, &comment) }))
+    Ok(json!({ "comment": serialize_comment(store, &comment) }))
 }
 
-pub fn list(args: &Value) -> Reply {
-    let mut store = open_store()?;
+pub fn list<S: AppStore>(store: &mut S, args: &Value) -> Reply {
     let mut project_filter = args["projectId"]
         .as_str()
         .filter(|s| !s.is_empty())
@@ -207,7 +197,7 @@ pub fn list(args: &Value) -> Reply {
     {
         let dir = Path::new(run_dir);
         let _ = store.import_run_dir(dir);
-        let snap = read(&dir.join("snapshot.json"))?;
+        let snap = read_json(&dir.join("snapshot.json"))?;
         if let Some(pid) = snap["projectId"].as_str() {
             project_filter = Some(ProjectId::parse(pid).map_err(|e| failure(2, &e.to_string()))?);
         }
@@ -233,7 +223,7 @@ pub fn list(args: &Value) -> Reply {
     let mut open_count = 0usize;
     let mut resolved_count = 0usize;
     for c in &raw_comments {
-        let serialized = serialize_comment(&store, c);
+        let serialized = serialize_comment(store, c);
         if let Some(st) = status_filter
             && serialized["status"].as_str() != Some(st)
         {
@@ -267,8 +257,7 @@ pub fn list(args: &Value) -> Reply {
     }))
 }
 
-pub fn resolve(args: &Value) -> Reply {
-    let mut store = open_store()?;
+pub fn resolve<S: AppStore>(store: &mut S, args: &Value) -> Reply {
     let id_str = args["id"]
         .as_str()
         .filter(|s| !s.is_empty())
@@ -285,11 +274,10 @@ pub fn resolve(args: &Value) -> Reply {
     store
         .upsert_comment(&comment)
         .map_err(|e| failure(3, &e.to_string()))?;
-    Ok(json!({ "comment": serialize_comment(&store, &comment) }))
+    Ok(json!({ "comment": serialize_comment(store, &comment) }))
 }
 
-pub fn reopen(args: &Value) -> Reply {
-    let mut store = open_store()?;
+pub fn reopen<S: AppStore>(store: &mut S, args: &Value) -> Reply {
     let id_str = args["id"]
         .as_str()
         .filter(|s| !s.is_empty())
@@ -304,5 +292,5 @@ pub fn reopen(args: &Value) -> Reply {
     store
         .upsert_comment(&comment)
         .map_err(|e| failure(3, &e.to_string()))?;
-    Ok(json!({ "comment": serialize_comment(&store, &comment) }))
+    Ok(json!({ "comment": serialize_comment(store, &comment) }))
 }
