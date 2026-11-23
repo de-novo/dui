@@ -13,7 +13,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Category | Supported now | Planned |
 | --- | --- | --- |
 | Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 19, Vite 7 / 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 18 / 19+, Vite 7 / 8+, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | Desktop App | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` rules) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) deep state plans |
 | Terminal UI (TUI) | Universal TUI (`pty` + VT100 cell grid -> `RenderNodeSnapshot` + monospace PNG), Ink 5 (`tsc` rules) | Ratatui (`rustc`), Bubble Tea (`go`) deep state plans |
@@ -26,12 +26,12 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | --- | --- | --- |
 | Screen & link discovery | Router file discovery, loop-free multi-hop BFS (`a[href]`), dynamic ID pattern collapsing (`/orders/:id`), `linksTo` screen-map edges | Supported |
 | State planning & verification | Compiler-derived types, greedy pairwise covering array, `<select>` real DOM `<option>` discovery, visual-change witness (`visualWitness`), convergence guard | Supported |
-| Data & API verification | Typed `GET` JSON auto-mocks, CSV mocks, explicit `mockResponses`, `hybrid` / `live` real-API modes with read-only mutation guard & secret redaction | Supported |
+| Data & API verification | Typed `GET` JSON auto-mocks, CSV mocks, explicit `mockResponses`, `hybrid` / `live` real-API modes with read-only guard, authenticated sessions (`storageState.json`, `POST authFlow`, interactive `dui auth login`) & secret redaction | Supported |
 | Diff & change review | 2D canvas inline diff (`Elements` render-tree diff with 2px tolerance, `After`, `Before`, lazy `Pixel` overlay), branch diff (`dui diff --base main`), `--changed-since` | Supported |
 | Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
 | Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
 | Element inspector & box model | DevTools-style element attributes, box-model diagram & overlay (width, height, margin, padding, border, gap, radius), and interactive spacing redline guides between elements | Supported |
-| Live components on canvas | Evolving from capture + interactive spec overlay to mounting and rendering real live components directly on the 2D canvas (`v0.2.0`) | Planned |
+| Live components on canvas | Mount real loopback components directly on 2D canvas cards (`dui open --live` / `--live-url`) with real-time `RenderNodeSnapshot` telemetry streaming into `ElementInspector` (`v0.2.0`) | Supported (prototype) |
 | Design-defect detection & scale | Automatic visual/design-defect & a11y lint from `renderTree` (horizontal overflow, element overlap, WCAG contrast, touch target size, unlabeled controls, spacing drift — visual overlays for humans + structured CLI/MCP `designAudit` JSON for AI), `SurfaceRegistry` multi-surface plugin pipeline, parallel multi-worker capture (`concurrency`), GPUI AccessKit render-tree diff | Supported |
 
 ## Install
@@ -52,7 +52,7 @@ dui update --check
 dui update
 ```
 
-**For web capture**, install Node.js 26, Chromium or Google Chrome, and the target app’s dependencies.
+**For web capture**, install Node.js 22+ LTS (22 / 24 / 26), Chromium or Google Chrome, and the target app’s dependencies.
 
 Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/binary-install.md)
 

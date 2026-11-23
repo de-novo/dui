@@ -13,7 +13,7 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | 분류 | 현재 지원 | 예정 |
 | --- | --- | --- |
 | 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 19, Vite 7 / 8, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
+| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 18 / 19+, Vite 7 / 8+, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
 | 데스크톱 앱 | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | 모바일 앱 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` 룰팩) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) 심층 상태 계획 |
 | 터미널 UI (TUI) | Universal TUI (`pty` + VT100 셀 그리드 → `RenderNodeSnapshot` + 모노스페이스 PNG), Ink 5 (`tsc` 룰팩) | Ratatui (`rustc`), Bubble Tea (`go`) 심층 상태 계획 |
@@ -26,12 +26,12 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | --- | --- | --- |
 | 화면 · 링크 탐색 | 라우터 파일 자동 발견, 무한루프 방지 다단계 BFS (`a[href]`), 동적 ID 패턴 축약 (`/orders/:id`), 화면 간 `linksTo` 연결선 | 지원 |
 | 상태 계획 · 검증 | 공식 컴파일러 타입 기반 조합, Greedy Pairwise Covering Array, `<select>` 실옵션 자동 수집, 시각 변화 검증(`visualWitness`), 수렴 가드 | 지원 |
-| 데이터 · API 검증 | 타입 기반 `GET` JSON 자동 목, CSV 목, 명시적 `mockResponses`, `hybrid` / `live` 실서버 API 모드(기본 읽기 전용 가드 · 비밀값 무유출) | 지원 |
+| 데이터 · API 검증 | 타입 기반 `GET` JSON 자동 목, CSV 목, 명시적 `mockResponses`, `hybrid` / `live` 실서버 API 모드(읽기 전용 가드), 인증 세션(`storageState.json`, `POST authFlow`, 대화형 `dui auth login`) 및 비밀값 무유출 | 지원 |
 | Diff · 변경 리뷰 | 2D 캔버스 인라인 비교(`요소` 렌더 트리 Diff · 2px 노이즈 허용, `이후`, `이전`, 지연 `픽셀` 오버레이), 브랜치 비교(`dui diff --base main`), `--changed-since` | 지원 |
 | 품질 · 다국어 · 감사 | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱 | 지원 |
 | 라이브 편집 · 뷰어 | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`) | 지원 |
 | 요소 인스펙터 · 박스 모델 | 개발자도구형 요소 속성 확인, 박스 모델 다이어그램·오버레이(너비·높이·마진·패딩·테두리·gap·radius), 요소 간 간격 레드라인 측정 가이드 | 지원 |
-| 캔버스 실제 컴포넌트 렌더링 | 캡처 + 인터랙티브 스펙 오버레이에서 2D 캔버스 위 실제 컴포넌트를 직접 마운트·렌더링하는 구조로 진화 (`v0.2.0`) | 예정 |
+| 캔버스 실제 컴포넌트 렌더링 | 2D 캔버스 카드 위에 실제 루프백 컴포넌트를 직접 마운트(`dui open --live` / `--live-url`)하고 실시간 `RenderNodeSnapshot` 텔레메트리를 `ElementInspector`로 스트리밍 (`v0.2.0`) | 지원 (프로토타입) |
 | 디자인 결함 탐지 · 엔진 확장 | `renderTree` 기반 자동 디자인 결함·접근성 진단(가로 넘침·요소 겹침·WCAG 색상 대비·터치 타깃 크기·미라벨 컨트롤·간격 불일치 — 사람용 캔버스 오버레이 + AI용 CLI/MCP `designAudit` 정형 JSON), `SurfaceRegistry` 멀티 서피스 플러그인 파이프라인, 병렬 멀티 워커 캡처(`concurrency`), GPUI AccessKit 렌더 트리 Diff | 지원 |
 
 ## 설치
@@ -52,7 +52,7 @@ dui update --check
 dui update
 ```
 
-**웹 화면을 캡처할 때는** Node.js 26, Chromium 또는 Google Chrome, 대상 앱의 의존성이 필요하다.
+**웹 화면을 캡처할 때는** Node.js 22+ LTS (22 / 24 / 26), Chromium 또는 Google Chrome, 대상 앱의 의존성이 필요하다.
 
 설치 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. [바이너리 설치 안내](docs/binary-install.md)
 
