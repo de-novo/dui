@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture — dui</title>
+    <meta
+      name="description"
+      content="Functional Core + Imperative Shell architecture, 5-crate Cargo workspace boundaries, and honest multi-surface support matrix."
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="./">
+          <span>dui<span class="brand-dot">.</span></span>
+          <span class="version-pill">v0.2.0</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="./" data-i18n="navOverview">Overview</a>
+          <a href="./examples.html" data-i18n="navExamples">Examples</a>
+          <a href="./architecture.html" aria-current="page" data-i18n="navArch">Architecture</a>
+          <a href="./cli.html" data-i18n="navCli">CLI &amp; MCP</a>
+        </nav>
+        <div class="header-actions">
+          <select class="lang-select" aria-label="Language" data-lang-select>
+            <option value="en">EN</option>
+            <option value="ko">한국어</option>
+            <option value="zh-CN">简体中文</option>
+          </select>
+          <button class="icon-btn" type="button" data-theme-toggle>Light</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <span class="eyebrow">Functional Core · Imperative Shell</span>
+        <h1>Five crates. Strict dependency direction.</h1>
+        <p class="lead">
+          Enforced automatically in CI via <code>npm run check:deps</code> over
+          <code>cargo metadata --locked</code>. Pure logic stays I/O-free; adapters never import one
+          another.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Cargo Workspace Crates</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Crate</th>
+                <th>Responsibility</th>
+                <th>Allowed Workspace Deps</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>dui-core</code></td>
+                <td>
+                  Pure deterministic IR, state planning, diffing, coverage audit, storage repository
+                  traits
+                </td>
+                <td><span class="badge badge-ok">None (0)</span></td>
+              </tr>
+              <tr>
+                <td><code>dui-ports</code></td>
+                <td>
+                  Three core ports (<code>TypeOracle</code>, <code>Host</code>,
+                  <code>Renderer</code>), <code>SurfaceAdapter</code>, <code>SurfaceRegistry</code>,
+                  <code>AppStore</code>
+                </td>
+                <td><code>dui-core</code></td>
+              </tr>
+              <tr>
+                <td><code>dui-storage</code></td>
+                <td>
+                  SQLite (<code>~/.dui/dui.db</code>) + content-addressed PNG blob archive
+                  (<code>SqliteStore</code>)
+                </td>
+                <td><code>dui-core</code>, <code>dui-ports</code></td>
+              </tr>
+              <tr>
+                <td><code>dui-app</code></td>
+                <td>
+                  Port-driven use cases: <code>audit</code>, <code>cache</code>,
+                  <code>comments</code>, <code>diff</code>, <code>graph_view</code>,
+                  <code>inspect</code>, <code>compiler_oracle</code>
+                </td>
+                <td><code>dui-core</code>, <code>dui-ports</code> (0 adapters)</td>
+              </tr>
+              <tr>
+                <td><code>dui</code></td>
+                <td>
+                  Single binary composition root: wires concrete adapters, CLI, MCP server, and
+                  embedded web viewer
+                </td>
+                <td>All workspace crates</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Verified Surface Support Matrix</h2>
+        <p class="section-sub">
+          Every entry reflects what actually ships and passes automated checks today.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Surface</th>
+                <th>Supported Today</th>
+                <th>Planned</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Web</strong></td>
+                <td>
+                  Universal Web (<code>static</code> / <code>url</code> / <code>command</code>),
+                  Vite 7 / 8+, React 18 / 19+, Next.js 16, Nitro SSR, Chromium CDP
+                </td>
+                <td>Preact, Solid, Rspack / Rsbuild</td>
+              </tr>
+              <tr>
+                <td><strong>Desktop</strong></td>
+                <td>
+                  GPUI (Metal + AccessKit <code>renderTree</code>), Electron 45
+                  (<code>ipcMocks</code>)
+                </td>
+                <td>Tauri 2, Dioxus, egui, Iced</td>
+              </tr>
+              <tr>
+                <td><strong>Mobile</strong></td>
+                <td>
+                  Android (<code>adb screencap</code> + <code>uiautomator</code>), iOS Simulator
+                  (<code>xcrun simctl</code> + XCUI), React Native / Expo <code>tsc</code> rules
+                </td>
+                <td>Native SwiftUI, Jetpack Compose, Flutter adapters</td>
+              </tr>
+              <tr>
+                <td><strong>Terminal (TUI)</strong></td>
+                <td>Universal PTY + VT100 cell grid PNG &amp; scene tree, Ink 5 rules</td>
+                <td>Ratatui, Bubble Tea compiler state plans</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <span>dui · Apache-2.0</span>
+        <div class="footer-links">
+          <a href="./">Overview</a>
+          <a href="./examples.html">Examples</a>
+          <a href="./cli.html">CLI &amp; MCP</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./site.js"></script>
+  </body>
+</html>

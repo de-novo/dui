@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Examples — dui</title>
+    <meta
+      name="description"
+      content="Runnable zero-config examples for Static HTML, Vite/React, Next.js App Router, TUI, and branch diffing with dui."
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="./">
+          <span>dui<span class="brand-dot">.</span></span>
+          <span class="version-pill">v0.2.0</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="./" data-i18n="navOverview">Overview</a>
+          <a href="./examples.html" aria-current="page" data-i18n="navExamples">Examples</a>
+          <a href="./architecture.html" data-i18n="navArch">Architecture</a>
+          <a href="./cli.html" data-i18n="navCli">CLI &amp; MCP</a>
+        </nav>
+        <div class="header-actions">
+          <select class="lang-select" aria-label="Language" data-lang-select>
+            <option value="en">EN</option>
+            <option value="ko">한국어</option>
+            <option value="zh-CN">简体中文</option>
+          </select>
+          <button class="icon-btn" type="button" data-theme-toggle>Light</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <span class="eyebrow">Dogfooding &amp; Runnable Recipes</span>
+        <h1>Real-world examples, zero boilerplate.</h1>
+        <p class="lead">
+          Every recipe below runs directly with the single <code>dui</code> binary. Even this demo
+          site is self-verified with <code>dui map site/</code>.
+        </p>
+        <div class="cta-row">
+          <button
+            class="btn btn-primary"
+            type="button"
+            aria-haspopup="dialog"
+            data-open-dialog="manifest-dialog"
+          >
+            Optional dui.json template
+          </button>
+          <a class="btn" href="./cli.html">Full CLI Reference</a>
+        </div>
+      </section>
+
+      <section class="grid-2">
+        <article class="card">
+          <span class="step-num">STATIC HTML · ZERO CONFIG</span>
+          <h3>Map this demo site itself</h3>
+          <p>
+            Discovers all four pages and both native <code>&lt;dialog&gt;</code> modals with zero
+            bundler or config file.
+          </p>
+          <pre class="code-block"><code>dui map site/
+dui open</code></pre>
+        </article>
+
+        <article class="card">
+          <span class="step-num">VITE + REACT + TANSTACK / REACT ROUTER</span>
+          <h3>Full-stack SPA state &amp; modal sweep</h3>
+          <p>
+            Reads official TypeScript declarations and generated route registries, expands WAI-ARIA
+            sidebars, and captures every screen × modal × width.
+          </p>
+          <pre class="code-block"><code>cd your-vite-app
+dui map .
+dui desktop</code></pre>
+        </article>
+
+        <article class="card">
+          <span class="step-num">NEXT.JS 16 APP ROUTER</span>
+          <h3>Zero-config Next.js capture &amp; scan</h3>
+          <p>
+            Automatically detects <code>next.config.*</code>, discovers App Router pages and Server
+            Component boundaries, and captures full scrollable height.
+          </p>
+          <pre class="code-block"><code>cd your-nextjs-app
+dui scan .
+dui map .</code></pre>
+        </article>
+
+        <article class="card">
+          <span class="step-num">AUTHENTICATED ROUTES &amp; PR DIFF</span>
+          <h3>Login once, diff every PR</h3>
+          <p>
+            Capture an authenticated browser session (form, MFA, or OAuth) into
+            <code>storageState.json</code> (0600) and generate a Markdown diff table against
+            <code>main</code>.
+          </p>
+          <pre class="code-block"><code>dui auth login http://localhost:5173/login --out auth.json
+dui map .
+dui diff --base main --markdown</code></pre>
+        </article>
+      </section>
+    </main>
+
+    <dialog id="manifest-dialog" aria-label="Optional Manifest Template">
+      <div class="dialog-head">
+        <h2>Optional dui.json Template</h2>
+        <button class="btn btn-sm" type="button" aria-label="Close" data-close-dialog>Close</button>
+      </div>
+      <p class="section-sub">
+        Only needed when supplying dynamic route params, auth storage state, or out-of-router
+        scenarios:
+      </p>
+      <pre class="code-block"><code>{
+  "widths": [375, 1280],
+  "storageState": "./auth.json",
+  "routeParams": {
+    "/orders/:id": { "id": "ord-1042" }
+  },
+  "scenarios": [
+    { "path": "/checkout?step=confirm" }
+  ]
+}</code></pre>
+    </dialog>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <span>dui · Apache-2.0</span>
+        <div class="footer-links">
+          <a href="./">Overview</a>
+          <a href="./architecture.html">Architecture</a>
+          <a href="./cli.html">CLI &amp; MCP</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./site.js"></script>
+  </body>
+</html>

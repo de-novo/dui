@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CLI &amp; MCP Reference — dui</title>
+    <meta
+      name="description"
+      content="Complete CLI command and MCP stdio tool reference for dui v0.2.0."
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="./">
+          <span>dui<span class="brand-dot">.</span></span>
+          <span class="version-pill">v0.2.0</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="./" data-i18n="navOverview">Overview</a>
+          <a href="./examples.html" data-i18n="navExamples">Examples</a>
+          <a href="./architecture.html" data-i18n="navArch">Architecture</a>
+          <a href="./cli.html" aria-current="page" data-i18n="navCli">CLI &amp; MCP</a>
+        </nav>
+        <div class="header-actions">
+          <select class="lang-select" aria-label="Language" data-lang-select>
+            <option value="en">EN</option>
+            <option value="ko">한국어</option>
+            <option value="zh-CN">简体中文</option>
+          </select>
+          <button class="icon-btn" type="button" data-theme-toggle>Light</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <span class="eyebrow">Single Rust Binary · JSON + MCP Parity</span>
+        <h1>CLI &amp; MCP Reference</h1>
+        <p class="lead">
+          Every CLI subcommand returns deterministic JSON with stable exit codes. Run
+          <code>dui mcp</code> to expose the exact same operations to AI coding agents over stdio.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Commands</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>CLI Command</th>
+                <th>MCP Tool</th>
+                <th>Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>dui map [PROJECT]</code></td>
+                <td><code>map(project)</code></td>
+                <td>
+                  Auto-discover routes &amp; modals (Vite, Next.js, static HTML), merge optional
+                  <code>dui.json</code>, and capture every width.
+                </td>
+              </tr>
+              <tr>
+                <td><code>dui run [PROJECT] [MANIFEST]</code></td>
+                <td><code>run(project, manifest)</code></td>
+                <td>Execute an explicit <code>dui.json</code> manifest directly.</td>
+              </tr>
+              <tr>
+                <td><code>dui scan [PROJECT]</code></td>
+                <td><code>scan(project)</code></td>
+                <td>
+                  Print official compiler facts, framework controls, and auto-mocks without
+                  launching a browser.
+                </td>
+              </tr>
+              <tr>
+                <td><code>dui open [RUN_DIR]</code></td>
+                <td>—</td>
+                <td>Open the embedded 2D web canvas viewer in the browser.</td>
+              </tr>
+              <tr>
+                <td><code>dui desktop</code></td>
+                <td>—</td>
+                <td>
+                  Open the native GPUI desktop viewer directly over <code>~/.dui/dui.db</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>dui diff --base BRANCH [--markdown]</code></td>
+                <td><code>diff(before, after)</code></td>
+                <td>
+                  Compare runs with element-level <code>renderDiff</code> and lazy PNG pixel diff.
+                </td>
+              </tr>
+              <tr>
+                <td><code>dui audit RUN_DIR [--goal N]</code></td>
+                <td><code>audit(run, goal?)</code></td>
+                <td>Report verification coverage, gap reasons, and unresolved review comments.</td>
+              </tr>
+              <tr>
+                <td><code>dui comment &lt;add|list|resolve|reopen&gt;</code></td>
+                <td><code>comment_*</code></td>
+                <td>Manage review comments anchored to screens, states, widths, or transitions.</td>
+              </tr>
+              <tr>
+                <td><code>dui auth login URL --out FILE</code></td>
+                <td>—</td>
+                <td>
+                  Launch Chromium for interactive login and save <code>0600</code>
+                  <code>storageState.json</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>dui toolchains</code></td>
+                <td>—</td>
+                <td>
+                  Probe installed official compilers (<code>tsc</code>, <code>rustc</code>,
+                  <code>go</code>, <code>swiftc</code>, <code>kotlinc</code>, <code>dart</code>).
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>MCP Server Configuration</h2>
+        <pre class="code-block"><code>{
+  "mcpServers": {
+    "dui": {
+      "command": "/Users/you/.local/bin/dui",
+      "args": ["mcp"]
+    }
+  }
+}</code></pre>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <span>dui · Apache-2.0</span>
+        <div class="footer-links">
+          <a href="./">Overview</a>
+          <a href="./examples.html">Examples</a>
+          <a href="./architecture.html">Architecture</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./site.js"></script>
+  </body>
+</html>
