@@ -284,10 +284,18 @@ fn run() -> Reply {
         let mut port: u16 = 0;
         let mut open_browser = cmd == "open";
         let mut run_dirs = Vec::new();
+        let mut live_opts = viewer::LiveViewerOptions::default();
         let mut iter = tail.iter();
         while let Some(arg) = iter.next() {
             if arg == "--no-open" {
                 open_browser = false;
+            } else if arg == "--live" {
+                live_opts.auto_live = true;
+            } else if arg == "--live-url" {
+                let Some(val) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --live-url"));
+                };
+                live_opts.live_url = Some(val.to_owned());
             } else if arg == "--port" {
                 let Some(val) = iter.next() else {
                     return Err(failure(2, "missing value for --port"));
@@ -300,7 +308,7 @@ fn run() -> Reply {
                 run_dirs.push(std::path::PathBuf::from(arg));
             }
         }
-        return viewer::serve(run_dirs, port, open_browser);
+        return viewer::serve(run_dirs, port, open_browser, live_opts);
     }
     if let [cmd, manifest, plan, out] = args.as_slice()
         && cmd == "replay-report"

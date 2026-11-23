@@ -60,7 +60,7 @@ try {
   });
 
   // 1. Loopback DUI_LIVE_URL is exposed cleanly on runs.json
-  const viewer1 = spawn(duiBin, ["open", outDir], {
+  const viewer1 = spawn(duiBin, ["open", "--no-open", outDir], {
     env: { ...process.env, HOME: duiHome, DUI_LIVE_URL: liveOrigin },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -68,14 +68,15 @@ try {
     const baseUrl = await waitForUrl(viewer1);
     const resp = await fetch(`${baseUrl}/archive/runs.json`);
     assert.equal(resp.status, 200);
-    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string }>;
+    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string; liveDefaultMode?: string }>;
     assert.equal(runs[0]?.liveBaseUrl, liveOrigin);
+    assert.equal(runs[0]?.liveDefaultMode, undefined);
   } finally {
     viewer1.kill("SIGTERM");
   }
 
   // 2. Non-loopback DUI_LIVE_URL is rejected for security
-  const viewer2 = spawn(duiBin, ["open", outDir], {
+  const viewer2 = spawn(duiBin, ["open", "--no-open", outDir], {
     env: { ...process.env, HOME: duiHome, DUI_LIVE_URL: "https://evil.example.com" },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -89,11 +90,62 @@ try {
     viewer2.kill("SIGTERM");
   }
 
+  // 3. Explicit `--live-url <loopback>` exposes liveBaseUrl and defaults canvas to Live mount mode
+  const viewer3 = spawn(duiBin, ["open", "--no-open", "--live-url", liveOrigin, outDir], {
+    env: { ...process.env, HOME: duiHome },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    const baseUrl = await waitForUrl(viewer3);
+    const resp = await fetch(`${baseUrl}/archive/runs.json`);
+    assert.equal(resp.status, 200);
+    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string; liveDefaultMode?: string }>;
+    assert.equal(runs[0]?.liveBaseUrl, liveOrigin);
+    assert.equal(runs[0]?.liveDefaultMode, "live");
+  } finally {
+    viewer3.kill("SIGTERM");
+  }
+
+  // 4. Non-loopback `--live-url` is rejected with exit code 2
+  const { spawnSync } = await import("node:child_process");
+  const badLive = spawnSync(
+    duiBin,
+    ["open", "--no-open", "--live-url", "https://evil.example.com", outDir],
+    { env: { ...process.env, HOME: duiHome }, encoding: "utf8" },
+  );
+  assert.equal(
+    badLive.status,
+    2,
+    `expected exit 2 for non-loopback --live-url, got ${badLive.status}`,
+  );
+
+  // 5. One-command `dui open --live <run>` auto-starts the static host on loopback and serves live HTML
+  let autoLiveUrl = "";
+  const viewer4 = spawn(duiBin, ["open", "--no-open", "--live", outDir], {
+    env: { ...process.env, HOME: duiHome },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    const baseUrl = await waitForUrl(viewer4);
+    const resp = await fetch(`${baseUrl}/archive/runs.json`);
+    assert.equal(resp.status, 200);
+    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string; liveDefaultMode?: string }>;
+    autoLiveUrl = runs[0]?.liveBaseUrl ?? "";
+    assert.match(autoLiveUrl, /^http:\/\/127\.0\.0\.1:\d+$/, "expected auto-started loopback host");
+    assert.equal(runs[0]?.liveDefaultMode, "live");
+    const liveHtml = await (await fetch(autoLiveUrl)).text();
+    assert.ok(liveHtml.includes("Static Host"), "auto-started live host serves live app HTML");
+  } finally {
+    viewer4.kill("SIGTERM");
+  }
+
   console.log(
     JSON.stringify({
       status: "ok",
       loopbackLiveBaseUrlExposed: liveOrigin,
       nonLoopbackRejected: true,
+      cliLiveUrlFlag: true,
+      autoLiveStartedUrl: autoLiveUrl,
     }),
   );
 } finally {
