@@ -124,6 +124,7 @@ impl SurfaceRegistry {
         registry.register(Box::new(crate::electron::ElectronDesktopSurface));
         registry.register(Box::new(crate::tui::UniversalTuiSurface));
         registry.register(Box::new(crate::android::AndroidSurface));
+        registry.register(Box::new(crate::ios::IosMobileSurface));
         registry
     }
 
@@ -231,6 +232,7 @@ mod tests {
                 dui_core::surface::SURFACE_ELECTRON_DESKTOP,
                 dui_core::surface::SURFACE_UNIVERSAL_TUI,
                 SURFACE_ANDROID_MOBILE,
+                dui_core::surface::SURFACE_IOS_MOBILE,
             ]
         );
         assert!(registry.find(SURFACE_VITE_WEB).is_some());
@@ -283,7 +285,7 @@ mod tests {
         let spec = dir.path().join("dui.json");
         fs::write(&spec, r#"{"host":"ios","widths":[390]}"#).expect("write manifest");
 
-        let registry = SurfaceRegistry::default_registry();
+        let registry = SurfaceRegistry::new();
         let reply = registry
             .dispatch(dir.path(), &spec, &dir.path().join("out"), false)
             .expect("unrenderable reply");

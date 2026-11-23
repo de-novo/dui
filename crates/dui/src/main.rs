@@ -12,6 +12,7 @@ mod gpui;
 mod graph_view;
 mod host;
 mod inspect;
+mod ios;
 mod live;
 mod mcp;
 mod nextjs;
