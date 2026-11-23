@@ -75,6 +75,7 @@ jobs:
           npm run check:universal-web
           npm run check:tui
           npm run check:android
+          npm run check:ios
           npm run check:electron
           npm run check:radix-nextjs
           npm run check:design-lint

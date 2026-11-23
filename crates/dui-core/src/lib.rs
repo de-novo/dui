@@ -99,6 +99,7 @@ pub mod design_lint;
 pub mod diff;
 pub mod edit;
 pub mod inspect;
+pub mod ios;
 pub mod locale;
 pub mod model;
 pub mod nextjs;
