@@ -7,19 +7,30 @@ import {
   pickNodeAtPoint,
 } from "../../model/elementInspect";
 
-export function ElementInspector({ cell, imageUrl }: { cell: Cell; imageUrl: string }) {
+export function ElementInspector({
+  cell,
+  imageUrl,
+  externalSelectedId,
+  onHighlightNode,
+}: {
+  cell: Cell;
+  imageUrl: string;
+  externalSelectedId?: string | null;
+  onHighlightNode?: (nodeId: string | null) => void;
+}) {
   const { t } = useI18n();
   const nodes = useMemo(() => cell.renderTree ?? [], [cell.renderTree]);
-  const [selectedId, setSelectedId] = useState<string | null>(() => nodes[0]?.id ?? null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(() => nodes[0]?.id ?? null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({
     w: Math.max(1, cell.width),
     h: Math.max(1, Math.round(cell.width * 0.75)),
   });
 
+  const activeSelectedId = externalSelectedId ?? localSelectedId;
   const selected = useMemo(
-    () => nodes.find((n) => n.id === selectedId) ?? nodes[0] ?? null,
-    [nodes, selectedId],
+    () => nodes.find((n) => n.id === activeSelectedId) ?? nodes[0] ?? null,
+    [nodes, activeSelectedId],
   );
   const hovered = useMemo(
     () => (hoveredId ? (nodes.find((n) => n.id === hoveredId) ?? null) : null),
@@ -41,13 +52,18 @@ export function ElementInspector({ cell, imageUrl }: { cell: Cell; imageUrl: str
   function handleMove(event: MouseEvent<HTMLDivElement>) {
     const pt = pointToCapture(event);
     const hit = pickNodeAtPoint(nodes, pt.x, pt.y);
-    setHoveredId(hit?.id ?? null);
+    const nextHover = hit?.id ?? null;
+    setHoveredId(nextHover);
+    onHighlightNode?.(nextHover ?? selected?.id ?? null);
   }
 
   function handleClick(event: MouseEvent<HTMLDivElement>) {
     const pt = pointToCapture(event);
     const hit = pickNodeAtPoint(nodes, pt.x, pt.y);
-    if (hit) setSelectedId(hit.id);
+    if (hit) {
+      setLocalSelectedId(hit.id);
+      onHighlightNode?.(hit.id);
+    }
   }
 
   const boxes = selected ? boxModelOverlayRects(selected) : null;
@@ -67,7 +83,10 @@ export function ElementInspector({ cell, imageUrl }: { cell: Cell; imageUrl: str
       <div
         className="element-stage"
         onMouseMove={handleMove}
-        onMouseLeave={() => setHoveredId(null)}
+        onMouseLeave={() => {
+          setHoveredId(null);
+          onHighlightNode?.(selected?.id ?? null);
+        }}
         onClick={handleClick}
         role="presentation"
       >
