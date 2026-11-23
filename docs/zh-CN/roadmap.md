@@ -54,16 +54,17 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 | v0.0.8 | **多平台抽象层与通用 Web · TUI。** 固定 `SurfaceRegistry`、`NoopOracle` 与统一的 `RenderNodeSnapshot` 中间表示，使新增平台只需实现单个适配器而不重复缓存、SQLite、Diff 或画布代码（[#99](https://github.com/de-novo/dui/issues/99)）。交付支持任意 HTML/JS 应用的 Universal Web 宿主（`static` / `url` / `command`，[#100](https://github.com/de-novo/dui/issues/100)）与 Universal TUI 适配器（`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG，[#101](https://github.com/de-novo/dui/issues/101)）。 |
 | v0.0.9 | **Android · 桌面 · 设计缺陷检测与开发者工具级元素检查器。** 新增 Android 适配器（`adb screencap` + `uiautomator`/Semantics → `RenderNodeSnapshot`，[#102](https://github.com/de-novo/dui/issues/102)）、Electron 45 宿主 + GPUI AccessKit 渲染树 Diff（[#103](https://github.com/de-novo/dui/issues/103)）、Radix UI / shadcn 规则包 + Next.js 16 宿主（[#104](https://github.com/de-novo/dui/issues/104)）、多标签页并行捕获 + 基于 `renderTree` 的自动设计缺陷与无障碍诊断（溢出、重叠、文本截断、对比度不足、触控目标过小、间距与对齐偏差——人类在画布上直观查看，AI 通过 CLI/MCP 获取结构化 JSON，[#105](https://github.com/de-novo/dui/issues/105)），以及在画布上查看任意元素属性、宽高、外边距、内边距与间距标尺的开发者工具级元素检查器（[#106](https://github.com/de-novo/dui/issues/106)）。 |
 | v0.1.0 | **跨平台移动端与编译器深度 TUI。** 新增 iOS Simulator（`xcrun simctl`）+ SwiftUI（`swiftc`）、React Native / Expo（Android + iOS）、Flutter / Dart、Kotlin Compose 深度状态分析，以及 Ratatui、Ink、Bubble Tea 的编译器状态枚举。 |
-| v0.2.0 | **画布上直接渲染真实组件、框架无关路由树与全页真实比例节点。** 从静态截图 + 交互式规格叠加演进为直接在 2D 画布上挂载并渲染真实组件，按页面完整高度（含嵌套滚动容器）捕获并按各画面真实宽高比排列画布与桌面节点以消除裁切和重叠（[#147](https://github.com/de-novo/dui/issues/147)），通过 WAI-ARIA 导航展开与官方编译器路由类型注册表实现框架无关路由树发现，支持 CSS Color 4（`oklch`/`oklab`/`lab`/`lch`）对比度诊断、零配置 `dui scan` 与多宿主 `dui map`（[#149](https://github.com/de-novo/dui/issues/149)、[#153](https://github.com/de-novo/dui/issues/153)），以及基于 WAI-ARIA 的模态框/抽屉自动捕获与 2D 画布子叠加层节点展示（[#157](https://github.com/de-novo/dui/issues/157)），同时在 Web、Desktop、Mobile 与 TUI 上保持同一套 `RenderNodeSnapshot` 场景图、盒模型检查器、元素 Diff 与评审评论锚点。 |
+| v0.2.0 | **画布实时组件渲染、框架无关路由树、模态框自动发现与客观事实核心。** 直接在 2D 画布上挂载并渲染真实组件，按页面完整高度（含嵌套滚动容器）捕获并按真实宽高比排列画布与桌面节点（[#147](https://github.com/de-novo/dui/issues/147)），通过 WAI-ARIA 导航展开与官方编译器路由类型注册表实现框架无关路由树发现、零配置 `dui scan` 与多宿主 `dui map`（[#149](https://github.com/de-novo/dui/issues/149)、[#153](https://github.com/de-novo/dui/issues/153)），对齐 GPUI 桌面原生 macOS `TitleBar` 与避障走廊连线（[#155](https://github.com/de-novo/dui/issues/155)、[#159](https://github.com/de-novo/dui/issues/159)），基于 WAI-ARIA 自动捕获模态框/抽屉并以子叠加层节点展示（[#157](https://github.com/de-novo/dui/issues/157)），并移除硬编码的全局设计缺陷启发式规则，使 `dui` 严格报告客观渲染证据（[#163](https://github.com/de-novo/dui/issues/163)）。 |
+| v0.3.0 | **插件化设计系统一致性校验（`DESIGN.md`、Design Tokens 与自定义审计插件）。** 保持 `dui-core` 严格输出客观事实，同时在 `dui.json` 中提供可选插件架构，允许项目接入自身的 `DESIGN.md`、W3C Design Tokens 或自定义审计插件，仅提取偏离本项目设计系统的真实不一致项，并在 CLI、MCP、Web 画布与 GPUI 桌面端统一呈现（[#167](https://github.com/de-novo/dui/issues/167)）。 |
 
 ## 多平台架构与演进路线
 
-dui 面向四大界面形态——**Web**、**Desktop App**、**Mobile App（Android 与 iOS）**、**TUI**——兼顾**人类与 AI 双方的高可读性**，并致力于快速定位**视觉与设计缺陷**：
+dui 面向四大界面形态——**Web**、**Desktop App**、**Mobile App（Android 与 iOS）**、**TUI**——以**客观渲染证据**与**插件化设计系统校验**为核心，兼顾**人类与 AI 双方的高可读性**：
 
 1. **三端口设计（`TypeOracle` · `Host` · `Renderer`）**：具备官方编译器类型时提供 Level 2 深度状态覆盖；任意应用也可通过 `NoopOracle` 立即获得 Level 1 通用捕获与对比。
 2. **统一 `RenderNodeSnapshot` 中间表示**：DOM、AccessKit、VT100 终端网格、Android `uiautomator`/Semantics 与 iOS `XCUI` 树均归一化为同一平台无关场景图，记录坐标、盒模型（`margin`、`padding`、`border`、`gap`）、排版、颜色与属性。
-3. **单一模板方法流水线（`CaptureEngine`）**：缓存、SQLite 存储、渲染级 Diff、惰性像素 Diff、视觉变化佐证、99% 覆盖率与设计缺陷审计、CLI/MCP 一致性仅在共享核心与外壳实现一次。
-4. **人类与 AI 双向友好**：人类在 2D 画布上通过视觉高亮、盒模型测量与设计缺陷标记快速审阅；AI 通过 CLI/MCP 直接读取相同的结构化缺陷、尺寸指标、Diff 与评论锚点，无需从像素猜测。
-5. **从捕获到实时组件渲染**：先在确定性捕获上提供开发者工具级属性检查与盒模型/间距测量标尺，后续在同一场景图上无缝过渡到画布直接渲染真实组件。
+3. **单一模板方法流水线（`CaptureEngine`）**：缓存、SQLite 存储、渲染级 Diff、惰性像素 Diff、视觉变化佐证、覆盖率审计、CLI/MCP 一致性仅在共享核心与外壳实现一次。
+4. **人类与 AI 双向友好**：人类在 2D 画布上通过视觉高亮、盒模型测量与 Diff 快速审阅；AI 通过 CLI/MCP 直接读取相同的 `renderTree`、尺寸指标、Diff 与评论锚点，无需从像素猜测。
+5. **客观事实核心 → 插件化设计系统规范**：核心不强加硬编码审美规则，团队可按需接入自有 `DESIGN.md`、Token 规范或自定义审计插件检测设计偏离（`v0.3.0`，[#167](https://github.com/de-novo/dui/issues/167)）。
 
 [GitHub 里程碑](https://github.com/de-novo/dui/milestones) · [变更日志](changelog.md)
