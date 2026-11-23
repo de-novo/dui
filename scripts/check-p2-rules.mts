@@ -171,7 +171,21 @@ try {
     "missing react-router URLSearchParams searchParam fact",
   );
 
-  // React Router 7.x compatibility check (e.g. 7.18.5 alongside Vite 7 apps).
+  // Newer ecosystem major check: Radix Select 2.4.1 and Dropdown Menu 2.2.0 must NOT block scanning.
+  writeFakePkg(
+    nm,
+    "@radix-ui/react-select",
+    "2.4.1",
+    "export declare function Root(props: { value?: string; open?: boolean }): unknown;\n",
+  );
+  writeFakePkg(
+    nm,
+    "@radix-ui/react-dropdown-menu",
+    "2.2.0",
+    "export declare function Root(props: { open?: boolean }): unknown;\n",
+  );
+
+  // React Router 7.x + newer Radix 2.x compatibility check.
   writeFakePkg(
     nm,
     "react-router",
@@ -181,6 +195,8 @@ try {
   const rr7Scan = runDui(["scan", appDir, manifest], env);
   assert.equal(rr7Scan.status, 0, JSON.stringify(rr7Scan.body));
   assert.equal(rr7Scan.body.versions?.["react-router"], "7.18.5");
+  assert.equal(rr7Scan.body.versions?.["@radix-ui/react-select"], "2.4.1");
+  assert.equal(rr7Scan.body.versions?.["@radix-ui/react-dropdown-menu"], "2.2.0");
   const rr7Facts = rr7Scan.body.facts as { kind: string; label?: string }[];
   assert(
     rr7Facts.some((f) => f.kind === "route" && f.label === "createBrowserRouter"),
@@ -191,31 +207,43 @@ try {
     "missing react-router 7 URLSearchParams searchParam fact",
   );
 
-  // Older React Router major rejection check: 6.30.0 must return exit 4 (`unsupported`).
+  // Below-baseline ecosystem libraries (e.g. zustand 4.5.0, react-router 6.30.0) must NOT abort scan;
+  // dui continues via official compiler types and records non-fatal versionNotes.
   writeFakePkg(
     nm,
     "react-router",
     "6.30.0",
     "export declare function createBrowserRouter(routes: { path: string }[]): unknown;\nexport declare function useSearchParams(): [URLSearchParams, (next: URLSearchParams) => void];\n",
   );
-  const rr6Scan = runDui(["scan", appDir, manifest], env);
-  assert.equal(rr6Scan.status, 4, `expected unsupported exit 4, got ${JSON.stringify(rr6Scan)}`);
-  assert.equal(rr6Scan.body.status, "unsupported");
-  assert.match(rr6Scan.body.reason, /react-router requires stable 7\.x or 8\.x; found 6\.30\.0/);
-
-  // Restore React Router 8.x before checking older Zustand major rejection.
-  writeFakePkg(
-    nm,
-    "react-router",
-    "8.5.2",
-    "export declare function createBrowserRouter(routes: { path: string }[]): unknown;\nexport declare function useSearchParams(): [URLSearchParams, (next: URLSearchParams) => void];\n",
+  writeFakePkg(nm, "zustand", "4.5.0", "export declare function create<T>(init: () => T): T;\n");
+  const nonBlockingScan = runDui(["scan", appDir, manifest], env);
+  assert.equal(
+    nonBlockingScan.status,
+    0,
+    `ecosystem library versions must not hard-block scan: ${JSON.stringify(nonBlockingScan)}`,
+  );
+  const notes = (nonBlockingScan.body.versionNotes ?? []) as Array<{ package: string }>;
+  assert(
+    notes.some((n) => n.package === "zustand") && notes.some((n) => n.package === "react-router"),
+    `expected non-fatal versionNotes for below-baseline packages, got ${JSON.stringify(notes)}`,
   );
 
-  // Older major rejection check: zustand 4.5.0 must return exit 4 (`unsupported`).
-  writeFakePkg(nm, "zustand", "4.5.0", "export declare function create<T>(init: () => T): T;\n");
-  const oldMajor = runDui(["scan", appDir, manifest], env);
-  assert.equal(oldMajor.status, 4, `expected unsupported exit 4, got ${JSON.stringify(oldMajor)}`);
-  assert.equal(oldMajor.body.status, "unsupported");
+  // Hard core runtime rejection check: React 17.0.2 (missing useId) must still exit 4 (`unsupported`).
+  rmSync(join(nm, "react"), { recursive: true, force: true });
+  writeFakePkg(
+    nm,
+    "react",
+    "17.0.2",
+    "export declare function useState<T>(v: T): [T, (x: T) => void];\n",
+  );
+  const oldReact = runDui(["scan", appDir, manifest], env);
+  assert.equal(
+    oldReact.status,
+    4,
+    `expected unsupported exit 4 for React 17, got ${JSON.stringify(oldReact)}`,
+  );
+  assert.equal(oldReact.body.status, "unsupported");
+  assert.match(oldReact.body.reason, /react requires stable 18\.x\+; found 17\.0\.2/);
 
   console.log(
     JSON.stringify({
@@ -226,7 +254,9 @@ try {
       schema: true,
       router: true,
       reactRouter7: "7.18.5",
-      olderMajorRejected: true,
+      radixSelect2: "2.4.1",
+      ecosystemNonBlocking: true,
+      coreRuntimeRejected: true,
     }),
   );
 } finally {

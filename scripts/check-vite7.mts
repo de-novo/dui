@@ -221,7 +221,7 @@ export const HomeRoute = createFileRoute("/dashboard")({ component: OrdersPage }
     reason: string;
   };
   assert.equal(unsupportedPayload.status, "unsupported");
-  assert.match(unsupportedPayload.reason, /vite requires stable 7\.x or 8\.x; found 6\.4\.0/);
+  assert.match(unsupportedPayload.reason, /vite requires stable 7\.x\+; found 6\.4\.0/);
 
   console.log(
     JSON.stringify({
