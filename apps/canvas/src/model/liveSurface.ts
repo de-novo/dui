@@ -186,10 +186,32 @@ export function buildLiveHighlightMessage(nodeId: string | null): {
   return { type: "dui:live-highlight-node", nodeId };
 }
 
-const INTERACTIVE_TAGS = new Set(["button", "a", "input", "select", "textarea"]);
-const INTERACTIVE_ROLES = new Set(["button", "link", "checkbox", "switch", "tab", "combobox"]);
+const INTERACTIVE_TAGS = new Set([
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  "checkbox",
+  "switch",
+  "radio",
+  "tab",
+]);
+const INTERACTIVE_ROLES = new Set([
+  "button",
+  "link",
+  "textbox",
+  "checkbox",
+  "switch",
+  "tab",
+  "menuitem",
+  "combobox",
+]);
 
 function isInteractiveNode(node: RenderNode): boolean {
+  const attrs = node.attributes ?? {};
+  if (attrs["aria-hidden"] === "true") return false;
+  if (node.role === "presentation" || node.role === "none") return false;
   return (
     INTERACTIVE_TAGS.has(node.tag.toLowerCase()) ||
     Boolean(node.role && INTERACTIVE_ROLES.has(node.role.toLowerCase()))
@@ -198,11 +220,26 @@ function isInteractiveNode(node: RenderNode): boolean {
 
 function rectContains(outer: RenderNode["rect"], inner: RenderNode["rect"]): boolean {
   return (
-    outer.x <= inner.x + 1 &&
-    outer.y <= inner.y + 1 &&
-    outer.x + outer.width >= inner.x + inner.width - 1 &&
-    outer.y + outer.height >= inner.y + inner.height - 1
+    outer.x <= inner.x + 2 &&
+    outer.y <= inner.y + 2 &&
+    outer.x + outer.width >= inner.x + inner.width - 2 &&
+    outer.y + outer.height >= inner.y + inner.height - 2
   );
+}
+
+function isAncestorNode(
+  parentMap: Map<string, string>,
+  ancestorId: string,
+  nodeId: string,
+): boolean {
+  let cur = nodeId;
+  for (let depth = 0; depth < 64; depth++) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (parent === ancestorId) return true;
+    cur = parent;
+  }
+  return false;
 }
 
 /**
@@ -217,21 +254,26 @@ export function auditLiveRenderTree(
   const findings: DesignFinding[] = [];
   const safeW = Math.max(1, Math.round(width));
   const interactiveNodes: RenderNode[] = [];
+  const parentMap = new Map<string, string>();
+  for (const node of nodes) {
+    if (node.parentId) parentMap.set(node.id, node.parentId);
+  }
 
   for (const node of nodes) {
     const r = node.rect;
     if (r.width <= 0 || r.height <= 0) continue;
+    const attrs = node.attributes ?? {};
 
-    if (r.x + r.width > safeW + 2) {
+    if (attrs["data-dui-clipped-x"] !== "true" && (r.x < -2 || r.x + r.width > safeW + 2)) {
       findings.push({
         kind: "horizontal-overflow",
         severity: "error",
         nodeId: node.id,
         tag: node.tag,
         rect: r,
-        summary: `Element ${node.id} overflows viewport width (${r.x + r.width}px > ${safeW}px)`,
-        measured: `${r.x + r.width}px`,
-        expected: `<= ${safeW}px`,
+        summary: `${node.tag} (${node.id}) overflows ${safeW}px viewport (x=${r.x}..${r.x + r.width})`,
+        measured: `${r.x}..${r.x + r.width}px`,
+        expected: `0..${safeW}px`,
         path,
         width: safeW,
       });
@@ -239,36 +281,53 @@ export function auditLiveRenderTree(
 
     if (isInteractiveNode(node)) {
       interactiveNodes.push(node);
-      if (r.width < 44 || r.height < 44) {
+      const tag = node.tag.toLowerCase();
+      const inputType = (attrs.type ?? "").toLowerCase();
+      const isHiddenInput = tag === "input" && inputType === "hidden";
+      const isNativeCheck = tag === "input" && (inputType === "checkbox" || inputType === "radio");
+      const enforceTarget =
+        !isHiddenInput &&
+        !isNativeCheck &&
+        (tag !== "a" || Boolean(node.style.display && node.style.display !== "inline"));
+      const tooSmall =
+        safeW <= 500
+          ? (r.width < 44 && r.height < 44) || r.width < 32 || r.height < 32
+          : r.width < 20 || r.height < 20;
+      const minLabel = safeW <= 500 ? "44×44" : "20×20";
+
+      if (enforceTarget && tooSmall) {
         findings.push({
           kind: "small-touch-target",
           severity: "warning",
           nodeId: node.id,
           tag: node.tag,
           rect: r,
-          summary: `Interactive ${node.tag} (${node.id}) is smaller than 44×44px`,
+          summary: `${node.tag} (${node.id}) is ${r.width}×${r.height}px (below ${minLabel}px target minimum)`,
           measured: `${r.width}×${r.height}px`,
-          expected: ">= 44×44px",
+          expected: `>= ${minLabel}px`,
           path,
           width: safeW,
         });
       }
-      const attrs = node.attributes ?? {};
       const hasLabel =
         node.text.trim().length > 0 ||
         Boolean(
-          attrs["aria-label"] || attrs["aria-labelledby"] || attrs.title || attrs.placeholder,
+          attrs["aria-label"] ||
+          attrs["aria-labelledby"] ||
+          attrs.title ||
+          attrs.placeholder ||
+          attrs.alt,
         );
-      if (!hasLabel && node.tag.toLowerCase() !== "select") {
+      if (!isHiddenInput && !hasLabel) {
         findings.push({
-          kind: "unlabeled-control",
+          kind: "unlabeled-interactive",
           severity: "error",
           nodeId: node.id,
           tag: node.tag,
           rect: r,
-          summary: `Interactive ${node.tag} (${node.id}) has no accessible label`,
-          measured: "empty label",
-          expected: "visible text or aria-label",
+          summary: `Interactive ${node.tag} (${node.id}) has no visible text or accessible label`,
+          measured: "empty-label",
+          expected: "non-empty text or aria-label",
           path,
           width: safeW,
         });
@@ -280,20 +339,32 @@ export function auditLiveRenderTree(
     const a = interactiveNodes[i];
     for (let j = i + 1; j < interactiveNodes.length; j++) {
       const b = interactiveNodes[j];
-      if (rectContains(a.rect, b.rect) || rectContains(b.rect, a.rect)) continue;
+      if (
+        isAncestorNode(parentMap, a.id, b.id) ||
+        isAncestorNode(parentMap, b.id, a.id) ||
+        rectContains(a.rect, b.rect) ||
+        rectContains(b.rect, a.rect)
+      ) {
+        continue;
+      }
       const ix =
         Math.min(a.rect.x + a.rect.width, b.rect.x + b.rect.width) - Math.max(a.rect.x, b.rect.x);
       const iy =
         Math.min(a.rect.y + a.rect.height, b.rect.y + b.rect.height) - Math.max(a.rect.y, b.rect.y);
-      if (ix > 4 && iy > 4) {
+      const overlapArea = Math.max(0, ix) * Math.max(0, iy);
+      const minArea = Math.max(
+        1,
+        Math.min(a.rect.width * a.rect.height, b.rect.width * b.rect.height),
+      );
+      if (ix >= 8 && iy >= 8 && overlapArea * 4 >= minArea) {
         findings.push({
           kind: "element-overlap",
-          severity: "warning",
+          severity: "error",
           nodeId: a.id,
           relatedNodeId: b.id,
           tag: a.tag,
           rect: a.rect,
-          summary: `Interactive elements ${a.id} and ${b.id} overlap (${ix}×${iy}px)`,
+          summary: `${a.tag} (${a.id}) overlaps ${b.tag} (${b.id}) by ${ix}×${iy}px`,
           measured: `${ix}×${iy}px overlap`,
           expected: "0px overlap",
           path,

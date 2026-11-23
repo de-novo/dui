@@ -307,12 +307,94 @@ declare var __duiProbe: {
       "strong",
       "label",
     ]);
+    const interactiveTags = new Set(["a", "button", "input", "select", "textarea", "summary"]);
+    const interactiveRoles = new Set([
+      "button",
+      "link",
+      "textbox",
+      "checkbox",
+      "switch",
+      "radio",
+      "tab",
+      "menuitem",
+      "combobox",
+    ]);
     const pxInt = (raw: string) => {
       const n = Number.parseFloat(raw);
       return Number.isFinite(n) ? Math.round(n) : 0;
     };
+    const isVisuallyHidden = (w: number, h: number, cs: CSSStyleDeclaration) => {
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") return true;
+      if (
+        w <= 1 &&
+        h <= 1 &&
+        (cs.overflow === "hidden" ||
+          cs.overflow === "clip" ||
+          cs.clip === "rect(0px, 0px, 0px, 0px)" ||
+          cs.clipPath === "inset(50%)")
+      ) {
+        return true;
+      }
+      return false;
+    };
+    const resolveAccessibleLabel = (el: Element): string => {
+      const labelledBy = el.getAttribute("aria-labelledby");
+      if (labelledBy) {
+        const parts = labelledBy
+          .split(/\s+/)
+          .map((refId) => document.getElementById(refId)?.textContent?.trim() ?? "")
+          .filter(Boolean);
+        if (parts.length > 0) return parts.join(" ").slice(0, 120);
+      }
+      if (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLSelectElement ||
+        el instanceof HTMLTextAreaElement
+      ) {
+        if (el.labels && el.labels.length > 0) {
+          const labelText = Array.from(el.labels)
+            .map((lbl) => (lbl.innerText || lbl.textContent || "").replace(/\s+/g, " ").trim())
+            .filter(Boolean)
+            .join(" ");
+          if (labelText) return labelText.slice(0, 120);
+        }
+        if (
+          el instanceof HTMLInputElement &&
+          ["submit", "button", "reset"].includes((el.type || "").toLowerCase()) &&
+          el.value.trim()
+        ) {
+          return el.value.trim().slice(0, 120);
+        }
+      }
+      const desc = el.querySelector("[aria-label], img[alt], svg title");
+      if (desc) {
+        const fromDesc =
+          desc.getAttribute("aria-label") || desc.getAttribute("alt") || desc.textContent || "";
+        const cleaned = fromDesc.replace(/\s+/g, " ").trim();
+        if (cleaned) return cleaned.slice(0, 120);
+      }
+      return "";
+    };
+    const isHorizontallyClipped = (el: Element, viewportWidth: number): boolean => {
+      let cur = el.parentElement;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        const pcs = getComputedStyle(cur);
+        const ox = pcs.overflowX;
+        if (ox === "auto" || ox === "scroll" || ox === "hidden" || ox === "clip") {
+          const pr = cur.getBoundingClientRect();
+          if (Math.round(pr.x) >= -2 && Math.round(pr.x + pr.width) <= viewportWidth + 2) {
+            return true;
+          }
+        }
+        cur = cur.parentElement;
+      }
+      return false;
+    };
     const tagCounts = new Map<string, number>();
     const elToId = new WeakMap<Element, string>();
+    const domParentIds = new WeakMap<Element, string>();
+    let nextDomParentId = 0;
+    const viewportW = Math.round(window.innerWidth || 0);
     const nodes: {
       id: string;
       tag: string;
@@ -351,7 +433,7 @@ declare var __duiProbe: {
       const h = Math.round(rect.height);
       if (w <= 0 || h <= 0) continue;
       const cs = getComputedStyle(el);
-      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      if (isVisuallyHidden(w, h, cs)) continue;
       const idx = tagCounts.get(tag) ?? 0;
       tagCounts.set(tag, idx + 1);
       const domId = el.getAttribute("id");
@@ -373,11 +455,21 @@ declare var __duiProbe: {
         }
         curParent = curParent.parentElement;
       }
-      const text =
-        ownText ||
-        (el instanceof HTMLElement && el.children.length === 0
-          ? (el.innerText ?? "").trim().slice(0, 120)
-          : "");
+      const isInteractiveEl =
+        interactiveTags.has(tag) || (role !== undefined && interactiveRoles.has(role));
+      let text = ownText;
+      if (!text && el instanceof HTMLSelectElement) {
+        text = (el.selectedOptions?.[0]?.textContent ?? "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 120);
+      } else if (
+        !text &&
+        el instanceof HTMLElement &&
+        (el.children.length === 0 || isInteractiveEl)
+      ) {
+        text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120);
+      }
       const margin = {
         top: pxInt(cs.marginTop),
         right: pxInt(cs.marginRight),
@@ -406,6 +498,9 @@ declare var __duiProbe: {
         "name",
         "href",
         "aria-label",
+        "aria-labelledby",
+        "aria-hidden",
+        "aria-disabled",
         "placeholder",
         "data-testid",
         "alt",
@@ -416,6 +511,37 @@ declare var __duiProbe: {
         if (val !== null && val !== "") {
           attributes[attrName] = val.slice(0, 120);
         }
+      }
+      if (el.hasAttribute("disabled") && !attributes.disabled) {
+        attributes.disabled = "true";
+      }
+      if (
+        isInteractiveEl &&
+        !text &&
+        !attributes["aria-label"] &&
+        !attributes.title &&
+        !attributes.placeholder
+      ) {
+        const resolved = resolveAccessibleLabel(el);
+        if (resolved) {
+          attributes["aria-label"] = resolved;
+        }
+      }
+      const rx = Math.round(rect.x);
+      if (
+        viewportW > 0 &&
+        (rx < -2 || rx + w > viewportW + 2) &&
+        isHorizontallyClipped(el, viewportW)
+      ) {
+        attributes["data-dui-clipped-x"] = "true";
+      }
+      if (el.parentElement) {
+        let dp = domParentIds.get(el.parentElement);
+        if (!dp) {
+          dp = `p${nextDomParentId++}`;
+          domParentIds.set(el.parentElement, dp);
+        }
+        attributes["data-dui-dom-parent"] = dp;
       }
       const cls = el.getAttribute("class");
       if (cls && cls.trim()) {
@@ -445,7 +571,7 @@ declare var __duiProbe: {
         tag,
         ...(role ? { role } : {}),
         text,
-        rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: w, height: h },
+        rect: { x: rx, y: Math.round(rect.y), width: w, height: h },
         style,
         ...(parentId ? { parentId } : {}),
         boxModel: {

@@ -53,8 +53,14 @@ try {
   <head><meta charset="utf-8" /><title>Design Defect Demo</title></head>
   <body style="margin:0;padding:16px;font-family:sans-serif;background:#ffffff">
     <h1 style="width:520px;margin:0;color:#111111;background:#ffffff">Overflowing Header</h1>
-    <button style="position:absolute;left:16px;top:80px;width:18px;height:18px;padding:0;border:1px solid #000"></button>
-    <button style="position:absolute;left:22px;top:84px;width:120px;height:48px;color:#b8b8b8;background:#ffffff;font-size:14px">Low Contrast</button>
+    <button id="bad-empty-btn" style="position:absolute;left:16px;top:80px;width:18px;height:18px;padding:0;border:1px solid #000"></button>
+    <button id="low-contrast-btn" style="position:absolute;left:22px;top:84px;width:120px;height:48px;color:#b8b8b8;background:#ffffff;font-size:14px">Low Contrast</button>
+    <button id="nested-span-btn" style="margin-top:120px;width:120px;height:44px;color:#111111;background:#ffffff"><span>Save Order</span></button>
+    <label for="search-input" style="display:block;margin-top:12px">Search Orders</label>
+    <input id="search-input" style="width:200px;height:44px" />
+    <div style="width:320px;overflow-x:auto;margin-top:12px">
+      <div id="scrolled-cell" style="width:600px;height:32px;color:#111111;background:#ffffff">Horizontally scrollable content</div>
+    </div>
   </body>
 </html>`,
   );
@@ -89,6 +95,22 @@ try {
   );
   assert.ok(kinds.has("element-overlap"), `missing element-overlap: ${[...kinds].join(",")}`);
   assert.ok(kinds.has("low-contrast"), `missing low-contrast: ${[...kinds].join(",")}`);
+
+  // False-positive regression checks: nested span button, <label for> input, and overflow-x:auto child must not trigger defects
+  assert.ok(
+    !mobileFindings.some(
+      (f) => f.kind === "unlabeled-interactive" && f.nodeId === "#nested-span-btn",
+    ),
+    `false-positive unlabeled-interactive on #nested-span-btn: ${JSON.stringify(mobileFindings)}`,
+  );
+  assert.ok(
+    !mobileFindings.some((f) => f.kind === "unlabeled-interactive" && f.nodeId === "#search-input"),
+    `false-positive unlabeled-interactive on #search-input: ${JSON.stringify(mobileFindings)}`,
+  );
+  assert.ok(
+    !mobileFindings.some((f) => f.kind === "horizontal-overflow" && f.nodeId === "#scrolled-cell"),
+    `false-positive horizontal-overflow on #scrolled-cell: ${JSON.stringify(mobileFindings)}`,
+  );
 
   console.log(
     JSON.stringify({

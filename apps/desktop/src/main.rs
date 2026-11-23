@@ -894,18 +894,11 @@ impl DuiDesktopView {
         self.selected_element_id = None;
     }
 
-    /// Floating Coverage Audit Pill at top-center matching `apps/canvas` `.audit-summary-pill`.
+    /// Floating Review & Design Audit Pill at top-center matching `apps/canvas` `.audit-summary-pill`.
     fn render_audit_pill(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let p = self.pal();
         let Some(run) = self.active_run() else {
             return div().id("audit-pill-empty");
-        };
-        let (total, verified, _unverified, unrenderable) = run.counts();
-        let renderable = total.saturating_sub(unrenderable);
-        let pct = if total == 0 {
-            0.0
-        } else {
-            (verified as f64 * 100.0) / total as f64
         };
         let open_comments: usize = self
             .workspace
@@ -913,25 +906,28 @@ impl DuiDesktopView {
             .iter()
             .filter(|c| c.project_id == run.project_id && c.status == "open")
             .count();
-        let design_total = self.design_audit.total;
+        let design_total: usize = self
+            .design_audit
+            .findings_by_screen_width
+            .iter()
+            .filter(|((_, w), _)| *w == self.selected_width)
+            .map(|(_, list)| list.len())
+            .sum();
+        if open_comments == 0 && design_total == 0 {
+            return div().id("audit-pill-empty");
+        }
         let overlay_active = self.show_design_overlay;
 
-        let (cov_text, cells_text, open_text, design_text) = match self.lang {
+        let (open_text, design_text) = match self.lang {
             UiLang::Ko => (
-                format!("커버리지 {pct:.1}% / 목표 99%"),
-                format!("검증 {verified} · 렌더 가능 {renderable}/{total}"),
                 format!("미해결 코멘트 {open_comments}개"),
                 format!("디자인 결함 {design_total}건"),
             ),
             UiLang::ZhCn => (
-                format!("覆盖率 {pct:.1}% / 目标 99%"),
-                format!("{verified} 已验证 · {renderable}/{total} 可渲染"),
                 format!("{open_comments} 条待处理评论"),
                 format!("{design_total} 项设计问题"),
             ),
             UiLang::En => (
-                format!("Coverage {pct:.1}% / 99% goal"),
-                format!("{verified} verified · {renderable}/{total} renderable"),
                 format!("{open_comments} unresolved"),
                 format!(
                     "{design_total} design {}",
@@ -952,17 +948,6 @@ impl DuiDesktopView {
             .flex()
             .items_center()
             .gap_3()
-            .child(
-                Label::new(cov_text)
-                    .text_xs()
-                    .font_semibold()
-                    .text_color(p.foreground),
-            )
-            .child(
-                Label::new(cells_text)
-                    .text_xs()
-                    .text_color(p.muted_foreground),
-            )
             .when(open_comments > 0, |el| {
                 el.child(
                     Label::new(open_text)

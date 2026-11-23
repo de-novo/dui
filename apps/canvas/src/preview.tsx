@@ -211,6 +211,12 @@ function MapView({
       }
     }
   }
+  const activeDesignIssueCount = Object.values(mergedDesignFindingsByPath).reduce(
+    (sum, list) => sum + list.length,
+    0,
+  );
+  const openCommentCount = audit?.summary.openComments ?? 0;
+  const showAuditPill = openCommentCount > 0 || activeDesignIssueCount > 0;
   const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
     const fromUrl = new URLSearchParams(location.search).get("compare");
     return fromUrl ?? "";
@@ -364,7 +370,7 @@ function MapView({
           )}
         </div>
 
-        {!showLive && (audit || otherRuns.length > 0 || liveBaseUrl) && (
+        {!showLive && (showAuditPill || otherRuns.length > 0 || liveBaseUrl) && (
           <div className="map-top-bar">
             {liveBaseUrl && (
               <fieldset
@@ -389,34 +395,21 @@ function MapView({
                 </button>
               </fieldset>
             )}
-            {audit && (
-              <output
-                className="audit-summary-pill glass-panel"
-                data-audit-meets-goal={String(audit.meetsGoal)}
-              >
-                <strong>
-                  {t.auditCoverageLabel(audit.summary.verifiedPercent, audit.goalPercent)}
-                </strong>
-                <span>
-                  {t.auditCellsLabel(
-                    audit.summary.verifiedCells,
-                    audit.summary.renderableCells,
-                    audit.summary.totalCells,
-                  )}
-                </span>
-                {audit.summary.openComments > 0 && (
+            {showAuditPill && (
+              <output className="audit-summary-pill glass-panel">
+                {openCommentCount > 0 && (
                   <span className="audit-open-comments">
-                    {t.auditOpenCommentsLabel(audit.summary.openComments)}
+                    {t.auditOpenCommentsLabel(openCommentCount)}
                   </span>
                 )}
-                {audit.designAudit && audit.designAudit.total > 0 && (
+                {activeDesignIssueCount > 0 && (
                   <button
                     type="button"
                     className={`audit-design-toggle${showDesignOverlay ? " active" : ""}`}
                     aria-pressed={showDesignOverlay}
                     onClick={() => setShowDesignOverlay((v) => !v)}
                   >
-                    {t.auditDesignIssuesLabel(audit.designAudit.total)}
+                    {t.auditDesignIssuesLabel(activeDesignIssueCount)}
                   </button>
                 )}
               </output>

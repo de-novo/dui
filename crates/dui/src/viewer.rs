@@ -175,6 +175,23 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
     const out = [];
     const root = document.body;
     if (!root) return out;
+    const interactiveTags = new Set(["a", "button", "input", "select", "textarea", "summary"]);
+    const interactiveRoles = new Set(["button", "link", "textbox", "checkbox", "switch", "radio", "tab", "menuitem", "combobox"]);
+    const elToId = new WeakMap();
+    const vpW = Math.round(window.innerWidth || 0);
+    const isClippedX = (el) => {
+      let cur = el.parentElement;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        const pcs = getComputedStyle(cur);
+        const ox = pcs.overflowX;
+        if (ox === "auto" || ox === "scroll" || ox === "hidden" || ox === "clip") {
+          const pr = cur.getBoundingClientRect();
+          if (Math.round(pr.x) >= -2 && Math.round(pr.x + pr.width) <= vpW + 2) return true;
+        }
+        cur = cur.parentElement;
+      }
+      return false;
+    };
     const els = root.querySelectorAll("*");
     let idx = 0;
     for (const el of els) {
@@ -184,27 +201,70 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
       const tag = el.localName;
       if (tag === "script" || tag === "style" || tag === "noscript") continue;
       const rect = el.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) continue;
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+      if (w <= 0 || h <= 0) continue;
       const cs = getComputedStyle(el);
       if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      if (w <= 1 && h <= 1 && (cs.overflow === "hidden" || cs.overflow === "clip" || cs.clip === "rect(0px, 0px, 0px, 0px)" || cs.clipPath === "inset(50%)")) continue;
       const id = el.getAttribute("data-testid")
         ? `[data-testid=${el.getAttribute("data-testid")}]`
         : el.id ? `#${el.id}` : `${tag}#${idx++}`;
       nodeMap.set(id, el);
-      const text = (el.innerText || "").replace(/\s+/g, " ").trim().slice(0, 120);
+      elToId.set(el, id);
+      let parentId;
+      let curP = el.parentElement;
+      while (curP) {
+        const mapped = elToId.get(curP);
+        if (mapped) { parentId = mapped; break; }
+        curP = curP.parentElement;
+      }
+      const role = el.getAttribute("role") || undefined;
+      const isInteractiveEl = interactiveTags.has(tag) || (role && interactiveRoles.has(role));
+      const ownText = Array.from(el.childNodes)
+        .filter((n) => n.nodeType === Node.TEXT_NODE)
+        .map((n) => (n.textContent || "").trim())
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 120);
+      const text = ownText || (el instanceof HTMLSelectElement
+        ? (el.selectedOptions && el.selectedOptions[0] ? (el.selectedOptions[0].textContent || "").replace(/\s+/g, " ").trim().slice(0, 120) : "")
+        : (el.children.length === 0 || isInteractiveEl)
+          ? (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120)
+          : "");
       const attrs = {};
       for (const a of el.attributes) {
-        if (a.name === "role" || a.name === "type" || a.name === "href" || a.name === "title" || a.name === "placeholder" || a.name.startsWith("aria-") || a.name.startsWith("data-")) {
+        if (a.name === "role" || a.name === "type" || a.name === "href" || a.name === "title" || a.name === "placeholder" || a.name === "alt" || a.name === "disabled" || a.name.startsWith("aria-") || a.name.startsWith("data-")) {
           attrs[a.name] = a.value.slice(0, 120);
         }
+      }
+      if (isInteractiveEl && !text && !attrs["aria-label"] && !attrs.title && !attrs.placeholder) {
+        let resolved = "";
+        const lby = el.getAttribute("aria-labelledby");
+        if (lby) {
+          resolved = lby.split(/\s+/).map((rid) => (document.getElementById(rid)?.textContent || "").trim()).filter(Boolean).join(" ");
+        }
+        if (!resolved && "labels" in el && el.labels && el.labels.length > 0) {
+          resolved = Array.from(el.labels).map((l) => (l.innerText || l.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean).join(" ");
+        }
+        if (!resolved) {
+          const desc = el.querySelector("[aria-label], img[alt], svg title");
+          if (desc) resolved = (desc.getAttribute("aria-label") || desc.getAttribute("alt") || desc.textContent || "").replace(/\s+/g, " ").trim();
+        }
+        if (resolved) attrs["aria-label"] = resolved.slice(0, 120);
+      }
+      const rx = Math.round(rect.x);
+      if (vpW > 0 && (rx < -2 || rx + w > vpW + 2) && isClippedX(el)) {
+        attrs["data-dui-clipped-x"] = "true";
       }
       out.push({
         id,
         tag,
-        role: el.getAttribute("role") || undefined,
+        role,
         text,
-        rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+        rect: { x: rx, y: Math.round(rect.y), width: w, height: h },
         style: { color: cs.color, backgroundColor: cs.backgroundColor, fontSize: cs.fontSize, fontWeight: cs.fontWeight, display: cs.display },
+        parentId,
         boxModel: {
           margin: { top: px(cs.marginTop), right: px(cs.marginRight), bottom: px(cs.marginBottom), left: px(cs.marginLeft) },
           padding: { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) },

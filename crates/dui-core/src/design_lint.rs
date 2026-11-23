@@ -170,6 +170,14 @@ pub fn deduplicate_findings(items: Vec<ScopedDesignFinding>) -> GroupedDesignAud
 }
 
 fn is_interactive(node: &RenderNodeSnapshot) -> bool {
+    if node
+        .attributes
+        .get("aria-hidden")
+        .is_some_and(|v| v == "true")
+        || matches!(node.role.as_deref(), Some("presentation" | "none"))
+    {
+        return false;
+    }
     if matches!(
         node.tag.as_str(),
         "button" | "a" | "input" | "select" | "textarea" | "checkbox" | "switch" | "radio" | "tab"
@@ -178,7 +186,9 @@ fn is_interactive(node: &RenderNodeSnapshot) -> bool {
     }
     if matches!(
         node.role.as_deref(),
-        Some("button" | "link" | "textbox" | "checkbox" | "switch" | "tab" | "menuitem")
+        Some(
+            "button" | "link" | "textbox" | "checkbox" | "switch" | "tab" | "menuitem" | "combobox"
+        )
     ) {
         return true;
     }
@@ -206,7 +216,49 @@ fn is_container_tag(tag: &str) -> bool {
             | "div"
             | "ul"
             | "ol"
+            | "li"
+            | "table"
+            | "thead"
+            | "tbody"
+            | "tfoot"
+            | "tr"
+            | "td"
+            | "th"
+            | "fieldset"
+            | "figure"
+            | "dl"
+            | "dt"
+            | "dd"
+            | "details"
     )
+}
+
+fn is_horizontally_clipped(node: &RenderNodeSnapshot) -> bool {
+    node.attributes
+        .get("data-dui-clipped-x")
+        .is_some_and(|v| v == "true")
+}
+
+fn is_disabled(node: &RenderNodeSnapshot) -> bool {
+    node.attributes.contains_key("disabled")
+        || node
+            .attributes
+            .get("aria-disabled")
+            .is_some_and(|v| v == "true")
+}
+
+fn is_ancestor(parent_map: &BTreeMap<&str, &str>, ancestor_id: &str, node_id: &str) -> bool {
+    let mut cur = node_id;
+    for _ in 0..64 {
+        let Some(parent) = parent_map.get(cur) else {
+            return false;
+        };
+        if *parent == ancestor_id {
+            return true;
+        }
+        cur = parent;
+    }
+    false
 }
 
 fn has_accessible_label(node: &RenderNodeSnapshot) -> bool {
@@ -309,7 +361,11 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
         }
         // Skip terminal cell rows for web-pixel viewport overflow if viewport_width is column count (< 200)
         let is_tui_row = node.tag == "tui-row";
-        if !is_tui_row && vp_w > 0 && (r.x < -2 || r.x + r.width > vp_w + 2) {
+        if !is_tui_row
+            && !is_horizontally_clipped(node)
+            && vp_w > 0
+            && (r.x < -2 || r.x + r.width > vp_w + 2)
+        {
             findings.push(DesignFinding {
                 kind: DesignDefectKind::HorizontalOverflow,
                 severity: DesignSeverity::Error,
@@ -386,6 +442,7 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
         let has_readable_text = !node.text.trim().is_empty()
             && (!is_tui_row || node.text.chars().any(char::is_alphanumeric));
         if has_readable_text
+            && !is_disabled(node)
             && let (Some(fg_raw), Some(bg_raw)) =
                 (node.style.get("color"), node.style.get("backgroundColor"))
             && let (Some((fr, fg, fb, fa)), Some((br, bg, bb, ba))) =
@@ -429,6 +486,12 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
     }
 
     // 2. Pairwise unintended overlap between non-container leaf/interactive elements.
+    let mut parent_map: BTreeMap<&str, &str> = BTreeMap::new();
+    for node in nodes {
+        if let Some(pid) = node.parent_id.as_deref() {
+            parent_map.insert(node.id.as_str(), pid);
+        }
+    }
     let leaf_nodes: Vec<&RenderNodeSnapshot> = nodes
         .iter()
         .filter(|n| {
@@ -444,6 +507,8 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
             let b = leaf_nodes[j];
             if a.parent_id.as_deref() == Some(b.id.as_str())
                 || b.parent_id.as_deref() == Some(a.id.as_str())
+                || is_ancestor(&parent_map, a.id.as_str(), b.id.as_str())
+                || is_ancestor(&parent_map, b.id.as_str(), a.id.as_str())
                 || rect_contains(a.rect, b.rect)
                 || rect_contains(b.rect, a.rect)
             {
@@ -481,8 +546,13 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
             && !is_container_tag(&node.tag)
             && node.tag != "tui-row"
         {
+            let parent_group = node
+                .attributes
+                .get("data-dui-dom-parent")
+                .map(String::as_str)
+                .or(node.parent_id.as_deref());
             groups
-                .entry((node.parent_id.as_deref(), node.tag.as_str()))
+                .entry((parent_group, node.tag.as_str()))
                 .or_default()
                 .push(node);
         }
@@ -777,5 +847,139 @@ mod tests {
         assert_eq!(grouped.warnings, 1);
         assert_eq!(grouped.findings[0].occurrences, 3);
         assert_eq!(grouped.findings[0].states, vec!["s0", "s1", "s2"]);
+    }
+
+    #[test]
+    fn excludes_clipped_scroll_ancestors_disabled_contrast_and_cross_card_spacing() {
+        let mut clipped = node(
+            "td#0",
+            "span",
+            "Scrollable column",
+            RenderRect {
+                x: 340,
+                y: 16,
+                width: 220,
+                height: 24,
+            },
+            BTreeMap::new(),
+        );
+        clipped
+            .attributes
+            .insert("data-dui-clipped-x".into(), "true".into());
+
+        let mut disabled_btn = node(
+            "button#disabled",
+            "button",
+            "Disabled",
+            RenderRect {
+                x: 16,
+                y: 60,
+                width: 120,
+                height: 44,
+            },
+            BTreeMap::from([
+                ("color".into(), "rgb(180, 180, 180)".into()),
+                ("backgroundColor".into(), "rgb(255, 255, 255)".into()),
+                ("fontSize".into(), "14px".into()),
+            ]),
+        );
+        disabled_btn
+            .attributes
+            .insert("disabled".into(), "true".into());
+
+        let mut hidden_icon = node(
+            "button#hidden",
+            "button",
+            "",
+            RenderRect {
+                x: 150,
+                y: 60,
+                width: 16,
+                height: 16,
+            },
+            BTreeMap::new(),
+        );
+        hidden_icon
+            .attributes
+            .insert("aria-hidden".into(), "true".into());
+
+        // Grandparent -> intermediate div -> grandchild badge slightly overlapping grandparent edge
+        let grandparent = node(
+            "button#gp",
+            "button",
+            "Notifications",
+            RenderRect {
+                x: 16,
+                y: 120,
+                width: 120,
+                height: 44,
+            },
+            BTreeMap::new(),
+        );
+        let mut mid = node(
+            "div#mid",
+            "div",
+            "",
+            RenderRect {
+                x: 100,
+                y: 112,
+                width: 40,
+                height: 30,
+            },
+            BTreeMap::new(),
+        );
+        mid.parent_id = Some("button#gp".into());
+        let mut grandchild = node(
+            "span#badge",
+            "span",
+            "3",
+            RenderRect {
+                x: 112,
+                y: 112,
+                width: 28,
+                height: 28,
+            },
+            BTreeMap::new(),
+        );
+        grandchild.parent_id = Some("div#mid".into());
+
+        // Two separate cards with <p> elements sharing captured parent_id "main#0" but distinct DOM parents
+        let card_p = |id: &str, y: i32, dom_parent: &str| {
+            let mut p = node(
+                id,
+                "p",
+                "Card line",
+                RenderRect {
+                    x: 16,
+                    y,
+                    width: 200,
+                    height: 20,
+                },
+                BTreeMap::new(),
+            );
+            p.attributes
+                .insert("data-dui-dom-parent".into(), dom_parent.into());
+            p
+        };
+
+        let tree = vec![
+            clipped,
+            disabled_btn,
+            hidden_icon,
+            grandparent,
+            mid,
+            grandchild,
+            card_p("p#c1a", 200, "p1"),
+            card_p("p#c1b", 224, "p1"),
+            card_p("p#c2a", 360, "p2"),
+            card_p("p#c2b", 384, "p2"),
+        ];
+
+        let audit = lint_render_tree(&tree, 375);
+        assert_eq!(
+            audit.total, 0,
+            "expected zero false-positive findings, got {:?}",
+            audit.findings
+        );
     }
 }
