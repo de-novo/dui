@@ -17,7 +17,7 @@
 | 桌面应用 | GPUI (`gpui-pre` 0.3.x、`gpui-kit` / `gpui-component` 0.10.x，Metal + AccessKit `renderTree`)、Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
 | 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | Jetpack Compose (`kotlinc` 2)、SwiftUI (`swiftc` 6)、Flutter (`dart` 3) 深度状态计划 |
 | 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG)、Ink 5 (`tsc` 规则包) | Ratatui (`rustc`)、Bubble Tea (`go`) 深度状态计划 |
-| 路由与 URL 状态 | TanStack Router 1、TanStack Start 1、React Router 8、Next.js App Router (`app/**/page.tsx`)、标准 Web `URLSearchParams` | Android Intent 与深度链接编译器分析 |
+| 路由与 URL 状态 | TanStack Router 1、TanStack Start 1、React Router 7 / 8、Next.js App Router (`app/**/page.tsx`)、标准 Web `URLSearchParams` | Android Intent 与深度链接编译器分析 |
 | 状态、表单与模式 | React `useState`、TanStack Query 5、Zustand 5、Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、zod 4、valibot 1、Radix UI 1 / shadcn/ui 4 | — |
 
 ### 分析与验证能力

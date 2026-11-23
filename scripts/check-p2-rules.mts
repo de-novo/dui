@@ -171,6 +171,46 @@ try {
     "missing react-router URLSearchParams searchParam fact",
   );
 
+  // React Router 7.x compatibility check (e.g. 7.18.5 alongside Vite 7 apps).
+  writeFakePkg(
+    nm,
+    "react-router",
+    "7.18.5",
+    "export declare function createBrowserRouter(routes: { path: string }[]): unknown;\nexport declare function useSearchParams(): [URLSearchParams, (next: URLSearchParams) => void];\n",
+  );
+  const rr7Scan = runDui(["scan", appDir, manifest], env);
+  assert.equal(rr7Scan.status, 0, JSON.stringify(rr7Scan.body));
+  assert.equal(rr7Scan.body.versions?.["react-router"], "7.18.5");
+  const rr7Facts = rr7Scan.body.facts as { kind: string; label?: string }[];
+  assert(
+    rr7Facts.some((f) => f.kind === "route" && f.label === "createBrowserRouter"),
+    "missing react-router 7 route fact",
+  );
+  assert(
+    rr7Facts.some((f) => f.kind === "searchParam" && f.label === "step"),
+    "missing react-router 7 URLSearchParams searchParam fact",
+  );
+
+  // Older React Router major rejection check: 6.30.0 must return exit 4 (`unsupported`).
+  writeFakePkg(
+    nm,
+    "react-router",
+    "6.30.0",
+    "export declare function createBrowserRouter(routes: { path: string }[]): unknown;\nexport declare function useSearchParams(): [URLSearchParams, (next: URLSearchParams) => void];\n",
+  );
+  const rr6Scan = runDui(["scan", appDir, manifest], env);
+  assert.equal(rr6Scan.status, 4, `expected unsupported exit 4, got ${JSON.stringify(rr6Scan)}`);
+  assert.equal(rr6Scan.body.status, "unsupported");
+  assert.match(rr6Scan.body.reason, /react-router requires stable 7\.x or 8\.x; found 6\.30\.0/);
+
+  // Restore React Router 8.x before checking older Zustand major rejection.
+  writeFakePkg(
+    nm,
+    "react-router",
+    "8.5.2",
+    "export declare function createBrowserRouter(routes: { path: string }[]): unknown;\nexport declare function useSearchParams(): [URLSearchParams, (next: URLSearchParams) => void];\n",
+  );
+
   // Older major rejection check: zustand 4.5.0 must return exit 4 (`unsupported`).
   writeFakePkg(nm, "zustand", "4.5.0", "export declare function create<T>(init: () => T): T;\n");
   const oldMajor = runDui(["scan", appDir, manifest], env);
@@ -185,6 +225,7 @@ try {
       form: true,
       schema: true,
       router: true,
+      reactRouter7: "7.18.5",
       olderMajorRejected: true,
     }),
   );

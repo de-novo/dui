@@ -17,7 +17,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 | Desktop App | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
 | Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` rules) | Jetpack Compose (`kotlinc` 2), SwiftUI (`swiftc` 6), Flutter (`dart` 3) deep state plans |
 | Terminal UI (TUI) | Universal TUI (`pty` + VT100 cell grid -> `RenderNodeSnapshot` + monospace PNG), Ink 5 (`tsc` rules) | Ratatui (`rustc`), Bubble Tea (`go`) deep state plans |
-| Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 8, Next.js App Router (`app/**/page.tsx`), standard Web `URLSearchParams` | Android intents & deep links compiler analysis |
+| Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 7 / 8, Next.js App Router (`app/**/page.tsx`), standard Web `URLSearchParams` | Android intents & deep links compiler analysis |
 | State, forms & schemas | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1, Radix UI 1 / shadcn/ui 4 | — |
 
 ### Analysis & verification capabilities

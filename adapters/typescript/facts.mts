@@ -103,7 +103,7 @@ for (const [name, majors] of Object.entries<number | number[]>({
   xstate: 5,
   "react-hook-form": 7,
   valibot: 1,
-  "react-router": 8,
+  "react-router": [7, 8],
   next: 16,
   "radix-ui": 1,
   "@radix-ui/react-dialog": 1,

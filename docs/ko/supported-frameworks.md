@@ -50,7 +50,7 @@
 | **React Hook Form** | 상태/데이터 | 7.x | 7.92.0 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/react-hook-form) | 폼 검증/제출 중/에러 상태. | — | — |
 | **valibot** | 상태/데이터 | 1.x | 1.5.0 | 2026-09-09 | [www.npmjs.com](https://www.npmjs.com/package/valibot) | 샘플 데이터에서 zod와 같은 역할. | — | — |
 | **Next.js** | 메타 프레임워크 | 16.x | 16.4.6 | 2026-11-09 | [www.npmjs.com](https://www.npmjs.com/package/next) | 가장 많이 쓰는 React 메타 프레임워크. | Server Components는 서버에서 렌더된다. 그곳에 상태를 주입하는 방법은 미확인. | 예 |
-| **React Router** | 메타 프레임워크 | 8.x | 8.5.2 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/react-router) | 흔한 라우터. framework 모드가 Remix의 후속. | 새 메이저 8.0.0이 2026-06-17 출시. | — |
+| **React Router** | 메타 프레임워크 | 7.x / 8.x | 8.5.2 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/react-router) | 흔한 라우터. framework 모드가 Remix의 후속. | 새 메이저 8.0.0이 2026-06-17 출시. 7.x도 동일한 선언형 라우터·검색 파라미터 API를 공유한다. | — |
 | **TanStack Start** | 메타 프레임워크 | 1.x | 1.169.7 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-start) | MVP에 있는 TanStack Router 위에 있다. | — | — |
 | **Electron** | 데스크톱 셸 | 45.x | 45.4.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/electron) | UI가 웹인 데스크톱 앱. 같은 Chromium 경로로 렌더. | 대략 8주마다 새 메이저라 기준이 자주 바뀐다. | 예 |
 | **Radix UI** | UI 킷 | 1.x | 1.8.1 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/radix-ui) | 많은 React 킷의 기반 headless 원시 컴포넌트. 열림/닫힘 상태. | — | — |
