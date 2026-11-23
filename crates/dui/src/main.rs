@@ -358,6 +358,94 @@ fn run() -> Reply {
         };
     }
     if let [cmd, tail @ ..] = args.as_slice()
+        && cmd == "auth"
+    {
+        let Some((sub, rest)) = tail.split_first() else {
+            return Err(failure(
+                2,
+                "expected auth login URL [--out FILE] [--wait-url PATTERN] [--timeout SECS] [--headless]",
+            ));
+        };
+        if sub != "login" {
+            return Err(failure(2, "expected auth login URL ..."));
+        }
+        let mut url: Option<String> = None;
+        let mut out_path = std::path::PathBuf::from(".dui-auth-state.json");
+        let mut wait_url: Option<String> = None;
+        let mut timeout_secs: u64 = 300;
+        let mut headless = false;
+        let mut iter = rest.iter();
+        while let Some(arg) = iter.next() {
+            if arg == "--out" {
+                let Some(val) = iter.next() else {
+                    return Err(failure(2, "missing value for --out"));
+                };
+                out_path = std::path::PathBuf::from(val);
+            } else if arg == "--wait-url" {
+                let Some(val) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --wait-url"));
+                };
+                wait_url = Some(val.to_owned());
+            } else if arg == "--timeout" {
+                let Some(val) = iter.next().and_then(|v| v.to_str()) else {
+                    return Err(failure(2, "missing value for --timeout"));
+                };
+                timeout_secs = val
+                    .parse::<u64>()
+                    .map_err(|_| failure(2, "invalid --timeout seconds"))?;
+            } else if arg == "--headless" {
+                headless = true;
+            } else if url.is_none() {
+                url = Some(
+                    arg.to_str()
+                        .ok_or_else(|| failure(2, "invalid UTF-8 login URL"))?
+                        .to_owned(),
+                );
+            } else {
+                return Err(failure(2, "unexpected argument for auth login"));
+            }
+        }
+        let raw_url = url.ok_or_else(|| {
+            failure(
+                2,
+                "expected auth login URL [--out FILE] [--wait-url PATTERN] [--timeout SECS] [--headless]",
+            )
+        })?;
+        let valid_url = dui_core::auth::validate_login_url(&raw_url).map_err(|e| failure(2, e))?;
+        let exe = chromium::executable();
+        let captured = chromium::capture_login_session(
+            &exe,
+            &valid_url,
+            wait_url.as_deref(),
+            std::time::Duration::from_secs(timeout_secs.max(1)),
+            headless,
+        )
+        .map_err(|e| failure(3, &e.to_string()))?;
+        if let Some(parent) = out_path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent).map_err(|e| failure(3, &e.to_string()))?;
+        }
+        let body = serde_json::to_vec_pretty(&captured.storage_state)
+            .map_err(|e| failure(3, &e.to_string()))?;
+        std::fs::write(&out_path, body).map_err(|e| failure(3, &e.to_string()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&out_path, std::fs::Permissions::from_mode(0o600));
+        }
+        let abs_out = out_path.canonicalize().unwrap_or(out_path);
+        return Ok(json!({
+            "status": "ok",
+            "output": abs_out,
+            "url": captured.url,
+            "origin": captured.origin,
+            "cookies": captured.cookies_count,
+            "localStorage": captured.local_storage_count,
+            "sessionStorage": captured.session_storage_count,
+        }));
+    }
+    if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "desktop"
     {
         return launch_desktop(tail);

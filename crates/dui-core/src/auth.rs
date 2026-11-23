@@ -149,6 +149,85 @@ pub fn build_storage_prelude_script(
     out
 }
 
+/// Validate that a login start URL uses http:// or https:// and includes a host.
+pub fn validate_login_url(raw: &str) -> Result<String, &'static str> {
+    let trimmed = raw.trim();
+    let rest = trimmed
+        .strip_prefix("http://")
+        .or_else(|| trimmed.strip_prefix("https://"))
+        .ok_or("login URL must start with http:// or https://")?;
+    let host = rest.split('/').next().unwrap_or("").trim();
+    if host.is_empty() || host.starts_with(':') {
+        return Err("login URL is missing a host");
+    }
+    Ok(trimmed.to_owned())
+}
+
+/// Build a Playwright-compatible `storageState.json` payload from captured browser
+/// cookies and origin storage maps.
+pub fn build_storage_state_json(
+    origin: &str,
+    cookies: &[Value],
+    local_storage: &BTreeMap<String, String>,
+    session_storage: &BTreeMap<String, String>,
+) -> Value {
+    let mut normalized_cookies: Vec<Value> = cookies
+        .iter()
+        .filter_map(|c| {
+            let name = c["name"].as_str().filter(|s| !s.is_empty())?;
+            let value = c["value"].as_str().unwrap_or("");
+            let domain = c["domain"].as_str().unwrap_or("");
+            let path = c["path"].as_str().unwrap_or("/");
+            Some(json!({
+                "name": name,
+                "value": value,
+                "domain": domain,
+                "path": path,
+                "httpOnly": c["httpOnly"].as_bool().unwrap_or(false),
+                "secure": c["secure"].as_bool().unwrap_or(false),
+                "sameSite": c["sameSite"].as_str().unwrap_or("Lax"),
+            }))
+        })
+        .collect();
+    normalized_cookies.sort_by(|a, b| {
+        let ka = (
+            a["domain"].as_str().unwrap_or(""),
+            a["path"].as_str().unwrap_or(""),
+            a["name"].as_str().unwrap_or(""),
+        );
+        let kb = (
+            b["domain"].as_str().unwrap_or(""),
+            b["path"].as_str().unwrap_or(""),
+            b["name"].as_str().unwrap_or(""),
+        );
+        ka.cmp(&kb)
+    });
+
+    let ls_entries: Vec<Value> = local_storage
+        .iter()
+        .map(|(k, v)| json!({ "name": k, "value": v }))
+        .collect();
+    let ss_entries: Vec<Value> = session_storage
+        .iter()
+        .map(|(k, v)| json!({ "name": k, "value": v }))
+        .collect();
+
+    let origins = if origin.is_empty() || (ls_entries.is_empty() && ss_entries.is_empty()) {
+        Vec::new()
+    } else {
+        vec![json!({
+            "origin": origin,
+            "localStorage": ls_entries,
+            "sessionStorage": ss_entries,
+        })]
+    };
+
+    json!({
+        "cookies": normalized_cookies,
+        "origins": origins,
+    })
+}
+
 /// Redact secret-bearing auth fields before persisting a manifest to disk or SQLite.
 pub fn redact_manifest_secrets(mut spec: Value) -> Value {
     let Some(obj) = spec.as_object_mut() else {
@@ -251,6 +330,42 @@ mod tests {
         assert_eq!(
             extract_json_string_path(&body, "data.accessToken").as_deref(),
             Some("tok-999")
+        );
+    }
+
+    #[test]
+    fn validates_login_urls_and_round_trips_storage_state_json() {
+        assert_eq!(
+            validate_login_url("http://127.0.0.1:5173/login").as_deref(),
+            Ok("http://127.0.0.1:5173/login")
+        );
+        assert_eq!(
+            validate_login_url("https://app.example.com/auth").as_deref(),
+            Ok("https://app.example.com/auth")
+        );
+        assert!(validate_login_url("javascript:alert(1)").is_err());
+        assert!(validate_login_url("http:///no-host").is_err());
+
+        let state = build_storage_state_json(
+            "http://127.0.0.1:5173",
+            &[
+                json!({"name": "sid", "value": "cookie-val", "domain": "127.0.0.1", "path": "/", "httpOnly": true}),
+            ],
+            &BTreeMap::from([("jwt".into(), "tok-123".into())]),
+            &BTreeMap::from([("role".into(), "admin".into())]),
+        );
+        let parsed = parse_storage_state_json(&state);
+        assert_eq!(
+            parsed.cookies.get("sid").map(String::as_str),
+            Some("cookie-val")
+        );
+        assert_eq!(
+            parsed.local_storage.get("jwt").map(String::as_str),
+            Some("tok-123")
+        );
+        assert_eq!(
+            parsed.session_storage.get("role").map(String::as_str),
+            Some("admin")
         );
     }
 }
