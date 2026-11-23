@@ -229,11 +229,11 @@ export function ElementInspector({
             {Object.entries(selected.style).map(([k, v]) => (
               <div key={k} className="element-prop-row">
                 <dt>{k}</dt>
-                <dd>
+                <dd title={v}>
                   {(k === "color" || k === "backgroundColor") && (
                     <span className="color-swatch" style={{ backgroundColor: v }} />
                   )}
-                  {v}
+                  <span className="element-prop-value">{v}</span>
                 </dd>
               </div>
             ))}
