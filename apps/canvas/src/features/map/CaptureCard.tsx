@@ -9,6 +9,7 @@ import {
 } from "../../model/canvasDiff";
 import {
   computeLiveFrameTransform,
+  resolveLiveBridgeUrl,
   resolveLiveSurfaceUrl,
   type LiveSurfaceMode,
 } from "../../model/liveSurface";
@@ -34,6 +35,7 @@ export function CaptureCard({
   beforeRunKey,
   afterRunKey,
   liveBaseUrl,
+  liveBridgePath,
   liveSurfaceMode = "capture",
 }: {
   screen: Screen;
@@ -52,13 +54,15 @@ export function CaptureCard({
   beforeRunKey?: string;
   afterRunKey?: string;
   liveBaseUrl?: string;
+  liveBridgePath?: string;
   liveSurfaceMode?: LiveSurfaceMode;
 }) {
   const { t } = useI18n();
   const [liveFallback, setLiveFallback] = useState(false);
   const liveUrl =
     liveSurfaceMode === "live" && !liveFallback
-      ? resolveLiveSurfaceUrl(liveBaseUrl, screen.path)
+      ? (resolveLiveBridgeUrl(liveBridgePath, screen.path) ??
+        resolveLiveSurfaceUrl(liveBaseUrl, screen.path))
       : null;
   const liveTransform =
     liveUrl && cardWidth && frameHeight

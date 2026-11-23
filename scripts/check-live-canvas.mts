@@ -119,8 +119,9 @@ try {
     `expected exit 2 for non-loopback --live-url, got ${badLive.status}`,
   );
 
-  // 5. One-command `dui open --live <run>` auto-starts the static host on loopback and serves live HTML
+  // 5. One-command `dui open --live <run>` auto-starts the static host on loopback and injects zero-modification telemetry bridge via /live-surface/
   let autoLiveUrl = "";
+  let bridgeInjected = false;
   const viewer4 = spawn(duiBin, ["open", "--no-open", "--live", outDir], {
     env: { ...process.env, HOME: duiHome },
     stdio: ["ignore", "pipe", "pipe"],
@@ -129,14 +130,78 @@ try {
     const baseUrl = await waitForUrl(viewer4);
     const resp = await fetch(`${baseUrl}/archive/runs.json`);
     assert.equal(resp.status, 200);
-    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string; liveDefaultMode?: string }>;
+    const runs = (await resp.json()) as Array<{
+      liveBaseUrl?: string;
+      liveBridgePath?: string;
+      liveDefaultMode?: string;
+    }>;
     autoLiveUrl = runs[0]?.liveBaseUrl ?? "";
     assert.match(autoLiveUrl, /^http:\/\/127\.0\.0\.1:\d+$/, "expected auto-started loopback host");
+    assert.equal(runs[0]?.liveBridgePath, "/live-surface");
     assert.equal(runs[0]?.liveDefaultMode, "live");
     const liveHtml = await (await fetch(autoLiveUrl)).text();
     assert.ok(liveHtml.includes("Static Host"), "auto-started live host serves live app HTML");
+
+    const bridgedResp = await fetch(`${baseUrl}/live-surface/`);
+    assert.equal(bridgedResp.status, 200);
+    const bridgedHtml = await bridgedResp.text();
+    assert.ok(bridgedHtml.includes("Static Host"), "bridged HTML retains upstream content");
+    assert.ok(
+      bridgedHtml.includes(`<base href="${autoLiveUrl}/" />`),
+      "bridged HTML injects loopback <base> tag",
+    );
+    assert.ok(
+      bridgedHtml.includes("dui:live-render-tree"),
+      "bridged HTML injects zero-modification live telemetry bridge",
+    );
+    bridgeInjected = true;
   } finally {
     viewer4.kill("SIGTERM");
+  }
+
+  // 6. One-command `dui open --live <vite-run>` auto-starts Vite dev server on loopback & serves bridged HTML
+  const toggleDir = path.join(repoRoot, "fixtures", "toggle");
+  let viteAutoLiveUrl = "";
+  if (fs.existsSync(path.join(toggleDir, "node_modules", ".bin", "vite"))) {
+    const viteOutDir = path.join(tmp, "out-vite");
+    fs.mkdirSync(viteOutDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(viteOutDir, "manifest.json"),
+      JSON.stringify({ path: "/", widths: [1280] }),
+    );
+    fs.writeFileSync(
+      path.join(viteOutDir, "snapshot.json"),
+      JSON.stringify({ projectRoot: toggleDir, app: "." }),
+    );
+    fs.writeFileSync(
+      path.join(viteOutDir, "graph.json"),
+      JSON.stringify({ screens: [], edges: [] }),
+    );
+    const viewer5 = spawn(duiBin, ["open", "--no-open", "--live", viteOutDir], {
+      env: { ...process.env, HOME: duiHome },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    try {
+      const baseUrl = await waitForUrl(viewer5);
+      const runs = (await (await fetch(`${baseUrl}/archive/runs.json`)).json()) as Array<{
+        liveBaseUrl?: string;
+        liveBridgePath?: string;
+      }>;
+      viteAutoLiveUrl = runs[0]?.liveBaseUrl ?? "";
+      assert.match(
+        viteAutoLiveUrl,
+        /^http:\/\/127\.0\.0\.1:\d+$/,
+        "expected auto-started Vite server",
+      );
+      assert.equal(runs[0]?.liveBridgePath, "/live-surface");
+      const viteBridgedHtml = await (await fetch(`${baseUrl}/live-surface/`)).text();
+      assert.ok(
+        viteBridgedHtml.includes("dui:live-render-tree"),
+        "Vite dev server HTML includes injected live telemetry bridge",
+      );
+    } finally {
+      viewer5.kill("SIGTERM");
+    }
   }
 
   console.log(
@@ -146,6 +211,8 @@ try {
       nonLoopbackRejected: true,
       cliLiveUrlFlag: true,
       autoLiveStartedUrl: autoLiveUrl,
+      bridgeInjected,
+      viteAutoLiveUrl,
     }),
   );
 } finally {

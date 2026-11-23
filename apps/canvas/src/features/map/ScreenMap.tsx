@@ -39,6 +39,7 @@ type CardNode = Node<
     beforeRunKey?: string;
     afterRunKey?: string;
     liveBaseUrl?: string;
+    liveBridgePath?: string;
     liveSurfaceMode?: LiveSurfaceMode;
   },
   "screen"
@@ -152,6 +153,7 @@ function Card({ data }: NodeProps<CardNode>) {
         beforeRunKey={data.beforeRunKey}
         afterRunKey={data.afterRunKey}
         liveBaseUrl={data.liveBaseUrl}
+        liveBridgePath={data.liveBridgePath}
         liveSurfaceMode={data.liveSurfaceMode}
       />
     </>
@@ -176,6 +178,7 @@ export function ScreenMap({
   beforeRunKey,
   afterRunKey,
   liveBaseUrl,
+  liveBridgePath,
   liveSurfaceMode = "capture",
   imageUrl,
   select,
@@ -196,6 +199,7 @@ export function ScreenMap({
   beforeRunKey?: string;
   afterRunKey?: string;
   liveBaseUrl?: string;
+  liveBridgePath?: string;
   liveSurfaceMode?: LiveSurfaceMode;
   imageUrl: (name: string) => string;
   select: (id: string, active?: Element | null) => void;
@@ -252,6 +256,7 @@ export function ScreenMap({
         beforeRunKey,
         afterRunKey,
         liveBaseUrl,
+        liveBridgePath,
         liveSurfaceMode,
       },
       ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,

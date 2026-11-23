@@ -162,10 +162,13 @@ function MapView({
     : (liveSurfaceChoice ?? (run.liveDefaultMode === "live" ? "live" : "capture"));
   const [liveTrees, setLiveTrees] = useState<Record<string, RenderNode[]>>({});
 
+  const liveBridgePath =
+    liveBaseUrl && run.liveBridgePath?.startsWith("/live-surface") ? run.liveBridgePath : undefined;
+
   useEffect(() => {
     if (!liveBaseUrl) return;
     const onMessage = (event: MessageEvent) => {
-      if (!isLoopbackOrigin(event.origin)) return;
+      if (event.origin !== window.location.origin && !isLoopbackOrigin(event.origin)) return;
       const telemetry = parseLiveTelemetryMessage(event.data);
       if (!telemetry) return;
       const key = liveSurfaceKey(telemetry.path, telemetry.width);
@@ -320,6 +323,7 @@ function MapView({
               beforeRunKey={compareBeforeKey || undefined}
               afterRunKey={run.key}
               liveBaseUrl={liveBaseUrl}
+              liveBridgePath={liveBridgePath}
               liveSurfaceMode={liveSurfaceMode}
               imageUrl={(name) => archiveUrl(name, run)}
               select={select}
