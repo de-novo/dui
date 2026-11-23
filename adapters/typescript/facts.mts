@@ -714,6 +714,7 @@ try {
             });
         } else if (n.kind === K.JsxOpeningElement || n.kind === K.JsxSelfClosingElement) {
           const tagNode = n.tagName;
+          const tagText = tagNode ? tagNode.getText() : "";
           const tagSym = tagNode ? symbol(tagNode.name ?? tagNode) : null;
           const tagPath = compiler.declarationPath(tagSym?.declarations?.[0]) ?? "";
           const controlRule = rules.find(
@@ -723,6 +724,22 @@ try {
               (tagPath.includes("/node_modules/" + r.package + "/") ||
                 tagPath.includes("/node_modules/@types/" + r.package + "/")),
           );
+          const attrNodes = n.attributes?.properties ?? [];
+          let ariaRole: string | undefined;
+          for (const attr of attrNodes) {
+            if (attr.kind !== K.JsxAttribute || !attr.name || attr.name.getText() !== "role") {
+              continue;
+            }
+            const init = attr.initializer;
+            if (init?.kind === K.StringLiteral) {
+              ariaRole = init.text;
+            } else if (
+              init?.kind === K.JsxExpression &&
+              init.expression?.kind === K.StringLiteral
+            ) {
+              ariaRole = init.expression.text;
+            }
+          }
           if (controlRule) {
             const stateProps = [
               "open",
@@ -734,7 +751,6 @@ try {
               "defaultChecked",
             ];
             const fields: { name: string; type: string; shape: Shape }[] = [];
-            const attrNodes = n.attributes?.properties ?? [];
             const seenProps = new Set<string>();
             for (const attr of attrNodes) {
               if (attr.kind !== K.JsxAttribute || !attr.name) continue;
@@ -771,9 +787,102 @@ try {
               ...base,
               kind: "control",
               package: controlRule.package,
-              label: tagNode ? tagNode.getText() : controlRule.symbol,
+              label: tagText || controlRule.symbol,
+              ...(ariaRole ? { ariaRole } : {}),
               fields,
             });
+          } else if (tagText) {
+            // Framework-level UI control extraction: works for any React component or native
+            // HTML/WAI-ARIA element without coupling to a specific UI component library.
+            const reactStateProps = new Set([
+              "open",
+              "defaultOpen",
+              "isOpen",
+              "visible",
+              "checked",
+              "defaultChecked",
+              "selected",
+              "disabled",
+              "loading",
+              "expanded",
+              "value",
+              "defaultValue",
+              "status",
+              "variant",
+              "size",
+              "mode",
+              "activeTab",
+              "state",
+            ]);
+            const ariaStateAttrs = new Set([
+              "aria-expanded",
+              "aria-selected",
+              "aria-checked",
+              "aria-pressed",
+              "aria-disabled",
+              "aria-hidden",
+              "aria-invalid",
+              "aria-current",
+              "aria-busy",
+              "data-state",
+            ]);
+            const htmlStateAttrs: Record<string, Set<string>> = {
+              dialog: new Set(["open"]),
+              details: new Set(["open"]),
+              input: new Set(["checked", "defaultChecked", "disabled", "value", "defaultValue"]),
+              select: new Set(["disabled", "value", "defaultValue"]),
+              textarea: new Set(["disabled", "value", "defaultValue"]),
+              button: new Set(["disabled"]),
+              fieldset: new Set(["disabled"]),
+            };
+            const isReactComponent = /^[A-Z]/.test(tagText);
+            const lowerTag = tagText.toLowerCase();
+            const allowedHtmlProps = htmlStateAttrs[lowerTag];
+            const isStaticLiteral = (node: Syntax): boolean => {
+              let cur = node;
+              while (cur.kind === K.ParenthesizedExpression && cur.expression) {
+                cur = cur.expression;
+              }
+              return (
+                cur.kind === K.StringLiteral ||
+                cur.kind === K.NoSubstitutionTemplateLiteral ||
+                cur.kind === K.NumericLiteral ||
+                cur.kind === K.TrueKeyword ||
+                cur.kind === K.FalseKeyword ||
+                cur.kind === K.NullKeyword
+              );
+            };
+            const fields: { name: string; type: string; shape: Shape }[] = [];
+            const seenProps = new Set<string>();
+            for (const attr of attrNodes) {
+              if (attr.kind !== K.JsxAttribute || !attr.name) continue;
+              const propName = attr.name.getText();
+              if (seenProps.has(propName)) continue;
+              const matchesProp = isReactComponent
+                ? reactStateProps.has(propName) || ariaStateAttrs.has(propName)
+                : ariaStateAttrs.has(propName) || Boolean(allowedHtmlProps?.has(propName));
+              if (!matchesProp) continue;
+              const init = attr.initializer;
+              if (!init || init.kind !== K.JsxExpression || !init.expression) continue;
+              if (isStaticLiteral(init.expression)) continue;
+              seenProps.add(propName);
+              const t = checker.getTypeAtLocation(init.expression);
+              fields.push({
+                name: propName,
+                type: t ? checker.typeToString(t) : "unknown",
+                shape: t ? shape(t) : { kind: "unknown" },
+              });
+            }
+            if (fields.length > 0) {
+              facts.push({
+                ...base,
+                kind: "control",
+                package: isReactComponent ? "react" : "html-aria",
+                label: tagText,
+                ...(ariaRole ? { ariaRole } : {}),
+                fields,
+              });
+            }
           }
         }
         n.forEachChild((child) => {
