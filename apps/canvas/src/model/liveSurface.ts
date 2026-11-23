@@ -284,10 +284,16 @@ export function auditLiveRenderTree(
       const tag = node.tag.toLowerCase();
       const inputType = (attrs.type ?? "").toLowerCase();
       const isHiddenInput = tag === "input" && inputType === "hidden";
-      const isNativeCheck = tag === "input" && (inputType === "checkbox" || inputType === "radio");
+      const isNativeCheck =
+        (tag === "input" && (inputType === "checkbox" || inputType === "radio")) ||
+        node.role === "checkbox" ||
+        node.role === "radio";
+      const isDesktopEdgeRail =
+        safeW > 500 && ((r.height >= 400 && r.width >= 8) || (r.width >= 400 && r.height >= 8));
       const enforceTarget =
         !isHiddenInput &&
         !isNativeCheck &&
+        !isDesktopEdgeRail &&
         (tag !== "a" || Boolean(node.style.display && node.style.display !== "inline"));
       const tooSmall =
         safeW <= 500

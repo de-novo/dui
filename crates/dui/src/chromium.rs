@@ -925,12 +925,17 @@ impl Browser {
             ));
             let shellH = 0;
             if (docH <= vpH + 8) {
-                const candidates = document.querySelectorAll('main, [role="main"], [data-dui-scroll-root], body > div, body > div > div, body > div > div > div');
+                const vpW = Math.max(1, Math.round(window.innerWidth || 0));
+                const candidates = document.querySelectorAll('main, [role="main"], [data-dui-scroll-root], div, section, ul, ol, article');
                 for (const el of candidates) {
                     if (!(el instanceof HTMLElement)) continue;
                     const cs = getComputedStyle(el);
                     if (cs.overflowY !== 'auto' && cs.overflowY !== 'scroll') continue;
-                    if (el.clientHeight >= vpH * 0.4 && el.scrollHeight > el.clientHeight + 40) {
+                    if (
+                        el.clientHeight >= vpH * 0.35 &&
+                        el.clientWidth >= vpW * 0.4 &&
+                        el.scrollHeight > el.clientHeight + 40
+                    ) {
                         const needed = Math.ceil(vpH + (el.scrollHeight - el.clientHeight));
                         if (needed > shellH) shellH = needed;
                     }
@@ -1015,6 +1020,22 @@ impl Browser {
             png,
             STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?,
         )?;
+        // After screenshot capture, safely expand collapsed WAI-ARIA nav disclosures to
+        // discover hidden submenu links without mutating the captured image.
+        if spec["routeSelector"].is_string()
+            && let Ok(expanded) = self.call(
+                s,
+                "Runtime.evaluate",
+                json!({
+                    "expression": format!("globalThis.__duiRuntime.discoverLinks({selector_json})"),
+                    "awaitPromise": true,
+                    "returnByValue": true
+                }),
+            )
+            && let Some(arr) = expanded["result"]["value"].as_array()
+        {
+            v["links"] = arr.clone().into();
+        }
         if !v.is_object() {
             v = json!({"ready":false});
         }

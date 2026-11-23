@@ -76,8 +76,34 @@ try {
   <head><meta charset="utf-8" /><title>Home</title></head>
   <body style="font-family:sans-serif;padding:24px">
     <h1>Universal Home</h1>
-    <nav><a href="/pricing.html">Pricing</a> <a href="/about.html">About</a></nav>
+    <nav>
+      <a href="/pricing.html">Pricing</a>
+      <a href="/about.html">About</a>
+      <button id="more-toggle" type="button" aria-expanded="false">More</button>
+      <div id="more-menu" hidden></div>
+    </nav>
     <p>Plain HTML rendered with zero bundler.</p>
+    <script>
+      const btn = document.getElementById("more-toggle");
+      const menu = document.getElementById("more-menu");
+      btn.addEventListener("click", () => {
+        const open = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", open ? "false" : "true");
+        menu.hidden = open;
+        menu.innerHTML = open ? "" : '<a href="/more.html">More Info</a>';
+      });
+    </script>
+  </body>
+</html>`,
+  );
+  fs.writeFileSync(
+    path.join(staticDir, "more.html"),
+    `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>More</title></head>
+  <body style="font-family:sans-serif;padding:24px">
+    <h1>More Info</h1>
+    <a href="/">Back Home</a>
   </body>
 </html>`,
   );
@@ -122,13 +148,17 @@ try {
   ) as RunReport;
   assert.equal(
     report1.coverage.verified,
-    6,
-    `expected 6 verified static cells, got ${report1.coverage.verified}`,
+    8,
+    `expected 8 verified static cells (incl. WAI-ARIA disclosed /more.html), got ${report1.coverage.verified}`,
   );
   const discoveredPaths = new Set(report1.cells.map((c) => c.path));
   assert.ok(discoveredPaths.has("/"), "static run includes /");
   assert.ok(discoveredPaths.has("/pricing.html"), "static run discovers /pricing.html");
   assert.ok(discoveredPaths.has("/about.html"), "static run discovers /about.html");
+  assert.ok(
+    discoveredPaths.has("/more.html"),
+    "static run discovers /more.html via WAI-ARIA aria-expanded disclosure expansion",
+  );
   for (const cell of report1.cells) {
     assert.ok(
       (cell.observation?.renderTree?.length ?? 0) > 0,

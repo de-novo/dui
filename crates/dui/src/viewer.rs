@@ -247,6 +247,18 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
         if (!resolved && "labels" in el && el.labels && el.labels.length > 0) {
           resolved = Array.from(el.labels).map((l) => (l.innerText || l.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean).join(" ");
         }
+        if (!resolved && el.id) {
+          try {
+            const linked = document.querySelectorAll(`label[for="${CSS.escape(el.id)}"]`);
+            if (linked.length > 0) {
+              resolved = Array.from(linked).map((l) => (l.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean).join(" ");
+            }
+          } catch {}
+        }
+        if (!resolved) {
+          const wrapLbl = el.closest("label");
+          if (wrapLbl) resolved = (wrapLbl.innerText || wrapLbl.textContent || "").replace(/\s+/g, " ").trim();
+        }
         if (!resolved) {
           const desc = el.querySelector("[aria-label], img[alt], svg title");
           if (desc) resolved = (desc.getAttribute("aria-label") || desc.getAttribute("alt") || desc.textContent || "").replace(/\s+/g, " ").trim();

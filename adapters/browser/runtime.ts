@@ -346,25 +346,43 @@ declare var __duiProbe: {
           .filter(Boolean);
         if (parts.length > 0) return parts.join(" ").slice(0, 120);
       }
-      if (
-        el instanceof HTMLInputElement ||
-        el instanceof HTMLSelectElement ||
-        el instanceof HTMLTextAreaElement
-      ) {
-        if (el.labels && el.labels.length > 0) {
-          const labelText = Array.from(el.labels)
+      if ("labels" in el) {
+        const lbls = (el as HTMLInputElement).labels;
+        if (lbls && lbls.length > 0) {
+          const labelText = Array.from(lbls)
             .map((lbl) => (lbl.innerText || lbl.textContent || "").replace(/\s+/g, " ").trim())
             .filter(Boolean)
             .join(" ");
           if (labelText) return labelText.slice(0, 120);
         }
-        if (
-          el instanceof HTMLInputElement &&
-          ["submit", "button", "reset"].includes((el.type || "").toLowerCase()) &&
-          el.value.trim()
-        ) {
-          return el.value.trim().slice(0, 120);
+      }
+      if (el.id) {
+        try {
+          const linkedLabels = document.querySelectorAll(`label[for="${CSS.escape(el.id)}"]`);
+          if (linkedLabels.length > 0) {
+            const labelText = Array.from(linkedLabels)
+              .map((lbl) => (lbl.textContent || "").replace(/\s+/g, " ").trim())
+              .filter(Boolean)
+              .join(" ");
+            if (labelText) return labelText.slice(0, 120);
+          }
+        } catch {
+          // Ignore invalid selector edge cases.
         }
+      }
+      const wrappingLabel = el.closest("label");
+      if (wrappingLabel) {
+        const labelText = (wrappingLabel.innerText || wrappingLabel.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (labelText) return labelText.slice(0, 120);
+      }
+      if (
+        el instanceof HTMLInputElement &&
+        ["submit", "button", "reset"].includes((el.type || "").toLowerCase()) &&
+        el.value.trim()
+      ) {
+        return el.value.trim().slice(0, 120);
       }
       const desc = el.querySelector("[aria-label], img[alt], svg title");
       if (desc) {
@@ -702,6 +720,97 @@ declare var __duiProbe: {
             !url.pathname.startsWith("//")
           ) {
             paths.add(url.pathname + url.search + url.hash);
+          }
+        }
+        return [...paths].sort();
+      },
+      async discoverLinks(selector: string) {
+        const collectInto = (target: Set<string>, sel: string) => {
+          for (const link of document.querySelectorAll(sel)) {
+            if (
+              !(link instanceof HTMLAnchorElement) ||
+              !link.hasAttribute("href") ||
+              link.hasAttribute("download")
+            )
+              continue;
+            const url = URL.parse(link.href);
+            if (
+              url &&
+              url.protocol === location.protocol &&
+              url.origin === location.origin &&
+              !url.pathname.startsWith("//")
+            ) {
+              target.add(url.pathname + url.search + url.hash);
+            }
+          }
+        };
+        const paths = new Set<string>();
+        collectInto(paths, selector);
+        collectInto(paths, "a[href]");
+
+        // Framework-agnostic WAI-ARIA navigation disclosure expansion:
+        // safely expand collapsed nav accordions/trees (aria-expanded="false") after capture
+        // to uncover submenu <a href> links without relying on any router-specific syntax.
+        const navRoots = document.querySelectorAll(
+          'nav, aside, header, [role="navigation"], [data-sidebar], [data-slot*="sidebar"]',
+        );
+        const triggers: HTMLElement[] = [];
+        const seen = new Set<Element>();
+        const destructiveRe = /\b(logout|log out|sign out|delete|remove|reset|destroy)\b/i;
+        for (const root of navRoots) {
+          for (const el of root.querySelectorAll(
+            'button[aria-expanded="false"], [role="button"][aria-expanded="false"], [role="treeitem"][aria-expanded="false"]',
+          )) {
+            if (!(el instanceof HTMLElement) || seen.has(el)) continue;
+            if (el.hasAttribute("disabled") || el.getAttribute("aria-disabled") === "true")
+              continue;
+            if (el.closest("form")) continue;
+            const label = (
+              el.innerText ||
+              el.getAttribute("aria-label") ||
+              el.textContent ||
+              ""
+            ).trim();
+            if (destructiveRe.test(label)) continue;
+            seen.add(el);
+            triggers.push(el);
+            if (triggers.length >= 24) break;
+          }
+          if (triggers.length >= 24) break;
+        }
+        if (triggers.length > 0) {
+          const startHref = location.href;
+          const opened: HTMLElement[] = [];
+          for (const trigger of triggers) {
+            if (!trigger.isConnected || trigger.getAttribute("aria-expanded") !== "false") continue;
+            try {
+              trigger.click();
+              opened.push(trigger);
+            } catch {
+              // Ignore click failures on detached or guarded triggers.
+            }
+            if (location.href !== startHref) {
+              try {
+                history.back();
+              } catch {
+                // Ignore history errors.
+              }
+              break;
+            }
+          }
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+          collectInto(paths, selector);
+          collectInto(paths, "a[href]");
+          for (const trigger of opened.reverse()) {
+            if (trigger.isConnected && trigger.getAttribute("aria-expanded") === "true") {
+              try {
+                trigger.click();
+              } catch {
+                // Ignore restore click failures.
+              }
+            }
           }
         }
         return [...paths].sort();
