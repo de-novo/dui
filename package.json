@@ -31,7 +31,6 @@
     "check:compiler-oracles": "tsc --project scripts && cargo build --locked && node scripts/check-compiler-oracles.mts",
     "check:reliability": "tsc --project scripts && cargo build --locked && node scripts/check-reliability.mts",
     "check:auth-pr-diff": "tsc --project scripts && cargo build --locked && node scripts/check-auth-and-pr-diff.mts",
-    "check:live-canvas": "tsc --project scripts && cargo build --locked && node scripts/check-live-canvas.mts",
     "check:vite7": "tsc --project scripts && cargo build --locked && node scripts/check-vite7.mts",
     "check:desktop": "tsc --project scripts && cargo build --locked && node scripts/check-desktop.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",

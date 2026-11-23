@@ -1,11 +1,10 @@
-import { ArrowDownLeft, ArrowUpRight, Play, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 import type { KeyboardEvent, RefObject } from "react";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
 import type { Cell, Screen, ScreenMap } from "../../data/overview";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
-import { canOpenLiveCell } from "../../model/live";
 import type { ScreenCanvasDiff } from "../../model/canvasDiff";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
@@ -48,11 +47,8 @@ export function ScreenInspector({
   onSelectLocale,
   onSelectState,
   onSelectScreen,
-  onOpenLive,
   screenDiff,
   beforeRunKey,
-  externalSelectedNodeId,
-  onHighlightNode,
 }: {
   archive: ScreenMap;
   run: Run;
@@ -71,14 +67,10 @@ export function ScreenInspector({
   onSelectLocale: (locale: string | null) => void;
   onSelectState: (stateKey: string, width?: number) => void;
   onSelectScreen: (screenId: string) => void;
-  onOpenLive: (targetCell: { state: string; width: number }) => void;
   screenDiff?: ScreenCanvasDiff;
   beforeRunKey?: string;
-  externalSelectedNodeId?: string | null;
-  onHighlightNode?: (nodeId: string | null) => void;
 }) {
   const { t } = useI18n();
-  const liveGate = canOpenLiveCell(cell, run);
   const connections = screen ? screenConnections(archive, screen.id) : [];
   const rawScreenCells = screen?.cells ?? [];
   const screenCells =
@@ -112,24 +104,6 @@ export function ScreenInspector({
           <X aria-hidden="true" />
         </Button>
       </div>
-
-      {screen && (
-        <div className="live-entry">
-          <Button
-            className="live-open-button"
-            variant="default"
-            disabled={!liveGate.ok}
-            onKeyDown={onKeyDown}
-            onClick={() => {
-              if (liveGate.ok) onOpenLive(liveGate.cell);
-            }}
-          >
-            <Play aria-hidden="true" />
-            {t.openLive}
-          </Button>
-          {!liveGate.ok && <p className="live-unavailable-note">{liveGate.reason}</p>}
-        </div>
-      )}
 
       {screenDiff && (
         <section className="inspector-diff-section" aria-label={t.diffTitle}>
@@ -267,8 +241,6 @@ export function ScreenInspector({
           key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
           cell={cell}
           imageUrl={`/archive/${encodeURIComponent(cell.image)}?run=${encodeURIComponent(run.key)}`}
-          externalSelectedId={externalSelectedNodeId}
-          onHighlightNode={onHighlightNode}
         />
       )}
 

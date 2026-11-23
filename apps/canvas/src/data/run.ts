@@ -5,7 +5,4 @@ export type Run = {
   branch: string | null;
   version: string;
   liveAvailable?: boolean;
-  liveBaseUrl?: string;
-  liveBridgePath?: string;
-  liveDefaultMode?: "capture" | "live";
 };

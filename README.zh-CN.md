@@ -15,7 +15,7 @@ dui 通过项目官方编译器读取类型，自动生成模拟数据并在真�
 | 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2、Go |
 | Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 18 / 19+、Vite 7 / 8+、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
 | 桌面应用 | GPUI (`gpui-pre` 0.3.x、`gpui-kit` / `gpui-component` 0.10.x，Metal + AccessKit `renderTree`)、Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
-| 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | Jetpack Compose (`kotlinc` 2)、SwiftUI (`swiftc` 6)、Flutter (`dart` 3) 深度状态计划 |
+| 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | 官方工具链探测 (`dui toolchains`)；SwiftUI / Compose / Flutter 适配器规划中（见[支持框架](docs/zh-CN/supported-frameworks.md)） |
 | 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG)、Ink 5 (`tsc` 规则包) | Ratatui (`rustc`)、Bubble Tea (`go`) 深度状态计划 |
 | 路由与 URL 状态 | TanStack Router 1、TanStack Start 1、React Router 7 / 8、Next.js App Router (`app/**/page.tsx`)、标准 Web `URLSearchParams` | Android Intent 与深度链接编译器分析 |
 | 状态、表单与模式 | React `useState`、TanStack Query 5、Zustand 5、Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、zod 4、valibot 1、Radix UI 1 / shadcn/ui 4 | — |
@@ -31,8 +31,7 @@ dui 通过项目官方编译器读取类型，自动生成模拟数据并在真�
 | 质量、多语言与审计 | 99% 覆盖率审计 (`dui audit`)、多语言与 RTL 校验、缺译键与文本溢出检测、SQLite 评审评论、基于模块图的内容寻址缓存 | 已支持 |
 | 实时编辑与查看器 | 共享 CLI/MCP 实时会话 (`dui live`)、内置 Web 画布 (`dui open`)、原生 GPUI 桌面查看器 (`dui desktop`) | 已支持 |
 | 元素检查器与盒模型 | 开发者工具级元素属性检查、盒模型图与叠加（宽高、外边距、内边距、边框、gap、圆角）以及元素间交互式间距标尺 | 已支持 |
-| 画布实时组件渲染 | 直接在 2D 画布卡片上挂载本地回环真实组件（`dui open --live` / `--live-url`），支持零修改 DOM 遥测桥接与 `ElementInspector` 双向高亮 (`v0.2.0`) | 已支持 |
-| 多平台引擎与扩展 | `SurfaceRegistry` 多平台插件流水线、多工作进程并行捕获 (`concurrency`)、基于 WAI-ARIA 的模态框/抽屉自动捕获、避障走廊连线、GPUI AccessKit 渲染树 Diff | 已支持 |
+| 通用路由、模态框与画布 | 全页真实比例捕获、WAI-ARIA 导航展开与模态框/抽屉自动捕获、避障走廊连线、原生 macOS `TitleBar`（`apps/desktop`）、多工作进程并行捕获 (`concurrency`)、`SurfaceRegistry` 流水线 | 已支持 |
 
 ## 安装
 
@@ -65,11 +64,11 @@ dui map
 # 2. （可选）捕获需登录应用的浏览器会话（支持表单 / MFA / OAuth）
 dui auth login http://localhost:5173/login --out auth-state.json
 
-# 3. 在 2D 画布中查看（加 --live 直接挂载本地实时组件）
+# 3. 在 2D 画布或原生桌面查看器中审阅
 dui open
-dui open --live
+dui desktop
 
-# 4. 分支对比生成 PR Markdown 摘要，并检查覆盖率与设计缺陷
+# 4. 分支对比生成 PR Markdown 摘要，并检查覆盖率
 dui diff --base main --markdown
 dui audit <run-dir>
 ```
@@ -78,15 +77,15 @@ dui audit <run-dir>
 
 | 命令 | 适用场景 |
 | --- | --- |
-| `dui map [PROJECT]` | **带路由应用的默认命令**（TanStack Router、React Router 7/8 或链接）。自动发现路由并合并 `dui.json` 中的 `routeParams`、`storageState`、`readySelector` 及额外 `scenarios`。 |
+| `dui map [PROJECT]` | **带路由应用的默认命令**（TanStack Router、React Router 7/8、Next.js 或链接）。自动发现路由与模态框，并合并 `dui.json` 中的 `routeParams`、`storageState`、`readySelector` 及额外 `scenarios`。 |
 | `dui run [PROJECT] [MANIFEST]` | **按清单直接捕获。** 直接运行 `dui.json`（省略参数默认使用 `.` / `dui.json`；若未指定 `path` 或 `host` 则自动回退到 `dui map`）。 |
 
 | 分组 | 命令 | 用途 |
 | --- | --- | --- |
-| 捕获 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 自动发现/捕获界面，或在不启动浏览器的情况下输出编译器事实与自动模拟 |
+| 捕获 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 自动发现/捕获界面与模态框，或在不启动浏览器的情况下输出编译器事实与自动模拟 |
 | 认证 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 保存 Playwright 兼容的 `storageState.json`（`0600` 权限） |
-| 查看与实时 | `dui open [--live \| --live-url URL]` · `dui desktop` · `dui live JSON` | 内置 2D Web 画布（支持实时组件挂载与 `Alt+点击` 元素定位）或原生 GPUI 查看器 |
-| 对比与质量 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 元素级与像素级 Diff、99% 覆盖率与 6 项设计/无障碍缺陷审计、评审评论 |
+| 查看 | `dui open [RUN_DIR]` · `dui desktop` | 内置 2D Web 画布或原生 GPUI 桌面查看器 |
+| 对比与质量 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 元素级与像素级 Diff、99% 覆盖率审计、评审评论 |
 | 工具 | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | 官方编译器探测、历史归档、缓存清理、版本更新、MCP stdio 服务器 |
 
 ## 自动发现页面

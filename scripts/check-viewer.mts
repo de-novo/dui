@@ -213,7 +213,7 @@ try {
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
     );
-    assert(dom.includes("Open live"), "expected embedded viewer React UI to mount in Chrome");
+    assert(dom.includes("Archive"), "expected embedded viewer React UI to mount in Chrome");
 
     console.log(
       JSON.stringify({

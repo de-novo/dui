@@ -11,19 +11,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Live component rendering directly on the 2D canvas (`Static | Live mount`, loopback origin guard, one-command `dui open --live` / `--live-url` auto-starting static/url/command/Vite/Next.js hosts, zero-modification `/live-surface/*` DOM telemetry bridge, real-time live Design Audit, bidirectional `ElementInspector` ↔ live-card highlight/selection, and GPUI desktop live surface indicator parity) ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138), [#141](https://github.com/de-novo/dui/pull/141), [#142](https://github.com/de-novo/dui/pull/142)).
+- Full-page screen capture (expanding nested app-shell scroll containers) with true-aspect card layout on both Web Canvas and GPUI Desktop ([#148](https://github.com/de-novo/dui/pull/148), [#150](https://github.com/de-novo/dui/pull/150)).
+- Framework-agnostic WAI-ARIA navigation disclosure expansion, official compiler route-registry lookup (`routeTree.gen.ts` `FileRoutesByTo`, React Router generated types), zero-config `dui scan .`, and multi-host `dui map .` auto-detection for Vite, Next.js, and static HTML apps ([#150](https://github.com/de-novo/dui/pull/150), [#154](https://github.com/de-novo/dui/pull/154)).
+- Framework-agnostic HTML/WAI-ARIA modal, dialog, drawer, and popover auto-capture promoted into verified child overlay nodes (`<path>#overlay:<slug>`) on the 2D canvas with CSS animation settling and content-addressed blob caching ([#158](https://github.com/de-novo/dui/pull/158), [#162](https://github.com/de-novo/dui/pull/162)).
+- Native GPUI desktop UX parity with Web Canvas: full-bleed canvas, floating glass rail & inspector, cursor-anchored continuous zoom, native transparent macOS `TitleBar`, and obstacle-free gutter edge routing with hover/selection focus highlighting across both viewers ([#156](https://github.com/de-novo/dui/pull/156), [#160](https://github.com/de-novo/dui/pull/160)).
 - Framework-level React controlled-prop and native HTML/WAI-ARIA control extraction (`package: "react"` and `package: "html-aria"`, independent of any specific UI component library) ([#140](https://github.com/de-novo/dui/pull/140)).
 - Full Level 2 Vite 7 support alongside Vite 8+ via an official TypeScript 6/7 AST fallback (`adapters/vite/parser.mts`, `npm run check:vite7`) ([#133](https://github.com/de-novo/dui/pull/133)).
 - Static React Router 7/8 route discovery (`createBrowserRouter`, `createHashRouter`, `createMemoryRouter`, and nested JSX `<Route>` trees with `index`, `:param`, and `*` splats) across Vite 7 and 8 ([#134](https://github.com/de-novo/dui/pull/134), [#135](https://github.com/de-novo/dui/pull/135)).
 - Interactive browser login session capture (`dui auth login <URL> --out FILE`) saving Playwright-compatible `storageState.json` (`HttpOnly` cookies, `localStorage`, `sessionStorage`) with `0600` permissions ([#137](https://github.com/de-novo/dui/pull/137)).
-- Compiler-deep Mobile & TUI state extraction rules (Ink 5, React Native, Expo Router 5), shared compiler-oracle IR, and `dui toolchains` probing 6 official compilers ([#124](https://github.com/de-novo/dui/pull/124)).
+- Shared compiler-oracle IR, Ink 5 / React Native / Expo Router 5 `tsc` rule packs, and `dui toolchains` probing 6 official compilers ([#124](https://github.com/de-novo/dui/pull/124)).
 - Automated SemVer and 3-language `CHANGELOG` version-sync guard (`npm run check:version`) enforced in `check:style` CI ([#131](https://github.com/de-novo/dui/pull/131)).
 - Viewer UI Design/Review agent skills (`anti-ui-slop`, `web-design-guidelines`) alongside `shadcn/ui` ([#132](https://github.com/de-novo/dui/pull/132)).
 
 ### Changed
 
+- Simplified `dui map` / `dui run` CLI defaults, accelerated canvas card rendering with immutable PNG caching and removal of per-card GPU backdrop blur ([#144](https://github.com/de-novo/dui/pull/144), [#145](https://github.com/de-novo/dui/pull/145), [#152](https://github.com/de-novo/dui/pull/152)).
 - Decoupled ecosystem / rule-pack library versions from hard toolchain gates: hard `>=` baseline checks apply only to core compiler/host/UI runtime layers (`tsc`, `vite` 7+, `react` 18+, `next` 16+ when `host: "next"`), while newer majors are always accepted and rule-pack libraries emit non-fatal `versionNotes` instead of aborting scans ([#136](https://github.com/de-novo/dui/pull/136)).
 - Synced workspace and desktop crate versions to `0.2.0`.
+
+### Removed
+
+- Removed hardcoded global design-defect heuristics (`design_lint.rs`, `designAudit`, live lint, and unused synthetic DOM attributes) in favor of objective rendering evidence and future opt-in `DESIGN.md` / plugin conformance (`v0.3.0`, [#167](https://github.com/de-novo/dui/issues/167)) ([#164](https://github.com/de-novo/dui/pull/164), [#166](https://github.com/de-novo/dui/pull/166)).
+- Removed premature iframe live-mount (`dui open --live` / `--live-url`, `/live-surface/*`) and viewer `Open live` buttons until true code-based canvas rendering is designed ([#169](https://github.com/de-novo/dui/issues/169)).
 
 ## [v0.1.0] - 2026-11-23
 
