@@ -1,0 +1,68 @@
+[
+  {
+    "key": "shadcn-admin",
+    "project": "satnaing/shadcn-admin",
+    "repo": "https://github.com/satnaing/shadcn-admin",
+    "commit": "e16c87f",
+    "stars": "16.9k",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2024 Sat Naing",
+    "stack": "React 19 · Vite 8 · TanStack Router · Tailwind v4 · shadcn/ui",
+    "summary": "Modern SaaS admin dashboard with collapsible sidebar, data tables, and auto-discovered Radix dialogs."
+  },
+  {
+    "key": "astrowind",
+    "project": "onwidget/astrowind",
+    "repo": "https://github.com/onwidget/astrowind",
+    "commit": "14e1a69",
+    "stars": "6.1k",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2023 onWidget",
+    "stack": "Astro 7 · Tailwind CSS v4",
+    "summary": "Multi-page marketing, startup, pricing, and blog landing-page kit built on Astro v7."
+  },
+  {
+    "key": "astro-paper",
+    "project": "satnaing/astro-paper",
+    "repo": "https://github.com/satnaing/astro-paper",
+    "commit": "217c4e3",
+    "stars": "5.2k",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2023 Sat Naing",
+    "stack": "Astro 7 · Tailwind CSS v4 · Pagefind",
+    "summary": "Minimal, accessible editorial blog theme with tags, archives, and client-side search."
+  },
+  {
+    "key": "next-shadcn-admin",
+    "project": "arhamkhnz/next-shadcn-admin-dashboard",
+    "repo": "https://github.com/arhamkhnz/next-shadcn-admin-dashboard",
+    "commit": "9a84df6",
+    "stars": "3.3k",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2024 Mohammed Arham Khan",
+    "stack": "Next.js 16 App Router · Base UI · shadcn 4 · Tailwind v4",
+    "summary": "Multi-dashboard Next.js 16 App Router workspace with CRM, finance, analytics, and auth flows."
+  },
+  {
+    "key": "shadcn-store",
+    "project": "shadcnstore/shadcn-dashboard-landing-template",
+    "repo": "https://github.com/shadcnstore/shadcn-dashboard-landing-template",
+    "commit": "1482344",
+    "stars": "1.3k",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2025-2026 ShadcnStore",
+    "stack": "Next.js 16 · Base UI · Tailwind v4",
+    "summary": "Combined marketing landing and admin dashboard kit with search, theme customizer, and notification drawers."
+  },
+  {
+    "key": "shadcn-vue-admin",
+    "project": "Whbbit1999/shadcn-vue-admin",
+    "repo": "https://github.com/Whbbit1999/shadcn-vue-admin",
+    "commit": "8979c8e",
+    "stars": "501",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2024 Whbbit1999",
+    "stack": "Vue 3.5 · Vite 8 · Reka UI · shadcn-vue · Tailwind v4",
+    "summary": "Responsive Vue 3 admin dashboard demonstrating framework-agnostic discovery outside React."
+  }
+]

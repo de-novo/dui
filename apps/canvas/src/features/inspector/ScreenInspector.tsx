@@ -2,6 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 import type { KeyboardEvent, RefObject } from "react";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
+import { archiveFileUrl, diffOverlayUrl } from "../../data/archiveUrls";
 import type { Cell, Screen, ScreenMap } from "../../data/overview";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -127,26 +128,20 @@ export function ScreenInspector({
                 <figcaption>{t.beforeLabel}</figcaption>
                 <img
                   alt={t.beforeLabel}
-                  src={`/archive/${encodeURIComponent(screenDiff.beforeImage)}?run=${encodeURIComponent(beforeRunKey)}`}
+                  src={archiveFileUrl(screenDiff.beforeImage, beforeRunKey)}
                 />
               </figure>
             )}
             {screenDiff.afterImage && (
               <figure>
                 <figcaption>{t.afterLabel}</figcaption>
-                <img
-                  alt={t.afterLabel}
-                  src={`/archive/${encodeURIComponent(screenDiff.afterImage)}?run=${encodeURIComponent(run.key)}`}
-                />
+                <img alt={t.afterLabel} src={archiveFileUrl(screenDiff.afterImage, run.key)} />
               </figure>
             )}
             {screenDiff.overlayImage && (
               <figure>
                 <figcaption>{t.pixelDiffOverlay}</figcaption>
-                <img
-                  alt={t.pixelDiffOverlay}
-                  src={`/api/diff-overlay?file=${encodeURIComponent(screenDiff.overlayImage)}`}
-                />
+                <img alt={t.pixelDiffOverlay} src={diffOverlayUrl(screenDiff.overlayImage)} />
               </figure>
             )}
           </div>
@@ -240,7 +235,7 @@ export function ScreenInspector({
         <ElementInspector
           key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
           cell={cell}
-          imageUrl={`/archive/${encodeURIComponent(cell.image)}?run=${encodeURIComponent(run.key)}`}
+          imageUrl={archiveFileUrl(cell.image, run.key)}
         />
       )}
 

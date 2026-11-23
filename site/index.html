@@ -59,8 +59,16 @@
         </div>
 
         <div class="cta-row">
-          <button
+          <a
             class="btn btn-primary"
+            href="https://de-novo.github.io/dui/demo/"
+            data-demo-link
+            data-i18n="btnDemo"
+          >
+            Open Interactive Canvas Demo
+          </a>
+          <button
+            class="btn"
             type="button"
             aria-haspopup="dialog"
             data-open-dialog="quickstart-dialog"
@@ -143,6 +151,191 @@
         <p class="showcase-caption" data-showcase-caption>
           2D Web Canvas (dui open): Full-page true-aspect screens, auto-discovered modal/drawer
           child nodes, and obstacle-free gutter routing.
+        </p>
+      </section>
+
+      <section class="section" id="live-oss-showcase">
+        <div class="section-head">
+          <div>
+            <h2 data-i18n="ossTitle">Browse 6 trending open-source apps live in dui</h2>
+            <p class="section-sub" data-i18n="ossSub">
+              Every project below is a real MIT-licensed open-source app captured with
+              <code>dui map</code> across mobile (375px) and desktop (1280px). Click any card to
+              inspect its full 2D canvas, gutter navigation edges, modals, and DevTools box model —
+              and switch projects inside the workspace picker.
+            </p>
+          </div>
+          <a class="btn btn-primary" href="https://de-novo.github.io/dui/demo/" data-demo-link>
+            Open all 7 in Canvas →
+          </a>
+        </div>
+        <div class="oss-grid">
+          <article class="card oss-card">
+            <div class="oss-top">
+              <span class="badge">MIT License</span>
+              <span class="oss-stars">★ 16.9k</span>
+            </div>
+            <h3>satnaing/shadcn-admin</h3>
+            <p class="oss-stack">React 19 · Vite 8 · TanStack Router · Tailwind v4</p>
+            <p>Modern SaaS admin dashboard with collapsible sidebar, tables, and Radix dialogs.</p>
+            <div class="oss-actions">
+              <a
+                class="btn btn-primary"
+                href="https://de-novo.github.io/dui/demo/?run=shadcn-admin"
+                data-demo-run="shadcn-admin"
+              >
+                Open 2D Canvas
+              </a>
+              <a
+                class="oss-repo"
+                href="https://github.com/satnaing/shadcn-admin/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source · MIT
+              </a>
+            </div>
+          </article>
+
+          <article class="card oss-card">
+            <div class="oss-top">
+              <span class="badge">MIT License</span>
+              <span class="oss-stars">★ 6.1k</span>
+            </div>
+            <h3>onwidget/astrowind</h3>
+            <p class="oss-stack">Astro 7 · Tailwind CSS v4</p>
+            <p>Multi-page marketing, startup, pricing, and blog landing-page kit on Astro v7.</p>
+            <div class="oss-actions">
+              <a
+                class="btn btn-primary"
+                href="https://de-novo.github.io/dui/demo/?run=astrowind"
+                data-demo-run="astrowind"
+              >
+                Open 2D Canvas
+              </a>
+              <a
+                class="oss-repo"
+                href="https://github.com/onwidget/astrowind/blob/main/LICENSE.md"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source · MIT
+              </a>
+            </div>
+          </article>
+
+          <article class="card oss-card">
+            <div class="oss-top">
+              <span class="badge">MIT License</span>
+              <span class="oss-stars">★ 5.2k</span>
+            </div>
+            <h3>satnaing/astro-paper</h3>
+            <p class="oss-stack">Astro 7 · Tailwind CSS v4 · Pagefind</p>
+            <p>Minimal, accessible editorial blog theme with tags, archives, and search.</p>
+            <div class="oss-actions">
+              <a
+                class="btn btn-primary"
+                href="https://de-novo.github.io/dui/demo/?run=astro-paper"
+                data-demo-run="astro-paper"
+              >
+                Open 2D Canvas
+              </a>
+              <a
+                class="oss-repo"
+                href="https://github.com/satnaing/astro-paper/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source · MIT
+              </a>
+            </div>
+          </article>
+
+          <article class="card oss-card">
+            <div class="oss-top">
+              <span class="badge">MIT License</span>
+              <span class="oss-stars">★ 3.3k</span>
+            </div>
+            <h3>arhamkhnz/next-shadcn-admin-dashboard</h3>
+            <p class="oss-stack">Next.js 16 App Router · Base UI · shadcn 4 · Tailwind v4</p>
+            <p>Multi-dashboard Next.js 16 workspace with CRM, finance, analytics, and auth flows.</p>
+            <div class="oss-actions">
+              <a
+                class="btn btn-primary"
+                href="https://de-novo.github.io/dui/demo/?run=next-shadcn-admin"
+                data-demo-run="next-shadcn-admin"
+              >
+                Open 2D Canvas
+              </a>
+              <a
+                class="oss-repo"
+                href="https://github.com/arhamkhnz/next-shadcn-admin-dashboard/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source · MIT
+              </a>
+            </div>
+          </article>
+
+          <article class="card oss-card">
+            <div class="oss-top">
+              <span class="badge">MIT License</span>
+              <span class="oss-stars">★ 1.3k</span>
+            </div>
+            <h3>shadcnstore/shadcn-dashboard-landing-template</h3>
+            <p class="oss-stack">Next.js 16 · Base UI · Tailwind v4</p>
+            <p>Combined landing + dashboard kit with search, customizer, and notification drawers.</p>
+            <div class="oss-actions">
+              <a
+                class="btn btn-primary"
+                href="https://de-novo.github.io/dui/demo/?run=shadcn-store"
+                data-demo-run="shadcn-store"
+              >
+                Open 2D Canvas
+              </a>
+              <a
+                class="oss-repo"
+                href="https://github.com/shadcnstore/shadcn-dashboard-landing-template/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source · MIT
+              </a>
+            </div>
+          </article>
+
+          <article class="card oss-card">
+            <div class="oss-top">
+              <span class="badge">MIT License</span>
+              <span class="oss-stars">★ 501</span>
+            </div>
+            <h3>Whbbit1999/shadcn-vue-admin</h3>
+            <p class="oss-stack">Vue 3.5 · Vite 8 · Reka UI · shadcn-vue · Tailwind v4</p>
+            <p>Responsive Vue 3 admin dashboard demonstrating framework-agnostic route discovery.</p>
+            <div class="oss-actions">
+              <a
+                class="btn btn-primary"
+                href="https://de-novo.github.io/dui/demo/?run=shadcn-vue-admin"
+                data-demo-run="shadcn-vue-admin"
+              >
+                Open 2D Canvas
+              </a>
+              <a
+                class="oss-repo"
+                href="https://github.com/Whbbit1999/shadcn-vue-admin/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source · MIT
+              </a>
+            </div>
+          </article>
+        </div>
+        <p class="license-note">
+          All 6 showcase repositories above are verified <strong>MIT License</strong> open-source
+          projects. Upstream license texts are bundled with each capture archive and indexed in
+          <a href="./showcase-licenses.json">showcase-licenses.json</a>.
         </p>
       </section>
 

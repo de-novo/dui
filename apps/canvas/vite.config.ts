@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  base: process.env.DUI_CANVAS_BASE || "/",
   plugins: [
     tailwindcss(),
     {

@@ -31,11 +31,15 @@
       heroTitle: "Render every screen, state, modal, and width from real code.",
       heroLead:
         "dui reads your app through its official compiler, captures every screen × state × modal × width at true aspect ratio, and gives humans a 2D canvas while AI agents consume structured JSON over CLI and MCP.",
+      btnDemo: "Open Interactive Canvas Demo",
       btnQuickstart: "Quickstart guide",
       btnExamples: "Explore examples",
       btnGithub: "GitHub",
       copy: "Copy",
       copied: "Copied",
+      ossTitle: "Browse 6 trending open-source apps live in dui",
+      ossSub:
+        "Every project below is a real MIT-licensed open-source app captured with dui map across mobile (375px) and desktop (1280px). Click any card to inspect its 2D canvas, navigation edges, modals, and box model.",
     },
     ko: {
       navOverview: "개요",
@@ -46,11 +50,15 @@
       heroTitle: "실제 코드의 모든 화면 · 상태 · 모달 · 폭을 한눈에.",
       heroLead:
         "dui는 공식 컴파일러와 웹 표준 탐색으로 앱의 모든 화면 × 상태 × 모달 × 폭을 실제 비율로 캡처합니다. 사람은 2D 캔버스에서 리뷰하고, AI 에이전트는 CLI와 MCP로 정형 JSON을 읽습니다.",
+      btnDemo: "인터랙티브 캔버스 데모 열기",
       btnQuickstart: "빠른 시작",
       btnExamples: "예제 보기",
       btnGithub: "GitHub",
       copy: "복사",
       copied: "복사됨",
+      ossTitle: "최신 오픈소스 6개 프로젝트를 dui 캔버스에서 그대로 둘러보기",
+      ossSub:
+        "아래 6개는 MIT 라이선스를 확인한 실제 오픈소스 앱을 dui map으로 모바일(375px)·데스크톱(1280px) 캡처한 결과입니다. 카드를 누르면 2D 캔버스·연결선·모달·박스 모델을 바로 탐색하고 워크스페이스에서 프로젝트를 전환할 수 있습니다.",
     },
     "zh-CN": {
       navOverview: "概览",
@@ -61,11 +69,15 @@
       heroTitle: "从真实代码渲染每个页面、状态、模态框与宽度。",
       heroLead:
         "dui 通过官方编译器与标准导航发现捕获应用的每个页面 × 状态 × 模态框 × 宽度。人类在 2D 画布上直观审阅，AI 代理通过 CLI 与 MCP 读取结构化 JSON。",
+      btnDemo: "打开交互式画布演示",
       btnQuickstart: "快速上手",
       btnExamples: "查看示例",
       btnGithub: "GitHub",
       copy: "复制",
       copied: "已复制",
+      ossTitle: "在 dui 画布中实时浏览 6 个热门开源项目",
+      ossSub:
+        "以下 6 个项目均已核验 MIT 许可证，由 dui map 在 375px 与 1280px 下真实捕获。点击任意卡片即可在 2D 画布中查看页面、导航连线、模态框与盒模型，并在工作区中切换项目。",
     },
   };
 
@@ -132,5 +144,13 @@
       const dlg = closer.closest("dialog");
       if (dlg instanceof HTMLDialogElement && dlg.open) dlg.close();
     });
+  }
+
+  for (const demoLink of document.querySelectorAll("[data-demo-link]")) {
+    demoLink.setAttribute("href", "./demo/");
+  }
+  for (const runLink of document.querySelectorAll("[data-demo-run]")) {
+    const key = runLink.getAttribute("data-demo-run");
+    if (key) runLink.setAttribute("href", `./demo/?run=${encodeURIComponent(key)}`);
   }
 })();
