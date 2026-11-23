@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const repoRoot = process.cwd();
 const duiBin = path.join(repoRoot, "target", "debug", "dui");
@@ -58,6 +61,19 @@ http.createServer((req, res) => {
         res.end(JSON.stringify({ error: "unauthorized" }));
       }
     });
+    return;
+  }
+
+  if (req.url === "/auto-login") {
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "set-cookie": "app_session=login-cookie-ok; Path=/; HttpOnly",
+    });
+    res.end(\`<html><body><h1>Signing in...</h1><script>
+      window.localStorage.setItem("jwtToken", "captured-jwt-ok");
+      window.sessionStorage.setItem("role", "reviewer");
+      setTimeout(() => { window.location.href = "/dashboard"; }, 50);
+    </script></body></html>\`);
     return;
   }
 
@@ -203,11 +219,100 @@ http.createServer((req, res) => {
     `expected element-level renderDiff summary in Markdown:\n${md}`,
   );
 
+  // Pattern 4: Interactive browser login session capture (`dui auth login --wait-url ... --headless`)
+  const http = await import("node:http");
+  const loginServer = http.createServer((req, res) => {
+    const cookie = req.headers.cookie || "";
+    if (req.url === "/auto-login") {
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "set-cookie": "app_session=login-cookie-ok; Path=/; HttpOnly",
+      });
+      res.end(`<html><body><h1>Signing in...</h1><script>
+        window.localStorage.setItem("jwtToken", "captured-jwt-ok");
+        window.sessionStorage.setItem("role", "reviewer");
+        setTimeout(() => { window.location.href = "/dashboard"; }, 50);
+      </script></body></html>`);
+      return;
+    }
+    if (req.url === "/dashboard") {
+      res.writeHead(cookie.includes("app_session=login-cookie-ok") ? 200 : 401, {
+        "content-type": "text/html; charset=utf-8",
+      });
+      res.end("<html><body><h1>Captured Login Dashboard</h1></body></html>");
+      return;
+    }
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end("<html><body><h1>Public</h1></body></html>");
+  });
+  await new Promise<void>((resolve) => loginServer.listen(0, "127.0.0.1", () => resolve()));
+  const loginAddr = loginServer.address();
+  assert.ok(loginAddr && typeof loginAddr === "object");
+  const capturedStatePath = path.join(appDir, "captured-state.json");
+  let authLoginSummary: {
+    status: string;
+    cookies: number;
+    localStorage: number;
+    sessionStorage: number;
+  };
+  try {
+    const { stdout: rawOut } = await execFileAsync(
+      duiBin,
+      [
+        "auth",
+        "login",
+        `http://127.0.0.1:${loginAddr.port}/auto-login`,
+        "--out",
+        capturedStatePath,
+        "--wait-url",
+        "/dashboard",
+        "--timeout",
+        "20",
+        "--headless",
+      ],
+      { encoding: "utf8", env: { ...process.env, HOME: duiHome } },
+    );
+    assert.ok(!rawOut.includes("login-cookie-ok"), "stdout must never print raw cookie values");
+    assert.ok(!rawOut.includes("captured-jwt-ok"), "stdout must never print raw token values");
+    authLoginSummary = JSON.parse(rawOut) as typeof authLoginSummary;
+    assert.equal(authLoginSummary.status, "ok");
+    assert.ok(authLoginSummary.cookies >= 1, "expected captured HttpOnly cookie");
+    assert.equal(authLoginSummary.localStorage, 1, "expected captured localStorage token");
+    assert.equal(authLoginSummary.sessionStorage, 1, "expected captured sessionStorage entry");
+  } finally {
+    loginServer.close();
+  }
+
+  // Feed captured storageState.json directly into `dui run` to confirm end-to-end compatibility.
+  const capturedManifest = path.join(appDir, "dui-captured-auth.json");
+  fs.writeFileSync(
+    capturedManifest,
+    JSON.stringify({
+      host: "command",
+      command: [process.execPath, "server.mjs"],
+      path: "/dashboard",
+      widths: [1280],
+      storageState: "captured-state.json",
+      scenarios: [{ path: "/editor" }],
+    }),
+  );
+  const outCaptured = path.join(tmp, "out-captured-auth");
+  runDuiText(["run", appDir, capturedManifest, outCaptured], { HOME: duiHome });
+  const repCaptured = JSON.parse(
+    fs.readFileSync(path.join(outCaptured, "report.json"), "utf8"),
+  ) as RunReport;
+  assert.equal(
+    repCaptured.coverage.verified,
+    2,
+    "captured storageState.json unlocks both cookie /dashboard and localStorage /editor",
+  );
+
   console.log(
     JSON.stringify({
       status: "ok",
       storageStateVerified: rep1.coverage.verified,
       authFlowVerified: repFlow.coverage.verified,
+      authLoginVerified: repCaptured.coverage.verified,
       secretRedacted: true,
       markdownDiffLines: md.trim().split("\n").length,
     }),

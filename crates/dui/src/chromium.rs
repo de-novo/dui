@@ -1148,5 +1148,206 @@ impl Browser {
     }
 }
 
+pub struct LoginCapture {
+    pub url: String,
+    pub origin: String,
+    pub cookies_count: usize,
+    pub local_storage_count: usize,
+    pub session_storage_count: usize,
+    pub storage_state: Value,
+}
+
+pub fn capture_login_session(
+    executable: &Path,
+    start_url: &str,
+    wait_url_substring: Option<&str>,
+    timeout: Duration,
+    headless: bool,
+) -> Result<LoginCapture> {
+    if !executable.is_file() {
+        return Err("Chromium executable not found; set DUI_CHROMIUM".into());
+    }
+    let profile = tempfile::tempdir()?;
+    let (stream, chrome) = UnixStream::pair()?;
+    stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(15)))?;
+    let reader = BufReader::new(stream.try_clone()?);
+    let mut args: Vec<&str> = vec![
+        "--remote-debugging-pipe",
+        "--disable-background-networking",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-component-update",
+        "--disable-sync",
+        "--disable-extensions",
+        "--disable-dev-shm-usage",
+        "--password-store=basic",
+        "--use-mock-keychain",
+    ];
+    if headless {
+        args.push("--headless");
+    }
+    let child = Command::new("/bin/sh")
+        .args([
+            "-c",
+            r#"exec "$@" 3<&0 4>&1 </dev/null >/dev/null"#,
+            "dui-chromium-login",
+        ])
+        .arg(executable)
+        .args(&args)
+        .arg(format!("--user-data-dir={}", profile.path().display()))
+        .arg("about:blank")
+        .stdin(Stdio::from(OwnedFd::from(chrome.try_clone()?)))
+        .stdout(Stdio::from(OwnedFd::from(chrome)))
+        .stderr(Stdio::null())
+        .spawn()?;
+    BROWSER_LAUNCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let mut browser = Browser {
+        child,
+        stream,
+        reader,
+        next_id: 0,
+        mock_responses: Default::default(),
+        generated_get: Default::default(),
+        fulfilled: Default::default(),
+        responses: Default::default(),
+        response_ids: Default::default(),
+        allowed_origin: String::new(),
+        api_mode: ApiMode::Live,
+        api_base_url: None,
+        api_proxy_prefixes: Vec::new(),
+        api_headers: Vec::new(),
+        allow_mutations: true,
+        live_api_requests: Default::default(),
+        blocked_mutations: Default::default(),
+        api_provenance: Default::default(),
+        requests: Default::default(),
+        auth_flow_cache: None,
+    };
+
+    let deadline = std::time::Instant::now() + timeout;
+    let target_id =
+        browser.call(None, "Target.createTarget", json!({ "url": "about:blank" }))?["targetId"]
+            .as_str()
+            .ok_or("missing created targetId")?
+            .to_owned();
+
+    let session_id = browser.call(
+        None,
+        "Target.attachToTarget",
+        json!({ "targetId": target_id, "flatten": true }),
+    )?["sessionId"]
+        .as_str()
+        .ok_or("missing browser sessionId")?
+        .to_owned();
+    let s = Some(session_id.as_str());
+    let _ = browser.call(s, "Page.enable", json!({}));
+    let _ = browser.call(s, "Network.enable", json!({}));
+    let _ = browser.call(s, "Runtime.enable", json!({}));
+    browser.call(s, "Page.navigate", json!({ "url": start_url }))?;
+
+    if let Some(pattern) = wait_url_substring {
+        loop {
+            let current_url = browser
+                .call(
+                    s,
+                    "Runtime.evaluate",
+                    json!({ "expression": "window.location.href", "returnByValue": true }),
+                )
+                .ok()
+                .and_then(|r| r["result"]["value"].as_str().map(str::to_owned))
+                .unwrap_or_default();
+            if current_url.contains(pattern) {
+                // Allow a brief tick for post-redirect storage writes to settle.
+                std::thread::sleep(Duration::from_millis(250));
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(format!(
+                    "timed out waiting for URL containing {pattern:?} (last URL: {current_url:?})"
+                )
+                .into());
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    } else {
+        eprintln!(
+            "Complete login in the Chromium window opened at {start_url}, then press Enter here to save storageState..."
+        );
+        let mut line = String::new();
+        let _ = std::io::stdin().read_line(&mut line);
+    }
+
+    let page_meta = browser.call(
+        s,
+        "Runtime.evaluate",
+        json!({
+            "expression": r#"(() => {
+                const readStore = (st) => {
+                    const out = {};
+                    try {
+                        for (let i = 0; i < st.length; i++) {
+                            const k = st.key(i);
+                            if (k !== null) out[k] = st.getItem(k) ?? "";
+                        }
+                    } catch {}
+                    return out;
+                };
+                return {
+                    url: window.location.href,
+                    origin: window.location.origin,
+                    localStorage: readStore(window.localStorage),
+                    sessionStorage: readStore(window.sessionStorage),
+                };
+            })()"#,
+            "returnByValue": true
+        }),
+    )?;
+    let meta_val = &page_meta["result"]["value"];
+    let final_url = meta_val["url"].as_str().unwrap_or(start_url).to_owned();
+    let origin = meta_val["origin"].as_str().unwrap_or("").to_owned();
+
+    let mut local_storage = BTreeMap::new();
+    if let Some(obj) = meta_val["localStorage"].as_object() {
+        for (k, v) in obj {
+            if let Some(sv) = v.as_str() {
+                local_storage.insert(k.clone(), sv.to_owned());
+            }
+        }
+    }
+    let mut session_storage = BTreeMap::new();
+    if let Some(obj) = meta_val["sessionStorage"].as_object() {
+        for (k, v) in obj {
+            if let Some(sv) = v.as_str() {
+                session_storage.insert(k.clone(), sv.to_owned());
+            }
+        }
+    }
+
+    let cookies_resp = browser
+        .call(None, "Storage.getCookies", json!({}))
+        .or_else(|_| browser.call(s, "Network.getCookies", json!({})))?;
+    let cookies = cookies_resp["cookies"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let storage_state = dui_core::auth::build_storage_state_json(
+        &origin,
+        &cookies,
+        &local_storage,
+        &session_storage,
+    );
+    let cookies_count = storage_state["cookies"].as_array().map_or(0, Vec::len);
+
+    Ok(LoginCapture {
+        url: final_url,
+        origin,
+        cookies_count,
+        local_storage_count: local_storage.len(),
+        session_storage_count: session_storage.len(),
+        storage_state,
+    })
+}
+
 pub(crate) static BROWSER_LAUNCHES: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
