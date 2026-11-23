@@ -238,6 +238,12 @@ impl Host for ViteHost {
                     include_str!(concat!(env!("OUT_DIR"), "/vite/instrument.mjs")),
                 )
             })
+            .and_then(|_| {
+                fs::write(
+                    file("parser.mjs"),
+                    include_str!(concat!(env!("OUT_DIR"), "/vite/parser.mjs")),
+                )
+            })
             .map_err(|e| failure(3, &e.to_string()))?;
         fs::write(
             file("probe-helpers.ts"),

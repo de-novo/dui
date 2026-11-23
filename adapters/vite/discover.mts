@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Rule } from "../typescript/contracts.mjs";
+import { createAstParser } from "./parser.mjs";
 
 const [root, builtin] = process.argv.slice(2);
 const configPath = join(root, "dui.json");
@@ -28,6 +29,7 @@ if (
   throw Error("appRoot must point to a package.json inside the project");
 const require = createRequire(join(app, "package.json"));
 const vite = await import(pathToFileURL(require.resolve("vite")).href);
+const parser = await createAstParser({ vite, app, root });
 interface Node {
   type: string;
   start: number;
@@ -80,100 +82,104 @@ const files = globSync("**/*.{ts,tsx,mts}", {
   cwd: app,
   exclude: (p) => p.split(/[\\/]/).some((s) => excluded.has(s) || s.startsWith(".")),
 }).sort();
-for (const file of files) {
-  if (/\.(test|spec|stories)\.[^.]+$/.test(file)) continue;
-  const source = readFileSync(join(app, file), "utf8");
-  if (!source.includes("${") && !routeRules.some((r) => source.includes(r.package))) continue;
-  const ast = vite.parseSync(file, source);
-  if (ast.errors.length) {
-    parseFailures.push(relative(root, join(app, file)));
-    continue;
-  }
-  const declarations = new Map<string, Node>();
-  const factories = new Set<string>();
-  for (const statement of ast.program.body as Node[]) {
-    if (statement.type === "ImportDeclaration")
-      for (const s of statement.specifiers)
+try {
+  for (const file of files) {
+    if (/\.(test|spec|stories)\.[^.]+$/.test(file)) continue;
+    const source = readFileSync(join(app, file), "utf8");
+    if (!source.includes("${") && !routeRules.some((r) => source.includes(r.package))) continue;
+    const ast = parser.parseSync(file, source);
+    if (ast.errors.length) {
+      parseFailures.push(relative(root, join(app, file)));
+      continue;
+    }
+    const declarations = new Map<string, Node>();
+    const factories = new Set<string>();
+    for (const statement of ast.program.body as Node[]) {
+      if (statement.type === "ImportDeclaration")
+        for (const s of statement.specifiers)
+          if (
+            s.imported &&
+            routeRules.some(
+              (r) => r.package === statement.source.value && r.symbol === s.imported?.name,
+            )
+          )
+            factories.add(s.local.name);
+      const n = statement.declaration ?? statement;
+      if (n.kind === "const")
+        for (const d of n.declarations)
+          if (d.init && d.id.type === "Identifier") declarations.set(d.id.name, d.init);
+    }
+    function literalTable(node: Node): string[] {
+      const seen = new Set<Node>();
+      while (node && !seen.has(node)) {
+        seen.add(node);
+        if (node.type === "Identifier") {
+          const next = declarations.get(node.name);
+          if (!next) break;
+          node = next;
+          continue;
+        }
         if (
-          s.imported &&
-          routeRules.some(
-            (r) => r.package === statement.source.value && r.symbol === s.imported?.name,
+          ["TSAsExpression", "TSSatisfiesExpression", "ParenthesizedExpression"].includes(node.type)
+        ) {
+          node = node.expression;
+          continue;
+        }
+        if (
+          node.type === "ObjectExpression" &&
+          node.properties.every(
+            (p) =>
+              p.type === "Property" &&
+              !p.computed &&
+              p.value.type === "Literal" &&
+              typeof p.value.value === "string",
           )
         )
-          factories.add(s.local.name);
-    const n = statement.declaration ?? statement;
-    if (n.kind === "const")
-      for (const d of n.declarations)
-        if (d.init && d.id.type === "Identifier") declarations.set(d.id.name, d.init);
-  }
-  function literalTable(node: Node): string[] {
-    const seen = new Set<Node>();
-    while (node && !seen.has(node)) {
-      seen.add(node);
-      if (node.type === "Identifier") {
-        const next = declarations.get(node.name);
-        if (!next) break;
-        node = next;
-        continue;
+          return node.properties.map((p) => p.value.value);
+        break;
       }
-      if (
-        ["TSAsExpression", "TSSatisfiesExpression", "ParenthesizedExpression"].includes(node.type)
-      ) {
-        node = node.expression;
-        continue;
-      }
-      if (
-        node.type === "ObjectExpression" &&
-        node.properties.every(
-          (p) =>
-            p.type === "Property" &&
-            !p.computed &&
-            p.value.type === "Literal" &&
-            typeof p.value.value === "string",
-        )
-      )
-        return node.properties.map((p) => p.value.value);
-      break;
+      return [];
     }
-    return [];
+    new parser.Visitor({
+      CallExpression(n: Node) {
+        const factory = n.callee;
+        if (factory.type !== "CallExpression" || !factories.has(factory.callee.name)) return;
+        const pattern = factory.arguments[0]?.value;
+        if (
+          typeof pattern === "string" &&
+          n.arguments[0]?.properties?.some((p) => p.key?.name === "component")
+        )
+          routes.push({ pattern, source: relative(root, join(app, file)) });
+      },
+      TemplateLiteral(n: Node) {
+        if (!n.quasis[0].value.cooked.startsWith("/") || !n.expressions.length) return;
+        const last = n.expressions.at(-1)!;
+        if (
+          last.type !== "MemberExpression" ||
+          !last.computed ||
+          n.quasis.at(-1)?.value.cooked !== ""
+        )
+          return;
+        let prefix = n.quasis[0].value.cooked;
+        for (const [index, expr] of n.expressions.slice(0, -1).entries()) {
+          const key =
+            expr.type === "Identifier"
+              ? expr.name
+              : expr.callee?.name === "encodeURIComponent"
+                ? expr.arguments[0]?.name
+                : undefined;
+          const value = key && segment(key);
+          if (!value) return;
+          prefix += value + n.quasis[index + 1].value.cooked;
+        }
+        for (const tail of literalTable(last.object))
+          if (/^[\w/-]*$/.test(tail) && !tail.startsWith("/"))
+            candidates.set(prefix + tail, relative(root, join(app, file)));
+      },
+    }).visit(ast.program);
   }
-  new vite.Visitor({
-    CallExpression(n: Node) {
-      const factory = n.callee;
-      if (factory.type !== "CallExpression" || !factories.has(factory.callee.name)) return;
-      const pattern = factory.arguments[0]?.value;
-      if (
-        typeof pattern === "string" &&
-        n.arguments[0]?.properties?.some((p) => p.key?.name === "component")
-      )
-        routes.push({ pattern, source: relative(root, join(app, file)) });
-    },
-    TemplateLiteral(n: Node) {
-      if (!n.quasis[0].value.cooked.startsWith("/") || !n.expressions.length) return;
-      const last = n.expressions.at(-1)!;
-      if (
-        last.type !== "MemberExpression" ||
-        !last.computed ||
-        n.quasis.at(-1)?.value.cooked !== ""
-      )
-        return;
-      let prefix = n.quasis[0].value.cooked;
-      for (const [index, expr] of n.expressions.slice(0, -1).entries()) {
-        const key =
-          expr.type === "Identifier"
-            ? expr.name
-            : expr.callee?.name === "encodeURIComponent"
-              ? expr.arguments[0]?.name
-              : undefined;
-        const value = key && segment(key);
-        if (!value) return;
-        prefix += value + n.quasis[index + 1].value.cooked;
-      }
-      for (const tail of literalTable(last.object))
-        if (/^[\w/-]*$/.test(tail) && !tail.startsWith("/"))
-          candidates.set(prefix + tail, relative(root, join(app, file)));
-    },
-  }).visit(ast.program);
+} finally {
+  parser.close?.();
 }
 const screens = new Map<string, string>();
 for (const { pattern, source } of routes) {

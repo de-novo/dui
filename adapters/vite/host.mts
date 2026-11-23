@@ -6,13 +6,16 @@ import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { serveNitro } from "./nitro.mjs";
 import { instrument, type InstrumentFact } from "./instrument.mjs";
+import { assertSupportedViteVersion, createAstParser } from "./parser.mjs";
 
 const [root, manifest, work] = process.argv.slice(2);
 const spec = JSON.parse(readFileSync(manifest, "utf8"));
 const app = resolve(root, spec.appRoot ?? ".");
 const require = createRequire(join(app, "package.json"));
-if (require("vite/package.json").version.split(".")[0] !== "8") throw Error("Vite 8 required");
+assertSupportedViteVersion(require("vite/package.json").version);
 const vite = await import(pathToFileURL(require.resolve("vite")).href);
+const parser = await createAstParser({ vite, app, root });
+process.once("exit", () => parser.close?.());
 const facts: InstrumentFact[] = JSON.parse(readFileSync(join(work, "facts.json"), "utf8")).facts;
 const byFile = new Map<string, InstrumentFact[]>();
 for (const f of facts) {
@@ -30,7 +33,7 @@ function plugins(stage: string) {
         if (id.includes("?") || id.startsWith("\0")) return;
         const original = id.startsWith(stage + sep) ? resolve(app, id.slice(stage.length + 1)) : id;
         const facts = byFile.get(original);
-        if (facts) return instrument(readFileSync(id, "utf8"), facts, vite);
+        if (facts) return instrument(readFileSync(id, "utf8"), facts, parser);
         if (id.endsWith(".css") && spec.offlineFonts)
           return readFileSync(id, "utf8").replace(/^@import url\("https:[^\n]+$/gm, "");
       },
@@ -38,25 +41,33 @@ function plugins(stage: string) {
   ];
 }
 if (spec.host === "nitro") {
-  await serveNitro({ vite, root, app, spec, manifest, work, plugins });
+  try {
+    await serveNitro({ vite, root, app, spec, manifest, work, plugins });
+  } finally {
+    parser.close?.();
+  }
 } else {
   if (spec.host && spec.host !== "vite") throw Error("unsupported host: " + spec.host);
   const dist = join(work, "dist");
   let base = "/";
-  await vite.build({
-    root: app,
-    cacheDir: join(work, "vite-cache"),
-    build: { outDir: dist, emptyOutDir: true },
-    plugins: [
-      ...plugins(app),
-      {
-        name: "dui-base",
-        configResolved(config: { base: string }) {
-          base = new URL(config.base, "http://localhost/").pathname;
+  try {
+    await vite.build({
+      root: app,
+      cacheDir: join(work, "vite-cache"),
+      build: { outDir: dist, emptyOutDir: true },
+      plugins: [
+        ...plugins(app),
+        {
+          name: "dui-base",
+          configResolved(config: { base: string }) {
+            base = new URL(config.base, "http://localhost/").pathname;
+          },
         },
-      },
-    ],
-  });
+      ],
+    });
+  } finally {
+    parser.close?.();
+  }
   const types: Record<string, string> = {
     ".css": "text/css",
     ".js": "text/javascript",

@@ -30,7 +30,7 @@
 | **TypeScript** | 언어/런타임 | 7.x | 7.0.2 | 2026-07-08 | [www.npmjs.com](https://www.npmjs.com/package/typescript) | 주력 타입 언어. 공식 `tsc` 7이 dui에 필요한 타입 정보를 준다. | TS 어댑터가 쓰는 7.1(sync API)은 아직 beta. | — |
 | **Node.js** | 언어/런타임 | 26.x | 26.13.1 (LTS) | 2026-11-10 | [nodejs.org](https://nodejs.org/en/about/previous-releases) | TS 사이드카와 사용자 dev 서버를 실행한다. | — | — |
 | **React** | 웹 UI | 19.x | 19.3.1 | 2026-10-14 | [www.npmjs.com](https://www.npmjs.com/package/react) | 가장 흔한 타입 UI 스택. 첫 렌더 대상. | — | — |
-| **Vite** | 번들러/dev 서버 | 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui가 주입된 dev 빌드를 띄워야 한다. Vite는 흔한 React dev 서버. | — | — |
+| **Vite** | 번들러/dev 서버 | 7.x / 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui가 주입된 dev 빌드를 띄워야 한다. Vite는 흔한 React dev 서버. | Vite 7에서는 Oxc `parseSync`가 없을 때 프로젝트의 공식 TypeScript AST 파서로 폴백한다. | — |
 | **TanStack Router** | 라우터 | 1.x | 1.170.46 | 2026-10-22 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-router) | 타입 라우트에서 화면 목록을 바로 얻는다. | — | — |
 | **TanStack Query** | 상태/데이터 | 5.x | 5.108.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-query) | 서버 상태(로딩/에러/빈 값)가 상태 셀의 핵심. | — | — |
 | **zod** | 상태/데이터 | 4.x | 4.6.7 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/zod) | 스키마에서 실제적인 샘플 데이터와 값 범위를 얻는다. | — | — |

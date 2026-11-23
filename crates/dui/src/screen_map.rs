@@ -22,6 +22,11 @@ pub(crate) fn discover(project: &Path, manifest: &Path) -> Result<(), (u8, serde
         include_str!(concat!(env!("OUT_DIR"), "/vite/discover.mjs")),
     )
     .map_err(io)?;
+    fs::write(
+        work.path().join("parser.mjs"),
+        include_str!(concat!(env!("OUT_DIR"), "/vite/parser.mjs")),
+    )
+    .map_err(io)?;
     let result = Command::new("node")
         .arg(discover)
         .arg(project)

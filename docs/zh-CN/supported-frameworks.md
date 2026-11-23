@@ -30,7 +30,7 @@
 | **TypeScript** | 语言/运行时 | 7.x | 7.0.2 | 2026-07-08 | [www.npmjs.com](https://www.npmjs.com/package/typescript) | 主要类型化语言；官方 `tsc` 7 提供 dui 所需的类型信息。 | TS 适配器使用的 7.1（sync API）仍是 beta。 | — |
 | **Node.js** | 语言/运行时 | 26.x | 26.13.1 (LTS) | 2026-11-10 | [nodejs.org](https://nodejs.org/en/about/previous-releases) | 运行 TS sidecar 和用户的开发服务器。 | — | — |
 | **React** | Web UI | 19.x | 19.3.1 | 2026-10-14 | [www.npmjs.com](https://www.npmjs.com/package/react) | 最常见的类型化 UI 技术栈；第一个渲染目标。 | — | — |
-| **Vite** | 打包器/开发服务器 | 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui 需要提供注入后的开发构建；Vite 是常见的 React 开发服务器。 | — | — |
+| **Vite** | 打包器/开发服务器 | 7.x / 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui 需要提供注入后的开发构建；Vite 是常见的 React 开发服务器。 | Vite 7 在缺少 Oxc `parseSync` 时回退到项目的官方 TypeScript AST 解析器。 | — |
 | **TanStack Router** | 路由 | 1.x | 1.170.46 | 2026-10-22 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-router) | 类型化路由可直接枚举页面。 | — | — |
 | **TanStack Query** | 状态/数据 | 5.x | 5.108.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-query) | 服务端状态（加载/错误/空）是状态单元的核心。 | — | — |
 | **zod** | 状态/数据 | 4.x | 4.6.7 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/zod) | schema 提供真实的示例数据与取值范围。 | — | — |

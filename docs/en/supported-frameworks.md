@@ -30,7 +30,7 @@ Versions were checked on 2026-11-20 (KST) against the official source linked in 
 | **TypeScript** | language/runtime | 7.x | 7.0.2 | 2026-07-08 | [www.npmjs.com](https://www.npmjs.com/package/typescript) | Primary typed language; official `tsc` 7 gives the types dui needs. | 7.1 (sync API used by the TS adapter) is still beta. | — |
 | **Node.js** | language/runtime | 26.x | 26.13.1 (LTS) | 2026-11-10 | [nodejs.org](https://nodejs.org/en/about/previous-releases) | Runs the TS sidecar and the user's dev server. | — | — |
 | **React** | web UI | 19.x | 19.3.1 | 2026-10-14 | [www.npmjs.com](https://www.npmjs.com/package/react) | Most common typed UI stack; first renderer target. | — | — |
-| **Vite** | bundler/dev server | 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui must serve the injected dev build; Vite is the common React dev server. | — | — |
+| **Vite** | bundler/dev server | 7.x / 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui must serve the injected dev build; Vite is the common React dev server. | Vite 7 uses the project's official TypeScript AST parser fallback when Oxc `parseSync` is absent. | — |
 | **TanStack Router** | router | 1.x | 1.170.46 | 2026-10-22 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-router) | Typed routes give screen enumeration directly. | — | — |
 | **TanStack Query** | state/data | 5.x | 5.108.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-query) | Server state (loading / error / empty) is the core of state cells. | — | — |
 | **zod** | state/data | 4.x | 4.6.7 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/zod) | Schemas give realistic sample data and value ranges. | — | — |
