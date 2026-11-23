@@ -100,6 +100,66 @@ const files = globSync("**/*.{ts,tsx,mts}", {
   cwd: app,
   exclude: (p) => p.split(/[\\/]/).some((s) => excluded.has(s) || s.startsWith(".")),
 }).sort();
+
+// Extract resolved URL string-literal keys from official compiler/router-generated type blocks
+// (e.g. `export interface FileRoutesByTo { '/sign-in': ... }` or React Router `pages: { ... }`)
+// without reimplementing any router-specific filename or route-group conventions.
+function extractInterfacePathKeys(source: string, anchorPattern: RegExp): string[] {
+  const match = anchorPattern.exec(source);
+  if (!match) return [];
+  const openIdx = source.indexOf("{", match.index + match[0].length - 1);
+  if (openIdx < 0) return [];
+  let depth = 0;
+  let bodyEnd = -1;
+  for (let i = openIdx; i < source.length; i += 1) {
+    const ch = source[i];
+    if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        bodyEnd = i;
+        break;
+      }
+    }
+  }
+  if (bodyEnd < 0) return [];
+  const body = source.slice(openIdx + 1, bodyEnd);
+  const found: string[] = [];
+  let level = 0;
+  for (const line of body.split(/\r?\n/)) {
+    if (level === 0) {
+      const m = line.match(/^\s*(['"])(\/[^'"]*)\1\s*:/);
+      if (m) found.push(m[2]);
+    }
+    for (const ch of line) {
+      if (ch === "{") level += 1;
+      else if (ch === "}") level = Math.max(0, level - 1);
+    }
+  }
+  return found;
+}
+
+let hasOfficialRouteRegistry = false;
+const officialRegistryCandidates = [
+  ...files.filter((f) => /(?:^|[\\/])routeTree\.gen\.tsx?$/.test(f)),
+  ...globSync(".react-router/types/+register.ts", { cwd: app }),
+];
+for (const regFile of officialRegistryCandidates) {
+  const absReg = join(app, regFile);
+  if (!existsSync(absReg)) continue;
+  const src = readFileSync(absReg, "utf8");
+  const relSource = relative(root, absReg);
+  const keys = regFile.endsWith("+register.ts")
+    ? extractInterfacePathKeys(src, /\bpages\s*:\s*\{/)
+    : extractInterfacePathKeys(src, /\binterface\s+FileRoutesByTo\s*\{/);
+  if (keys.length > 0) {
+    hasOfficialRouteRegistry = true;
+    for (const key of keys) {
+      routes.push({ pattern: key, source: relSource });
+    }
+  }
+}
+
 try {
   for (const file of files) {
     if (/\.(test|spec|stories)\.[^.]+$/.test(file)) continue;
@@ -124,7 +184,7 @@ try {
           if (routeRules.some((r) => r.package === pkg && r.symbol === imported)) {
             if (REACT_ROUTER_CREATORS.has(imported)) routerCreators.add(s.local.name);
             else if (imported === "Route") routeComponents.add(s.local.name);
-            else factories.add(s.local.name);
+            else if (!hasOfficialRouteRegistry) factories.add(s.local.name);
           }
         }
       }
@@ -389,13 +449,16 @@ const config = {
     mode: paths.length ? "router" : "links",
   },
 };
-if (!paths.length) {
+if (profile.routeSelector !== false) {
   config.linkDefaults = {
     cookies: profile.cookies ?? {},
     readySelector: profile.readySelector ?? defaultReady,
     hasScreenAssertion: Boolean(profile.readySelector),
   };
-  config.routeSelector = profile.routeSelector ?? "main a[href], nav a[href], header a[href]";
+  config.routeSelector =
+    typeof profile.routeSelector === "string"
+      ? profile.routeSelector
+      : "main a[href], nav a[href], aside a[href], header a[href]";
 } else delete config.routeSelector;
 if (config.mockPreload) config.mockPreload = resolve(root, config.mockPreload);
 if (config.rulePacks) config.rulePacks = config.rulePacks.map((p: string) => resolve(root, p));

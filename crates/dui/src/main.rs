@@ -768,10 +768,18 @@ fn run() -> Reply {
         && cmd == "scan"
     {
         return match rest {
-            [] => analysis::analyze(Path::new("."), Path::new("dui.json")),
-            [root] => {
-                let p = Path::new(root);
-                analysis::analyze(p, &p.join("dui.json"))
+            [] | [_] => {
+                let p = rest.first().map_or(Path::new("."), Path::new);
+                let manifest = p.join("dui.json");
+                if manifest.is_file() {
+                    analysis::analyze(p, &manifest)
+                } else {
+                    let project = p.canonicalize().map_err(replay::io)?;
+                    let work = tempfile::tempdir().map_err(replay::io)?;
+                    let temp_manifest = work.path().join("scan.json");
+                    screen_map::discover(&project, &temp_manifest)?;
+                    analysis::analyze(&project, &temp_manifest)
+                }
             }
             [root, spec] => analysis::analyze(Path::new(root), Path::new(spec)),
             _ => Err(failure(2, "expected scan [PROJECT] [MANIFEST]")),

@@ -300,29 +300,171 @@ fn overlap_intersection(a: RenderRect, b: RenderRect) -> (i32, i32) {
     ((x2 - x1).max(0), (y2 - y1).max(0))
 }
 
+fn parse_alpha(raw: &str) -> Option<f64> {
+    let s = raw.trim();
+    if let Some(pct) = s.strip_suffix('%') {
+        Some((pct.trim().parse::<f64>().ok()? / 100.0).clamp(0.0, 1.0))
+    } else {
+        Some(s.parse::<f64>().ok()?.clamp(0.0, 1.0))
+    }
+}
+
+fn parse_unit_or_pct(raw: &str, pct_scale: f64) -> Option<f64> {
+    let s = raw.trim();
+    if let Some(pct) = s.strip_suffix('%') {
+        Some(pct.trim().parse::<f64>().ok()? / 100.0 * pct_scale)
+    } else {
+        s.parse::<f64>().ok()
+    }
+}
+
+fn parse_angle_rad(raw: &str) -> Option<f64> {
+    let s = raw.trim();
+    if let Some(v) = s.strip_suffix("deg") {
+        Some(v.trim().parse::<f64>().ok()?.to_radians())
+    } else if let Some(v) = s.strip_suffix("rad") {
+        v.trim().parse::<f64>().ok()
+    } else if let Some(v) = s.strip_suffix("turn") {
+        Some(v.trim().parse::<f64>().ok()? * std::f64::consts::TAU)
+    } else if let Some(v) = s.strip_suffix("grad") {
+        Some(v.trim().parse::<f64>().ok()? * std::f64::consts::PI / 200.0)
+    } else if s.eq_ignore_ascii_case("none") {
+        Some(0.0)
+    } else {
+        Some(s.parse::<f64>().ok()?.to_radians())
+    }
+}
+
+fn linear_to_srgb_255(c: f64) -> f64 {
+    let clamped = c.clamp(0.0, 1.0);
+    let gamma = if clamped <= 0.003_130_8 {
+        12.92 * clamped
+    } else {
+        1.055 * clamped.powf(1.0 / 2.4) - 0.055
+    };
+    (gamma * 255.0).clamp(0.0, 255.0)
+}
+
+fn oklab_to_srgb(l: f64, a: f64, b: f64) -> (f64, f64, f64) {
+    let l_ = l + 0.396_337_777_4 * a + 0.215_803_757_3 * b;
+    let m_ = l - 0.105_561_345_8 * a - 0.063_854_172_8 * b;
+    let s_ = l - 0.089_484_177_5 * a - 1.291_485_548_0 * b;
+
+    let l3 = l_ * l_ * l_;
+    let m3 = m_ * m_ * m_;
+    let s3 = s_ * s_ * s_;
+
+    let r_lin = 4.076_741_662_1 * l3 - 3.307_711_591_3 * m3 + 0.230_969_929_2 * s3;
+    let g_lin = -1.268_438_004_6 * l3 + 2.609_757_401_1 * m3 - 0.341_319_396_5 * s3;
+    let b_lin = -0.004_196_086_3 * l3 - 0.703_418_614_7 * m3 + 1.707_614_701_0 * s3;
+
+    (
+        linear_to_srgb_255(r_lin),
+        linear_to_srgb_255(g_lin),
+        linear_to_srgb_255(b_lin),
+    )
+}
+
 fn parse_css_rgba(raw: &str) -> Option<(f64, f64, f64, f64)> {
     let trimmed = raw.trim();
-    let inner = trimmed
+    if let Some(inner) = trimmed
         .strip_prefix("rgba(")
-        .or_else(|| trimmed.strip_prefix("rgb("))?
-        .strip_suffix(')')?;
-    let parts: Vec<&str> = inner
-        .split([',', '/'])
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .collect();
-    if parts.len() < 3 {
-        return None;
+        .or_else(|| trimmed.strip_prefix("rgb("))
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (rgb_part, alpha_part) = match inner.split_once('/') {
+            Some((l, r)) => (l, Some(r)),
+            None => (inner, None),
+        };
+        let parts: Vec<&str> = rgb_part
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let r = parse_unit_or_pct(parts[0], 255.0)?.clamp(0.0, 255.0);
+        let g = parse_unit_or_pct(parts[1], 255.0)?.clamp(0.0, 255.0);
+        let b = parse_unit_or_pct(parts[2], 255.0)?.clamp(0.0, 255.0);
+        let a = if let Some(ap) = alpha_part {
+            parse_alpha(ap)?
+        } else if parts.len() >= 4 {
+            parse_alpha(parts[3])?
+        } else {
+            1.0
+        };
+        return Some((r, g, b, a));
     }
-    let r = parts[0].parse::<f64>().ok()?.clamp(0.0, 255.0);
-    let g = parts[1].parse::<f64>().ok()?.clamp(0.0, 255.0);
-    let b = parts[2].parse::<f64>().ok()?.clamp(0.0, 255.0);
-    let a = if parts.len() >= 4 {
-        parts[3].parse::<f64>().ok()?.clamp(0.0, 1.0)
-    } else {
-        1.0
-    };
-    Some((r, g, b, a))
+
+    if let Some(inner) = trimmed
+        .strip_prefix("oklab(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (coords, alpha_part) = match inner.split_once('/') {
+            Some((l, r)) => (l, Some(r)),
+            None => (inner, None),
+        };
+        let parts: Vec<&str> = coords.split_whitespace().collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let l = parse_unit_or_pct(parts[0], 1.0)?;
+        let a = parse_unit_or_pct(parts[1], 0.4)?;
+        let b = parse_unit_or_pct(parts[2], 0.4)?;
+        let alpha = match alpha_part {
+            Some(ap) => parse_alpha(ap)?,
+            None => 1.0,
+        };
+        let (r, g, bl) = oklab_to_srgb(l, a, b);
+        return Some((r, g, bl, alpha));
+    }
+
+    if let Some(inner) = trimmed
+        .strip_prefix("oklch(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (coords, alpha_part) = match inner.split_once('/') {
+            Some((l, r)) => (l, Some(r)),
+            None => (inner, None),
+        };
+        let parts: Vec<&str> = coords.split_whitespace().collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let l = parse_unit_or_pct(parts[0], 1.0)?;
+        let c = parse_unit_or_pct(parts[1], 0.4)?;
+        let h_rad = parse_angle_rad(parts[2])?;
+        let alpha = match alpha_part {
+            Some(ap) => parse_alpha(ap)?,
+            None => 1.0,
+        };
+        let (r, g, bl) = oklab_to_srgb(l, c * h_rad.cos(), c * h_rad.sin());
+        return Some((r, g, bl, alpha));
+    }
+
+    if let Some(inner) = trimmed
+        .strip_prefix("color(srgb ")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (coords, alpha_part) = match inner.split_once('/') {
+            Some((l, r)) => (l, Some(r)),
+            None => (inner, None),
+        };
+        let parts: Vec<&str> = coords.split_whitespace().collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let r = (parse_unit_or_pct(parts[0], 1.0)? * 255.0).clamp(0.0, 255.0);
+        let g = (parse_unit_or_pct(parts[1], 1.0)? * 255.0).clamp(0.0, 255.0);
+        let b = (parse_unit_or_pct(parts[2], 1.0)? * 255.0).clamp(0.0, 255.0);
+        let alpha = match alpha_part {
+            Some(ap) => parse_alpha(ap)?,
+            None => 1.0,
+        };
+        return Some((r, g, b, alpha));
+    }
+
+    None
 }
 
 fn relative_luminance(r: f64, g: f64, b: f64) -> f64 {
@@ -388,11 +530,16 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
         if is_interactive(node) {
             let input_type = node.attributes.get("type").map(|s| s.to_ascii_lowercase());
             let is_hidden_input = node.tag == "input" && input_type.as_deref() == Some("hidden");
-            let is_native_check =
-                node.tag == "input" && matches!(input_type.as_deref(), Some("checkbox" | "radio"));
-            // Inline text links inside prose and native 13-16px checkboxes paired with labels are excluded.
+            let is_native_check = (node.tag == "input"
+                && matches!(input_type.as_deref(), Some("checkbox" | "radio")))
+                || matches!(node.role.as_deref(), Some("checkbox" | "radio"));
+            let is_desktop_edge_rail =
+                vp_w > 500 && ((r.height >= 400 && r.width >= 8) || (r.width >= 400 && r.height >= 8));
+            // Inline text links inside prose, checkbox/radio indicators paired with labels,
+            // and full-height desktop sidebar resize rails are excluded.
             let enforce_target = !is_hidden_input
                 && !is_native_check
+                && !is_desktop_edge_rail
                 && (node.tag != "a" || node.style.get("display").is_some_and(|d| d != "inline"));
             let too_small = if vp_w > 0 && vp_w <= 500 {
                 (r.width < 44 && r.height < 44) || r.width < 32 || r.height < 32
@@ -981,5 +1128,86 @@ mod tests {
             "expected zero false-positive findings, got {:?}",
             audit.findings
         );
+    }
+
+    #[test]
+    fn evaluates_oklch_oklab_contrast_and_exempts_aria_checkbox_and_desktop_rail() {
+        // Low-contrast oklch muted gray on dark slate background -> must flag LowContrast
+        let low_oklch = node(
+            "p#muted",
+            "p",
+            "Muted text",
+            RenderRect {
+                x: 16,
+                y: 16,
+                width: 200,
+                height: 20,
+            },
+            BTreeMap::from([
+                ("color".into(), "oklch(0.35 0.01 250)".into()),
+                ("backgroundColor".into(), "oklch(0.2 0.02 250)".into()),
+                ("fontSize".into(), "14px".into()),
+            ]),
+        );
+        // High-contrast oklch white on dark slate -> must pass
+        let high_oklch = node(
+            "p#bright",
+            "p",
+            "Bright text",
+            RenderRect {
+                x: 16,
+                y: 48,
+                width: 200,
+                height: 20,
+            },
+            BTreeMap::from([
+                ("color".into(), "oklch(0.984 0.003 247.858)".into()),
+                ("backgroundColor".into(), "oklab(0.18 -0.01 -0.03)".into()),
+                ("fontSize".into(), "14px".into()),
+            ]),
+        );
+        // WAI-ARIA role="checkbox" (16x16 Radix checkbox) with resolved aria-label -> must pass
+        let mut aria_checkbox = node(
+            "button#cb",
+            "button",
+            "",
+            RenderRect {
+                x: 16,
+                y: 90,
+                width: 16,
+                height: 16,
+            },
+            BTreeMap::new(),
+        );
+        aria_checkbox.role = Some("checkbox".into());
+        aria_checkbox
+            .attributes
+            .insert("aria-label".into(), "Recents".into());
+        // Desktop full-height sidebar resize rail (16x800px) -> must pass SmallTouchTarget
+        let mut sidebar_rail = node(
+            "button#rail",
+            "button",
+            "",
+            RenderRect {
+                x: 240,
+                y: 0,
+                width: 16,
+                height: 800,
+            },
+            BTreeMap::new(),
+        );
+        sidebar_rail
+            .attributes
+            .insert("aria-label".into(), "Toggle Sidebar".into());
+
+        let audit = lint_render_tree(&[low_oklch, high_oklch, aria_checkbox, sidebar_rail], 1280);
+        assert_eq!(
+            audit.findings.len(),
+            1,
+            "expected only low_oklch LowContrast, got {:?}",
+            audit.findings
+        );
+        assert_eq!(audit.findings[0].kind, DesignDefectKind::LowContrast);
+        assert_eq!(audit.findings[0].node_id, "p#muted");
     }
 }
