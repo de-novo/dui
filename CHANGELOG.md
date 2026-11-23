@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Compiler-deep Mobile & TUI state extraction rules (Ink 5, React Native, Expo Router 5), shared compiler-oracle IR, and `dui toolchains` probing 6 official compilers ([#124](https://github.com/de-novo/dui/pull/124)).
+- Live component rendering directly on the 2D canvas (`Static | Live mount`, loopback origin guard, real-time `postMessage` `RenderNodeSnapshot` streaming into `ElementInspector`), plus one-command `dui open --live` / `--live-url` and GPUI desktop live surface indicator parity ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138)).
+- Automated SemVer and 3-language `CHANGELOG` version-sync guard (`npm run check:version`) enforced in `check:style` CI ([#131](https://github.com/de-novo/dui/pull/131)).
+- Full Level 2 Vite 7 support alongside Vite 8+ via an official TypeScript 6/7 AST fallback (`adapters/vite/parser.mts`, `npm run check:vite7`) ([#133](https://github.com/de-novo/dui/pull/133)).
+- Static React Router 7/8 route discovery (`createBrowserRouter`, `createHashRouter`, `createMemoryRouter`, and nested JSX `<Route>` trees with `index`, `:param`, and `*` splats) across Vite 7 and 8 ([#134](https://github.com/de-novo/dui/pull/134), [#135](https://github.com/de-novo/dui/pull/135)).
+- Interactive browser login session capture (`dui auth login <URL> --out FILE`) saving Playwright-compatible `storageState.json` (`HttpOnly` cookies, `localStorage`, `sessionStorage`) with `0600` permissions ([#137](https://github.com/de-novo/dui/pull/137)).
+- Viewer UI Design/Review agent skills (`anti-ui-slop`, `web-design-guidelines`) alongside `shadcn/ui` ([#132](https://github.com/de-novo/dui/pull/132)).
+
+### Changed
+
+- Decoupled ecosystem / rule-pack library versions from hard toolchain gates: hard `>=` baseline checks apply only to core compiler/host/UI runtime layers (`tsc`, `vite` 7+, `react` 18+, `next` 16+ when `host: "next"`), while newer majors are always accepted and rule-pack libraries emit non-fatal `versionNotes` instead of aborting scans ([#136](https://github.com/de-novo/dui/pull/136)).
+
 ## [v0.1.0] - 2026-11-23
 
 ### Added
@@ -126,7 +140,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Official TypeScript 6/7 compiler analysis, typed GET auto-mocks, Vite host, and Chromium CDP capture across viewport widths.
 - Local capture archiving under `~/.dui/` grouped by project, branch, and worktree, plus the source installer.
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.1.0...HEAD
+[v0.1.0]: https://github.com/de-novo/dui/releases/tag/v0.1.0
+[v0.0.9]: https://github.com/de-novo/dui/compare/v0.0.8...v0.0.9
+[v0.0.8]: https://github.com/de-novo/dui/compare/v0.0.7...v0.0.8
+[v0.0.7]: https://github.com/de-novo/dui/compare/v0.0.6...v0.0.7
 [v0.0.6]: https://github.com/de-novo/dui/compare/v0.0.5...v0.0.6
 [v0.0.5]: https://github.com/de-novo/dui/compare/v0.0.4...v0.0.5
 [v0.0.4]: https://github.com/de-novo/dui/compare/v0.0.3...v0.0.4

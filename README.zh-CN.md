@@ -13,7 +13,7 @@
 | 类别 | 当前已支持 | 计划支持 |
 | --- | --- | --- |
 | 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2、Go |
-| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 19、Vite 7 / 8、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
+| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 18 / 19+、Vite 7 / 8+、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
 | 桌面应用 | GPUI (`gpui-pre` 0.3.x、`gpui-kit` / `gpui-component` 0.10.x，Metal + AccessKit `renderTree`)、Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
 | 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | Jetpack Compose (`kotlinc` 2)、SwiftUI (`swiftc` 6)、Flutter (`dart` 3) 深度状态计划 |
 | 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG)、Ink 5 (`tsc` 规则包) | Ratatui (`rustc`)、Bubble Tea (`go`) 深度状态计划 |
@@ -26,12 +26,12 @@
 | --- | --- | --- |
 | 界面与链接发现 | 路由文件自动发现、无环多跳 BFS (`a[href]`)、动态 ID 模式折叠 (`/orders/:id`)、界面间 `linksTo` 连线 | 已支持 |
 | 状态规划与验证 | 官方编译器类型推导、贪心成对覆盖数组（Covering Array）、`<select>` 真实 DOM 选项发现、视觉变化佐证 (`visualWitness`)、收敛保护 | 已支持 |
-| 数据与 API 验证 | 类型化 `GET` JSON 自动模拟、CSV 模拟、显式 `mockResponses`、`hybrid` / `live` 真实 API 模式（默认只读保护与密钥脱敏） | 已支持 |
+| 数据与 API 验证 | 类型化 `GET` JSON 自动模拟、CSV 模拟、显式 `mockResponses`、`hybrid` / `live` 真实 API 模式（只读保护）、认证会话（`storageState.json`、`POST authFlow`、交互式 `dui auth login`）与密钥脱敏 | 已支持 |
 | Diff 与变更评审 | 2D 画布内联对比（`元素` 渲染树 Diff · 2px 容差、`变更后`、`变更前`、惰性 `像素` 叠加）、分支对比 (`dui diff --base main`)、`--changed-since` | 已支持 |
 | 质量、多语言与审计 | 99% 覆盖率审计 (`dui audit`)、多语言与 RTL 校验、缺译键与文本溢出检测、SQLite 评审评论、基于模块图的内容寻址缓存 | 已支持 |
 | 实时编辑与查看器 | 共享 CLI/MCP 实时会话 (`dui live`)、内置 Web 画布 (`dui open`)、原生 GPUI 桌面查看器 (`dui desktop`) | 已支持 |
 | 元素检查器与盒模型 | 开发者工具级元素属性检查、盒模型图与叠加（宽高、外边距、内边距、边框、gap、圆角）以及元素间交互式间距标尺 | 已支持 |
-| 画布实时组件渲染 | 从截图 + 交互式规格叠加演进为直接在 2D 画布上挂载并渲染真实组件 (`v0.2.0`) | 计划中 |
+| 画布实时组件渲染 | 直接在 2D 画布卡片上挂载本地回环真实组件（`dui open --live` / `--live-url`），并将实时 `RenderNodeSnapshot` 遥测流式传入 `ElementInspector` (`v0.2.0`) | 已支持（原型） |
 | 设计缺陷检测与引擎扩展 | 基于 `renderTree` 的自动设计缺陷与无障碍诊断（横向溢出、元素重叠、WCAG 对比度、触控目标尺寸、无标签交互控件、间距偏差——人类画布高亮 + AI 结构化 CLI/MCP `designAudit` JSON）、`SurfaceRegistry` 多平台插件流水线、多工作进程并行捕获 (`concurrency`)、GPUI AccessKit 渲染树 Diff | 已支持 |
 
 ## 安装
@@ -52,7 +52,7 @@ dui update --check
 dui update
 ```
 
-**捕获网页时**需要 Node.js 26、Chromium 或 Google Chrome，以及目标应用的依赖。
+**捕获网页时**需要 Node.js 22+ LTS（22 / 24 / 26）、Chromium 或 Google Chrome，以及目标应用的依赖。
 
 ## 自动发现页面
 

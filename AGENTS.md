@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Entry point for AI coding agents (and humans) working on `de-novo/dui`. Read this first, then follow the links.
-Updated: 2026-11-20 · Stage: web capture and history · Next goal: [v0.0.2 live web state editing](docs/en/roadmap.md#v002)
+Updated: 2026-11-23 · Stage: v0.1.0 multi-surface & auth shipped · Next goal: [v0.2.0 live component rendering on canvas](docs/en/roadmap.md#later-milestones)
 
 ## Mission
 
