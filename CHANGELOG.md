@@ -7,6 +7,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-11-23
+
+### Added
+
+- Universal authenticated session support (`storageState.json`, `localStorage`, `sessionStorage`, `extraHeaders`, `POST` `authFlow` with chunked HTTP decoding, `env:` secret indirection & manifest redaction, and auth-isolated cache keys) plus `dui diff ... --markdown` GitHub PR comment output ([#128](https://github.com/de-novo/dui/pull/128)).
+- iOS Simulator surface adapter (`host: "ios"`, `xcrun simctl` screenshots + XCUI accessibility tree → `RenderNodeSnapshot`) with honest `macos-required` / `no-ios-simulator` reporting ([#123](https://github.com/de-novo/dui/pull/123)).
+- GPUI desktop viewer (`apps/desktop`) parity for the interactive Element Inspector, nested Box-Model diagram, and Design Audit overlays ([#122](https://github.com/de-novo/dui/pull/122)).
+
+### Changed
+
+- Relaxed TypeScript oracle runtime requirement from hardcoded Node 26 to Node 22+ LTS (`22` / `24` / `26+`) for real-world project compatibility ([#126](https://github.com/de-novo/dui/pull/126)).
+- Deduplicated `designAudit` findings by `(kind, path, width, nodeId)` with `occurrences` & `rawTotal` counts and tightened overlap/touch-target/spacing-drift heuristics ([#126](https://github.com/de-novo/dui/pull/126)).
+- Synced workspace package version to `0.1.0` matching `apps/desktop`.
+
+### Fixed
+
+- Rejected HTTP `4xx`/`5xx` primary document responses (e.g., 404 Not Found, 500 Internal Server Error) as `unverified` (`http-error`) while ignoring ancillary `/favicon.ico` 404s ([#126](https://github.com/de-novo/dui/pull/126)).
+- Added VT100 `CSI b` (`REP`) / `CSI X` (`ECH`), block-element glyphs (`▌` `▏` `█`), lowercase `p`/`q` alignment, and text-cell contrast sampling for TUI captures (`htop`, `fzf`) ([#117](https://github.com/de-novo/dui/pull/117)).
+
+## [v0.0.9] - 2026-11-23
+
+### Added
+
+- Android mobile surface adapter (`host: "android"`, `adb screencap` + `uiautomator` XML → `RenderNodeSnapshot`) ([#111](https://github.com/de-novo/dui/pull/111)).
+- Electron 45 desktop adapter (`host: "electron"` + `ipcMocks`) and GPUI AccessKit → `RenderNodeSnapshot` render-tree diffing ([#112](https://github.com/de-novo/dui/pull/112)).
+- Radix UI 1 / shadcn/ui 4 declarative `control` rule pack and Next.js 16 App Router host adapter with Server Component boundary reporting ([#113](https://github.com/de-novo/dui/pull/113)).
+- Automatic 6-rule Design & Accessibility lint engine (AI structured JSON + 2D canvas overlay) and parallel multi-worker viewport capture (`concurrency`) ([#114](https://github.com/de-novo/dui/pull/114)).
+- DevTools-style Element Inspector, nested Box-Model overlay (`margin`, `padding`, `border`, `gap`, `borderRadius`, attributes), and element-to-element spacing redline guides ([#115](https://github.com/de-novo/dui/pull/115)).
+
+## [v0.0.8] - 2026-11-23
+
+### Added
+
+- Multi-surface architecture (`SurfaceRegistry`, `NoopOracle`, box-model & attribute-extended `RenderNodeSnapshot` IR) ([#107](https://github.com/de-novo/dui/pull/107), [#108](https://github.com/de-novo/dui/pull/108)).
+- Universal Web host (`static` / `url` / `command`) for any HTML/JS app without bundler lock-in ([#109](https://github.com/de-novo/dui/pull/109)).
+- Universal TUI adapter (`host: "pty"`, pure VT100/ANSI emulator → `RenderNodeSnapshot` + monospace PNG) ([#110](https://github.com/de-novo/dui/pull/110)).
+
+## [v0.0.7] - 2026-11-22
+
+### Added
+
+- Live API proxy mode (`apiMode: "live"` / `"hybrid"`) with default mutation blocking, real-time branch comparison (`dui diff --base`), element-level `renderDiff` + lazy pixel diff hydration, and 2D canvas inline branch diff highlights ([#81](https://github.com/de-novo/dui/pull/81), [#85](https://github.com/de-novo/dui/pull/85), [#88](https://github.com/de-novo/dui/pull/88), [#92](https://github.com/de-novo/dui/pull/92)).
+- Expanded declarative P2 rule packs (Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, valibot 1) and removed arbitrary `stateBudget` caps in favor of exhaustive deterministic convergence ([#90](https://github.com/de-novo/dui/pull/90), [#94](https://github.com/de-novo/dui/pull/94)).
+
 ## [v0.0.6] - 2026-11-22
 
 ### Added

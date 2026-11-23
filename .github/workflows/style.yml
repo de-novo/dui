@@ -81,3 +81,6 @@ jobs:
           npm run check:design-lint
           npm run check:box-model
           npm run check:compiler-oracles
+          npm run check:reliability
+          npm run check:auth-pr-diff
+          npm run check:live-canvas

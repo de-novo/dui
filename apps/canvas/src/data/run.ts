@@ -5,4 +5,5 @@ export type Run = {
   branch: string | null;
   version: string;
   liveAvailable?: boolean;
+  liveBaseUrl?: string;
 };

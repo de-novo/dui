@@ -46,10 +46,12 @@ export type DesignFinding = {
   expected: string;
   path: string;
   width: number;
+  occurrences?: number;
 };
 
 export type DesignAudit = {
   total: number;
+  rawTotal?: number;
   errors: number;
   warnings: number;
   info: number;
@@ -121,12 +123,14 @@ export function decodeAuditReport(raw: unknown): AuditReport | null {
             expected: typeof f.expected === "string" ? f.expected : "",
             path: typeof f.path === "string" ? f.path : "/",
             width: num(f.width),
+            occurrences: typeof f.occurrences === "number" ? f.occurrences : undefined,
           };
         })
       : [];
   const designAudit: DesignAudit | undefined = rawDesign
     ? {
         total: num(rawDesign.total),
+        rawTotal: typeof rawDesign.rawTotal === "number" ? rawDesign.rawTotal : undefined,
         errors: num(rawDesign.errors),
         warnings: num(rawDesign.warnings),
         info: num(rawDesign.info),

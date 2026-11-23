@@ -19,6 +19,7 @@ import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import type { DesignFinding } from "../../model/audit";
 import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
+import type { LiveSurfaceMode } from "../../model/liveSurface";
 
 type CardNode = Node<
   {
@@ -37,6 +38,8 @@ type CardNode = Node<
     diffVisualMode?: CanvasDiffVisualMode;
     beforeRunKey?: string;
     afterRunKey?: string;
+    liveBaseUrl?: string;
+    liveSurfaceMode?: LiveSurfaceMode;
   },
   "screen"
 >;
@@ -148,6 +151,8 @@ function Card({ data }: NodeProps<CardNode>) {
         diffVisualMode={data.diffVisualMode}
         beforeRunKey={data.beforeRunKey}
         afterRunKey={data.afterRunKey}
+        liveBaseUrl={data.liveBaseUrl}
+        liveSurfaceMode={data.liveSurfaceMode}
       />
     </>
   );
@@ -170,6 +175,8 @@ export function ScreenMap({
   diffVisualMode = "after",
   beforeRunKey,
   afterRunKey,
+  liveBaseUrl,
+  liveSurfaceMode = "capture",
   imageUrl,
   select,
   onClearSelection,
@@ -188,6 +195,8 @@ export function ScreenMap({
   diffVisualMode?: CanvasDiffVisualMode;
   beforeRunKey?: string;
   afterRunKey?: string;
+  liveBaseUrl?: string;
+  liveSurfaceMode?: LiveSurfaceMode;
   imageUrl: (name: string) => string;
   select: (id: string, active?: Element | null) => void;
   onClearSelection?: () => void;
@@ -242,6 +251,8 @@ export function ScreenMap({
         diffVisualMode,
         beforeRunKey,
         afterRunKey,
+        liveBaseUrl,
+        liveSurfaceMode,
       },
       ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
       className: classes || undefined,

@@ -62,6 +62,146 @@ impl ApiMode {
     }
 }
 
+fn execute_auth_flow_request(
+    origin: &str,
+    flow: &Value,
+) -> Result<dui_core::auth::AuthSessionBundle> {
+    let mut bundle = dui_core::auth::AuthSessionBundle::default();
+    let method = flow["method"].as_str().unwrap_or("POST");
+    let path = flow["path"].as_str().unwrap_or("/api/login");
+    if !path.starts_with('/') || path.starts_with("//") {
+        return Err("authFlow.path must be a same-origin path starting with '/'".into());
+    }
+    let stripped = origin
+        .strip_prefix("http://")
+        .ok_or("authFlow requires an http:// local origin")?;
+    let addr = if stripped.contains(':') {
+        stripped.to_owned()
+    } else {
+        format!("{stripped}:80")
+    };
+    let mut body_val = flow.get("body").cloned().unwrap_or_else(|| json!({}));
+    if let Some(obj) = body_val.as_object_mut() {
+        for v in obj.values_mut() {
+            if let Some(raw) = v.as_str()
+                && let Some(resolved) =
+                    dui_core::auth::resolve_env_value(raw, |k| std::env::var(k).ok())
+            {
+                *v = json!(resolved);
+            }
+        }
+    }
+    let body_bytes = serde_json::to_vec(&body_val)?;
+    let mut stream = std::net::TcpStream::connect(&addr)?;
+    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    let req = format!(
+        "{method} {path} HTTP/1.1\r\nHost: {stripped}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body_bytes.len()
+    );
+    stream.write_all(req.as_bytes())?;
+    stream.write_all(&body_bytes)?;
+    let mut raw_resp = Vec::new();
+    std::io::Read::read_to_end(&mut stream, &mut raw_resp)?;
+    let split = raw_resp
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .ok_or("malformed HTTP response from authFlow")?;
+    let head = String::from_utf8_lossy(&raw_resp[..split]);
+    let resp_body = dui_core::auth::decode_http_body(&head, &raw_resp[split + 4..]);
+    let mut set_cookies = Vec::new();
+    for line in head.lines().skip(1) {
+        if let Some((k, v)) = line.split_once(':')
+            && k.trim().eq_ignore_ascii_case("set-cookie")
+        {
+            set_cookies.push(v.trim().to_owned());
+        }
+    }
+    bundle
+        .cookies
+        .extend(dui_core::auth::parse_set_cookie_headers(&set_cookies));
+    if let (Some(json_path), Some(ls_key)) = (
+        flow["tokenJsonPath"].as_str(),
+        flow["localStorageKey"].as_str(),
+    ) && let Ok(parsed) = serde_json::from_slice::<Value>(&resp_body)
+        && let Some(token) = dui_core::auth::extract_json_string_path(&parsed, json_path)
+    {
+        bundle.local_storage.insert(ls_key.to_owned(), token);
+    }
+    Ok(bundle)
+}
+
+fn collect_auth_session(
+    origin: &str,
+    spec: &Value,
+    flow_cache: &mut Option<dui_core::auth::AuthSessionBundle>,
+) -> Result<dui_core::auth::AuthSessionBundle> {
+    let mut bundle = dui_core::auth::AuthSessionBundle::default();
+    let env_lookup = |k: &str| std::env::var(k).ok();
+
+    if let Some(state_path) = spec["storageState"].as_str().filter(|s| !s.is_empty()) {
+        let raw = fs::read_to_string(state_path)?;
+        let parsed: Value = serde_json::from_str(&raw)?;
+        let from_file = dui_core::auth::parse_storage_state_json(&parsed);
+        bundle.cookies.extend(from_file.cookies);
+        bundle.local_storage.extend(from_file.local_storage);
+        bundle.session_storage.extend(from_file.session_storage);
+    }
+
+    if let Some(flow) = spec.get("authFlow").filter(|v| v.is_object())
+        && flow["type"].as_str().unwrap_or("request") == "request"
+    {
+        if flow_cache.is_none() {
+            *flow_cache = Some(execute_auth_flow_request(origin, flow)?);
+        }
+        if let Some(cached) = flow_cache.as_ref() {
+            bundle.cookies.extend(cached.cookies.clone());
+            bundle.local_storage.extend(cached.local_storage.clone());
+            bundle
+                .session_storage
+                .extend(cached.session_storage.clone());
+        }
+    }
+
+    if let Some(cookies) = spec["cookies"].as_object() {
+        for (name, value) in cookies {
+            if let Some(raw) = value.as_str()
+                && let Some(resolved) = dui_core::auth::resolve_env_value(raw, env_lookup)
+            {
+                bundle.cookies.insert(name.clone(), resolved);
+            }
+        }
+    }
+    if let Some(ls) = spec["localStorage"].as_object() {
+        for (name, value) in ls {
+            if let Some(raw) = value.as_str()
+                && let Some(resolved) = dui_core::auth::resolve_env_value(raw, env_lookup)
+            {
+                bundle.local_storage.insert(name.clone(), resolved);
+            }
+        }
+    }
+    if let Some(ss) = spec["sessionStorage"].as_object() {
+        for (name, value) in ss {
+            if let Some(raw) = value.as_str()
+                && let Some(resolved) = dui_core::auth::resolve_env_value(raw, env_lookup)
+            {
+                bundle.session_storage.insert(name.clone(), resolved);
+            }
+        }
+    }
+    if let Some(hdrs) = spec["extraHeaders"].as_object() {
+        for (name, value) in hdrs {
+            if let Some(raw) = value.as_str()
+                && let Some(resolved) = dui_core::auth::resolve_env_value(raw, env_lookup)
+            {
+                bundle.headers.insert(name.clone(), resolved);
+            }
+        }
+    }
+    Ok(bundle)
+}
+
 fn forward_live_http(
     target_url: &str,
     method: &str,
@@ -169,6 +309,7 @@ pub struct Browser {
     blocked_mutations: std::collections::BTreeSet<String>,
     api_provenance: BTreeMap<String, &'static str>,
     requests: std::collections::BTreeSet<String>,
+    auth_flow_cache: Option<dui_core::auth::AuthSessionBundle>,
 }
 
 impl Drop for Browser {
@@ -230,6 +371,7 @@ impl Browser {
             blocked_mutations: Default::default(),
             api_provenance: Default::default(),
             requests: Default::default(),
+            auth_flow_cache: None,
         })
     }
     fn send(&mut self, session: Option<&str>, method: &str, params: Value) -> Result<u64> {
@@ -649,14 +791,24 @@ impl Browser {
         )?;
         self.call(s, "Network.enable", json!({}))?;
         self.call(s, "Network.setBypassServiceWorker", json!({"bypass":true}))?;
-        if let Some(cookies) = spec["cookies"].as_object() {
-            for (name, value) in cookies {
-                self.call(
-                    s,
-                    "Network.setCookie",
-                    json!({"url":origin,"name":name,"value":value}),
-                )?;
-            }
+        let auth_session = collect_auth_session(&origin, spec, &mut self.auth_flow_cache)?;
+        for (name, value) in &auth_session.cookies {
+            self.call(
+                s,
+                "Network.setCookie",
+                json!({"url":origin,"name":name,"value":value}),
+            )?;
+        }
+        let mut extra_headers = auth_session.headers.clone();
+        if let Some(locale) = spec["locale"].as_str() {
+            extra_headers.insert("Accept-Language".into(), locale.to_owned());
+        }
+        if !extra_headers.is_empty() {
+            self.call(
+                s,
+                "Network.setExtraHTTPHeaders",
+                json!({"headers": extra_headers}),
+            )?;
         }
         self.call(
             s,
@@ -665,11 +817,6 @@ impl Browser {
         )?;
         let locale_prelude = if let Some(locale) = spec["locale"].as_str() {
             let _ = self.call(s, "Emulation.setLocaleOverride", json!({"locale": locale}));
-            self.call(
-                s,
-                "Network.setExtraHTTPHeaders",
-                json!({"headers": {"Accept-Language": locale}}),
-            )?;
             let encoded = serde_json::to_string(locale)?;
             format!(
                 "Object.defineProperty(navigator,'language',{{get:()=>({encoded}),configurable:true}});\
@@ -679,12 +826,16 @@ impl Browser {
         } else {
             String::new()
         };
+        let storage_prelude = dui_core::auth::build_storage_prelude_script(
+            &auth_session.local_storage,
+            &auth_session.session_storage,
+        );
         let init_prelude = spec["initScript"]
             .as_str()
             .map(|s| format!("{s}\n"))
             .unwrap_or_default();
         let script = format!(
-            "{init_prelude}{locale_prelude}{}\nglobalThis.__duiRuntime.install({input});",
+            "{storage_prelude}{init_prelude}{locale_prelude}{}\nglobalThis.__duiRuntime.install({input});",
             include_str!(concat!(env!("OUT_DIR"), "/browser/runtime.js"))
         );
         self.call(

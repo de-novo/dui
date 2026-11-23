@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-11-23
+
+### Added
+
+- 범용 인증 세션 지원(`storageState.json` · `localStorage` · `sessionStorage` · `extraHeaders` · chunked 응답 지원 `POST authFlow` · `env:` 비밀값 간접 참조/리댁션 · 인증별 캐시 분리) 및 GitHub PR 코멘트용 `dui diff ... --markdown` 출력 ([#128](https://github.com/de-novo/dui/pull/128)).
+- iOS Simulator 서피스 어댑터(`host: "ios"`, `xcrun simctl` 스크린샷 + XCUI 접근성 트리 → `RenderNodeSnapshot`) 및 `macos-required` / `no-ios-simulator` 정직 보고 ([#123](https://github.com/de-novo/dui/pull/123)).
+- GPUI 데스크톱 뷰어(`apps/desktop`)에 개발자도구형 요소 인스펙터 · 중첩 박스 모델 다이어그램 · 디자인 결함 오버레이 패리티 추가 ([#122](https://github.com/de-novo/dui/pull/122)).
+
+### Changed
+
+- TypeScript 오라클 런타임 요구 사항을 Node 26 고정에서 Node 22+ LTS(`22` / `24` / `26+`)로 완화 ([#126](https://github.com/de-novo/dui/pull/126)).
+- `designAudit` 결함을 `(kind, path, width, nodeId)` 기준으로 중복 제거(`occurrences` · `rawTotal` 포함)하고 겹침·터치 타깃·간격 편차 오탐 기준을 강화 ([#126](https://github.com/de-novo/dui/pull/126)).
+- 워크스페이스 버전을 `apps/desktop`과 맞춰 `0.1.0`으로 동기화.
+
+### Fixed
+
+- 탐색한 페이지 문서가 HTTP `4xx`/`5xx`(404 · 500 등)를 반환하면 `unverified` (`http-error`)로 실패 처리(`/favicon.ico` 404 오탐 방지) ([#126](https://github.com/de-novo/dui/pull/126)).
+- TUI 캡처(`htop`, `fzf`)용 VT100 `CSI b` (`REP`) / `CSI X` (`ECH`), 블록 문자(`▌` `▏` `█`), 소문자 `p`/`q` 글리프 정렬 및 텍스트 셀 대비 샘플링 수정 ([#117](https://github.com/de-novo/dui/pull/117)).
+
+## [v0.0.9] - 2026-11-23
+
+### Added
+
+- Android 모바일 서피스 어댑터(`host: "android"`, `adb screencap` + `uiautomator` XML → `RenderNodeSnapshot`) ([#111](https://github.com/de-novo/dui/pull/111)).
+- Electron 45 데스크톱 어댑터(`host: "electron"` + `ipcMocks`) 및 GPUI AccessKit → `RenderNodeSnapshot` 렌더 트리 Diff ([#112](https://github.com/de-novo/dui/pull/112)).
+- Radix UI 1 / shadcn/ui 4 선언형 `control` 룰팩 및 Next.js 16 App Router 호스트(Server Component 경계 보고 포함) ([#113](https://github.com/de-novo/dui/pull/113)).
+- 6대 디자인·접근성 결함 자동 진단 엔진(AI 정형 JSON + 2D 캔버스 오버레이) 및 병렬 멀티 워커 캡처(`concurrency`) ([#114](https://github.com/de-novo/dui/pull/114)).
+- 개발자도구형 요소 인스펙터, 중첩 박스 모델 오버레이(`margin` · `padding` · `border` · `gap` · `borderRadius` · 속성), 요소 간 거리 레드라인 가이드 ([#115](https://github.com/de-novo/dui/pull/115)).
+
+## [v0.0.8] - 2026-11-23
+
+### Added
+
+- 멀티 서피스 추상화 기반(`SurfaceRegistry` · `NoopOracle` · 박스 모델/속성 확장 `RenderNodeSnapshot` IR) ([#107](https://github.com/de-novo/dui/pull/107), [#108](https://github.com/de-novo/dui/pull/108)).
+- 번들러 비종속 Universal Web 호스트(`static` / `url` / `command`) ([#109](https://github.com/de-novo/dui/pull/109)).
+- Universal TUI 어댑터(`host: "pty"`, 순수 VT100/ANSI 에뮬레이터 → `RenderNodeSnapshot` + 모노스페이스 PNG) ([#110](https://github.com/de-novo/dui/pull/110)).
+
+## [v0.0.7] - 2026-11-22
+
+### Added
+
+- 실 API 프록시 모드(`apiMode: "live"` / `"hybrid"`, 기본 변경 요청 차단), 브랜치 비교(`dui diff --base`), 요소 단위 `renderDiff` + 지연 픽셀 Diff 및 2D 캔버스 인라인 브랜치 변경 하이라이트 ([#81](https://github.com/de-novo/dui/pull/81), [#85](https://github.com/de-novo/dui/pull/85), [#88](https://github.com/de-novo/dui/pull/88), [#92](https://github.com/de-novo/dui/pull/92)).
+- 선언형 P2 룰팩 확장(Redux Toolkit 2 · Jotai 3 · XState 5 · React Hook Form 7 · valibot 1) 및 임의 `stateBudget` 제한 제거 ([#90](https://github.com/de-novo/dui/pull/90), [#94](https://github.com/de-novo/dui/pull/94)).
+
 ## [v0.0.6] - 2026-11-22
 
 ### Added

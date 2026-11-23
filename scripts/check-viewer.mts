@@ -61,8 +61,8 @@ try {
   assert.equal((upToDate.body as { updateAvailable: boolean }).updateAvailable, false);
   assert.equal((upToDate.body as { latest: string }).latest, verBody.tag);
 
-  execFileSync("git", ["tag", "v0.0.2"], { cwd: tagRepo });
-  execFileSync("git", ["tag", "v0.0.10"], { cwd: tagRepo });
+  execFileSync("git", ["tag", "v99.0.2"], { cwd: tagRepo });
+  execFileSync("git", ["tag", "v99.0.10"], { cwd: tagRepo });
   const hasUpdate = runDui(["update", "--check", "--repo", tagRepo], baseEnv);
   assert.equal(hasUpdate.status, 0);
   const updateBody = hasUpdate.body as {
@@ -72,10 +72,10 @@ try {
     updateAvailable: boolean;
   };
   assert.equal(updateBody.updateAvailable, true);
-  assert.equal(updateBody.latest, "v0.0.10");
-  assert.equal(updateBody.nextTag, "v0.0.10");
+  assert.equal(updateBody.latest, "v99.0.10");
+  assert.equal(updateBody.nextTag, "v99.0.10");
 
-  // Confirm `scripts/install` tag resolver picks v0.0.10 (numeric SemVer sort, not lexicographic).
+  // Confirm `scripts/install` tag resolver picks v99.0.10 (numeric SemVer sort, not lexicographic).
   const installResolved = execFileSync(
     "sh",
     [
@@ -86,7 +86,7 @@ try {
     ],
     { encoding: "utf8" },
   ).trim();
-  assert.equal(installResolved, "v0.0.10");
+  assert.equal(installResolved, "v99.0.10");
 
   // Confirm `scripts/install` PATH helper updates shell rc idempotently and respects DUI_NO_MODIFY_PATH=1.
   const fakeHome = join(stage, "fake-home");
