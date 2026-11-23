@@ -36,7 +36,8 @@ use std::{
     sync::Arc,
 };
 use store::{
-    CellItem, DesktopWorkspace, DiffCellEntry, ImageCache, NewCommentAnchor, RunItem, ScreenItem,
+    CellItem, DesktopWorkspace, DiffCellEntry, ImageCache, NewCommentAnchor, RunDesignAudit,
+    RunItem, ScreenItem, compute_run_design_audit, design_severity_color_hex,
 };
 use tokens::Palette;
 
@@ -127,6 +128,11 @@ struct DuiDesktopView {
     canvas_diff_enabled: bool,
     canvas_diff_changed_only: bool,
     canvas_diff_mode: CanvasDiffVisualMode,
+    // Design-defect & Element Inspector state (matching `apps/canvas` #105 / #106)
+    design_audit_run: Option<usize>,
+    design_audit: RunDesignAudit,
+    show_design_overlay: bool,
+    selected_element_id: Option<String>,
 }
 
 impl Drop for DuiDesktopView {
@@ -253,7 +259,12 @@ impl DuiDesktopView {
             canvas_diff_enabled: opts.canvas_diff,
             canvas_diff_changed_only: false,
             canvas_diff_mode: CanvasDiffVisualMode::Render,
+            design_audit_run: None,
+            design_audit: RunDesignAudit::default(),
+            show_design_overlay: false,
+            selected_element_id: None,
         };
+        this.ensure_design_audit();
         this.sync_cell_to_width();
         this.fit_map();
         if this.view_mode == ViewMode::Diff || this.canvas_diff_enabled {
@@ -379,6 +390,8 @@ impl DuiDesktopView {
 
     fn select_run(&mut self, idx: usize, cx: &mut Context<Self>) {
         self.selected_run = idx;
+        self.design_audit_run = None;
+        self.ensure_design_audit();
         self.selected_screen = 0;
         self.selected_cell = 0;
         self.neighbor_page = 0;
@@ -444,6 +457,8 @@ impl DuiDesktopView {
                     self.selected_screen = 0;
                 }
                 self.sync_cell_to_width();
+                self.design_audit_run = None;
+                self.ensure_design_audit();
                 self.diff_cache_key = None;
                 if self.view_mode == ViewMode::Diff {
                     self.ensure_diff_loaded();
@@ -848,8 +863,22 @@ impl DuiDesktopView {
             )
     }
 
+    fn ensure_design_audit(&mut self) {
+        if self.design_audit_run == Some(self.selected_run) {
+            return;
+        }
+        if let Some(run) = self.workspace.runs.get(self.selected_run) {
+            self.design_audit = compute_run_design_audit(run);
+            self.design_audit_run = Some(self.selected_run);
+        } else {
+            self.design_audit = RunDesignAudit::default();
+            self.design_audit_run = None;
+        }
+        self.selected_element_id = None;
+    }
+
     /// Floating Coverage Audit Pill at top-center matching `apps/canvas` `.audit-summary-pill`.
-    fn render_audit_pill(&self) -> impl IntoElement + use<> {
+    fn render_audit_pill(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let p = self.pal();
         let Some(run) = self.active_run() else {
             return div().id("audit-pill-empty");
@@ -867,22 +896,30 @@ impl DuiDesktopView {
             .iter()
             .filter(|c| c.project_id == run.project_id && c.status == "open")
             .count();
+        let design_total = self.design_audit.total;
+        let overlay_active = self.show_design_overlay;
 
-        let (cov_text, cells_text, open_text) = match self.lang {
+        let (cov_text, cells_text, open_text, design_text) = match self.lang {
             UiLang::Ko => (
                 format!("커버리지 {pct:.1}% / 목표 99%"),
                 format!("검증 {verified} · 렌더 가능 {renderable}/{total}"),
                 format!("미해결 코멘트 {open_comments}개"),
+                format!("디자인 결함 {design_total}건"),
             ),
             UiLang::ZhCn => (
                 format!("覆盖率 {pct:.1}% / 目标 99%"),
                 format!("{verified} 已验证 · {renderable}/{total} 可渲染"),
                 format!("{open_comments} 条待处理评论"),
+                format!("{design_total} 项设计问题"),
             ),
             UiLang::En => (
                 format!("Coverage {pct:.1}% / 99% goal"),
                 format!("{verified} verified · {renderable}/{total} renderable"),
                 format!("{open_comments} unresolved"),
+                format!(
+                    "{design_total} design {}",
+                    if design_total == 1 { "issue" } else { "issues" }
+                ),
             ),
         };
 
@@ -915,6 +952,40 @@ impl DuiDesktopView {
                         .text_xs()
                         .font_semibold()
                         .text_color(p.primary),
+                )
+            })
+            .when(design_total > 0, |el| {
+                let mut pill_bg = p.primary;
+                if !overlay_active {
+                    pill_bg.a = 0.16;
+                }
+                el.child(
+                    div()
+                        .id("desktop-design-overlay-toggle")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_full()
+                        .border_1()
+                        .border_color(p.primary)
+                        .bg(pill_bg)
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                this.show_design_overlay = !this.show_design_overlay;
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(design_text)
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(if overlay_active {
+                                    p.primary_foreground
+                                } else {
+                                    p.primary
+                                }),
+                        ),
                 )
             })
     }
@@ -1550,7 +1621,7 @@ impl DuiDesktopView {
                 (badge_bg, badge_label)
             });
 
-            let render_boxes: Vec<(f32, f32, f32, f32, Hsla)> = if canvas_diff_mode
+            let mut render_boxes: Vec<(f32, f32, f32, f32, Hsla)> = if canvas_diff_mode
                 == CanvasDiffVisualMode::Render
                 && let Some(d) = screen_diff
                 && let Some(rd) = &d.render_diff
@@ -1586,6 +1657,33 @@ impl DuiDesktopView {
             } else {
                 Vec::new()
             };
+
+            let screen_design_findings = self
+                .design_audit
+                .findings_by_screen_width
+                .get(&(screen.path.clone(), self.selected_width))
+                .cloned()
+                .unwrap_or_default();
+            let design_finding_count = screen_design_findings.len();
+            if self.show_design_overlay && !screen_design_findings.is_empty() {
+                let cw = self.selected_width.max(1) as f32;
+                let ch = (cw * 0.75).max(1.0);
+                for finding in screen_design_findings.iter().take(24) {
+                    let rect = finding.rect;
+                    if rect.width <= 0 || rect.height <= 0 {
+                        continue;
+                    }
+                    let rx = ((rect.x.max(0) as f32) / cw * inner_w).clamp(0.0, inner_w);
+                    let ry = ((rect.y.max(0) as f32) / ch * frame_h).clamp(0.0, frame_h);
+                    let rw =
+                        ((rect.width as f32) / cw * inner_w).clamp(2.0, (inner_w - rx).max(2.0));
+                    let rh =
+                        ((rect.height as f32) / ch * frame_h).clamp(2.0, (frame_h - ry).max(2.0));
+                    let color =
+                        Hsla::from(gpui_kit::rgb(design_severity_color_hex(finding.severity)));
+                    render_boxes.push((rx, ry, rw, rh, color));
+                }
+            }
 
             let media_el = if let Some(ri) = render_img {
                 let mut frame = div()
@@ -1731,6 +1829,14 @@ impl DuiDesktopView {
                                 .flex()
                                 .items_center()
                                 .gap_1()
+                                .when(design_finding_count > 0, |el| {
+                                    el.child(
+                                        Label::new(format!("⚠ {design_finding_count}"))
+                                            .text_xs()
+                                            .font_semibold()
+                                            .text_color(p.primary),
+                                    )
+                                })
                                 .when(open_comments > 0, |el| {
                                     el.child(
                                         Label::new(format!("● {open_comments}"))
@@ -1853,7 +1959,7 @@ impl DuiDesktopView {
             .items_center()
             .justify_center()
             .gap_2()
-            .child(self.render_audit_pill())
+            .child(self.render_audit_pill(cx))
             .child(self.render_canvas_diff_bar(cx));
 
         div()
@@ -2733,6 +2839,277 @@ impl DuiDesktopView {
                 .when(has_render_changes, |el| el.child(render_changes_col))
         });
 
+        let render_nodes = self
+            .design_audit
+            .trees_by_screen_width
+            .get(&(screen.path.clone(), self.selected_width))
+            .cloned()
+            .unwrap_or_default();
+        let selected_node = self
+            .selected_element_id
+            .as_deref()
+            .and_then(|id| render_nodes.iter().find(|n| n.id == id))
+            .or_else(|| render_nodes.first())
+            .cloned();
+
+        let element_inspector_box = selected_node.map(|node| {
+            let (title, bm_label, attr_label) = match self.lang {
+                UiLang::Ko => ("요소 인스펙터", "박스 모델", "속성"),
+                UiLang::ZhCn => ("元素检查器", "盒模型", "属性"),
+                UiLang::En => ("Element inspector", "Box model", "Attributes"),
+            };
+            let bm = node.box_model.clone().unwrap_or_default();
+            let content_w = (node.rect.width
+                - bm.padding.left
+                - bm.padding.right
+                - bm.border.left
+                - bm.border.right)
+                .max(0);
+            let content_h = (node.rect.height
+                - bm.padding.top
+                - bm.padding.bottom
+                - bm.border.top
+                - bm.border.bottom)
+                .max(0);
+
+            let mut pills_row = div().flex().flex_wrap().gap_1();
+            for item in render_nodes.iter().take(12) {
+                let is_active = item.id == node.id;
+                let item_id = item.id.clone();
+                pills_row = pills_row.child(
+                    div()
+                        .id(format!("el-pick-{}", item.id))
+                        .px_1p5()
+                        .py_0p5()
+                        .rounded_sm()
+                        .border_1()
+                        .border_color(if is_active { p.primary } else { p.glass_line })
+                        .bg(if is_active { p.primary } else { p.background })
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.selected_element_id = Some(item_id.clone());
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(format!(
+                                "{} ({}×{})",
+                                item.id, item.rect.width, item.rect.height
+                            ))
+                            .text_xs()
+                            .text_color(if is_active {
+                                p.primary_foreground
+                            } else {
+                                p.foreground
+                            }),
+                        ),
+                );
+            }
+
+            let mut props_col = div().flex().flex_col().gap_0p5();
+            if let Some(gap) = &bm.gap {
+                props_col = props_col.child(
+                    Label::new(format!("gap: {gap}"))
+                        .text_xs()
+                        .text_color(p.muted_foreground),
+                );
+            }
+            if let Some(radius) = &bm.border_radius {
+                props_col = props_col.child(
+                    Label::new(format!("border-radius: {radius}"))
+                        .text_xs()
+                        .text_color(p.muted_foreground),
+                );
+            }
+            for (k, v) in node.style.iter().take(6) {
+                props_col = props_col.child(
+                    Label::new(format!("{k}: {v}"))
+                        .text_xs()
+                        .text_color(p.muted_foreground),
+                );
+            }
+            if !node.attributes.is_empty() {
+                props_col = props_col.child(
+                    Label::new(format!(
+                        "{attr_label}: {}",
+                        node.attributes
+                            .iter()
+                            .take(4)
+                            .map(|(k, v)| format!("{k}={v}"))
+                            .collect::<Vec<_>>()
+                            .join(" · ")
+                    ))
+                    .text_xs()
+                    .text_color(p.foreground),
+                );
+            }
+
+            let margin_bg = Hsla {
+                a: 0.16,
+                ..Hsla::from(gpui_kit::rgb(0xf59e0b))
+            };
+            let padding_bg = Hsla {
+                a: 0.16,
+                ..Hsla::from(gpui_kit::rgb(0x10b981))
+            };
+            let content_bg = Hsla {
+                a: 0.20,
+                ..Hsla::from(gpui_kit::rgb(0x3b82f6))
+            };
+
+            div()
+                .id("desktop-element-inspector")
+                .p_2()
+                .rounded_md()
+                .border_1()
+                .border_color(p.glass_line)
+                .bg(p.glass_surface)
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(
+                            Label::new(format!("{title} ({})", render_nodes.len()))
+                                .text_xs()
+                                .font_semibold()
+                                .text_color(p.foreground),
+                        )
+                        .child(
+                            Label::new(format!(
+                                "{}×{} px · ({}, {})",
+                                node.rect.width, node.rect.height, node.rect.x, node.rect.y
+                            ))
+                            .text_xs()
+                            .text_color(p.muted_foreground),
+                        ),
+                )
+                .child(pills_row)
+                // Nested DevTools Box-Model diagram (Margin -> Padding -> Content)
+                .child(
+                    div()
+                        .p_1p5()
+                        .rounded_sm()
+                        .border_1()
+                        .border_color(Hsla::from(gpui_kit::rgb(0xf59e0b)))
+                        .bg(margin_bg)
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            Label::new(format!(
+                                "{bm_label} · margin {} {} {} {}",
+                                bm.margin.top, bm.margin.right, bm.margin.bottom, bm.margin.left
+                            ))
+                            .text_xs()
+                            .text_color(p.foreground),
+                        )
+                        .child(
+                            div()
+                                .p_1p5()
+                                .rounded_sm()
+                                .border_1()
+                                .border_color(Hsla::from(gpui_kit::rgb(0x10b981)))
+                                .bg(padding_bg)
+                                .flex()
+                                .flex_col()
+                                .gap_1()
+                                .child(
+                                    Label::new(format!(
+                                        "padding {} {} {} {}",
+                                        bm.padding.top,
+                                        bm.padding.right,
+                                        bm.padding.bottom,
+                                        bm.padding.left
+                                    ))
+                                    .text_xs()
+                                    .text_color(p.foreground),
+                                )
+                                .child(
+                                    div()
+                                        .px_2()
+                                        .py_1()
+                                        .rounded_sm()
+                                        .border_1()
+                                        .border_color(Hsla::from(gpui_kit::rgb(0x3b82f6)))
+                                        .bg(content_bg)
+                                        .flex()
+                                        .justify_center()
+                                        .child(
+                                            Label::new(format!(
+                                                "{} · {content_w} × {content_h} px",
+                                                node.id
+                                            ))
+                                            .text_xs()
+                                            .font_semibold()
+                                            .text_color(p.foreground),
+                                        ),
+                                ),
+                        ),
+                )
+                .child(props_col)
+        });
+
+        let screen_findings = self
+            .design_audit
+            .findings_by_screen_width
+            .get(&(screen.path.clone(), self.selected_width))
+            .cloned()
+            .unwrap_or_default();
+        let design_findings_box = (!screen_findings.is_empty()).then(|| {
+            let heading = match self.lang {
+                UiLang::Ko => format!("디자인 · 접근성 진단 ({})", screen_findings.len()),
+                UiLang::ZhCn => format!("设计与无障碍检查 ({})", screen_findings.len()),
+                UiLang::En => format!("Design & a11y checks ({})", screen_findings.len()),
+            };
+            let mut list = div()
+                .id("desktop-design-findings")
+                .p_2()
+                .rounded_md()
+                .border_1()
+                .border_color(p.primary)
+                .bg(p.glass_surface)
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(
+                    Label::new(heading)
+                        .text_xs()
+                        .font_semibold()
+                        .text_color(p.primary),
+                );
+            for f in screen_findings.iter().take(8) {
+                let accent = Hsla::from(gpui_kit::rgb(design_severity_color_hex(f.severity)));
+                list = list.child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .rounded_sm()
+                        .border_l_2()
+                        .border_color(accent)
+                        .bg(p.background)
+                        .flex()
+                        .flex_col()
+                        .child(
+                            Label::new(f.summary.clone())
+                                .text_xs()
+                                .text_color(p.foreground),
+                        )
+                        .child(
+                            Label::new(format!("{} · {}", f.measured, f.expected))
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                        ),
+                );
+            }
+            list
+        });
+
         let diagnostic_box = active_cell.as_ref().and_then(|c| {
             let show_reason = c.status_kind != "verified";
             let path_diff = c
@@ -2910,6 +3287,8 @@ impl DuiDesktopView {
                     )
                     .child(cells_col)
                     .when_some(inspector_diff_box, |el, diff_box| el.child(diff_box))
+                    .when_some(element_inspector_box, |el, el_box| el.child(el_box))
+                    .when_some(design_findings_box, |el, df_box| el.child(df_box))
                     .when_some(diagnostic_box, |el, diag| el.child(diag))
                     .child(div().h(px(1.0)).w_full().bg(p.glass_line))
                     .child(
