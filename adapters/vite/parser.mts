@@ -44,12 +44,17 @@ interface TsNode {
   };
   expression?: TsNode;
   arguments?: readonly TsNode[];
+  elements?: readonly TsNode[];
   properties?: readonly TsNode[];
   name?: TsNode;
   initializer?: TsNode;
   argumentExpression?: TsNode;
   head?: { text: string };
   templateSpans?: readonly { expression: TsNode; literal: { text: string } }[];
+  openingElement?: TsNode;
+  tagName?: TsNode;
+  attributes?: { properties?: readonly TsNode[] };
+  children?: readonly TsNode[];
 }
 
 interface TsSourceFile extends TsNode {
@@ -179,6 +184,71 @@ function convertSourceFile(sf: TsSourceFile, enums: TsSyntaxEnums): AstNode {
 
     if (node.kind === K.TrueKeyword || node.kind === K.FalseKeyword) {
       return { type: "Literal", start, end, value: node.kind === K.TrueKeyword };
+    }
+
+    if (node.kind === K.ArrayLiteralExpression) {
+      return {
+        type: "ArrayExpression",
+        start,
+        end,
+        elements: (node.elements ?? []).map(convert),
+      };
+    }
+
+    if (node.kind === K.JsxElement || node.kind === K.JsxSelfClosingElement) {
+      const opening = node.kind === K.JsxElement ? node.openingElement : node;
+      const tag = opening?.tagName;
+      const jsxName: AstNode =
+        tag && tag.kind === K.Identifier
+          ? { type: "JSXIdentifier", start: startOf(tag), end: tag.end, name: tag.text ?? "" }
+          : tag
+            ? convert(tag)
+            : { type: "JSXIdentifier", name: "" };
+      const attributes: AstNode[] = (opening?.attributes?.properties ?? []).map((attr) => {
+        if (attr.kind === K.JsxAttribute && attr.name) {
+          let value: AstNode | null = null;
+          if (attr.initializer) {
+            if (attr.initializer.kind === K.JsxExpression) {
+              value = {
+                type: "JSXExpressionContainer",
+                start: startOf(attr.initializer),
+                end: attr.initializer.end,
+                expression: attr.initializer.expression
+                  ? convert(attr.initializer.expression)
+                  : undefined,
+              };
+            } else {
+              value = convert(attr.initializer);
+            }
+          }
+          return {
+            type: "JSXAttribute",
+            start: startOf(attr),
+            end: attr.end,
+            name: {
+              type: "JSXIdentifier",
+              start: startOf(attr.name),
+              end: attr.name.end,
+              name: attr.name.text ?? "",
+            },
+            value,
+          };
+        }
+        return convert(attr);
+      });
+      return {
+        type: "JSXElement",
+        start,
+        end,
+        openingElement: {
+          type: "JSXOpeningElement",
+          start: opening ? startOf(opening) : start,
+          end: opening ? opening.end : end,
+          name: jsxName,
+          attributes,
+        },
+        children: node.kind === K.JsxElement ? (node.children ?? []).map(convert) : [],
+      };
     }
 
     if (node.kind === K.ObjectLiteralExpression) {

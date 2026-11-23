@@ -169,6 +169,108 @@ export const HomeRoute = createFileRoute("/dashboard")({ component: OrdersPage }
   assert.deepEqual(discovered.screenDiscovery.parseFailures, []);
   assert.deepEqual(discoveredPaths, ["/dashboard", "/orders/active", "/orders/archived"]);
 
+  // 2b. React Router 7/8 static route discovery (`createBrowserRouter` + JSX `<Route>`) under BOTH Vite 7 and Vite 8.
+  const rrApp = path.join(tmp, "rr-discovery-app");
+  makeFakeViteProject(rrApp, "7.3.1");
+  fs.writeFileSync(path.join(rrApp, "dui.json"), JSON.stringify({ routeParams: { id: "42" } }));
+  fs.mkdirSync(path.join(rrApp, "src"), { recursive: true });
+  fs.writeFileSync(
+    path.join(rrApp, "src", "router.tsx"),
+    `import { createBrowserRouter, Route, Routes } from "react-router";
+const nestedRoutes = [
+  {
+    path: "/",
+    children: [
+      { index: true },
+      { path: "login" },
+      {
+        path: "items",
+        children: [
+          { index: true },
+          { path: ":id" },
+          { path: ":missingParam" },
+        ],
+      },
+    ],
+  },
+];
+export const router = createBrowserRouter(nestedRoutes);
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/settings">
+        <Route index />
+        <Route path="profile" />
+        <Route path={"members/:id"} />
+      </Route>
+    </Routes>
+  );
+}
+`,
+  );
+  const rrDiscover7 = spawnSync(
+    process.execPath,
+    [
+      path.join(adapterOut, "vite", "discover.mjs"),
+      rrApp,
+      fs.readFileSync(path.join(repoRoot, "rules", "web.json"), "utf8"),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    rrDiscover7.status,
+    0,
+    `React Router discover failed (Vite 7): ${rrDiscover7.stderr}`,
+  );
+  const rrParsed7 = JSON.parse(rrDiscover7.stdout) as {
+    path: string;
+    scenarios: Array<{ path: string }>;
+    screenDiscovery: { mode: string; unresolved: string[]; parseFailures: string[] };
+  };
+  const rrPaths7 = [rrParsed7.path, ...rrParsed7.scenarios.map((s) => s.path)].sort();
+  assert.equal(rrParsed7.screenDiscovery.mode, "router");
+  assert.deepEqual(rrParsed7.screenDiscovery.parseFailures, []);
+  assert.deepEqual(rrPaths7, [
+    "/",
+    "/items",
+    "/items/42",
+    "/login",
+    "/settings",
+    "/settings/members/42",
+    "/settings/profile",
+  ]);
+  assert.deepEqual(rrParsed7.screenDiscovery.unresolved, ["/items/:missingParam"]);
+
+  // Verify identical React Router discovery on Vite 8 (Oxc parser) too.
+  fs.rmSync(path.join(rrApp, "node_modules", "vite"), { recursive: true, force: true });
+  fs.symlinkSync(
+    path.join(toggleNodeModules, "vite"),
+    path.join(rrApp, "node_modules", "vite"),
+    "dir",
+  );
+  const rrDiscover8 = spawnSync(
+    process.execPath,
+    [
+      path.join(adapterOut, "vite", "discover.mjs"),
+      rrApp,
+      fs.readFileSync(path.join(repoRoot, "rules", "web.json"), "utf8"),
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    rrDiscover8.status,
+    0,
+    `React Router discover failed (Vite 8): ${rrDiscover8.stderr}`,
+  );
+  const rrParsed8 = JSON.parse(rrDiscover8.stdout) as typeof rrParsed7;
+  const rrPaths8 = [rrParsed8.path, ...rrParsed8.scenarios.map((s) => s.path)].sort();
+  assert.deepEqual(
+    rrPaths8,
+    rrPaths7,
+    "React Router discovery must match between Vite 7 and Vite 8",
+  );
+  assert.deepEqual(rrParsed8.screenDiscovery.unresolved, rrParsed7.screenDiscovery.unresolved);
+
   // 3. Byte-for-byte instrumentation parity between Vite 8 Oxc and Vite 7 TypeScript fallback.
   const realVite = (await import(
     pathToFileURL(path.join(toggleNodeModules, "vite", "dist", "node", "index.js")).href

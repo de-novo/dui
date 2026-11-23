@@ -34,10 +34,11 @@ interface Node {
   type: string;
   start: number;
   name: string;
-  value: string;
+  value: unknown;
   computed: boolean;
   callee: Node;
   arguments: Node[];
+  elements?: (Node | null)[];
   expression: Node;
   object: Node;
   property: Node;
@@ -49,12 +50,29 @@ interface Node {
   declaration?: Node;
   expressions: Node[];
   quasis: { value: { cooked: string } }[];
+  openingElement?: {
+    name?: Node;
+    attributes?: { type: string; name?: Node; value?: Node | null }[];
+  };
+  children?: Node[];
 }
 const routes: { pattern: string; source: string }[] = [];
 const candidates = new Map<string, string>();
 const params = profile.routeParams ?? {};
 const unresolved = new Set<string>();
 const parseFailures: string[] = [];
+const REACT_ROUTER_CREATORS = new Set([
+  "createBrowserRouter",
+  "createHashRouter",
+  "createMemoryRouter",
+]);
+function joinRoutePath(parent: string, child: string): string {
+  const cleanChild = child.trim();
+  if (!cleanChild) return parent || "/";
+  if (cleanChild.startsWith("/")) return cleanChild;
+  const base = parent && parent !== "/" ? parent.replace(/\/+$/, "") : "";
+  return `${base}/${cleanChild.replace(/^\/+/, "")}`;
+}
 function isLocalPath(path: string): boolean {
   return (
     path.startsWith("/") &&
@@ -94,54 +112,150 @@ try {
     }
     const declarations = new Map<string, Node>();
     const factories = new Set<string>();
+    const routerCreators = new Set<string>();
+    const routeComponents = new Set<string>();
+    const relSource = relative(root, join(app, file));
     for (const statement of ast.program.body as Node[]) {
-      if (statement.type === "ImportDeclaration")
-        for (const s of statement.specifiers)
-          if (
-            s.imported &&
-            routeRules.some(
-              (r) => r.package === statement.source.value && r.symbol === s.imported?.name,
-            )
-          )
-            factories.add(s.local.name);
+      if (statement.type === "ImportDeclaration") {
+        const pkg = typeof statement.source.value === "string" ? statement.source.value : "";
+        for (const s of statement.specifiers) {
+          const imported = s.imported?.name;
+          if (!imported) continue;
+          if (routeRules.some((r) => r.package === pkg && r.symbol === imported)) {
+            if (REACT_ROUTER_CREATORS.has(imported)) routerCreators.add(s.local.name);
+            else if (imported === "Route") routeComponents.add(s.local.name);
+            else factories.add(s.local.name);
+          }
+        }
+      }
       const n = statement.declaration ?? statement;
       if (n.kind === "const")
         for (const d of n.declarations)
           if (d.init && d.id.type === "Identifier") declarations.set(d.id.name, d.init);
     }
-    function literalTable(node: Node): string[] {
+    function unwrapExpr(node: Node | undefined): Node | undefined {
       const seen = new Set<Node>();
-      while (node && !seen.has(node)) {
-        seen.add(node);
-        if (node.type === "Identifier") {
-          const next = declarations.get(node.name);
+      let cur = node;
+      while (cur && !seen.has(cur)) {
+        seen.add(cur);
+        if (cur.type === "Identifier") {
+          const next = declarations.get(cur.name);
           if (!next) break;
-          node = next;
+          cur = next;
           continue;
         }
         if (
-          ["TSAsExpression", "TSSatisfiesExpression", "ParenthesizedExpression"].includes(node.type)
+          [
+            "TSAsExpression",
+            "TSSatisfiesExpression",
+            "ParenthesizedExpression",
+            "JSXExpressionContainer",
+          ].includes(cur.type)
         ) {
-          node = node.expression;
+          cur = cur.expression;
           continue;
         }
-        if (
-          node.type === "ObjectExpression" &&
-          node.properties.every(
-            (p) =>
-              p.type === "Property" &&
-              !p.computed &&
-              p.value.type === "Literal" &&
-              typeof p.value.value === "string",
-          )
-        )
-          return node.properties.map((p) => p.value.value);
         break;
       }
+      return cur;
+    }
+    function literalString(node: Node | undefined): string | undefined {
+      const resolved = unwrapExpr(node);
+      return resolved?.type === "Literal" && typeof resolved.value === "string"
+        ? resolved.value
+        : undefined;
+    }
+    function literalTable(node: Node): string[] {
+      const resolved = unwrapExpr(node);
+      if (
+        resolved?.type === "ObjectExpression" &&
+        resolved.properties.every(
+          (p) =>
+            p.type === "Property" &&
+            !p.computed &&
+            p.value.type === "Literal" &&
+            typeof p.value.value === "string",
+        )
+      )
+        return resolved.properties.map((p) => p.value.value as string);
       return [];
+    }
+    function collectRouteObjects(node: Node | undefined, parentPath: string): void {
+      const arr = unwrapExpr(node);
+      if (arr?.type !== "ArrayExpression" || !arr.elements) return;
+      for (const el of arr.elements) {
+        const obj = unwrapExpr(el ?? undefined);
+        if (obj?.type !== "ObjectExpression") continue;
+        let routePath: string | undefined;
+        let isIndex = false;
+        let childrenNode: Node | undefined;
+        for (const prop of obj.properties) {
+          if (prop.type !== "Property" || prop.computed) continue;
+          const key = prop.key?.name;
+          if (key === "path") routePath = literalString(prop.value);
+          else if (key === "index") {
+            const val = unwrapExpr(prop.value);
+            isIndex = val?.type === "Literal" && val.value === true;
+          } else if (key === "children") {
+            childrenNode = prop.value;
+          }
+        }
+        const fullPath = isIndex
+          ? parentPath || "/"
+          : routePath !== undefined
+            ? joinRoutePath(parentPath, routePath)
+            : parentPath;
+        const resolvedChildren = unwrapExpr(childrenNode);
+        const hasChildren =
+          resolvedChildren?.type === "ArrayExpression" &&
+          (resolvedChildren.elements?.length ?? 0) > 0;
+        if (hasChildren) collectRouteObjects(resolvedChildren, fullPath);
+        if (isIndex || (routePath !== undefined && !hasChildren)) {
+          routes.push({ pattern: fullPath || "/", source: relSource });
+        }
+      }
+    }
+    const visitedJsxRoutes = new WeakSet<Node>();
+    function collectJsxRoute(el: Node, parentPath: string): void {
+      if (visitedJsxRoutes.has(el)) return;
+      visitedJsxRoutes.add(el);
+      const attrs = el.openingElement?.attributes ?? [];
+      let routePath: string | undefined;
+      let isIndex = false;
+      for (const attr of attrs) {
+        if (attr.type !== "JSXAttribute") continue;
+        const name = attr.name?.name;
+        if (name === "path") routePath = literalString(attr.value ?? undefined);
+        else if (name === "index") {
+          if (attr.value == null) isIndex = true;
+          else {
+            const val = unwrapExpr(attr.value);
+            isIndex = val?.type === "Literal" && val.value === true;
+          }
+        }
+      }
+      const fullPath = isIndex
+        ? parentPath || "/"
+        : routePath !== undefined
+          ? joinRoutePath(parentPath, routePath)
+          : parentPath;
+      const childRoutes = (el.children ?? []).filter(
+        (c) =>
+          c.type === "JSXElement" &&
+          c.openingElement?.name?.name !== undefined &&
+          routeComponents.has(c.openingElement.name.name),
+      );
+      for (const child of childRoutes) collectJsxRoute(child, fullPath);
+      if (isIndex || (routePath !== undefined && childRoutes.length === 0)) {
+        routes.push({ pattern: fullPath || "/", source: relSource });
+      }
     }
     new parser.Visitor({
       CallExpression(n: Node) {
+        if (n.callee.type === "Identifier" && routerCreators.has(n.callee.name)) {
+          collectRouteObjects(n.arguments[0], "");
+          return;
+        }
         const factory = n.callee;
         if (factory.type !== "CallExpression" || !factories.has(factory.callee.name)) return;
         const pattern = factory.arguments[0]?.value;
@@ -149,7 +263,11 @@ try {
           typeof pattern === "string" &&
           n.arguments[0]?.properties?.some((p) => p.key?.name === "component")
         )
-          routes.push({ pattern, source: relative(root, join(app, file)) });
+          routes.push({ pattern, source: relSource });
+      },
+      JSXElement(n: Node) {
+        const tag = n.openingElement?.name?.name;
+        if (tag && routeComponents.has(tag)) collectJsxRoute(n, "");
       },
       TemplateLiteral(n: Node) {
         if (!n.quasis[0].value.cooked.startsWith("/") || !n.expressions.length) return;
@@ -174,7 +292,7 @@ try {
         }
         for (const tail of literalTable(last.object))
           if (/^[\w/-]*$/.test(tail) && !tail.startsWith("/"))
-            candidates.set(prefix + tail, relative(root, join(app, file)));
+            candidates.set(prefix + tail, relSource);
       },
     }).visit(ast.program);
   }
@@ -191,11 +309,15 @@ for (const { pattern, source } of routes) {
     .split("/")
     .filter(Boolean)
     .filter((part) => !part.startsWith("_"));
-  const splat = parts.at(-1) === "$";
+  const splat = parts.at(-1) === "$" || parts.at(-1) === "*";
   if (splat) parts.pop();
   const segments = parts
     .map((part) => part.replace(/_$/, ""))
-    .map((part) => (part.startsWith("$") ? segment(part.slice(1)) : part));
+    .map((part) => {
+      if (part.startsWith("$")) return segment(part.slice(1));
+      if (part.startsWith(":")) return segment(part.slice(1).replace(/\?$/, ""));
+      return part;
+    });
   if (segments.includes(undefined)) {
     unresolved.add(pattern);
     continue;
