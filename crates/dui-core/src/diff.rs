@@ -449,6 +449,90 @@ pub fn diff_captures(before: &[DiffCellSnapshot], after: &[DiffCellSnapshot]) ->
     }
 }
 
+/// Format a `dui diff` JSON payload into a concise GitHub PR comment Markdown report
+/// highlighting changed/added/removed screens and element-level `renderDiff` summaries.
+pub fn format_diff_markdown(diff: &serde_json::Value) -> String {
+    let summary = &diff["summary"];
+    let changed = summary["changed"].as_u64().unwrap_or(0);
+    let added = summary["added"].as_u64().unwrap_or(0);
+    let removed = summary["removed"].as_u64().unwrap_or(0);
+    let unchanged = summary["unchanged"].as_u64().unwrap_or(0);
+    let mut out = String::from("## dui UI Diff Summary\n\n");
+    if let (Some(before_br), Some(after_br)) =
+        (diff["beforeBranch"].as_str(), diff["afterBranch"].as_str())
+    {
+        out.push_str(&format!("- **Branches**: `{before_br}` -> `{after_br}`\n"));
+    }
+    out.push_str(&format!(
+        "- **Cells**: **{changed}** changed · **{added}** added · **{removed}** removed · {unchanged} unchanged\n\n"
+    ));
+
+    let screens = diff["screens"].as_array();
+    let mut rows = Vec::new();
+    if let Some(screen_list) = screens {
+        for sc in screen_list {
+            let path = sc["path"].as_str().unwrap_or("/");
+            let Some(cells) = sc["cells"].as_array() else {
+                continue;
+            };
+            for cell in cells {
+                let kind = cell["kind"].as_str().unwrap_or("changed");
+                if kind == "unchanged" {
+                    continue;
+                }
+                let width = cell["width"].as_u64().unwrap_or(0);
+                let mut details = Vec::new();
+                if let Some(changes) = cell["renderDiff"]["changes"].as_array() {
+                    for chg in changes.iter().take(3) {
+                        if let Some(s) = chg["summary"].as_str() {
+                            details.push(s.replace('|', "\\|"));
+                        }
+                    }
+                    if changes.len() > 3 {
+                        details.push(format!("+{} more", changes.len() - 3));
+                    }
+                } else if cell["renderDiff"]["visualOnly"] == serde_json::json!(true) {
+                    details.push("visual-only pixel change".to_owned());
+                }
+                if details.is_empty()
+                    && let Some(pct) = cell["pixelDiff"]["diffRatio"].as_f64()
+                {
+                    details.push(format!("{:.1}% pixels changed", pct * 100.0));
+                }
+                if details.is_empty() {
+                    let after_status = cell["after"]["status"].as_str().unwrap_or(kind);
+                    details.push(after_status.to_owned());
+                }
+                rows.push(format!(
+                    "| `{}` | `{}px` | `{}` | {} |",
+                    path.replace('|', "\\|"),
+                    width,
+                    kind,
+                    details.join("; ")
+                ));
+            }
+        }
+    }
+
+    if rows.is_empty() {
+        out.push_str("_No UI changes detected._\n");
+    } else {
+        out.push_str("| Screen | Width | Change | Details |\n");
+        out.push_str("| --- | --- | --- | --- |\n");
+        for row in rows.iter().take(40) {
+            out.push_str(row);
+            out.push('\n');
+        }
+        if rows.len() > 40 {
+            out.push_str(&format!(
+                "\n_...and {} more changed cells._\n",
+                rows.len() - 40
+            ));
+        }
+    }
+    out
+}
+
 /// Normalize GPUI / native AccessKit element arrays (`role`, `label`, `bounds`, `checked`, `visible`)
 /// into the unified platform-neutral `RenderNodeSnapshot` tree so native desktop apps share the
 /// exact same element-level diff and canvas overlay pipeline as Web, TUI, and Android.
@@ -1253,6 +1337,31 @@ mod tests {
         assert_eq!(
             diff.changes[0].after_text.as_deref(),
             Some("Primary density: expanded")
+        );
+    }
+
+    #[test]
+    fn formats_diff_json_into_pr_ready_markdown_table() {
+        let payload = serde_json::json!({
+            "beforeBranch": "main",
+            "afterBranch": "feat/auth",
+            "summary": {"changed": 1, "added": 1, "removed": 0, "unchanged": 4},
+            "screens": [{
+                "path": "/dashboard",
+                "cells": [{
+                    "width": 1280,
+                    "kind": "changed",
+                    "renderDiff": {
+                        "changes": [{"summary": "h1 text \"Old\" -> \"New\""}]
+                    }
+                }]
+            }]
+        });
+        let md = format_diff_markdown(&payload);
+        assert!(md.contains("## dui UI Diff Summary"));
+        assert!(md.contains("`main` -> `feat/auth`"));
+        assert!(
+            md.contains("| `/dashboard` | `1280px` | `changed` | h1 text \"Old\" -> \"New\" |")
         );
     }
 }

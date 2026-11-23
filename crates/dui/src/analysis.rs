@@ -148,8 +148,14 @@ pub(crate) fn exercise_with_renderer(
         {
             stored_spec["mockPreload"] = json!(abs);
         }
+        if let Some(rel) = spec["storageState"].as_str()
+            && let Ok(abs) = base.join(rel).canonicalize()
+        {
+            spec["storageState"] = json!(abs);
+        }
     }
-    store(&out.join("manifest.json"), &stored_spec)?;
+    let redacted_spec = dui_core::auth::redact_manifest_secrets(stored_spec);
+    store(&out.join("manifest.json"), &redacted_spec)?;
     let (locales, missing_by_locale) = resolve_locales(&spec, manifest.parent());
     let force = force || spec["force"] == true;
     let dui_home = crate::archive::home_dir().ok();
