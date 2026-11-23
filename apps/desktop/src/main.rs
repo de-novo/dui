@@ -36,8 +36,8 @@ use std::{
     sync::Arc,
 };
 use store::{
-    CellItem, DesktopWorkspace, DiffCellEntry, ImageCache, NewCommentAnchor, RunDesignAudit,
-    RunItem, ScreenItem, compute_run_design_audit, design_severity_color_hex,
+    CellItem, DesktopWorkspace, DiffCellEntry, ImageCache, NewCommentAnchor, RunItem,
+    RunRenderTrees, ScreenItem, load_run_render_trees,
 };
 use tokens::Palette;
 
@@ -145,10 +145,9 @@ struct DuiDesktopView {
     canvas_diff_enabled: bool,
     canvas_diff_changed_only: bool,
     canvas_diff_mode: CanvasDiffVisualMode,
-    // Design-defect & Element Inspector state (matching `apps/canvas` #105 / #106)
-    design_audit_run: Option<usize>,
-    design_audit: RunDesignAudit,
-    show_design_overlay: bool,
+    // Element Inspector render-tree state (matching `apps/canvas` #106)
+    render_trees_run: Option<usize>,
+    render_trees: RunRenderTrees,
     selected_element_id: Option<String>,
 }
 
@@ -282,12 +281,11 @@ impl DuiDesktopView {
             canvas_diff_enabled: opts.canvas_diff,
             canvas_diff_changed_only: false,
             canvas_diff_mode: CanvasDiffVisualMode::Render,
-            design_audit_run: None,
-            design_audit: RunDesignAudit::default(),
-            show_design_overlay: false,
+            render_trees_run: None,
+            render_trees: RunRenderTrees::default(),
             selected_element_id: None,
         };
-        this.ensure_design_audit();
+        this.ensure_render_trees();
         this.sync_cell_to_width();
         this.fit_map();
         if this.view_mode == ViewMode::Diff || this.canvas_diff_enabled {
@@ -436,8 +434,8 @@ impl DuiDesktopView {
 
     fn select_run(&mut self, idx: usize, cx: &mut Context<Self>) {
         self.selected_run = idx;
-        self.design_audit_run = None;
-        self.ensure_design_audit();
+        self.render_trees_run = None;
+        self.ensure_render_trees();
         self.selected_screen = 0;
         self.selected_cell = 0;
         self.neighbor_page = 0;
@@ -503,8 +501,8 @@ impl DuiDesktopView {
                     self.selected_screen = 0;
                 }
                 self.sync_cell_to_width();
-                self.design_audit_run = None;
-                self.ensure_design_audit();
+                self.render_trees_run = None;
+                self.ensure_render_trees();
                 self.diff_cache_key = None;
                 if self.view_mode == ViewMode::Diff {
                     self.ensure_diff_loaded();
@@ -1152,22 +1150,22 @@ impl DuiDesktopView {
             )
     }
 
-    fn ensure_design_audit(&mut self) {
-        if self.design_audit_run == Some(self.selected_run) {
+    fn ensure_render_trees(&mut self) {
+        if self.render_trees_run == Some(self.selected_run) {
             return;
         }
         if let Some(run) = self.workspace.runs.get(self.selected_run) {
-            self.design_audit = compute_run_design_audit(run);
-            self.design_audit_run = Some(self.selected_run);
+            self.render_trees = load_run_render_trees(run);
+            self.render_trees_run = Some(self.selected_run);
         } else {
-            self.design_audit = RunDesignAudit::default();
-            self.design_audit_run = None;
+            self.render_trees = RunRenderTrees::default();
+            self.render_trees_run = None;
         }
         self.selected_element_id = None;
     }
 
-    /// Floating Review & Design Audit Pill at top-center matching `apps/canvas` `.audit-summary-pill`.
-    fn render_audit_pill(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    /// Review comments pill in TitleBar matching `apps/canvas` `.audit-summary-pill`.
+    fn render_audit_pill(&self, _cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let p = self.pal();
         let Some(run) = self.active_run() else {
             return div().id("audit-pill-empty");
@@ -1178,34 +1176,14 @@ impl DuiDesktopView {
             .iter()
             .filter(|c| c.project_id == run.project_id && c.status == "open")
             .count();
-        let design_total: usize = self
-            .design_audit
-            .findings_by_screen_width
-            .iter()
-            .filter(|((_, w), _)| *w == self.selected_width)
-            .map(|(_, list)| list.len())
-            .sum();
-        if open_comments == 0 && design_total == 0 {
+        if open_comments == 0 {
             return div().id("audit-pill-empty");
         }
-        let overlay_active = self.show_design_overlay;
 
-        let (open_text, design_text) = match self.lang {
-            UiLang::Ko => (
-                format!("미해결 코멘트 {open_comments}개"),
-                format!("디자인 결함 {design_total}건"),
-            ),
-            UiLang::ZhCn => (
-                format!("{open_comments} 条待处理评论"),
-                format!("{design_total} 项设计问题"),
-            ),
-            UiLang::En => (
-                format!("{open_comments} unresolved"),
-                format!(
-                    "{design_total} design {}",
-                    if design_total == 1 { "issue" } else { "issues" }
-                ),
-            ),
+        let open_text = match self.lang {
+            UiLang::Ko => format!("미해결 코멘트 {open_comments}개"),
+            UiLang::ZhCn => format!("{open_comments} 条待处理评论"),
+            UiLang::En => format!("{open_comments} unresolved"),
         };
 
         div()
@@ -1220,48 +1198,12 @@ impl DuiDesktopView {
             .flex()
             .items_center()
             .gap_3()
-            .when(open_comments > 0, |el| {
-                el.child(
-                    Label::new(open_text)
-                        .text_xs()
-                        .font_semibold()
-                        .text_color(p.primary),
-                )
-            })
-            .when(design_total > 0, |el| {
-                let mut pill_bg = p.primary;
-                if !overlay_active {
-                    pill_bg.a = 0.16;
-                }
-                el.child(
-                    div()
-                        .id("desktop-design-overlay-toggle")
-                        .px_2()
-                        .py_0p5()
-                        .rounded_full()
-                        .border_1()
-                        .border_color(p.primary)
-                        .bg(pill_bg)
-                        .cursor_pointer()
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(|this, _, _, cx| {
-                                this.show_design_overlay = !this.show_design_overlay;
-                                cx.notify();
-                            }),
-                        )
-                        .child(
-                            Label::new(design_text)
-                                .text_xs()
-                                .font_semibold()
-                                .text_color(if overlay_active {
-                                    p.primary_foreground
-                                } else {
-                                    p.primary
-                                }),
-                        ),
-                )
-            })
+            .child(
+                Label::new(open_text)
+                    .text_xs()
+                    .font_semibold()
+                    .text_color(p.primary),
+            )
     }
 
     fn render_live_surface_pill(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
@@ -2006,7 +1948,7 @@ impl DuiDesktopView {
                 (badge_bg, badge_label)
             });
 
-            let mut render_boxes: Vec<(f32, f32, f32, f32, Hsla)> = if canvas_diff_mode
+            let render_boxes: Vec<(f32, f32, f32, f32, Hsla)> = if canvas_diff_mode
                 == CanvasDiffVisualMode::Render
                 && let Some(d) = screen_diff
                 && let Some(rd) = &d.render_diff
@@ -2042,42 +1984,6 @@ impl DuiDesktopView {
             } else {
                 Vec::new()
             };
-
-            let screen_design_findings = self
-                .design_audit
-                .findings_by_screen_width
-                .get(&(screen.path.clone(), self.selected_width))
-                .cloned()
-                .unwrap_or_default();
-            let design_finding_count = screen_design_findings.len();
-            if self.show_design_overlay && !screen_design_findings.is_empty() {
-                let active_cell_dims = self
-                    .cell_for_width(screen)
-                    .and_then(|c| c.image_width.zip(c.image_height));
-                let cw = active_cell_dims
-                    .map(|(w, _)| w as f32)
-                    .unwrap_or(self.selected_width.max(1) as f32)
-                    .max(1.0);
-                let ch = active_cell_dims
-                    .map(|(_, h)| h as f32)
-                    .unwrap_or(node.frame_height)
-                    .max(1.0);
-                for finding in screen_design_findings.iter().take(24) {
-                    let rect = finding.rect;
-                    if rect.width <= 0 || rect.height <= 0 {
-                        continue;
-                    }
-                    let rx = ((rect.x.max(0) as f32) / cw * inner_w).clamp(0.0, inner_w);
-                    let ry = ((rect.y.max(0) as f32) / ch * frame_h).clamp(0.0, frame_h);
-                    let rw =
-                        ((rect.width as f32) / cw * inner_w).clamp(2.0, (inner_w - rx).max(2.0));
-                    let rh =
-                        ((rect.height as f32) / ch * frame_h).clamp(2.0, (frame_h - ry).max(2.0));
-                    let color =
-                        Hsla::from(gpui_kit::rgb(design_severity_color_hex(finding.severity)));
-                    render_boxes.push((rx, ry, rw, rh, color));
-                }
-            }
 
             let media_el = if let Some(ri) = render_img {
                 let mut frame = div()
@@ -2231,14 +2137,6 @@ impl DuiDesktopView {
                                 .flex()
                                 .items_center()
                                 .gap_1()
-                                .when(design_finding_count > 0, |el| {
-                                    el.child(
-                                        Label::new(format!("⚠ {design_finding_count}"))
-                                            .text_xs()
-                                            .font_semibold()
-                                            .text_color(p.primary),
-                                    )
-                                })
                                 .when(open_comments > 0, |el| {
                                     el.child(
                                         Label::new(format!("● {open_comments}"))
@@ -3198,7 +3096,7 @@ impl DuiDesktopView {
         });
 
         let render_nodes = self
-            .design_audit
+            .render_trees
             .trees_by_screen_width
             .get(&(screen.path.clone(), self.selected_width))
             .cloned()
@@ -3413,61 +3311,6 @@ impl DuiDesktopView {
                 .child(props_col)
         });
 
-        let screen_findings = self
-            .design_audit
-            .findings_by_screen_width
-            .get(&(screen.path.clone(), self.selected_width))
-            .cloned()
-            .unwrap_or_default();
-        let design_findings_box = (!screen_findings.is_empty()).then(|| {
-            let heading = match self.lang {
-                UiLang::Ko => format!("디자인 · 접근성 진단 ({})", screen_findings.len()),
-                UiLang::ZhCn => format!("设计与无障碍检查 ({})", screen_findings.len()),
-                UiLang::En => format!("Design & a11y checks ({})", screen_findings.len()),
-            };
-            let mut list = div()
-                .id("desktop-design-findings")
-                .p_2()
-                .rounded_md()
-                .border_1()
-                .border_color(p.primary)
-                .bg(p.glass_surface)
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    Label::new(heading)
-                        .text_xs()
-                        .font_semibold()
-                        .text_color(p.primary),
-                );
-            for f in screen_findings.iter().take(8) {
-                let accent = Hsla::from(gpui_kit::rgb(design_severity_color_hex(f.severity)));
-                list = list.child(
-                    div()
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .border_l_2()
-                        .border_color(accent)
-                        .bg(p.background)
-                        .flex()
-                        .flex_col()
-                        .child(
-                            Label::new(f.summary.clone())
-                                .text_xs()
-                                .text_color(p.foreground),
-                        )
-                        .child(
-                            Label::new(format!("{} · {}", f.measured, f.expected))
-                                .text_xs()
-                                .text_color(p.muted_foreground),
-                        ),
-                );
-            }
-            list
-        });
-
         let diagnostic_box = active_cell.as_ref().and_then(|c| {
             let show_reason = c.status_kind != "verified";
             let path_diff = c
@@ -3652,7 +3495,6 @@ impl DuiDesktopView {
                     .child(cells_col)
                     .when_some(inspector_diff_box, |el, diff_box| el.child(diff_box))
                     .when_some(element_inspector_box, |el, el_box| el.child(el_box))
-                    .when_some(design_findings_box, |el, df_box| el.child(df_box))
                     .when_some(diagnostic_box, |el, diag| el.child(diag))
                     .child(div().h(px(1.0)).w_full().bg(p.glass_line))
                     .child(

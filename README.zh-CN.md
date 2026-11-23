@@ -31,8 +31,8 @@ dui 通过项目官方编译器读取类型，自动生成模拟数据并在真�
 | 质量、多语言与审计 | 99% 覆盖率审计 (`dui audit`)、多语言与 RTL 校验、缺译键与文本溢出检测、SQLite 评审评论、基于模块图的内容寻址缓存 | 已支持 |
 | 实时编辑与查看器 | 共享 CLI/MCP 实时会话 (`dui live`)、内置 Web 画布 (`dui open`)、原生 GPUI 桌面查看器 (`dui desktop`) | 已支持 |
 | 元素检查器与盒模型 | 开发者工具级元素属性检查、盒模型图与叠加（宽高、外边距、内边距、边框、gap、圆角）以及元素间交互式间距标尺 | 已支持 |
-| 画布实时组件渲染 | 直接在 2D 画布卡片上挂载本地回环真实组件（`dui open --live` / `--live-url`），支持零修改 DOM 遥测桥接、实时 Design Audit 与 `ElementInspector` 双向高亮 (`v0.2.0`) | 已支持 |
-| 设计缺陷检测与引擎扩展 | 基于 `renderTree` 的自动设计缺陷与无障碍诊断（横向溢出、元素重叠、WCAG 对比度、触控目标尺寸、无标签交互控件、间距偏差——人类画布高亮 + AI 结构化 CLI/MCP `designAudit` JSON）、`SurfaceRegistry` 多平台插件流水线、多工作进程并行捕获 (`concurrency`)、GPUI AccessKit 渲染树 Diff | 已支持 |
+| 画布实时组件渲染 | 直接在 2D 画布卡片上挂载本地回环真实组件（`dui open --live` / `--live-url`），支持零修改 DOM 遥测桥接与 `ElementInspector` 双向高亮 (`v0.2.0`) | 已支持 |
+| 多平台引擎与扩展 | `SurfaceRegistry` 多平台插件流水线、多工作进程并行捕获 (`concurrency`)、基于 WAI-ARIA 的模态框/抽屉自动捕获、避障走廊连线、GPUI AccessKit 渲染树 Diff | 已支持 |
 
 ## 安装
 

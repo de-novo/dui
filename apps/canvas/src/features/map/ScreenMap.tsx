@@ -22,7 +22,6 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
-import type { DesignFinding } from "../../model/audit";
 import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
 import type { LiveSurfaceMode } from "../../model/liveSurface";
 
@@ -36,8 +35,6 @@ type CardNode = Node<
     related: boolean;
     dimmed: boolean;
     openComments: number;
-    designFindings: DesignFinding[];
-    showDesignOverlay: boolean;
     imageUrl: (name: string) => string;
     screenDiff?: ScreenCanvasDiff;
     diffVisualMode?: CanvasDiffVisualMode;
@@ -152,8 +149,6 @@ function Card({ data }: NodeProps<CardNode>) {
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
         openComments={data.openComments}
-        designFindings={data.designFindings}
-        showDesignOverlay={data.showDesignOverlay}
         screenDiff={data.screenDiff}
         diffVisualMode={data.diffVisualMode}
         beforeRunKey={data.beforeRunKey}
@@ -288,8 +283,6 @@ export function ScreenMap({
   selectedId,
   focusActive = false,
   openCommentsByPath,
-  designFindingsByPath,
-  showDesignOverlay = false,
   diffsByPath,
   diffActive = false,
   diffVisualMode = "after",
@@ -309,8 +302,6 @@ export function ScreenMap({
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
-  designFindingsByPath?: Record<string, DesignFinding[]>;
-  showDesignOverlay?: boolean;
   diffsByPath?: Record<string, ScreenCanvasDiff>;
   diffActive?: boolean;
   diffVisualMode?: CanvasDiffVisualMode;
@@ -372,8 +363,6 @@ export function ScreenMap({
           related: isRelated,
           dimmed: isDimmed,
           openComments: openCommentsByPath?.[screen.path] ?? 0,
-          designFindings: designFindingsByPath?.[screen.path] ?? [],
-          showDesignOverlay,
           imageUrl,
           screenDiff,
           diffVisualMode,

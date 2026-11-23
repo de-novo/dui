@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Cell } from "../src/data/overview.ts";
 import {
-  auditLiveRenderTree,
   buildLiveHighlightMessage,
   computeLiveFrameTransform,
   isLoopbackOrigin,
@@ -88,79 +87,7 @@ describe("liveSurface protocol (v0.2.0)", () => {
     assert.equal(merged.renderTree?.[0]?.attributes?.["data-live"], "true");
   });
 
-  it("audits live RenderNode telemetry for overflow, touch targets, unlabeled controls, and overlap", () => {
-    const findings = auditLiveRenderTree(
-      [
-        {
-          id: "#wide-banner",
-          tag: "div",
-          text: "Wide",
-          rect: { x: 0, y: 0, width: 420, height: 40 },
-          style: {},
-        },
-        {
-          id: "#tiny-icon-btn",
-          tag: "button",
-          text: "",
-          rect: { x: 10, y: 60, width: 24, height: 24 },
-          style: {},
-        },
-        {
-          id: "#overlap-btn",
-          tag: "button",
-          text: "OK",
-          rect: { x: 18, y: 68, width: 50, height: 48 },
-          style: {},
-        },
-      ],
-      "/dashboard",
-      375,
-    );
-    const kinds = new Set(findings.map((f) => f.kind));
-    assert.ok(kinds.has("horizontal-overflow"));
-    assert.ok(kinds.has("small-touch-target"));
-    assert.ok(kinds.has("unlabeled-interactive"));
-    assert.ok(kinds.has("element-overlap"));
-
-    // Desktop parity & false-positive exclusions
-    const desktopClean = auditLiveRenderTree(
-      [
-        {
-          id: "#scroll-cell",
-          tag: "div",
-          text: "Wide Table Cell",
-          rect: { x: 1100, y: 20, width: 300, height: 32 },
-          style: {},
-          attributes: { "data-dui-clipped-x": "true" },
-        },
-        {
-          id: "#toolbar-btn",
-          tag: "button",
-          text: "Filter",
-          rect: { x: 16, y: 16, width: 80, height: 32 },
-          style: {},
-        },
-        {
-          id: "#parent-btn",
-          tag: "button",
-          text: "Parent",
-          rect: { x: 120, y: 16, width: 100, height: 32 },
-          style: {},
-        },
-        {
-          id: "#child-badge-btn",
-          tag: "button",
-          text: "2",
-          rect: { x: 196, y: 10, width: 28, height: 28 },
-          style: {},
-          parentId: "#parent-btn",
-        },
-      ],
-      "/orders",
-      1280,
-    );
-    assert.deepEqual(desktopClean, []);
-
+  it("parses live node selection and builds highlight messages cleanly", () => {
     const selectMsg = parseLiveSelectMessage({
       type: "dui:live-select-node",
       path: "/dashboard",

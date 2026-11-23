@@ -27,7 +27,6 @@
     "check:ios": "tsc --project scripts && cargo build --locked && node scripts/check-ios.mts",
     "check:electron": "tsc --project scripts && cargo build --locked && node scripts/check-electron.mts",
     "check:radix-nextjs": "tsc --project scripts && cargo build --locked && node scripts/check-radix-nextjs.mts",
-    "check:design-lint": "tsc --project scripts && cargo build --locked && node scripts/check-design-lint.mts",
     "check:box-model": "tsc --project scripts && cargo build --locked && node scripts/check-box-model.mts",
     "check:compiler-oracles": "tsc --project scripts && cargo build --locked && node scripts/check-compiler-oracles.mts",
     "check:reliability": "tsc --project scripts && cargo build --locked && node scripts/check-reliability.mts",
