@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Entry point for AI coding agents (and humans) working on `de-novo/dui`. Read this first, then follow the links.
-Updated: 2026-11-23 · Stage: v0.1.0 multi-surface & auth shipped · Next goal: [v0.2.0 live component rendering on canvas](docs/en/roadmap.md#later-milestones)
+Updated: 2026-11-23 · Stage: v0.2.0 live canvas & framework-level controls ready · Next goal: [workspace crate split & deep native compilers](docs/en/architecture.md)
 
 ## Mission
 

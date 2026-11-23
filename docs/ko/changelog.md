@@ -7,19 +7,23 @@
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-11-23
+
 ### Added
 
-- 모바일·TUI 컴파일러 심층 상태 추출 룰팩(Ink 5 · React Native · Expo Router 5), 공용 컴파일러 오라클 IR 및 공식 6개 툴체인 진단(`dui toolchains`) 추가 ([#124](https://github.com/de-novo/dui/pull/124)).
-- 2D 캔버스 직접 라이브 컴포넌트 마운트(`Static | Live mount`, 루프백 검증, `postMessage` 실시간 `RenderNodeSnapshot` → `ElementInspector` 스트리밍) 및 원커맨드 `dui open --live` / `--live-url`, GPUI 데스크톱 라이브 표시 패리티 추가 ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138)).
-- SemVer 및 3개 언어 `CHANGELOG` 버전 동기화 CI 가드(`npm run check:version`)를 `check:style`에 연동 ([#131](https://github.com/de-novo/dui/pull/131)).
+- 2D 캔버스 직접 라이브 컴포넌트 렌더링 완성 (`Static | Live mount`, 루프백 검증, static/url/command/Vite/Next.js 호스트를 자동 기동하는 원커맨드 `dui open --live` / `--live-url`, 무수정 `/live-surface/*` DOM 텔레메트리 브리지, 실시간 라이브 Design Audit, `ElementInspector` ↔ 라이브 카드 양방향 요소 하이라이트/선택 및 GPUI 데스크톱 패리티) ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138), [#141](https://github.com/de-novo/dui/pull/141), [#142](https://github.com/de-novo/dui/pull/142)).
+- 특정 UI 컴포넌트 라이브러리에 의존하지 않는 프레임워크 단 React 제어 props 및 네이티브 HTML/WAI-ARIA 컨트롤 상태 추출 (`package: "react"`, `package: "html-aria"`) ([#140](https://github.com/de-novo/dui/pull/140)).
 - 공식 TypeScript 6/7 AST 폴백(`adapters/vite/parser.mts`, `npm run check:vite7`)으로 Vite 7 정식(Level 2) 지원 추가 ([#133](https://github.com/de-novo/dui/pull/133)).
 - Vite 7·8 양쪽에서 동작하는 React Router 7/8 정적 라우트 자동 발견(`createBrowserRouter`, `createHashRouter`, `createMemoryRouter`, 중첩 JSX `<Route>`, `index`, `:param`, `*` splat) 추가 ([#134](https://github.com/de-novo/dui/pull/134), [#135](https://github.com/de-novo/dui/pull/135)).
 - 대화형 브라우저 로그인 세션 캡처(`dui auth login <URL> --out FILE`) 추가 — `HttpOnly` 쿠키·`localStorage`·`sessionStorage`를 `0600` 권한의 Playwright 호환 `storageState.json`으로 저장 ([#137](https://github.com/de-novo/dui/pull/137)).
+- 모바일·TUI 컴파일러 심층 상태 추출 룰팩(Ink 5 · React Native · Expo Router 5), 공용 컴파일러 오라클 IR 및 공식 6개 툴체인 진단(`dui toolchains`) 추가 ([#124](https://github.com/de-novo/dui/pull/124)).
+- SemVer 및 3개 언어 `CHANGELOG` 버전 동기화 CI 가드(`npm run check:version`)를 `check:style`에 연동 ([#131](https://github.com/de-novo/dui/pull/131)).
 - 뷰어 UI 설계·검수용 에이전트 스킬(`anti-ui-slop`, `web-design-guidelines`) 등록 ([#132](https://github.com/de-novo/dui/pull/132)).
 
 ### Changed
 
 - 생태계·룰팩 라이브러리를 하드 버전 게이트에서 분리: 하드 `>=` 기준선 검사는 핵심 컴파일러·호스트·UI 런타임(`tsc`, `vite` 7+, `react` 18+, `host: "next"` 시 `next` 16+)에만 적용하고, 더 새로운 안정 메이저는 항상 허용하며 룰팩 라이브러리 버전 차이는 스캔 중단 없이 비치명적 `versionNotes`로 기록 ([#136](https://github.com/de-novo/dui/pull/136)).
+- 워크스페이스 및 데스크톱 크레이트 버전을 `0.2.0`으로 동기화.
 
 ## [v0.1.0] - 2026-11-23
 
@@ -140,7 +144,8 @@
 - 공식 TypeScript 6/7 컴파일러 분석, 타입드 GET 자동 목, Vite 호스트 및 다폭 Chromium CDP 캡처.
 - 프로젝트·브랜치·워크트리별 `~/.dui/` 로컬 아카이빙 및 소스 설치기.
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/de-novo/dui/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/de-novo/dui/releases/tag/v0.1.0
 [v0.0.9]: https://github.com/de-novo/dui/compare/v0.0.8...v0.0.9
 [v0.0.8]: https://github.com/de-novo/dui/compare/v0.0.7...v0.0.8
