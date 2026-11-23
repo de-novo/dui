@@ -62,6 +62,7 @@ pub struct TerminalGrid {
     dim: bool,
     underline: bool,
     inverse: bool,
+    last_char: Option<char>,
 }
 
 impl TerminalGrid {
@@ -80,6 +81,7 @@ impl TerminalGrid {
             dim: false,
             underline: false,
             inverse: false,
+            last_char: None,
         }
     }
 
@@ -178,6 +180,7 @@ impl TerminalGrid {
     }
 
     fn put_char(&mut self, ch: char) {
+        self.last_char = Some(ch);
         if self.cursor_col >= self.cols {
             self.cursor_col = 0;
             self.line_feed();
@@ -308,6 +311,29 @@ impl TerminalGrid {
                     _ => {}
                 }
             }
+            'X' => {
+                // ECH: erase next N characters on the current line using current background.
+                let n = p0.max(1);
+                let row_start = self.cursor_row * self.cols;
+                let row_end = row_start + self.cols;
+                let cur = (row_start + self.cursor_col).min(row_end);
+                let end = (cur + n).min(row_end);
+                for cell in &mut self.cells[cur..end] {
+                    *cell = TerminalCell {
+                        bg: self.bg,
+                        ..TerminalCell::default()
+                    };
+                }
+            }
+            'b' => {
+                // REP: repeat the preceding graphic character N times (used heavily by ncurses/htop).
+                if let Some(ch) = self.last_char {
+                    let n = p0.max(1).min(self.cols * self.rows);
+                    for _ in 0..n {
+                        self.put_char(ch);
+                    }
+                }
+            }
             'm' => {
                 if nums.is_empty() {
                     self.reset_sgr();
@@ -423,7 +449,13 @@ impl TerminalGrid {
                 .to_owned();
             let sample = row_slice[start_col..=end_col]
                 .iter()
-                .find(|c| c.ch != ' ')
+                .find(|c| c.ch.is_alphanumeric())
+                .or_else(|| {
+                    row_slice[start_col..=end_col]
+                        .iter()
+                        .find(|c| c.ch != ' ' && !is_box_drawing_char(c.ch))
+                })
+                .or_else(|| row_slice[start_col..=end_col].iter().find(|c| c.ch != ' '))
                 .copied()
                 .unwrap_or(row_slice[start_col]);
             let (fg, bg) = if sample.inverse {
@@ -476,6 +508,10 @@ impl TerminalGrid {
         }
         nodes
     }
+}
+
+fn is_box_drawing_char(ch: char) -> bool {
+    matches!(ch, '\u{2500}'..='\u{259F}')
 }
 
 fn xterm_256_color(n: u8) -> [u8; 3] {
@@ -571,5 +607,22 @@ mod tests {
         assert_eq!(encode_key_token("Up"), b"\x1b[A");
         assert_eq!(encode_key_token("Ctrl+C"), vec![0x03]);
         assert_eq!(encode_key_token("q"), b"q");
+    }
+
+    #[test]
+    fn handles_rep_ech_and_samples_alphanumeric_cell_color_over_dim_border() {
+        let mut grid = TerminalGrid::new(30, 4);
+        // Repeat '-' 5 times via CSI 5 b, then write text and erase 2 chars via CSI 2 X.
+        grid.feed(b"\x1b[1;1H-\x1b[5b OK\x1b[1;2H\x1b[2X");
+        assert_eq!(grid.plain_text(), "-  --- OK");
+
+        // Row 2 has a dim gray box border followed by bright white text; style must sample the text.
+        grid.feed("\x1b[2;1H\x1b[90m│\x1b[0m Hello World \x1b[90m│\x1b[0m".as_bytes());
+        let tree = grid.to_render_tree(12, 20, 16, 16);
+        let row2 = tree.iter().find(|n| n.id == "tui-row#1").expect("row 2");
+        assert_eq!(
+            row2.style.get("color").map(String::as_str),
+            Some("rgb(244, 244, 245)")
+        );
     }
 }
