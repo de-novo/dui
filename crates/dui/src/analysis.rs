@@ -832,6 +832,76 @@ fn execute_with_locales(
         rounds.push(json!({"scenario":scenario,"name":spec["name"],"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
         remaining += pending.len();
     }
+    // Promote runtime-discovered WAI-ARIA/HTML modals, dialogs, and drawers into verified
+    // child screen nodes (`<parentPath>#overlay:<slug>`), deduplicating global header overlays
+    // once per `(slug, width)` so shared header triggers (e.g. Search) do not spam every route.
+    let mut overlay_cells = Vec::new();
+    let mut seen_overlay_keys: BTreeSet<(String, u64)> = BTreeSet::new();
+    let mut seen_header_overlays: BTreeSet<(String, u64)> = BTreeSet::new();
+    for cell in &cells {
+        let Some(parent_path) = cell["path"].as_str() else {
+            continue;
+        };
+        let Some(width) = cell["width"].as_u64() else {
+            continue;
+        };
+        let Some(overlays) = cell["observation"]["overlays"].as_array() else {
+            continue;
+        };
+        for ov in overlays {
+            let Some(slug) = ov["slug"].as_str() else {
+                continue;
+            };
+            let Some(img) = ov["image"].as_str() else {
+                continue;
+            };
+            let scope = ov["scope"].as_str().unwrap_or("main");
+            if scope == "header" && !seen_header_overlays.insert((slug.to_owned(), width)) {
+                continue;
+            }
+            let overlay_path = format!("{parent_path}#overlay:{slug}");
+            if !seen_overlay_keys.insert((overlay_path.clone(), width)) {
+                continue;
+            }
+            let title = ov["title"].as_str().unwrap_or(slug);
+            let trigger_label = ov["triggerLabel"].as_str().unwrap_or(title);
+            let mut obs = json!({
+                "ready": true,
+                "settled": true,
+                "width": width,
+                "path": overlay_path,
+            });
+            if let Some(tree) = ov.get("renderTree").filter(|t| t.is_array()) {
+                obs["renderTree"] = tree.clone();
+            }
+            let parent_slug: String = parent_path
+                .chars()
+                .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+                .collect();
+            let state_key = format!("overlay-{parent_slug}-{slug}");
+            overlay_cells.push(json!({
+                "scenario": state_key,
+                "path": overlay_path,
+                "width": width,
+                "input": {},
+                "state": state_key,
+                "planIndex": 0,
+                "status": "verified",
+                "image": img,
+                "overlay": {
+                    "kind": "dialog",
+                    "parentPath": parent_path,
+                    "slug": slug,
+                    "title": title,
+                    "triggerLabel": trigger_label,
+                    "scope": scope,
+                },
+                "observation": obs,
+            }));
+            verified += 1;
+        }
+    }
+    cells.extend(overlay_cells);
     let graph = graph(facts, &hits);
     let expected: BTreeSet<_> = facts
         .iter()

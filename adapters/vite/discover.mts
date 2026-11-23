@@ -460,6 +460,9 @@ if (profile.routeSelector !== false) {
       ? profile.routeSelector
       : "main a[href], nav a[href], aside a[href], header a[href]";
 } else delete config.routeSelector;
+if (profile.discoverOverlays !== false) {
+  config.discoverOverlays = true;
+}
 if (config.mockPreload) config.mockPreload = resolve(root, config.mockPreload);
 if (config.rulePacks) config.rulePacks = config.rulePacks.map((p: string) => resolve(root, p));
 console.log(JSON.stringify(config));

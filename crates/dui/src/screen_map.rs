@@ -82,6 +82,9 @@ fn detect_non_vite_manifest(project: &Path) -> Option<Value> {
     if manifest.get("routeSelector").is_none() {
         manifest["routeSelector"] = json!("a[href]");
     }
+    if manifest.get("discoverOverlays").is_none() {
+        manifest["discoverOverlays"] = json!(true);
+    }
     Some(manifest)
 }
 

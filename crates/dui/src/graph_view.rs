@@ -16,6 +16,7 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         .collect();
     let screen_paths: BTreeSet<_> = cells.iter().filter_map(|c| c["path"].as_str()).collect();
     let mut navigation = BTreeMap::<(&str, &str), BTreeSet<u64>>::new();
+    let mut overlay_edges = BTreeMap::<(&str, &str), (BTreeSet<u64>, Option<String>)>::new();
     // Large sweeps share many identical branch traces. Keep the full membership once.
     let mut traces = std::collections::BTreeMap::<Vec<&str>, String>::new();
     for cell in cells {
@@ -32,6 +33,20 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
                 screen["discoveredFrom"] = source.clone();
             }
             extra.push(screen);
+        }
+        if let Some(parent_path) = cell["overlay"]["parentPath"].as_str()
+            && screen_paths.contains(parent_path)
+            && parent_path != path
+            && let Some(width) = cell["width"].as_u64()
+        {
+            let trigger_label = cell["overlay"]["triggerLabel"].as_str().map(str::to_owned);
+            let entry = overlay_edges
+                .entry((parent_path, path))
+                .or_insert_with(|| (BTreeSet::new(), trigger_label.clone()));
+            entry.0.insert(width);
+            if entry.1.is_none() {
+                entry.1 = trigger_label;
+            }
         }
         if let Some(obs_path) = cell["observation"]["path"].as_str()
             && let Some(width) = cell["width"].as_u64()
@@ -126,6 +141,22 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
             if let Some(selector) = source.get("selector").filter(|v| v.is_string()) {
                 edge["selector"] = selector.clone();
             }
+        }
+        links.push(edge);
+    }
+    for ((from, to), (widths, trigger_label)) in overlay_edges {
+        let mut edge = json!({
+            "source": format!("route:{from}"),
+            "target": format!("route:{to}"),
+            "kind": "linksTo",
+            "origin": "overlay",
+            "provenance": "verified",
+            "replayVerified": true,
+            "observedWidths": widths,
+            "confirmedWidths": widths,
+        });
+        if let Some(label) = trigger_label {
+            edge["action"] = json!({ "kind": "overlay", "selector": "", "label": label });
         }
         links.push(edge);
     }

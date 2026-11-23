@@ -773,7 +773,7 @@ declare var __duiProbe: {
         // safely expand collapsed nav accordions/trees (aria-expanded="false") after capture
         // to uncover submenu <a href> links without relying on any router-specific syntax.
         const navRoots = document.querySelectorAll(
-          'nav, aside, header, [role="navigation"], [data-sidebar], [data-slot*="sidebar"]',
+          'nav, aside, [role="navigation"], [data-slot="sidebar"]',
         );
         const triggers: HTMLElement[] = [];
         const seen = new Set<Element>();
@@ -835,6 +835,176 @@ declare var __duiProbe: {
           }
         }
         return [...paths].sort();
+      },
+      listOverlayTriggers() {
+        const destructiveRe =
+          /\b(logout|log out|sign out|delete|remove|reset|destroy|clear|cancel|close|submit|save|back|next|prev|previous|download|export)\b/i;
+        const skipRoles = new Set([
+          "tab",
+          "checkbox",
+          "radio",
+          "switch",
+          "combobox",
+          "menuitem",
+          "option",
+          "treeitem",
+        ]);
+        const triggers: { el: HTMLElement; label: string; scope: "header" | "main" }[] = [];
+        const seen = new Set<Element>();
+        const pushCandidate = (el: Element, explicit: boolean) => {
+          if (triggers.length >= 12 || seen.has(el) || !(el instanceof HTMLElement)) return;
+          if (el.hasAttribute("disabled") || el.getAttribute("aria-disabled") === "true") return;
+          if (el.closest("form")) return;
+          if (el.closest('nav, aside, [role="navigation"], [data-slot="sidebar"]')) return;
+          const role = (el.getAttribute("role") || "").toLowerCase();
+          if (skipRoles.has(role)) return;
+          if (el instanceof HTMLButtonElement && (el.type || "").toLowerCase() === "submit") return;
+          const rect = el.getBoundingClientRect();
+          if (rect.width < 16 || rect.height < 16) return;
+          const cs = getComputedStyle(el);
+          if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") return;
+          const label = (
+            el.getAttribute("aria-label") ||
+            el.getAttribute("title") ||
+            el.innerText ||
+            el.textContent ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 60);
+          if (!explicit && (!label || /^\d+$/.test(label) || destructiveRe.test(label))) return;
+          if (explicit && destructiveRe.test(label)) return;
+          const scope: "header" | "main" = el.closest("header") ? "header" : "main";
+          seen.add(el);
+          triggers.push({ el, label: label || "Dialog", scope });
+        };
+
+        // Priority 1: explicit standard HTML / WAI-ARIA dialog & popover triggers
+        for (const el of document.querySelectorAll(
+          'button[aria-haspopup="dialog"], [role="button"][aria-haspopup="dialog"], button[popovertarget], button[commandfor]',
+        )) {
+          pushCandidate(el, true);
+        }
+        // Priority 2: safe visible action buttons inside main/header (e.g. Create, Import, Search)
+        for (const el of document.querySelectorAll(
+          'main button, [role="main"] button, header button',
+        )) {
+          pushCandidate(el, false);
+        }
+        (globalThis as Record<string, unknown>).__duiOverlayTriggers = triggers;
+        return triggers.map((t, index) => ({ index, label: t.label, scope: t.scope }));
+      },
+      async openOverlayTrigger(index: number) {
+        const triggers = ((globalThis as Record<string, unknown>).__duiOverlayTriggers ?? []) as {
+          el: HTMLElement;
+          label: string;
+          scope: "header" | "main";
+        }[];
+        const entry = triggers[index];
+        if (!entry || !entry.el.isConnected) return { opened: false };
+
+        const visibleDialogs = (): HTMLElement[] => {
+          const found: HTMLElement[] = [];
+          for (const el of document.querySelectorAll(
+            '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], [popover]:popover-open',
+          )) {
+            if (!(el instanceof HTMLElement)) continue;
+            const cs = getComputedStyle(el);
+            if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+            const r = el.getBoundingClientRect();
+            if (r.width >= 120 && r.height >= 80) found.push(el);
+          }
+          return found;
+        };
+
+        const before = new Set(visibleDialogs());
+        const startHref = location.href;
+        try {
+          entry.el.click();
+        } catch {
+          return { opened: false };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 380));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (location.href !== startHref) {
+          try {
+            history.back();
+          } catch {
+            // Ignore history restore errors.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return { opened: false };
+        }
+        const newlyOpened = visibleDialogs().filter((d) => !before.has(d));
+        if (newlyOpened.length === 0) return { opened: false };
+
+        const dialog = newlyOpened[newlyOpened.length - 1]!;
+        (globalThis as Record<string, unknown>).__duiActiveOverlay = dialog;
+        let title = (dialog.getAttribute("aria-label") || "").trim();
+        if (!title) {
+          const lby = dialog.getAttribute("aria-labelledby");
+          if (lby) {
+            title = lby
+              .split(/\s+/)
+              .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+              .filter(Boolean)
+              .join(" ");
+          }
+        }
+        if (!title) {
+          const heading = dialog.querySelector('h1, h2, h3, h4, [role="heading"]');
+          if (heading) title = (heading.textContent || "").replace(/\s+/g, " ").trim();
+        }
+        if (!title) title = entry.label;
+        title = title.slice(0, 80);
+        const slug =
+          title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 40) || `dialog-${index}`;
+        const renderTree = collectRenderTree();
+        return {
+          opened: true,
+          slug,
+          title,
+          triggerLabel: entry.label,
+          scope: entry.scope,
+          renderTree,
+        };
+      },
+      async closeOverlay() {
+        const target = (document.activeElement as HTMLElement | null) ?? document.body;
+        try {
+          target?.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }),
+          );
+          document.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }),
+          );
+        } catch {
+          // Ignore synthetic keyboard event failures.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 260));
+        const active = (globalThis as Record<string, unknown>).__duiActiveOverlay as
+          | HTMLElement
+          | undefined;
+        if (active && active.isConnected) {
+          const cs = getComputedStyle(active);
+          if (cs.display !== "none" && cs.visibility !== "hidden") {
+            if (active instanceof HTMLDialogElement && active.open) {
+              active.close();
+            } else {
+              const closeBtn = active.querySelector<HTMLElement>(
+                'button[aria-label*="close" i], button[title*="close" i], [data-slot*="close"]',
+              );
+              closeBtn?.click();
+            }
+            await new Promise((resolve) => setTimeout(resolve, 220));
+          }
+        }
+        (globalThis as Record<string, unknown>).__duiActiveOverlay = undefined;
       },
       auditLocale() {
         function selectorFor(el: Element): string {

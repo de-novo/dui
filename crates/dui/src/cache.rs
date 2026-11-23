@@ -391,6 +391,7 @@ impl CellCache {
                 "readySelector": spec["readySelector"],
                 "slotAssertions": spec["slotAssertions"],
                 "routeSelector": spec["routeSelector"],
+                "discoverOverlays": spec["discoverOverlays"],
                 "hasScreenAssertion": spec["hasScreenAssertion"],
             }),
         );
@@ -427,13 +428,30 @@ impl CellCache {
                 .link_or_copy_blob(&blob_id, &out.join(&image_name))
                 .is_ok()
             {
+                let mut obs = evidence_to_observation(&evidence);
+                if let Some(overlays) = obs.get_mut("overlays").and_then(Value::as_array_mut) {
+                    let mut restored = Vec::with_capacity(overlays.len());
+                    for ov in overlays.drain(..) {
+                        if let (Some(img_name), Some(bid_raw)) =
+                            (ov["image"].as_str(), ov["blobId"].as_str())
+                            && let Ok(ov_blob_id) = dui_core::model::BlobId::parse(bid_raw)
+                            && store.blob_path(&ov_blob_id).is_file()
+                            && store
+                                .link_or_copy_blob(&ov_blob_id, &out.join(img_name))
+                                .is_ok()
+                        {
+                            restored.push(ov);
+                        }
+                    }
+                    *overlays = restored;
+                }
                 let _ = entry.record_hit(now_epoch_ms());
                 let _ = store.put_cache(&entry);
                 return CacheLookup::Hit {
                     key,
                     image_name,
                     status: entry.status().clone(),
-                    observation: evidence_to_observation(&evidence),
+                    observation: obs,
                 };
             }
         }
@@ -467,7 +485,26 @@ impl CellCache {
             .map_err(|e| e.to_string())?;
 
         if let Some(inputs) = inputs {
-            let evidence = observation_to_evidence(obs);
+            let mut obs_for_cache = obs.clone();
+            if let Some(out_dir) = out_image.parent()
+                && let Some(overlays) = obs_for_cache
+                    .get_mut("overlays")
+                    .and_then(Value::as_array_mut)
+            {
+                for ov in overlays {
+                    if let Some(img_name) = ov["image"].as_str()
+                        && let Ok(ov_bytes) = fs::read(out_dir.join(img_name))
+                    {
+                        let (ow, oh) = png_dimensions(&ov_bytes);
+                        if let Ok(ov_blob) = ImageBlob::from_bytes("image/png", &ov_bytes, ow, oh)
+                            && store.put_blob(&ov_blob, &ov_bytes).is_ok()
+                        {
+                            ov["blobId"] = json!(ov_blob.id().as_str());
+                        }
+                    }
+                }
+            }
+            let evidence = observation_to_evidence(&obs_for_cache);
             let ev_id = evidence.id().clone();
             store.put_evidence(&evidence).map_err(|e| e.to_string())?;
             let blob_ref = (!status.is_unrenderable()).then(|| blob.id().clone());
@@ -519,6 +556,9 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
     if let Some(tree) = obs.get("renderTree").filter(|v| v.is_array()) {
         assertions.push(json!({"__duiRenderTree": tree}));
     }
+    if let Some(overlays) = obs.get("overlays").filter(|v| v.is_array()) {
+        assertions.push(json!({"__duiOverlays": overlays}));
+    }
     Evidence::new(
         obs["path"].as_str().map(str::to_owned),
         obs["width"].as_u64().map(|w| w as u32),
@@ -538,11 +578,14 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
     let mut assertions = Vec::new();
     let mut locale_audit = None;
     let mut render_tree = None;
+    let mut overlays = None;
     for item in ev.assertions() {
         if let Some(audit) = item.get("__duiLocaleAudit") {
             locale_audit = Some(audit.clone());
         } else if let Some(tree) = item.get("__duiRenderTree") {
             render_tree = Some(tree.clone());
+        } else if let Some(ov) = item.get("__duiOverlays") {
+            overlays = Some(ov.clone());
         } else {
             assertions.push(item.clone());
         }
@@ -569,6 +612,9 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
     }
     if let Some(tree) = render_tree {
         obs["renderTree"] = tree;
+    }
+    if let Some(ov) = overlays {
+        obs["overlays"] = ov;
     }
     obs
 }
