@@ -306,17 +306,25 @@ pub struct RunDesignAudit {
 pub fn compute_run_design_audit(run: &RunItem) -> RunDesignAudit {
     let mut out = RunDesignAudit::default();
     let trees = load_render_trees_for_run(run);
+    let mut seen: BTreeSet<(dui_core::design_lint::DesignDefectKind, String, u32, String)> =
+        BTreeSet::new();
     for ((path, width, _ordinal), tree) in trees {
         let lint = lint_render_tree(&tree, width);
-        out.total += lint.total;
-        out.errors += lint.errors;
-        out.warnings += lint.warnings;
-        out.info += lint.info;
-        if !lint.findings.is_empty() {
+        for finding in lint.findings {
+            let key = (finding.kind, path.clone(), width, finding.node_id.clone());
+            if !seen.insert(key) {
+                continue;
+            }
+            out.total += 1;
+            match finding.severity {
+                DesignSeverity::Error => out.errors += 1,
+                DesignSeverity::Warning => out.warnings += 1,
+                DesignSeverity::Info => out.info += 1,
+            }
             out.findings_by_screen_width
                 .entry((path.clone(), width))
                 .or_default()
-                .extend(lint.findings);
+                .push(finding);
         }
         out.trees_by_screen_width
             .entry((path, width))

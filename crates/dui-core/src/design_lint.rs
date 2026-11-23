@@ -49,6 +49,126 @@ pub struct DesignAuditSummary {
     pub findings: Vec<DesignFinding>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScopedDesignFinding {
+    pub path: String,
+    pub width: u32,
+    pub state: Option<String>,
+    pub scenario: Option<String>,
+    pub finding: DesignFinding,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupedDesignFinding {
+    pub kind: DesignDefectKind,
+    pub severity: DesignSeverity,
+    pub severity_rank: u8,
+    pub path: String,
+    pub width: u32,
+    pub node_id: String,
+    pub tag: String,
+    pub rect: RenderRect,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub related_node_id: Option<String>,
+    pub summary: String,
+    pub measured: String,
+    pub expected: String,
+    pub occurrences: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub states: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scenario: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupedDesignAudit {
+    pub total: usize,
+    pub raw_total: usize,
+    pub errors: usize,
+    pub warnings: usize,
+    pub info: usize,
+    pub findings: Vec<GroupedDesignFinding>,
+}
+
+/// Deduplicate identical design findings across multiple states/scenarios of the same
+/// `(path, width, kind, node_id)` so repeated defects are reported once with an exact
+/// `occurrences` count instead of spamming reviewers and AI agents.
+pub fn deduplicate_findings(items: Vec<ScopedDesignFinding>) -> GroupedDesignAudit {
+    let raw_total = items.len();
+    let mut grouped: BTreeMap<(DesignDefectKind, String, u32, String), GroupedDesignFinding> =
+        BTreeMap::new();
+    for item in items {
+        let key = (
+            item.finding.kind,
+            item.path.clone(),
+            item.width,
+            item.finding.node_id.clone(),
+        );
+        let entry = grouped.entry(key).or_insert_with(|| {
+            let severity_rank = match item.finding.severity {
+                DesignSeverity::Error => 0,
+                DesignSeverity::Warning => 1,
+                DesignSeverity::Info => 2,
+            };
+            GroupedDesignFinding {
+                kind: item.finding.kind,
+                severity: item.finding.severity,
+                severity_rank,
+                path: item.path.clone(),
+                width: item.width,
+                node_id: item.finding.node_id,
+                tag: item.finding.tag,
+                rect: item.finding.rect,
+                related_node_id: item.finding.related_node_id,
+                summary: item.finding.summary,
+                measured: item.finding.measured,
+                expected: item.finding.expected,
+                occurrences: 0,
+                states: Vec::new(),
+                scenario: item.scenario.clone(),
+            }
+        });
+        entry.occurrences += 1;
+        if let Some(st) = item.state
+            && entry.states.len() < 8
+            && !entry.states.contains(&st)
+        {
+            entry.states.push(st);
+        }
+    }
+    let mut findings: Vec<GroupedDesignFinding> = grouped.into_values().collect();
+    findings.sort_by(|a, b| {
+        a.severity_rank
+            .cmp(&b.severity_rank)
+            .then(b.occurrences.cmp(&a.occurrences))
+            .then(a.path.cmp(&b.path))
+            .then(a.width.cmp(&b.width))
+            .then(a.node_id.cmp(&b.node_id))
+    });
+    let errors = findings
+        .iter()
+        .filter(|f| f.severity == DesignSeverity::Error)
+        .count();
+    let warnings = findings
+        .iter()
+        .filter(|f| f.severity == DesignSeverity::Warning)
+        .count();
+    let info = findings
+        .iter()
+        .filter(|f| f.severity == DesignSeverity::Info)
+        .count();
+    GroupedDesignAudit {
+        total: findings.len(),
+        raw_total,
+        errors,
+        warnings,
+        info,
+        findings,
+    }
+}
+
 fn is_interactive(node: &RenderNodeSnapshot) -> bool {
     if matches!(
         node.tag.as_str(),
@@ -210,11 +330,25 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
         }
 
         if is_interactive(node) {
-            let min_size = if vp_w > 0 && vp_w <= 500 { 44 } else { 24 };
-            // Inline text links inside prose often have line-height ~19px; check buttons/controls strictly
-            let enforce_target =
-                node.tag != "a" || node.style.get("display").is_some_and(|d| d != "inline");
-            if enforce_target && (r.width < min_size || r.height < min_size) {
+            let input_type = node.attributes.get("type").map(|s| s.to_ascii_lowercase());
+            let is_hidden_input = node.tag == "input" && input_type.as_deref() == Some("hidden");
+            let is_native_check =
+                node.tag == "input" && matches!(input_type.as_deref(), Some("checkbox" | "radio"));
+            // Inline text links inside prose and native 13-16px checkboxes paired with labels are excluded.
+            let enforce_target = !is_hidden_input
+                && !is_native_check
+                && (node.tag != "a" || node.style.get("display").is_some_and(|d| d != "inline"));
+            let too_small = if vp_w > 0 && vp_w <= 500 {
+                (r.width < 44 && r.height < 44) || r.width < 32 || r.height < 32
+            } else {
+                r.width < 20 || r.height < 20
+            };
+            let min_label = if vp_w > 0 && vp_w <= 500 {
+                "44x44"
+            } else {
+                "20x20"
+            };
+            if enforce_target && too_small {
                 findings.push(DesignFinding {
                     kind: DesignDefectKind::SmallTouchTarget,
                     severity: DesignSeverity::Warning,
@@ -223,15 +357,15 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
                     rect: r,
                     related_node_id: None,
                     summary: format!(
-                        "{} ({}) is {}x{}px (below {}x{}px target minimum)",
-                        node.tag, node.id, r.width, r.height, min_size, min_size
+                        "{} ({}) is {}x{}px (below {min_label}px target minimum)",
+                        node.tag, node.id, r.width, r.height
                     ),
                     measured: format!("{}x{}px", r.width, r.height),
-                    expected: format!(">={min_size}x{min_size}px"),
+                    expected: format!(">={min_label}px"),
                 });
             }
 
-            if !has_accessible_label(node) {
+            if !is_hidden_input && !has_accessible_label(node) {
                 findings.push(DesignFinding {
                     kind: DesignDefectKind::UnlabeledInteractive,
                     severity: DesignSeverity::Error,
@@ -298,7 +432,10 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
     let leaf_nodes: Vec<&RenderNodeSnapshot> = nodes
         .iter()
         .filter(|n| {
-            n.rect.width > 0 && n.rect.height > 0 && !is_container_tag(&n.tag) && n.tag != "tui-row"
+            n.rect.width > 0
+                && n.rect.height > 0
+                && !is_container_tag(&n.tag)
+                && !matches!(n.tag.as_str(), "tui-row" | "svg" | "img" | "label")
         })
         .collect();
     for i in 0..leaf_nodes.len() {
@@ -313,7 +450,11 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
                 continue;
             }
             let (dx, dy) = overlap_intersection(a.rect, b.rect);
-            if dx >= 4 && dy >= 4 {
+            let overlap_area = i64::from(dx) * i64::from(dy);
+            let min_area = (i64::from(a.rect.width) * i64::from(a.rect.height))
+                .min(i64::from(b.rect.width) * i64::from(b.rect.height))
+                .max(1);
+            if dx >= 8 && dy >= 8 && overlap_area * 4 >= min_area {
                 findings.push(DesignFinding {
                     kind: DesignDefectKind::ElementOverlap,
                     severity: DesignSeverity::Error,
@@ -332,7 +473,7 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
         }
     }
 
-    // 3. Peer spacing consistency check for vertical stacks of 3+ identically tagged peers.
+    // 3. Peer spacing consistency check for vertical stacks of 4+ identically tagged peers.
     let mut groups: BTreeMap<(Option<&str>, &str), Vec<&RenderNodeSnapshot>> = BTreeMap::new();
     for node in nodes {
         if node.rect.width > 0
@@ -347,7 +488,7 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
         }
     }
     for ((_, tag), mut peers) in groups {
-        if peers.len() < 3 {
+        if peers.len() < 4 {
             continue;
         }
         peers.sort_by_key(|n| (n.rect.y, n.rect.x));
@@ -363,14 +504,17 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
                 gaps.push((gap, pair[1]));
             }
         }
-        if gaps.len() < 2 {
+        if gaps.len() < 3 {
             continue;
         }
         let mut sorted_gaps: Vec<i32> = gaps.iter().map(|(g, _)| *g).collect();
         sorted_gaps.sort_unstable();
         let median = sorted_gaps[sorted_gaps.len() / 2];
+        if median == 0 {
+            continue;
+        }
         for (gap, target) in gaps {
-            if (gap - median).abs() >= 6 {
+            if (gap - median).abs() >= 8 {
                 findings.push(DesignFinding {
                     kind: DesignDefectKind::SpacingDrift,
                     severity: DesignSeverity::Info,
@@ -585,5 +729,53 @@ mod tests {
         assert!(audit.errors >= 3);
         assert!(audit.warnings >= 2);
         assert!(audit.info >= 1);
+    }
+
+    #[test]
+    fn deduplicates_identical_defects_across_states_with_occurrence_counts() {
+        let finding = DesignFinding {
+            kind: DesignDefectKind::SmallTouchTarget,
+            severity: DesignSeverity::Warning,
+            node_id: "button#0".into(),
+            tag: "button".into(),
+            rect: RenderRect {
+                x: 16,
+                y: 80,
+                width: 20,
+                height: 20,
+            },
+            related_node_id: None,
+            summary: "button (button#0) is 20x20px".into(),
+            measured: "20x20px".into(),
+            expected: ">=44x44px".into(),
+        };
+        let grouped = deduplicate_findings(vec![
+            ScopedDesignFinding {
+                path: "/".into(),
+                width: 375,
+                state: Some("s0".into()),
+                scenario: Some("default".into()),
+                finding: finding.clone(),
+            },
+            ScopedDesignFinding {
+                path: "/".into(),
+                width: 375,
+                state: Some("s1".into()),
+                scenario: Some("default".into()),
+                finding: finding.clone(),
+            },
+            ScopedDesignFinding {
+                path: "/".into(),
+                width: 375,
+                state: Some("s2".into()),
+                scenario: Some("default".into()),
+                finding,
+            },
+        ]);
+        assert_eq!(grouped.raw_total, 3);
+        assert_eq!(grouped.total, 1);
+        assert_eq!(grouped.warnings, 1);
+        assert_eq!(grouped.findings[0].occurrences, 3);
+        assert_eq!(grouped.findings[0].states, vec!["s0", "s1", "s2"]);
     }
 }
