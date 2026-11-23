@@ -135,6 +135,8 @@ export type Messages = {
   boxModelLabel: string;
   elementAttributesLabel: string;
   elementTreeLabel: string;
+  canvasSurfaceStatic: string;
+  canvasSurfaceLive: string;
   canvasDiffCompare: string;
   canvasDiffOff: string;
   canvasDiffChangedOnly: string;
@@ -263,6 +265,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     boxModelLabel: "Box model",
     elementAttributesLabel: "Attributes",
     elementTreeLabel: "Rendered elements",
+    canvasSurfaceStatic: "Static",
+    canvasSurfaceLive: "Live mount",
     canvasDiffCompare: "Compare",
     canvasDiffOff: "No diff",
     canvasDiffChangedOnly: "Changed only",
@@ -390,6 +394,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     boxModelLabel: "盒模型",
     elementAttributesLabel: "元素属性",
     elementTreeLabel: "已渲染元素",
+    canvasSurfaceStatic: "静态捕获",
+    canvasSurfaceLive: "实时挂载",
     canvasDiffCompare: "对比",
     canvasDiffOff: "关闭对比",
     canvasDiffChangedOnly: "仅看变更界面",
@@ -517,6 +523,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     boxModelLabel: "박스 모델",
     elementAttributesLabel: "요소 속성",
     elementTreeLabel: "렌더된 요소",
+    canvasSurfaceStatic: "정적 캡처",
+    canvasSurfaceLive: "라이브 마운트",
     canvasDiffCompare: "비교",
     canvasDiffOff: "비교 끄기",
     canvasDiffChangedOnly: "변경된 화면만",

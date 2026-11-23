@@ -30,6 +30,7 @@
     "check:box-model": "tsc --project scripts && cargo build --locked && node scripts/check-box-model.mts",
     "check:reliability": "tsc --project scripts && cargo build --locked && node scripts/check-reliability.mts",
     "check:auth-pr-diff": "tsc --project scripts && cargo build --locked && node scripts/check-auth-and-pr-diff.mts",
+    "check:live-canvas": "tsc --project scripts && cargo build --locked && node scripts/check-live-canvas.mts",
     "check:desktop": "tsc --project scripts && cargo build --locked && node scripts/check-desktop.mts",
     "check:gpui": "tsc --project scripts && cargo build --locked && node scripts/check-gpui.mts",
     "check:gpui-live": "tsc --project scripts && cargo build --locked && node scripts/check-gpui-live.mts",

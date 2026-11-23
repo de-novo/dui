@@ -90,6 +90,21 @@ fn list_subdirs(dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+fn configured_live_base_url() -> Option<String> {
+    let raw = std::env::var("DUI_LIVE_URL").ok()?;
+    let trimmed = raw.trim().trim_end_matches('/');
+    let rest = trimmed
+        .strip_prefix("http://")
+        .or_else(|| trimmed.strip_prefix("https://"))?;
+    let host_port = rest.split('/').next().unwrap_or("");
+    let host = host_port.split(':').next().unwrap_or("");
+    if host == "127.0.0.1" || host == "localhost" {
+        Some(trimmed.to_owned())
+    } else {
+        None
+    }
+}
+
 fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
     let mut paths: Vec<PathBuf> = state.cli_paths.clone();
     paths.extend(state.extra_saved_paths.iter().cloned());
@@ -192,7 +207,7 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
                 .unwrap_or("")
                 .to_owned();
 
-            let run = json!({
+            let mut run = json!({
                 "key": key,
                 "projectId": project_id,
                 "project": project_name,
@@ -200,6 +215,9 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
                 "version": version,
                 "liveAvailable": project_path.is_some(),
             });
+            if let Some(live_url) = configured_live_base_url() {
+                run["liveBaseUrl"] = json!(live_url);
+            }
             ArchiveEntry {
                 root,
                 project_path,

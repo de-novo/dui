@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import type { DesignFinding } from "../../model/audit";
@@ -6,6 +7,11 @@ import {
   type CanvasDiffVisualMode,
   type ScreenCanvasDiff,
 } from "../../model/canvasDiff";
+import {
+  computeLiveFrameTransform,
+  resolveLiveSurfaceUrl,
+  type LiveSurfaceMode,
+} from "../../model/liveSurface";
 
 export function routeName(path: string) {
   return path.split("?")[0].split("/").filter(Boolean).slice(-2).join("/") || path;
@@ -27,6 +33,8 @@ export function CaptureCard({
   diffVisualMode = "after",
   beforeRunKey,
   afterRunKey,
+  liveBaseUrl,
+  liveSurfaceMode = "capture",
 }: {
   screen: Screen;
   cell?: Cell;
@@ -43,8 +51,19 @@ export function CaptureCard({
   diffVisualMode?: CanvasDiffVisualMode;
   beforeRunKey?: string;
   afterRunKey?: string;
+  liveBaseUrl?: string;
+  liveSurfaceMode?: LiveSurfaceMode;
 }) {
   const { t } = useI18n();
+  const [liveFallback, setLiveFallback] = useState(false);
+  const liveUrl =
+    liveSurfaceMode === "live" && !liveFallback
+      ? resolveLiveSurfaceUrl(liveBaseUrl, screen.path)
+      : null;
+  const liveTransform =
+    liveUrl && cardWidth && frameHeight
+      ? computeLiveFrameTransform(cell?.width ?? 1280, cardWidth, frameHeight)
+      : null;
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
   const large = Boolean(cardWidth && cardWidth >= 800);
@@ -98,7 +117,20 @@ export function CaptureCard({
           cardWidth && frameHeight ? { aspectRatio: `${cardWidth} / ${frameHeight}` } : undefined
         }
       >
-        {resolvedSrc ? (
+        {liveUrl && liveTransform ? (
+          <iframe
+            className="live-surface-iframe"
+            src={liveUrl}
+            title={`Live ${screen.path}`}
+            sandbox="allow-scripts allow-same-origin allow-forms"
+            onError={() => setLiveFallback(true)}
+            style={{
+              width: `${liveTransform.viewportWidth}px`,
+              height: `${liveTransform.viewportHeight}px`,
+              transform: `scale(${liveTransform.scale})`,
+            }}
+          />
+        ) : resolvedSrc ? (
           <img loading="lazy" alt="" src={resolvedSrc} />
         ) : (
           <div className="missing-frame-copy">
@@ -106,6 +138,7 @@ export function CaptureCard({
             {cell?.reason && <small>{cell.reason}</small>}
           </div>
         )}
+        {liveUrl && <span className="card-live-pill">LIVE</span>}
         {showRenderBoxes && screenDiff?.renderDiff && (
           <div className="render-diff-box-layer" aria-hidden="true">
             {screenDiff.renderDiff.changes.slice(0, 24).map((chg) => {

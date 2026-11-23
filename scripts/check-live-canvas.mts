@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import { execFileSync, spawn } from "node:child_process";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+
+const repoRoot = process.cwd();
+const duiBin = path.join(repoRoot, "target", "debug", "dui");
+assert.ok(fs.existsSync(duiBin), `missing built dui binary at ${duiBin}`);
+
+async function waitForUrl(child: ReturnType<typeof spawn>): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let buf = "";
+    const timer = setTimeout(
+      () => reject(new Error(`timed out waiting for viewer URL: ${buf}`)),
+      15000,
+    );
+    child.stdout?.on("data", (chunk: Buffer) => {
+      buf += chunk.toString("utf8");
+      const m = buf.match(/http:\/\/127\.0\.0\.1:\d+/);
+      if (m) {
+        clearTimeout(timer);
+        resolve(m[0]);
+      }
+    });
+    child.on("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`viewer exited early (${code}): ${buf}`));
+    });
+  });
+}
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dui-live-canvas-"));
+const duiHome = path.join(tmp, ".dui-home");
+
+const liveServer = http.createServer((_req, res) => {
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.end("<html><body><h1>Live Surface Host</h1></body></html>");
+});
+
+try {
+  await new Promise<void>((resolve) => liveServer.listen(0, "127.0.0.1", () => resolve()));
+  const addr = liveServer.address();
+  assert.ok(addr && typeof addr === "object");
+  const liveOrigin = `http://127.0.0.1:${addr.port}`;
+
+  const siteDir = path.join(tmp, "site");
+  fs.mkdirSync(siteDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(siteDir, "index.html"),
+    "<html><body><h1>Static Host</h1></body></html>",
+  );
+  const manifest = path.join(siteDir, "dui.json");
+  fs.writeFileSync(manifest, JSON.stringify({ host: "static", path: "/", widths: [1280] }));
+
+  const outDir = path.join(tmp, "out");
+  execFileSync(duiBin, ["run", siteDir, manifest, outDir], {
+    env: { ...process.env, HOME: duiHome },
+  });
+
+  // 1. Loopback DUI_LIVE_URL is exposed cleanly on runs.json
+  const viewer1 = spawn(duiBin, ["open", outDir], {
+    env: { ...process.env, HOME: duiHome, DUI_LIVE_URL: liveOrigin },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    const baseUrl = await waitForUrl(viewer1);
+    const resp = await fetch(`${baseUrl}/archive/runs.json`);
+    assert.equal(resp.status, 200);
+    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string }>;
+    assert.equal(runs[0]?.liveBaseUrl, liveOrigin);
+  } finally {
+    viewer1.kill("SIGTERM");
+  }
+
+  // 2. Non-loopback DUI_LIVE_URL is rejected for security
+  const viewer2 = spawn(duiBin, ["open", outDir], {
+    env: { ...process.env, HOME: duiHome, DUI_LIVE_URL: "https://evil.example.com" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    const baseUrl = await waitForUrl(viewer2);
+    const resp = await fetch(`${baseUrl}/archive/runs.json`);
+    assert.equal(resp.status, 200);
+    const runs = (await resp.json()) as Array<{ liveBaseUrl?: string }>;
+    assert.equal(runs[0]?.liveBaseUrl, undefined);
+  } finally {
+    viewer2.kill("SIGTERM");
+  }
+
+  console.log(
+    JSON.stringify({
+      status: "ok",
+      loopbackLiveBaseUrlExposed: liveOrigin,
+      nonLoopbackRejected: true,
+    }),
+  );
+} finally {
+  liveServer.close();
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
