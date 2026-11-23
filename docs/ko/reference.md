@@ -76,11 +76,19 @@
 
 | CLI | MCP | 동작 |
 | --- | --- | --- |
-| `dui scan PROJECT MANIFEST` | `scan(project, manifest)` | 컴파일러에서 읽은 사실과 생성한 목 응답을 출력한다. |
-| `dui map PROJECT` | `map(project)` | 경로를 자동으로 찾고 각 진입 상태를 캡처해 화면 지도를 저장한다. |
-| `dui run PROJECT MANIFEST [OUTPUT]` | `run(project, manifest, output?)` | 앱을 빌드하고 캡처와 갤러리를 저장한다. |
-| `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | 저장한 계획의 모든 칸을 시도한다. 예산 때문에 남았던 칸도 포함한다. |
+| `dui map [PROJECT]` | `map(project)` | 라우터(TanStack Router · React Router)와 링크에서 화면을 자동 발견하고, `dui.json`(`routeParams`, `storageState`, 추가 `scenarios`)을 병합해 캡처한다. |
+| `dui run [PROJECT] [MANIFEST] [OUTPUT]` | `run(project, manifest, output?)` | `dui.json` 설정대로 직접 캡처한다(인자 생략 시 `.` / `dui.json` 사용, 설정이 없으면 `map`으로 자동 발견). |
+| `dui scan [PROJECT] [MANIFEST]` | `scan(project, manifest)` | 브라우저 없이 컴파일러 사실, 프레임워크 컨트롤, 생성한 목 응답을 출력한다. |
+| `dui auth login URL [--out FILE]` | — | Chromium 창에서 로그인(폼·MFA·OAuth) 후 `0600` 권한의 `storageState.json`으로 저장한다. |
+| `dui open [RUN_DIR] [--live \| --live-url URL]` | — | 내장 2D 캔버스 뷰어를 연다(`--live`는 static/command/Vite/Next.js 서버를 자동 기동해 라이브 마운트). |
+| `dui desktop [--live-url URL]` | — | `~/.dui/dui.db`를 직접 읽는 네이티브 GPUI 데스크톱 뷰어를 연다. |
+| `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | 두 캡처를 비교한다(요소 `renderDiff`, 지연 픽셀 오버레이, `--base BRANCH --markdown` PR 코멘트 출력). |
+| `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | 검증률·누락 사유·미해결 리뷰 코멘트·디자인 결함 감사(`designAudit`)를 계산한다. |
+| `dui comment <add\|list\|resolve\|reopen>` | `comment_*` | 화면·상태·폭·전이에 고정된 리뷰 코멘트를 관리한다. |
+| `dui transitions PROJECT MANIFEST [RUN]` | `transitions(...)` | 액션을 재실행해 화면 전이를 검증한다. |
+| `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | 저장한 계획의 모든 칸을 시도한다. |
 | `dui replay-report MANIFEST PLAN OUTPUT` | `replay_report(manifest, plan, output)` | 저장한 증거로 보고서를 다시 계산한다. |
+| `dui toolchains` | — | 설치된 6개 공식 컴파일러(`tsc`, `rustc`, `go`, `swiftc`, `kotlinc`, `dart`) 지원 상태를 진단한다. |
 
 CLI 전용 명령도 있다. `check-ts PROJECT`는 설치된 컴파일러를 확인하고, `plan FIXTURE`는 명시한 상태와 폭을 칸 목록으로 변환한다. `exercise PROJECT MANIFEST OUTPUT PORT`는 실행 중인 로컬 호스트에서 캡처한다.
 
