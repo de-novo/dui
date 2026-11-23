@@ -1,6 +1,10 @@
 //! Embedded loopback HTTP server for `apps/canvas` (`dui open`).
 
-use crate::{Reply, archive, audit, comments, diff, failure, live, sqlite_store::SqliteStore};
+use crate::{
+    Reply, archive, audit, comments, diff, failure, live,
+    sqlite_store::SqliteStore,
+    universal_web::{self, UniversalSession},
+};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use dui_core::storage::{RunFilter, RunRepository};
 use serde_json::{Value, json};
@@ -28,10 +32,19 @@ struct ArchiveEntry {
     run: Value,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct LiveViewerOptions {
+    pub auto_live: bool,
+    pub live_url: Option<String>,
+}
+
 struct ViewerState {
     cli_paths: Vec<PathBuf>,
     extra_saved_paths: BTreeSet<PathBuf>,
     diff_overlay_dirs: BTreeMap<String, PathBuf>,
+    live_base_url: Option<String>,
+    live_default_mode: bool,
+    _live_host: Option<UniversalSession>,
 }
 
 impl Drop for ViewerState {
@@ -90,8 +103,7 @@ fn list_subdirs(dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
-fn configured_live_base_url() -> Option<String> {
-    let raw = std::env::var("DUI_LIVE_URL").ok()?;
+pub(crate) fn validate_loopback_live_url(raw: &str) -> Option<String> {
     let trimmed = raw.trim().trim_end_matches('/');
     let rest = trimmed
         .strip_prefix("http://")
@@ -103,6 +115,26 @@ fn configured_live_base_url() -> Option<String> {
     } else {
         None
     }
+}
+
+fn configured_live_base_url() -> Option<String> {
+    let raw = std::env::var("DUI_LIVE_URL").ok()?;
+    validate_loopback_live_url(&raw)
+}
+
+fn start_auto_live_host(run_dirs: &[PathBuf]) -> Option<(UniversalSession, String)> {
+    let first = run_dirs.first()?;
+    let manifest = read_optional_json(&first.join("manifest.json"))?;
+    let host_kind = manifest["host"].as_str()?;
+    if !matches!(host_kind, "static" | "url" | "command") {
+        return None;
+    }
+    let meta = read_optional_json(&first.join("snapshot.json"));
+    let project_path =
+        resolve_project_path(meta.as_ref()).or_else(|| first.parent().map(Path::to_path_buf))?;
+    let session = universal_web::start_universal_session(&project_path, &manifest).ok()?;
+    let url = format!("http://127.0.0.1:{}", session.port());
+    Some((session, url))
 }
 
 fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
@@ -215,8 +247,15 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
                 "version": version,
                 "liveAvailable": project_path.is_some(),
             });
-            if let Some(live_url) = configured_live_base_url() {
+            if let Some(live_url) = state
+                .live_base_url
+                .clone()
+                .or_else(configured_live_base_url)
+            {
                 run["liveBaseUrl"] = json!(live_url);
+                if state.live_default_mode {
+                    run["liveDefaultMode"] = json!("live");
+                }
             }
             ArchiveEntry {
                 root,
@@ -979,7 +1018,33 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
     send_response(&mut stream, 404, "text/plain", "no-store", b"Not Found");
 }
 
-pub fn serve(run_dirs: Vec<PathBuf>, port: u16, open_browser: bool) -> Reply {
+pub fn serve(
+    run_dirs: Vec<PathBuf>,
+    port: u16,
+    open_browser: bool,
+    live_opts: LiveViewerOptions,
+) -> Reply {
+    let mut live_host: Option<UniversalSession> = None;
+    let live_default_mode = live_opts.auto_live || live_opts.live_url.is_some();
+    let live_base_url = if let Some(raw) = live_opts.live_url.as_deref() {
+        let valid = validate_loopback_live_url(raw).ok_or_else(|| {
+            failure(
+                2,
+                "--live-url must be a loopback http:// or https:// URL (127.0.0.1 or localhost)",
+            )
+        })?;
+        Some(valid)
+    } else if live_opts.auto_live {
+        if let Some((session, url)) = start_auto_live_host(&run_dirs) {
+            live_host = Some(session);
+            Some(url)
+        } else {
+            configured_live_base_url()
+        }
+    } else {
+        configured_live_base_url()
+    };
+
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port))
         .map_err(|e| failure(3, &format!("failed to bind viewer port: {e}")))?;
     let actual_port = listener
@@ -1004,6 +1069,9 @@ pub fn serve(run_dirs: Vec<PathBuf>, port: u16, open_browser: bool) -> Reply {
         cli_paths: run_dirs,
         extra_saved_paths: BTreeSet::new(),
         diff_overlay_dirs: BTreeMap::new(),
+        live_base_url,
+        live_default_mode,
+        _live_host: live_host,
     }));
 
     for incoming in listener.incoming() {

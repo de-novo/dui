@@ -147,14 +147,20 @@ function MapView({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [audit, setAudit] = useState<AuditReport | null>(null);
   const [showDesignOverlay, setShowDesignOverlay] = useState(false);
-  const [liveSurfaceMode, setLiveSurfaceMode] = useState<LiveSurfaceMode>("capture");
-  const [liveTrees, setLiveTrees] = useState<Record<string, RenderNode[]>>({});
   const liveBaseUrl = useMemo(() => {
     const queryUrl = new URLSearchParams(location.search).get("liveUrl");
     if (queryUrl && isLoopbackOrigin(queryUrl)) return queryUrl;
     if (run.liveBaseUrl && isLoopbackOrigin(run.liveBaseUrl)) return run.liveBaseUrl;
     return undefined;
   }, [run.liveBaseUrl]);
+  const [liveSurfaceChoice, setLiveSurfaceChoice] = useState<LiveSurfaceMode | null>(() => {
+    const queryMode = new URLSearchParams(location.search).get("surface");
+    return queryMode === "live" || queryMode === "capture" ? queryMode : null;
+  });
+  const liveSurfaceMode: LiveSurfaceMode = !liveBaseUrl
+    ? "capture"
+    : (liveSurfaceChoice ?? (run.liveDefaultMode === "live" ? "live" : "capture"));
+  const [liveTrees, setLiveTrees] = useState<Record<string, RenderNode[]>>({});
 
   useEffect(() => {
     if (!liveBaseUrl) return;
@@ -333,7 +339,7 @@ function MapView({
                   type="button"
                   className={liveSurfaceMode === "capture" ? "active" : ""}
                   aria-pressed={liveSurfaceMode === "capture"}
-                  onClick={() => setLiveSurfaceMode("capture")}
+                  onClick={() => setLiveSurfaceChoice("capture")}
                 >
                   {t.canvasSurfaceStatic}
                 </button>
@@ -341,7 +347,7 @@ function MapView({
                   type="button"
                   className={liveSurfaceMode === "live" ? "active" : ""}
                   aria-pressed={liveSurfaceMode === "live"}
-                  onClick={() => setLiveSurfaceMode("live")}
+                  onClick={() => setLiveSurfaceChoice("live")}
                 >
                   {t.canvasSurfaceLive}
                 </button>

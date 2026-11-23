@@ -6,4 +6,5 @@ export type Run = {
   version: string;
   liveAvailable?: boolean;
   liveBaseUrl?: string;
+  liveDefaultMode?: "capture" | "live";
 };

@@ -80,12 +80,27 @@ struct LaunchOptions {
     project: Option<String>,
     run_id: Option<String>,
     screen_path: Option<String>,
+    live_base_url: Option<String>,
     view: ViewMode,
     canvas_diff: bool,
     dark: bool,
     lang: UiLang,
     viewport_width: u32,
     viewport_height: u32,
+}
+
+fn validate_loopback_live_url(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_end_matches('/');
+    let rest = trimmed
+        .strip_prefix("http://")
+        .or_else(|| trimmed.strip_prefix("https://"))?;
+    let host_port = rest.split('/').next().unwrap_or("");
+    let host = host_port.split(':').next().unwrap_or("");
+    if host == "127.0.0.1" || host == "localhost" {
+        Some(trimmed.to_owned())
+    } else {
+        None
+    }
 }
 
 struct DuiDesktopView {
@@ -119,8 +134,9 @@ struct DuiDesktopView {
     comment_input: Entity<InputState>,
     comment_target: CommentTargetChoice,
     error_message: Option<String>,
-    // Active `dui live` session
+    // Active `dui live` session & optional loopback live surface URL (`--live-url` / `DUI_LIVE_URL`)
     live_session: Option<LiveSessionState>,
+    live_base_url: Option<String>,
     // Cached diff entries for current (before, after) pair
     diff_cache_key: Option<(usize, usize)>,
     diff_entries: Vec<DiffCellEntry>,
@@ -254,6 +270,7 @@ impl DuiDesktopView {
             comment_target: CommentTargetChoice::Screen,
             error_message: None,
             live_session: None,
+            live_base_url: opts.live_base_url,
             diff_cache_key: None,
             diff_entries: Vec::new(),
             canvas_diff_enabled: opts.canvas_diff,
@@ -988,6 +1005,64 @@ impl DuiDesktopView {
                         ),
                 )
             })
+    }
+
+    fn render_live_surface_pill(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let Some(live_url) = self.live_base_url.clone() else {
+            return div().id("desktop-live-surface-empty");
+        };
+        let screen_path = self
+            .active_screen()
+            .map(|s| s.path.clone())
+            .unwrap_or_else(|| "/".to_owned());
+        let label_text = match self.lang {
+            UiLang::Ko => format!("● 라이브 · {live_url}"),
+            UiLang::ZhCn => format!("● 实时 · {live_url}"),
+            UiLang::En => format!("● Live · {live_url}"),
+        };
+        div()
+            .id("desktop-live-surface-pill")
+            .px_3()
+            .py_1()
+            .rounded_full()
+            .border_1()
+            .border_color(p.primary)
+            .bg(p.glass)
+            .shadow_md()
+            .cursor_pointer()
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    let target = format!(
+                        "{}{}",
+                        live_url.trim_end_matches('/'),
+                        if screen_path.starts_with('/') {
+                            screen_path.clone()
+                        } else {
+                            format!("/{screen_path}")
+                        }
+                    );
+                    let opener = if cfg!(target_os = "macos") {
+                        "open"
+                    } else {
+                        "xdg-open"
+                    };
+                    let _ = std::process::Command::new(opener).arg(&target).spawn();
+                    let _ = this;
+                    cx.notify();
+                }),
+            )
+            .child(
+                Label::new(label_text)
+                    .text_xs()
+                    .font_semibold()
+                    .text_color(p.primary),
+            )
     }
 
     /// Floating inline Canvas Diff Bar next to the audit pill, matching `apps/canvas` `.canvas-diff-bar`.
@@ -1959,6 +2034,7 @@ impl DuiDesktopView {
             .items_center()
             .justify_center()
             .gap_2()
+            .child(self.render_live_surface_pill(cx))
             .child(self.render_audit_pill(cx))
             .child(self.render_canvas_diff_bar(cx));
 
@@ -4209,6 +4285,7 @@ fn run_snapshot(opts: LaunchOptions, snapshot_out: PathBuf) -> Result<Value, Str
         );
     });
 
+    let live_base_url_out = opts.live_base_url.clone();
     let dui_home_str = opts.dui_home.display().to_string();
     let width = opts.viewport_width;
     let height = opts.viewport_height;
@@ -4263,6 +4340,7 @@ fn run_snapshot(opts: LaunchOptions, snapshot_out: PathBuf) -> Result<Value, Str
     Ok(json!({
         "ok": true,
         "duiHome": dui_home_str,
+        "liveBaseUrl": live_base_url_out,
         "snapshot": snapshot_out.display().to_string(),
         "pixelWidth": pixel_w,
         "pixelHeight": pixel_h,
@@ -4279,6 +4357,9 @@ fn main() {
         project: None,
         run_id: None,
         screen_path: None,
+        live_base_url: env::var("DUI_LIVE_URL")
+            .ok()
+            .and_then(|v| validate_loopback_live_url(&v)),
         view: ViewMode::Overview,
         canvas_diff: false,
         dark: true,
@@ -4312,6 +4393,12 @@ fn main() {
             "--screen" => {
                 if let Some(val) = args.get(i + 1) {
                     opts.screen_path = Some(val.clone());
+                    i += 1;
+                }
+            }
+            "--live-url" => {
+                if let Some(val) = args.get(i + 1) {
+                    opts.live_base_url = validate_loopback_live_url(val);
                     i += 1;
                 }
             }
