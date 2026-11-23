@@ -239,19 +239,22 @@ export function ElementInspector({
             ))}
           </dl>
 
-          {selected.attributes && Object.keys(selected.attributes).length > 0 && (
-            <details className="readonly-disclosure">
-              <summary>{t.elementAttributesLabel}</summary>
-              <dl className="element-props-grid">
-                {Object.entries(selected.attributes).map(([k, v]) => (
-                  <div key={k} className="element-prop-row">
-                    <dt>{k}</dt>
-                    <dd>{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </details>
-          )}
+          {selected.attributes &&
+            Object.keys(selected.attributes).some((k) => !k.startsWith("data-dui-")) && (
+              <details className="readonly-disclosure">
+                <summary>{t.elementAttributesLabel}</summary>
+                <dl className="element-props-grid">
+                  {Object.entries(selected.attributes)
+                    .filter(([k]) => !k.startsWith("data-dui-"))
+                    .map(([k, v]) => (
+                      <div key={k} className="element-prop-row">
+                        <dt>{k}</dt>
+                        <dd>{v}</dd>
+                      </div>
+                    ))}
+                </dl>
+              </details>
+            )}
         </div>
       )}
 
@@ -265,9 +268,18 @@ export function ElementInspector({
               <button
                 type="button"
                 className={`element-node-btn${selected?.id === node.id ? " active" : ""}`}
-                onMouseEnter={() => setHoveredId(node.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={() => setSelectedId(node.id)}
+                onMouseEnter={() => {
+                  setHoveredId(node.id);
+                  onHighlightNode?.(node.id);
+                }}
+                onMouseLeave={() => {
+                  setHoveredId(null);
+                  onHighlightNode?.(selected?.id ?? null);
+                }}
+                onClick={() => {
+                  setLocalSelectedId(node.id);
+                  onHighlightNode?.(node.id);
+                }}
               >
                 <code>{node.id}</code>
                 <span>

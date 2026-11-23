@@ -126,8 +126,6 @@ export type Messages = {
   commentResolved: string;
   noComments: string;
   commentFailed: string;
-  auditCoverageLabel: (verifiedPct: number, goalPct: number) => string;
-  auditCellsLabel: (verified: number, renderable: number, total: number) => string;
   auditOpenCommentsLabel: (count: number) => string;
   auditDesignIssuesLabel: (count: number) => string;
   designIssuesTitle: string;
@@ -254,10 +252,6 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     commentResolved: "Resolved",
     noComments: "No review comments on this screen yet.",
     commentFailed: "Could not save review comments.",
-    auditCoverageLabel: (verifiedPct, goalPct) =>
-      `Coverage ${verifiedPct.toFixed(1)}% / ${goalPct}% goal`,
-    auditCellsLabel: (verified, renderable, total) =>
-      `${verified} verified · ${renderable}/${total} renderable`,
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
     auditDesignIssuesLabel: (count) => `${count} design ${count === 1 ? "issue" : "issues"}`,
     designIssuesTitle: "Design & a11y checks",
@@ -383,10 +377,6 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     commentResolved: "已解决",
     noComments: "此界面暂无评审评论。",
     commentFailed: "无法保存评审评论。",
-    auditCoverageLabel: (verifiedPct, goalPct) =>
-      `覆盖率 ${verifiedPct.toFixed(1)}% / 目标 ${goalPct}%`,
-    auditCellsLabel: (verified, renderable, total) =>
-      `${verified} 已验证 · ${renderable}/${total} 可渲染`,
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
     auditDesignIssuesLabel: (count) => `${count} 项设计问题`,
     designIssuesTitle: "设计与无障碍检查",
@@ -512,10 +502,6 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     commentResolved: "해결됨",
     noComments: "이 화면에 등록된 코멘트가 없습니다.",
     commentFailed: "코멘트를 불러오거나 저장할 수 없습니다.",
-    auditCoverageLabel: (verifiedPct, goalPct) =>
-      `커버리지 ${verifiedPct.toFixed(1)}% / 목표 ${goalPct}%`,
-    auditCellsLabel: (verified, renderable, total) =>
-      `검증 ${verified} · 렌더 가능 ${renderable}/${total}`,
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
     auditDesignIssuesLabel: (count) => `디자인 결함 ${count}건`,
     designIssuesTitle: "디자인 · 접근성 진단",
