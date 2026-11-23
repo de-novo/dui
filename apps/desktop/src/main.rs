@@ -13,7 +13,7 @@ use gpui_kit::{
     base::StyledExt,
     canvas,
     component::{
-        Theme, ThemeMode,
+        Theme, ThemeMode, TitleBar,
         button::{Button, ButtonVariants as _},
         input::{Input, InputState},
         label::Label,
@@ -263,7 +263,7 @@ impl DuiDesktopView {
             dragging: false,
             drag_moved: false,
             drag_last: point(px(0.0), px(0.0)),
-            viewport_w: opts.viewport_width.saturating_sub(220).max(400) as f32,
+            viewport_w: opts.viewport_width.max(400) as f32,
             viewport_h: opts.viewport_height.max(400) as f32,
             focus_handle,
             comment_input,
@@ -358,29 +358,46 @@ impl DuiDesktopView {
         compute_layout(&run.screens, self.selected_width)
     }
 
+    fn rail_width(&self) -> f32 {
+        if self.rail_collapsed { 52.0 } else { 204.0 }
+    }
+
+    fn inspector_width(&self) -> f32 {
+        if self.view_mode == ViewMode::Detail && !self.full_1x_detail {
+            332.0
+        } else {
+            0.0
+        }
+    }
+
     fn fit_map(&mut self) {
         let layout = self.current_layout();
+        let left_inset = self.rail_width() + 56.0;
+        let right_inset = self.inspector_width() + 28.0;
+        let top_inset = 24.0;
+        let bottom_inset = 28.0;
         if layout.nodes.is_empty() || layout.content_width <= 0.0 || layout.content_height <= 0.0 {
             self.zoom = 0.2;
-            self.pan_x = 32.0;
-            self.pan_y = 32.0;
+            self.pan_x = left_inset;
+            self.pan_y = top_inset;
             return;
         }
-        let pad_x = 56.0;
-        let pad_y = 64.0;
-        let avail_w = (self.viewport_w - pad_x * 2.0).max(240.0);
-        let avail_h = (self.viewport_h - pad_y * 2.0).max(240.0);
+        let avail_w = (self.viewport_w - left_inset - right_inset).max(240.0);
+        let avail_h = (self.viewport_h - top_inset - bottom_inset).max(240.0);
         let zx = avail_w / layout.content_width;
         let zy = avail_h / layout.content_height;
-        self.zoom = zx.min(zy).clamp(0.05, 1.0);
+        self.zoom = zx.min(zy).clamp(0.02, 1.0);
         let scaled_w = layout.content_width * self.zoom;
         let scaled_h = layout.content_height * self.zoom;
-        self.pan_x = ((self.viewport_w - scaled_w) * 0.5).max(pad_x * 0.5);
-        self.pan_y = ((self.viewport_h - scaled_h) * 0.5).max(pad_y * 0.5);
+        self.pan_x = left_inset + (avail_w - scaled_w) * 0.5;
+        self.pan_y = top_inset + (avail_h - scaled_h) * 0.5;
     }
 
     fn zoom_one_to_one(&mut self) {
         let layout = self.current_layout();
+        let left_inset = self.rail_width();
+        let right_inset = self.inspector_width();
+        let center_x = left_inset + ((self.viewport_w - left_inset - right_inset).max(240.0) * 0.5);
         self.zoom = 1.0;
         if let Some(node) = layout
             .nodes
@@ -390,19 +407,25 @@ impl DuiDesktopView {
         {
             let cx_world = node.x + layout.metrics.card_width * 0.5;
             let cy_world = node.y + node.card_height.min(900.0) * 0.5;
-            self.pan_x = self.viewport_w * 0.5 - cx_world;
+            self.pan_x = center_x - cx_world;
             self.pan_y = self.viewport_h * 0.5 - cy_world;
         }
     }
 
-    fn adjust_zoom(&mut self, factor: f32) {
-        let next = (self.zoom * factor).clamp(0.04, 3.0);
+    fn adjust_zoom_at(&mut self, factor: f32, anchor_x: f32, anchor_y: f32) {
+        let next = (self.zoom * factor).clamp(0.02, 3.0);
         let ratio = next / self.zoom;
-        let anchor_x = self.viewport_w * 0.5;
-        let anchor_y = self.viewport_h * 0.5;
         self.pan_x = anchor_x - (anchor_x - self.pan_x) * ratio;
         self.pan_y = anchor_y - (anchor_y - self.pan_y) * ratio;
         self.zoom = next;
+    }
+
+    fn adjust_zoom(&mut self, factor: f32) {
+        let left_inset = self.rail_width();
+        let right_inset = self.inspector_width();
+        let anchor_x = left_inset + ((self.viewport_w - left_inset - right_inset).max(240.0) * 0.5);
+        let anchor_y = self.viewport_h * 0.5;
+        self.adjust_zoom_at(factor, anchor_x, anchor_y);
     }
 
     fn select_run(&mut self, idx: usize, cx: &mut Context<Self>) {
@@ -649,6 +672,243 @@ impl DuiDesktopView {
         }
     }
 
+    /// Unified native macOS/desktop TitleBar (traffic-light strip) hosting workspace switcher,
+    /// live/audit/diff status pills, and 1-click capture width controls.
+    fn render_title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let p = self.pal();
+        let tr = i18n::strings(self.lang);
+        let collapsed = self.rail_collapsed;
+
+        let left_group = {
+            let mut row = div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    div()
+                        .id("titlebar-rail-toggle")
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .rounded_md()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.rail_collapsed = !this.rail_collapsed;
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(if collapsed { "▸" } else { "◧" })
+                                .text_xs()
+                                .text_color(p.sidebar_muted),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_baseline()
+                        .child(
+                            Label::new("dui")
+                                .text_sm()
+                                .font_bold()
+                                .text_color(p.sidebar_foreground),
+                        )
+                        .child(Label::new(".").text_sm().font_bold().text_color(p.primary)),
+                );
+
+            if let Some(run) = self.active_run() {
+                let short_ver = short_run_id(&run.id);
+                let label_text = match run.branch.as_deref() {
+                    Some(b) if !b.is_empty() && b != "main" => {
+                        format!("{} · {b} · {short_ver}", run.project_name)
+                    }
+                    _ => format!("{} · {short_ver}", run.project_name),
+                };
+                row = row.child(
+                    div()
+                        .id("titlebar-workspace-btn")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.picker_open = !this.picker_open;
+                                this.options_open = false;
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(label_text)
+                                .text_xs()
+                                .font_medium()
+                                .text_color(p.foreground),
+                        )
+                        .child(Label::new("↕").text_xs().text_color(p.muted_foreground)),
+                );
+            }
+            row
+        };
+
+        let center_group = div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                cx.stop_propagation();
+            })
+            .child(self.render_live_surface_pill(cx))
+            .child(self.render_audit_pill(cx))
+            .child(self.render_canvas_diff_bar(cx));
+
+        let right_group = {
+            let mut row = div()
+                .flex()
+                .items_center()
+                .gap_1p5()
+                .pr_2()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                    cx.stop_propagation();
+                });
+
+            if let Some(run) = self.active_run() {
+                let widths = run.widths();
+                if !widths.is_empty() {
+                    let mut seg = div()
+                        .flex()
+                        .items_center()
+                        .gap_0p5()
+                        .p_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface);
+                    for w in widths.into_iter().take(4) {
+                        let active = w == self.selected_width;
+                        seg = seg.child(
+                            div()
+                                .id(format!("titlebar-width-{w}"))
+                                .px_1p5()
+                                .py_0p5()
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .when(active, |el| el.bg(p.foreground))
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.selected_width = w;
+                                        this.sync_cell_to_width();
+                                        this.fit_map();
+                                        cx.notify();
+                                    }),
+                                )
+                                .child(
+                                    Label::new(format!("{w}px"))
+                                        .text_xs()
+                                        .font_medium()
+                                        .text_color(if active {
+                                            p.background
+                                        } else {
+                                            p.muted_foreground
+                                        }),
+                                ),
+                        );
+                    }
+                    row = row.child(seg);
+                }
+            }
+
+            row = row
+                .child(
+                    div()
+                        .id("titlebar-theme-btn")
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, window, cx| {
+                                cx.stop_propagation();
+                                this.dark_mode = !this.dark_mode;
+                                Theme::change(
+                                    if this.dark_mode {
+                                        ThemeMode::Dark
+                                    } else {
+                                        ThemeMode::Light
+                                    },
+                                    Some(window),
+                                    cx,
+                                );
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            Label::new(if self.dark_mode { "☾" } else { "☀" })
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                        ),
+                )
+                .child(
+                    div()
+                        .id("titlebar-options-btn")
+                        .px_2()
+                        .py_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(p.glass_line)
+                        .bg(p.glass_surface)
+                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.options_open = !this.options_open;
+                                this.picker_open = false;
+                                cx.notify();
+                            }),
+                        )
+                        .child(Label::new("⊶").text_xs().text_color(p.muted_foreground))
+                        .child(
+                            Label::new(tr.map_options)
+                                .text_xs()
+                                .text_color(p.foreground),
+                        ),
+                );
+            row
+        };
+
+        TitleBar::new()
+            .bg(p.sidebar)
+            .border_color(p.sidebar_line)
+            .child(left_group)
+            .child(center_group)
+            .child(right_group)
+    }
+
     /// Floating rounded glass left WorkspaceRail matching `apps/canvas/src/features/workspace/WorkspaceRail.tsx` 1:1.
     fn render_workspace_rail(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let p = self.pal();
@@ -858,6 +1118,12 @@ impl DuiDesktopView {
             .h_full()
             .flex_shrink_0()
             .p_2()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                cx.stop_propagation();
+            })
+            .on_scroll(|_, _, cx| {
+                cx.stop_propagation();
+            })
             .child(
                 div()
                     .size_full()
@@ -1943,10 +2209,11 @@ impl DuiDesktopView {
                 .child(Label::new(text).text_xs().text_color(p.foreground))
         };
 
+        let rail_w = self.rail_width();
         let zoom_stack = div()
             .id("desktop-zoom-controls")
             .absolute()
-            .left(px(12.0))
+            .left(px(rail_w + 12.0))
             .bottom(px(12.0))
             .flex()
             .flex_col()
@@ -1984,59 +2251,10 @@ impl DuiDesktopView {
                 }),
             ));
 
-        // Bottom-right floating `Map options` pill matching `/tmp/obora-dui-overview.png`
-        let map_options_btn = div()
-            .id("map-options-btn")
-            .absolute()
-            .right(px(16.0))
-            .bottom(px(14.0))
-            .px_3()
-            .py_2()
-            .rounded_lg()
-            .border_1()
-            .border_color(p.glass_line)
-            .bg(p.glass)
-            .shadow_md()
-            .cursor_pointer()
-            .flex()
-            .items_center()
-            .gap_2()
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, _, cx| {
-                    cx.stop_propagation();
-                    this.options_open = !this.options_open;
-                    this.picker_open = false;
-                    cx.notify();
-                }),
-            )
-            .child(Label::new("⊶").text_xs().text_color(p.muted_foreground))
-            .child(
-                Label::new(tr.map_options)
-                    .text_xs()
-                    .text_color(p.foreground),
-            );
-
-        // Top-center floating audit pill + inline canvas diff bar (matching `apps/canvas` `.map-top-bar`)
-        let top_pill = div()
-            .absolute()
-            .top(px(12.0))
-            .left_0()
-            .right_0()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .justify_center()
-            .gap_2()
-            .child(self.render_live_surface_pill(cx))
-            .child(self.render_audit_pill(cx))
-            .child(self.render_canvas_diff_bar(cx));
-
         div()
             .id("desktop-map-viewport")
             .relative()
-            .flex_1()
-            .h_full()
+            .size_full()
             .overflow_hidden()
             .on_scroll(cx.listener(|this, event: &ScrollEvent, _, cx| {
                 let delta = match event.delta {
@@ -2044,7 +2262,12 @@ impl DuiDesktopView {
                     ScrollDelta::Lines(l) => (l.x * 24.0, l.y * 24.0),
                 };
                 if event.modifiers.platform || event.modifiers.control {
-                    this.adjust_zoom(if delta.1 > 0.0 { 1.1 } else { 0.9 });
+                    let factor = (1.0 + delta.1 * 0.008).clamp(0.75, 1.35);
+                    this.adjust_zoom_at(
+                        factor,
+                        f32::from(event.position.x),
+                        f32::from(event.position.y),
+                    );
                 } else {
                     this.pan_x += delta.0;
                     this.pan_y += delta.1;
@@ -2087,9 +2310,7 @@ impl DuiDesktopView {
             )
             .child(edges_and_grid)
             .child(cards_layer)
-            .child(top_pill)
             .child(zoom_stack)
-            .child(map_options_btn)
     }
 
     /// Screen Neighborhood + Floating Glass Right Inspector matching `/tmp/obora-dui-detail.png` 1:1.
@@ -3225,13 +3446,19 @@ impl DuiDesktopView {
             Some(box_el)
         });
 
-        // Floating glass panel (margin: 10px, rounded-xl) matching `/tmp/obora-dui-detail.png`!
+        // Floating glass panel (margin: 10px, rounded-xl) matching `apps/canvas` ScreenInspector 1:1
         div()
             .id("floating-inspector-wrapper")
             .w(px(332.0))
             .h_full()
             .flex_shrink_0()
             .p_2()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                cx.stop_propagation();
+            })
+            .on_scroll(|_, _, cx| {
+                cx.stop_propagation();
+            })
             .child(
                 div()
                     .id("desktop-inspector")
@@ -4167,18 +4394,45 @@ impl Render for DuiDesktopView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = self.pal();
         let win_bounds = window.viewport_size();
-        let rail_w = if self.rail_collapsed { 52.0 } else { 204.0 };
-        let insp_w = if self.view_mode == ViewMode::Detail {
-            332.0
-        } else {
-            0.0
-        };
-        self.viewport_w = (f32::from(win_bounds.width) - rail_w - insp_w).max(320.0);
-        self.viewport_h = f32::from(win_bounds.height).max(320.0);
+        self.viewport_w = f32::from(win_bounds.width).max(320.0);
+        self.viewport_h = (f32::from(win_bounds.height) - 34.0).max(320.0);
 
+        let title_bar = self.render_title_bar(cx);
         let rail = self.render_workspace_rail(cx);
         let picker_modal = self.picker_open.then(|| self.render_work_picker_modal(cx));
         let options_modal = self.options_open.then(|| self.render_map_options_modal(cx));
+
+        let is_full_bleed_map = matches!(self.view_mode, ViewMode::Overview)
+            || (self.view_mode == ViewMode::Detail && !self.full_1x_detail);
+
+        let mut body = div().relative().flex_1().w_full().overflow_hidden();
+
+        if is_full_bleed_map {
+            let focus_active = self.view_mode == ViewMode::Detail;
+            let map = self.render_overview_stage(focus_active, cx);
+            let floating_rail = div()
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .left_0()
+                .child(rail);
+            body = body.child(map).child(floating_rail);
+            if focus_active
+                && let (Some(run), Some(screen)) =
+                    (self.active_run().cloned(), self.active_screen().cloned())
+            {
+                let insp = self.render_floating_inspector(&run, &screen, cx);
+                body = body.child(div().absolute().top_0().bottom_0().right_0().child(insp));
+            }
+        } else {
+            body = body.flex().flex_row().child(rail);
+            body = match self.view_mode {
+                ViewMode::Detail => body.child(self.render_detail_stage(cx)),
+                ViewMode::Live => body.child(self.render_live_stage(cx)),
+                ViewMode::Diff => body.child(self.render_diff_stage(cx)),
+                ViewMode::Overview => body.child(self.render_overview_stage(false, cx)),
+            };
+        }
 
         let mut root = div()
             .id("dui-desktop-root")
@@ -4187,29 +4441,11 @@ impl Render for DuiDesktopView {
             .relative()
             .size_full()
             .flex()
-            .flex_row()
+            .flex_col()
             .bg(p.background)
             .text_color(p.foreground)
-            .child(rail);
-
-        root = match self.view_mode {
-            ViewMode::Overview => root.child(self.render_overview_stage(false, cx)),
-            ViewMode::Detail => {
-                if self.full_1x_detail {
-                    root.child(self.render_detail_stage(cx))
-                } else if let (Some(run), Some(screen)) =
-                    (self.active_run().cloned(), self.active_screen().cloned())
-                {
-                    let map = self.render_overview_stage(true, cx);
-                    let insp = self.render_floating_inspector(&run, &screen, cx);
-                    root.child(map).child(insp)
-                } else {
-                    root.child(self.render_overview_stage(false, cx))
-                }
-            }
-            ViewMode::Live => root.child(self.render_live_stage(cx)),
-            ViewMode::Diff => root.child(self.render_diff_stage(cx)),
-        };
+            .child(title_bar)
+            .child(body);
 
         if let Some(modal) = picker_modal {
             root = root.child(modal);
@@ -4293,7 +4529,7 @@ fn run_snapshot(opts: LaunchOptions, snapshot_out: PathBuf) -> Result<Value, Str
                     })),
                     focus: false,
                     show: false,
-                    ..Default::default()
+                    ..TitleBar::window_options()
                 },
                 cx,
                 |window, cx| cx.new(|cx| DuiDesktopView::new(opts, window, cx)),
@@ -4471,7 +4707,7 @@ fn main() {
         let _ = gpui_kit::open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
+                ..TitleBar::window_options()
             },
             cx,
             move |window, cx| cx.new(|cx| DuiDesktopView::new(opts, window, cx)),
