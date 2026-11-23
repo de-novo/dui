@@ -249,7 +249,9 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
             }
         }
 
-        if !node.text.trim().is_empty()
+        let has_readable_text = !node.text.trim().is_empty()
+            && (!is_tui_row || node.text.chars().any(char::is_alphanumeric));
+        if has_readable_text
             && let (Some(fg_raw), Some(bg_raw)) =
                 (node.style.get("color"), node.style.get("backgroundColor"))
             && let (Some((fr, fg, fb, fa)), Some((br, bg, bb, ba))) =
