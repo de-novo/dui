@@ -31,7 +31,7 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 | 품질 · 다국어 · 감사 | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱 | 지원 |
 | 라이브 편집 · 뷰어 | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`) | 지원 |
 | 요소 인스펙터 · 박스 모델 | 개발자도구형 요소 속성 확인, 박스 모델 다이어그램·오버레이(너비·높이·마진·패딩·테두리·gap·radius), 요소 간 간격 레드라인 측정 가이드 | 지원 |
-| 캔버스 실제 컴포넌트 렌더링 | 2D 캔버스 카드 위에 실제 루프백 컴포넌트를 직접 마운트(`dui open --live` / `--live-url`)하고 실시간 `RenderNodeSnapshot` 텔레메트리를 `ElementInspector`로 스트리밍 (`v0.2.0`) | 지원 (프로토타입) |
+| 캔버스 실제 컴포넌트 렌더링 | 2D 캔버스 카드 위에 실제 루프백 컴포넌트를 직접 마운트(`dui open --live` / `--live-url`), 무수정 DOM 텔레메트리 브리지, 실시간 Design Audit 및 `ElementInspector` 양방향 하이라이트 (`v0.2.0`) | 지원 |
 | 디자인 결함 탐지 · 엔진 확장 | `renderTree` 기반 자동 디자인 결함·접근성 진단(가로 넘침·요소 겹침·WCAG 색상 대비·터치 타깃 크기·미라벨 컨트롤·간격 불일치 — 사람용 캔버스 오버레이 + AI용 CLI/MCP `designAudit` 정형 JSON), `SurfaceRegistry` 멀티 서피스 플러그인 파이프라인, 병렬 멀티 워커 캡처(`concurrency`), GPUI AccessKit 렌더 트리 Diff | 지원 |
 
 ## 설치

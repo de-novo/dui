@@ -7,19 +7,23 @@
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-11-23
+
 ### Added
 
-- 移动端与 TUI 编译器深度状态提取规则包（Ink 5、React Native、Expo Router 5）、共享编译器预言机 IR 与 6 个官方工具链探测命令（`dui toolchains`） ([#124](https://github.com/de-novo/dui/pull/124))。
-- 2D 画布实时组件挂载（`Static | Live mount`、回环源校验、`postMessage` 实时 `RenderNodeSnapshot` 流式传入 `ElementInspector`）、一键 `dui open --live` / `--live-url` 以及 GPUI 桌面查看器实时表面指示器对齐 ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138))。
-- 在 `check:style` CI 中强制校验 SemVer 与三语 `CHANGELOG` 版本同步（`npm run check:version`） ([#131](https://github.com/de-novo/dui/pull/131))。
+- 完整实现 2D 画布实时组件渲染（`Static | Live mount`、回环源校验、支持自动启动 static/url/command/Vite/Next.js 的一键 `dui open --live` / `--live-url`、零修改 `/live-surface/*` DOM 遥测桥接、实时 Design Audit、`ElementInspector` 与实时画布卡片双向高亮/选择，以及 GPUI 桌面查看器实时指示器对齐） ([#130](https://github.com/de-novo/dui/pull/130), [#138](https://github.com/de-novo/dui/pull/138), [#141](https://github.com/de-novo/dui/pull/141), [#142](https://github.com/de-novo/dui/pull/142))。
+- 框架级 React 受控属性与原生 HTML/WAI-ARIA 控件状态提取（`package: "react"` 与 `package: "html-aria"`，不绑定特定 UI 组件库） ([#140](https://github.com/de-novo/dui/pull/140))。
 - 通过官方 TypeScript 6/7 AST 解析回退（`adapters/vite/parser.mts`、`npm run check:vite7`）完整支持 Vite 7 Level 2 插桩与捕获 ([#133](https://github.com/de-novo/dui/pull/133))。
 - 在 Vite 7 与 8 中新增 React Router 7/8 静态路由自动发现（`createBrowserRouter`、`createHashRouter`、`createMemoryRouter`、嵌套 JSX `<Route>`、`index`、`:param` 与 `*` 通配路由） ([#134](https://github.com/de-novo/dui/pull/134), [#135](https://github.com/de-novo/dui/pull/135))。
 - 交互式浏览器登录会话捕获（`dui auth login <URL> --out FILE`），将 `HttpOnly` Cookie、`localStorage` 与 `sessionStorage` 以 `0600` 权限保存为 Playwright 兼容的 `storageState.json` ([#137](https://github.com/de-novo/dui/pull/137))。
+- 移动端与 TUI 编译器深度状态提取规则包（Ink 5、React Native、Expo Router 5）、共享编译器预言机 IR 与 6 个官方工具链探测命令（`dui toolchains`） ([#124](https://github.com/de-novo/dui/pull/124))。
+- 在 `check:style` CI 中强制校验 SemVer 与三语 `CHANGELOG` 版本同步（`npm run check:version`） ([#131](https://github.com/de-novo/dui/pull/131))。
 - 注册查看器 UI 设计与评审技能（`anti-ui-slop`、`web-design-guidelines`） ([#132](https://github.com/de-novo/dui/pull/132))。
 
 ### Changed
 
 - 将生态/规则包库版本从硬性工具链门禁中解耦：硬性 `>=` 基线校验仅适用于核心编译器、宿主与 UI 运行时（`tsc`、`vite` 7+、`react` 18+、`host: "next"` 时的 `next` 16+），始终接受更新的稳定主版本，并对规则包库版本差异以非致命 `versionNotes` 报告而不中断扫描 ([#136](https://github.com/de-novo/dui/pull/136))。
+- 将工作区与桌面端 crate 版本同步为 `0.2.0`。
 
 ## [v0.1.0] - 2026-11-23
 
@@ -140,7 +144,8 @@
 - 官方 TypeScript 6/7 编译器分析、类型化 GET 自动模拟、Vite 宿主与多宽度 Chromium CDP 捕获。
 - 按项目、分支与工作树组织在 `~/.dui/` 下的本地归档与源码安装器。
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/de-novo/dui/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/de-novo/dui/releases/tag/v0.1.0
 [v0.0.9]: https://github.com/de-novo/dui/compare/v0.0.8...v0.0.9
 [v0.0.8]: https://github.com/de-novo/dui/compare/v0.0.7...v0.0.8
