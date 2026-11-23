@@ -43,7 +43,7 @@ for (const changelog of ["CHANGELOG.md", "docs/ko/changelog.md", "docs/zh-CN/cha
 }
 
 const cargoLock = fs.readFileSync(path.join(root, "Cargo.lock"), "utf8");
-for (const pkg of ["dui", "dui-core"]) {
+for (const pkg of ["dui", "dui-core", "dui-ports", "dui-storage", "dui-app"]) {
   const pkgRe = new RegExp(`name = "${pkg}"\\nversion = "([^"]+)"`);
   const match = cargoLock.match(pkgRe);
   assert.ok(match, `Cargo.lock missing package '${pkg}'`);

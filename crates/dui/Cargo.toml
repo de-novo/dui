@@ -8,6 +8,9 @@ publish = false
 [dependencies]
 serde_json.workspace = true
 dui-core.workspace = true
+dui-ports.workspace = true
+dui-storage.workspace = true
+dui-app.workspace = true
 base64.workspace = true
 png.workspace = true
 rusqlite.workspace = true

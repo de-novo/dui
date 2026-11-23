@@ -1,53 +1,11 @@
-use crate::{Reply, analysis, failure, ports::TypeOracle, typescript::TypeScript};
+use crate::{Reply, analysis, ports::TypeOracle, typescript::TypeScript};
 use dui_core::surface::{
     SURFACE_GPUI_DESKTOP, SURFACE_VITE_WEB, SupportTier, SurfaceCapabilities, SurfaceDescriptor,
     SurfaceKind, UnrenderableReason, resolve_surface_id,
 };
-use serde_json::{Value, json};
+pub use dui_ports::{NoopOracle, SurfaceAdapter, unrenderable_reply};
+use serde_json::Value;
 use std::{fs, path::Path};
-
-pub struct NoopOracle;
-
-impl TypeOracle for NoopOracle {
-    fn facts(&self, _project: &Path, spec: &Path) -> Reply {
-        let bytes = fs::read(spec).map_err(|e| failure(2, &e.to_string()))?;
-        let manifest: Value =
-            serde_json::from_slice(&bytes).map_err(|e| failure(2, &e.to_string()))?;
-        let path = manifest.get("path").and_then(Value::as_str).unwrap_or("/");
-        Ok(json!({
-            "status": "ok",
-            "tier": "universal",
-            "compiler": "none",
-            "path": path,
-            "diagnostics": [],
-            "facts": [],
-            "autoMocks": {},
-            "files": []
-        }))
-    }
-}
-
-pub trait SurfaceAdapter {
-    fn descriptor(&self) -> SurfaceDescriptor;
-    fn oracle(&self) -> &dyn TypeOracle {
-        &NoopOracle
-    }
-    fn check_env(&self) -> Result<(), UnrenderableReason> {
-        Ok(())
-    }
-    fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply;
-}
-
-pub fn unrenderable_reply(surface_id: &str, reason: &UnrenderableReason) -> Value {
-    json!({
-        "status": "unrenderable",
-        "surface": surface_id,
-        "reason": reason.code,
-        "detail": reason.detail,
-        "verified": 0,
-        "attempted": 0
-    })
-}
 
 struct ViteWebSurface;
 
@@ -179,6 +137,7 @@ impl SurfaceRegistry {
 mod tests {
     use super::*;
     use dui_core::surface::SURFACE_ANDROID_MOBILE;
+    use serde_json::json;
 
     struct MockAndroidSurface {
         has_adb: bool,

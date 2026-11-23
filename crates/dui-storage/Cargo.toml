@@ -1,0 +1,13 @@
+[package]
+name = "dui-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+dui-core.workspace = true
+dui-ports.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

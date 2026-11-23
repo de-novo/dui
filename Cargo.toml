@@ -1,5 +1,11 @@
 [workspace]
-members = ["crates/dui-core", "crates/dui"]
+members = [
+  "crates/dui-core",
+  "crates/dui-ports",
+  "crates/dui-storage",
+  "crates/dui-app",
+  "crates/dui",
+]
 resolver = "3"
 
 [workspace.package]
@@ -10,7 +16,10 @@ version = "0.2.0"
 [workspace.dependencies]
 base64 = "0.22"
 csv = "1"
+dui-app = { path = "crates/dui-app" }
 dui-core = { path = "crates/dui-core" }
+dui-ports = { path = "crates/dui-ports" }
+dui-storage = { path = "crates/dui-storage" }
 png = "0.18.1"
 rusqlite = { version = "0.43", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

@@ -1,13 +1,13 @@
 //! Capture-to-capture diff with changed source file attribution and PNG pixel-diff overlays.
 
-use crate::{Reply, archive, failure, sqlite_store::SqliteStore};
 use dui_core::{
     diff::{
         DiffCellSnapshot, RenderNodeSnapshot, affected_files, compute_rgba_diff, diff_captures,
     },
     model::{CacheKey, ProjectId},
-    storage::{CacheRepository, RunFilter, RunRepository},
+    storage::RunFilter,
 };
+use dui_ports::{AppStore, Reply, failure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -29,9 +29,9 @@ fn optional_json_file(path: &Path) -> Option<Value> {
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
 }
 
-fn load_cell_snapshots(
+fn load_cell_snapshots<S: AppStore>(
     dir: &Path,
-    store: Option<&SqliteStore>,
+    store: Option<&S>,
 ) -> Result<(Option<Value>, Vec<DiffCellSnapshot>), (u8, Value)> {
     let report = read_json_file(&dir.join("report.json"))?;
     let snapshot = optional_json_file(&dir.join("snapshot.json"));
@@ -172,22 +172,24 @@ fn overlay_filename(before_img: &str, after_img: &str) -> String {
     format!("{}-diff.png", &digest[..16])
 }
 
-pub fn compare(before: &Path, after: &Path, overlay_dir: Option<&Path>) -> Reply {
-    compare_with_options(before, after, overlay_dir, true)
+pub fn compare<S: AppStore>(
+    store: Option<&S>,
+    before: &Path,
+    after: &Path,
+    overlay_dir: Option<&Path>,
+) -> Reply {
+    compare_with_options(store, before, after, overlay_dir, true)
 }
 
-pub fn compare_with_options(
+pub fn compare_with_options<S: AppStore>(
+    store: Option<&S>,
     before: &Path,
     after: &Path,
     overlay_dir: Option<&Path>,
     include_pixels: bool,
 ) -> Reply {
-    let store = crate::archive::home_dir()
-        .ok()
-        .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
-
-    let (before_snap, before_cells) = load_cell_snapshots(before, store.as_ref())?;
-    let (after_snap, after_cells) = load_cell_snapshots(after, store.as_ref())?;
+    let (before_snap, before_cells) = load_cell_snapshots(before, store)?;
+    let (after_snap, after_cells) = load_cell_snapshots(after, store)?;
 
     let mut diff = diff_captures(&before_cells, &after_cells);
 
@@ -247,28 +249,14 @@ pub fn compare_with_options(
     }))
 }
 
-pub fn compare_branches(
-    project: &Path,
+pub fn compare_branches_with_store<S: AppStore>(
+    store: &S,
+    home: &Path,
+    project_id_str: &str,
     base_branch: &str,
-    head_branch: Option<&str>,
+    resolved_head: &str,
     overlay_dir: Option<&Path>,
 ) -> Reply {
-    let prov = archive::provenance(project)?;
-    let project_id_str = prov["projectId"]
-        .as_str()
-        .ok_or_else(|| failure(2, "could not resolve project identity"))?;
-    let resolved_head = head_branch
-        .map(str::to_owned)
-        .or_else(|| prov["branch"].as_str().map(str::to_owned))
-        .ok_or_else(|| {
-            failure(
-                2,
-                "could not determine current git branch; pass --head BRANCH",
-            )
-        })?;
-
-    let home = archive::home_dir()?;
-    let (store, _) = SqliteStore::open(&home).map_err(|e| failure(3, &e.to_string()))?;
     let pid = ProjectId::parse(project_id_str).map_err(|e| failure(2, &e.to_string()))?;
 
     let find_latest_run = |branch: &str| -> Result<PathBuf, (u8, Value)> {
@@ -300,8 +288,8 @@ pub fn compare_branches(
     };
 
     let before_dir = find_latest_run(base_branch)?;
-    let after_dir = find_latest_run(&resolved_head)?;
-    let mut reply = compare(&before_dir, &after_dir, overlay_dir)?;
+    let after_dir = find_latest_run(resolved_head)?;
+    let mut reply = compare(Some(store), &before_dir, &after_dir, overlay_dir)?;
     if let Some(obj) = reply.as_object_mut() {
         obj.insert("beforeBranch".into(), json!(base_branch));
         obj.insert("afterBranch".into(), json!(resolved_head));
@@ -446,7 +434,9 @@ mod tests {
 
         // Lazy mode skips pixelDiff for `/` (renderDiff found h1 text change),
         // but still computes pixelDiff automatically for visual-only `/canvas`.
-        let lazy = compare_with_options(&before, &after, None, false).expect("lazy compare");
+        let no_store: Option<&DummyStore> = None;
+        let lazy =
+            compare_with_options(no_store, &before, &after, None, false).expect("lazy compare");
         let screens = lazy["screens"].as_array().unwrap();
         let home_cell = &screens.iter().find(|s| s["path"] == "/").unwrap()["cells"][0];
         assert_eq!(home_cell["renderDiff"]["textChanged"], 1);
@@ -457,7 +447,8 @@ mod tests {
         assert_eq!(canvas_cell["pixelDiff"]["diffPixels"], 4);
 
         // Eager pixel mode hydrates pixelDiff on `/` as well.
-        let eager = compare_with_options(&before, &after, None, true).expect("eager compare");
+        let eager =
+            compare_with_options(no_store, &before, &after, None, true).expect("eager compare");
         let home_eager = &eager["screens"]
             .as_array()
             .unwrap()
@@ -465,5 +456,196 @@ mod tests {
             .find(|s| s["path"] == "/")
             .unwrap()["cells"][0];
         assert_eq!(home_eager["pixelDiff"]["diffPixels"], 4);
+    }
+
+    struct DummyStore;
+    impl dui_core::storage::WorkspaceRepository for DummyStore {
+        fn upsert_project(
+            &mut self,
+            _: &dui_core::model::Project,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_project(
+            &self,
+            _: &dui_core::model::ProjectId,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::Project>> {
+            unimplemented!()
+        }
+        fn upsert_worktree(
+            &mut self,
+            _: &dui_core::model::Worktree,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_worktree(
+            &self,
+            _: &dui_core::model::WorktreeId,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::Worktree>> {
+            unimplemented!()
+        }
+        fn put_commit(
+            &mut self,
+            _: &dui_core::model::Commit,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_commit(
+            &self,
+            _: &dui_core::model::CommitId,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::Commit>> {
+            unimplemented!()
+        }
+    }
+    impl dui_core::storage::RunRepository for DummyStore {
+        fn save_run(
+            &mut self,
+            _: &dui_core::model::RunAggregate,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn load_run(
+            &self,
+            _: &dui_core::model::RunId,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::RunAggregate>> {
+            unimplemented!()
+        }
+        fn list_runs(
+            &self,
+            _: &RunFilter,
+        ) -> dui_core::storage::StoreResult<Vec<dui_core::storage::RunSummary>> {
+            unimplemented!()
+        }
+    }
+    impl dui_core::storage::ArtifactStore for DummyStore {
+        fn put_blob(
+            &mut self,
+            _: &dui_core::model::ImageBlob,
+            _: &[u8],
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_blob(
+            &self,
+            _: &dui_core::model::BlobId,
+        ) -> dui_core::storage::StoreResult<Option<(dui_core::model::ImageBlob, Vec<u8>)>> {
+            unimplemented!()
+        }
+        fn put_evidence(
+            &mut self,
+            _: &dui_core::model::Evidence,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_evidence(
+            &self,
+            _: &dui_core::model::EvidenceId,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::Evidence>> {
+            unimplemented!()
+        }
+        fn unreferenced_blobs(
+            &self,
+        ) -> dui_core::storage::StoreResult<Vec<dui_core::model::BlobId>> {
+            unimplemented!()
+        }
+        fn delete_blob(&mut self, _: &dui_core::model::BlobId) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+    }
+    impl dui_core::storage::CacheRepository for DummyStore {
+        fn put_cache(
+            &mut self,
+            _: &dui_core::model::CacheEntry,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_cache(
+            &self,
+            _: &CacheKey,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::CacheEntry>> {
+            Ok(None)
+        }
+    }
+    impl dui_core::storage::CommentRepository for DummyStore {
+        fn upsert_comment(
+            &mut self,
+            _: &dui_core::model::Comment,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn get_comment(
+            &self,
+            _: &dui_core::model::CommentId,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::Comment>> {
+            unimplemented!()
+        }
+        fn list_comments(
+            &self,
+            _: &dui_core::model::RunId,
+        ) -> dui_core::storage::StoreResult<Vec<dui_core::model::Comment>> {
+            unimplemented!()
+        }
+    }
+    impl AppStore for DummyStore {
+        fn blob_path(&self, _: &dui_core::model::BlobId) -> PathBuf {
+            unimplemented!()
+        }
+        fn link_or_copy_blob(
+            &self,
+            _: &dui_core::model::BlobId,
+            _: &Path,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn find_previous_cache_inputs(
+            &self,
+            _: &dui_core::model::StateId,
+            _: dui_core::model::Width,
+            _: Option<&str>,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::CacheInputs>> {
+            unimplemented!()
+        }
+        fn import_run_dir(&mut self, _: &Path) -> dui_core::storage::StoreResult<bool> {
+            unimplemented!()
+        }
+        fn ensure_screen_record(
+            &self,
+            _: &dui_core::model::ScreenId,
+            _: &str,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn ensure_edge_record(
+            &self,
+            _: &dui_core::model::EdgeId,
+            _: &dui_core::model::RunId,
+            _: &dui_core::model::ScreenId,
+            _: &dui_core::model::ScreenId,
+        ) -> dui_core::storage::StoreResult<()> {
+            unimplemented!()
+        }
+        fn find_cell_id(
+            &self,
+            _: &dui_core::model::RunId,
+            _: &str,
+            _: Option<&str>,
+            _: u32,
+        ) -> dui_core::storage::StoreResult<Option<dui_core::model::CellId>> {
+            unimplemented!()
+        }
+        fn describe_comment_target(&self, _: &dui_core::model::CommentTarget) -> Value {
+            unimplemented!()
+        }
+        fn list_comments_by_project(
+            &self,
+            _: &ProjectId,
+        ) -> dui_core::storage::StoreResult<Vec<dui_core::model::Comment>> {
+            unimplemented!()
+        }
+        fn list_all_comments(
+            &self,
+        ) -> dui_core::storage::StoreResult<Vec<dui_core::model::Comment>> {
+            unimplemented!()
+        }
     }
 }
