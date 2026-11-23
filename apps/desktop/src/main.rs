@@ -160,6 +160,10 @@ impl Drop for DuiDesktopView {
 }
 
 fn route_short_name(path: &str) -> String {
+    if let Some((_, slug)) = path.split_once("#overlay:") {
+        let label = slug.replace('-', " ");
+        return format!("◫ {}", if label.is_empty() { "modal" } else { &label });
+    }
     let clean = path.split('?').next().unwrap_or(path);
     let parts: Vec<&str> = clean.split('/').filter(|s| !s.is_empty()).collect();
     if parts.is_empty() {

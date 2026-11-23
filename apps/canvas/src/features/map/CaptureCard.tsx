@@ -14,7 +14,16 @@ import {
   type LiveSurfaceMode,
 } from "../../model/liveSurface";
 
+export function isOverlayPath(path: string): boolean {
+  return path.includes("#overlay:");
+}
+
 export function routeName(path: string) {
+  const overlayIdx = path.indexOf("#overlay:");
+  if (overlayIdx >= 0) {
+    const slug = path.slice(overlayIdx + "#overlay:".length);
+    return slug.replace(/-/g, " ") || "Overlay";
+  }
   return path.split("?")[0].split("/").filter(Boolean).slice(-2).join("/") || path;
 }
 
@@ -168,6 +177,7 @@ export function CaptureCard({
           </div>
         )}
         {liveUrl && <span className="card-live-pill">LIVE</span>}
+        {!liveUrl && isOverlayPath(screen.path) && <span className="card-overlay-pill">MODAL</span>}
         {showRenderBoxes && screenDiff?.renderDiff && (
           <div className="render-diff-box-layer" aria-hidden="true">
             {screenDiff.renderDiff.changes.slice(0, 24).map((chg) => {

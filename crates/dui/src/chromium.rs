@@ -1036,6 +1036,105 @@ impl Browser {
         {
             v["links"] = arr.clone().into();
         }
+        if spec["discoverOverlays"] == true
+            && let Some(out_dir) = png.parent()
+            && let Ok(listed) = self.call(
+                s,
+                "Runtime.evaluate",
+                json!({
+                    "expression": "globalThis.__duiRuntime.listOverlayTriggers()",
+                    "returnByValue": true
+                }),
+            )
+            && let Some(triggers) = listed["result"]["value"].as_array()
+        {
+            let mut overlays = Vec::new();
+            let mut seen_slugs = std::collections::BTreeSet::new();
+            for trigger in triggers.iter().take(12) {
+                if overlays.len() >= 4 {
+                    break;
+                }
+                let Some(idx) = trigger["index"].as_u64() else {
+                    continue;
+                };
+                let Ok(opened) = self.call(
+                    s,
+                    "Runtime.evaluate",
+                    json!({
+                        "expression": format!("globalThis.__duiRuntime.openOverlayTrigger({idx})"),
+                        "awaitPromise": true,
+                        "returnByValue": true
+                    }),
+                ) else {
+                    continue;
+                };
+                let res = &opened["result"]["value"];
+                if res["opened"] == true
+                    && let Some(slug) = res["slug"].as_str()
+                    && seen_slugs.insert(slug.to_owned())
+                    && let Ok(shot) =
+                        self.call(s, "Page.captureScreenshot", json!({"format": "png"}))
+                    && let Some(b64) = shot["data"].as_str()
+                    && let Ok(bytes) = STANDARD.decode(b64)
+                {
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(&bytes);
+                    let hex: String = hasher
+                        .finalize()
+                        .iter()
+                        .take(8)
+                        .map(|b| format!("{b:02x}"))
+                        .collect();
+                    let file_name = format!("{hex}-overlay-{width}-{slug}.png");
+                    if fs::write(out_dir.join(&file_name), &bytes).is_ok() {
+                        overlays.push(json!({
+                            "slug": slug,
+                            "title": res["title"],
+                            "triggerLabel": res["triggerLabel"],
+                            "scope": res["scope"],
+                            "image": file_name,
+                            "width": width,
+                            "renderTree": res["renderTree"],
+                        }));
+                    }
+                    let _ = self.call(
+                        s,
+                        "Input.dispatchKeyEvent",
+                        json!({
+                            "type": "keyDown",
+                            "key": "Escape",
+                            "code": "Escape",
+                            "windowsVirtualKeyCode": 27,
+                            "nativeVirtualKeyCode": 27
+                        }),
+                    );
+                    let _ = self.call(
+                        s,
+                        "Input.dispatchKeyEvent",
+                        json!({
+                            "type": "keyUp",
+                            "key": "Escape",
+                            "code": "Escape",
+                            "windowsVirtualKeyCode": 27,
+                            "nativeVirtualKeyCode": 27
+                        }),
+                    );
+                    let _ = self.call(
+                        s,
+                        "Runtime.evaluate",
+                        json!({
+                            "expression": "globalThis.__duiRuntime.closeOverlay()",
+                            "awaitPromise": true,
+                            "returnByValue": true
+                        }),
+                    );
+                }
+            }
+            if !overlays.is_empty() {
+                v["overlays"] = json!(overlays);
+            }
+        }
         if !v.is_object() {
             v = json!({"ready":false});
         }

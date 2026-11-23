@@ -82,7 +82,15 @@ try {
       <button id="more-toggle" type="button" aria-expanded="false">More</button>
       <div id="more-menu" hidden></div>
     </nav>
-    <p>Plain HTML rendered with zero bundler.</p>
+    <main>
+      <p>Plain HTML rendered with zero bundler.</p>
+      <button id="open-modal-btn" type="button" aria-haspopup="dialog">Create Item</button>
+      <dialog id="create-dialog" aria-label="Create Item">
+        <h2>Create Item</h2>
+        <p>Modal content captured automatically.</p>
+        <button id="close-modal-btn" type="button" aria-label="Close">Close</button>
+      </dialog>
+    </main>
     <script>
       const btn = document.getElementById("more-toggle");
       const menu = document.getElementById("more-menu");
@@ -92,6 +100,9 @@ try {
         menu.hidden = open;
         menu.innerHTML = open ? "" : '<a href="/more.html">More Info</a>';
       });
+      const dlg = document.getElementById("create-dialog");
+      document.getElementById("open-modal-btn").addEventListener("click", () => dlg.showModal());
+      document.getElementById("close-modal-btn").addEventListener("click", () => dlg.close());
     </script>
   </body>
 </html>`,
@@ -137,6 +148,7 @@ try {
       host: "static",
       widths: [375, 1280],
       routeSelector: "a[href]",
+      discoverOverlays: true,
     }),
   );
 
@@ -148,8 +160,8 @@ try {
   ) as RunReport;
   assert.equal(
     report1.coverage.verified,
-    8,
-    `expected 8 verified static cells (incl. WAI-ARIA disclosed /more.html), got ${report1.coverage.verified}`,
+    10,
+    `expected 10 verified static cells (incl. /more.html + /#overlay:create-item), got ${report1.coverage.verified}`,
   );
   const discoveredPaths = new Set(report1.cells.map((c) => c.path));
   assert.ok(discoveredPaths.has("/"), "static run includes /");
@@ -158,6 +170,10 @@ try {
   assert.ok(
     discoveredPaths.has("/more.html"),
     "static run discovers /more.html via WAI-ARIA aria-expanded disclosure expansion",
+  );
+  assert.ok(
+    discoveredPaths.has("/#overlay:create-item"),
+    "static run auto-discovers and captures native <dialog> overlay child node",
   );
   for (const cell of report1.cells) {
     assert.ok(

@@ -1900,7 +1900,8 @@ h2 {
   transform-origin: top left;
   background: #fff;
 }
-.card-live-pill {
+.card-live-pill,
+.card-overlay-pill {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -1913,6 +1914,9 @@ h2 {
   font-weight: 700;
   letter-spacing: 0.04em;
   pointer-events: none;
+}
+.card-overlay-pill {
+  background: rgba(99, 102, 241, 0.92);
 }
 .live-surface-toggle {
   display: inline-flex;
