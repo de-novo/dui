@@ -2,6 +2,7 @@
 //! against `~/.dui/dui.db` and `~/.dui/blobs/` for the GPUI desktop viewer.
 
 use dui_core::{
+    design_lint::{DesignFinding, DesignSeverity, lint_render_tree},
     diff::{RenderDiffSummary, RenderNodeSnapshot, compute_rgba_diff, diff_render_trees},
     model::{
         CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeEndpoint, EdgeId, ProjectId,
@@ -289,6 +290,46 @@ fn compute_entry_pixel_diff(entry: &mut DiffCellEntry) {
 pub fn hydrate_pixel_diffs(entries: &mut [DiffCellEntry]) {
     for entry in entries.iter_mut() {
         compute_entry_pixel_diff(entry);
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RunDesignAudit {
+    pub total: usize,
+    pub errors: usize,
+    pub warnings: usize,
+    pub info: usize,
+    pub findings_by_screen_width: BTreeMap<(String, u32), Vec<DesignFinding>>,
+    pub trees_by_screen_width: BTreeMap<(String, u32), Vec<RenderNodeSnapshot>>,
+}
+
+pub fn compute_run_design_audit(run: &RunItem) -> RunDesignAudit {
+    let mut out = RunDesignAudit::default();
+    let trees = load_render_trees_for_run(run);
+    for ((path, width, _ordinal), tree) in trees {
+        let lint = lint_render_tree(&tree, width);
+        out.total += lint.total;
+        out.errors += lint.errors;
+        out.warnings += lint.warnings;
+        out.info += lint.info;
+        if !lint.findings.is_empty() {
+            out.findings_by_screen_width
+                .entry((path.clone(), width))
+                .or_default()
+                .extend(lint.findings);
+        }
+        out.trees_by_screen_width
+            .entry((path, width))
+            .or_insert(tree);
+    }
+    out
+}
+
+pub fn design_severity_color_hex(sev: DesignSeverity) -> u32 {
+    match sev {
+        DesignSeverity::Error => 0xdc2626,
+        DesignSeverity::Warning => 0xef803f,
+        DesignSeverity::Info => 0x2563eb,
     }
 }
 
@@ -1168,5 +1209,79 @@ mod tests {
         hydrate_pixel_diffs(&mut entries);
         assert!(entries[0].overlay.is_some());
         assert_eq!(entries[0].changed_pixels, Some(4));
+    }
+
+    #[test]
+    fn compute_run_design_audit_loads_box_model_trees_and_detects_defects() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let run_dir = dir.path().join("run-design");
+        fs::create_dir_all(&run_dir).expect("mkdir");
+        fs::write(
+            run_dir.join("report.json"),
+            json!({
+                "path": "/",
+                "cells": [{
+                    "path": "/",
+                    "width": 375,
+                    "observation": {
+                        "renderTree": [
+                            {
+                                "id": "h1#0",
+                                "tag": "h1",
+                                "text": "Wide Heading",
+                                "rect": {"x": 16, "y": 16, "width": 440, "height": 32},
+                                "style": {"fontSize": "24px"},
+                                "boxModel": {
+                                    "margin": {"top": 8, "right": 0, "bottom": 12, "left": 0},
+                                    "padding": {"top": 4, "right": 8, "bottom": 4, "left": 8},
+                                    "gap": "8px"
+                                },
+                                "attributes": {"data-testid": "hero"}
+                            },
+                            {
+                                "id": "button#0",
+                                "tag": "button",
+                                "text": "",
+                                "rect": {"x": 16, "y": 72, "width": 20, "height": 20},
+                                "style": {}
+                            }
+                        ]
+                    }
+                }]
+            })
+            .to_string(),
+        )
+        .expect("write report");
+
+        let run = RunItem {
+            id: "r1".into(),
+            project_id: "p1".into(),
+            project_name: "demo".into(),
+            branch: Some("main".into()),
+            project_path: None,
+            run_dir: Some(run_dir),
+            created_at_ms: 1,
+            screens: vec![],
+        };
+
+        let audit = compute_run_design_audit(&run);
+        assert!(
+            audit.total >= 3,
+            "expected overflow + small target + unlabeled"
+        );
+        assert!(audit.errors >= 2);
+        let nodes = audit
+            .trees_by_screen_width
+            .get(&("/".into(), 375))
+            .expect("render tree loaded");
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(
+            nodes[0].box_model.as_ref().map(|b| b.padding.right),
+            Some(8)
+        );
+        assert_eq!(
+            nodes[0].attributes.get("data-testid").map(String::as_str),
+            Some("hero")
+        );
     }
 }
