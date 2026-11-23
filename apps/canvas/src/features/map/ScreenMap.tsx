@@ -50,7 +50,7 @@ function ZoomOneToOneButton({
   cardWidth,
   frameHeight,
 }: {
-  target?: { position: { x: number; y: number } };
+  target?: { position: { x: number; y: number }; frameHeight?: number };
   cardWidth: number;
   frameHeight: number;
 }) {
@@ -58,7 +58,8 @@ function ZoomOneToOneButton({
 
   const jumpOneToOne = () => {
     if (target) {
-      void setCenter(target.position.x + cardWidth / 2, target.position.y + frameHeight / 2, {
+      const focusH = Math.min(target.frameHeight ?? frameHeight, 800);
+      void setCenter(target.position.x + cardWidth / 2, target.position.y + focusH / 2, {
         zoom: 1,
         duration: 200,
       });
@@ -220,49 +221,51 @@ export function ScreenMap({
     }
     return set;
   }, [focusActive, selectedId, layout.links]);
-  const nodes: CardNode[] = layout.nodes.map(({ screen, position }) => {
-    const screenDiff = diffsByPath?.[screen.path];
-    const isSelected = screen.id === selectedId;
-    const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
-    const isDimmed = (dimming && !relatedIds.has(screen.id)) || (diffActive && !screenDiff);
-    const classes = [
-      mode === "focus:" + screen.id ? "focus-screen" : "",
-      isSelected ? "selected-screen" : "",
-      isRelated ? "related-screen" : "",
-      isDimmed ? "dimmed-screen" : "",
-      screenDiff ? `diff-node-${screenDiff.kind}` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    return {
-      id: screen.id,
-      type: "screen",
-      position,
-      selected: isSelected,
-      data: {
-        screen,
-        width,
-        cardWidth,
-        frameHeight,
+  const nodes: CardNode[] = layout.nodes.map(
+    ({ screen, position, frameHeight: nodeFrameHeight }) => {
+      const screenDiff = diffsByPath?.[screen.path];
+      const isSelected = screen.id === selectedId;
+      const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
+      const isDimmed = (dimming && !relatedIds.has(screen.id)) || (diffActive && !screenDiff);
+      const classes = [
+        mode === "focus:" + screen.id ? "focus-screen" : "",
+        isSelected ? "selected-screen" : "",
+        isRelated ? "related-screen" : "",
+        isDimmed ? "dimmed-screen" : "",
+        screenDiff ? `diff-node-${screenDiff.kind}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return {
+        id: screen.id,
+        type: "screen",
+        position,
         selected: isSelected,
-        related: isRelated,
-        dimmed: isDimmed,
-        openComments: openCommentsByPath?.[screen.path] ?? 0,
-        designFindings: designFindingsByPath?.[screen.path] ?? [],
-        showDesignOverlay,
-        imageUrl,
-        screenDiff,
-        diffVisualMode,
-        beforeRunKey,
-        afterRunKey,
-        liveBaseUrl,
-        liveBridgePath,
-        liveSurfaceMode,
-      },
-      ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
-      className: classes || undefined,
-    };
-  });
+        data: {
+          screen,
+          width,
+          cardWidth,
+          frameHeight: nodeFrameHeight,
+          selected: isSelected,
+          related: isRelated,
+          dimmed: isDimmed,
+          openComments: openCommentsByPath?.[screen.path] ?? 0,
+          designFindings: designFindingsByPath?.[screen.path] ?? [],
+          showDesignOverlay,
+          imageUrl,
+          screenDiff,
+          diffVisualMode,
+          beforeRunKey,
+          afterRunKey,
+          liveBaseUrl,
+          liveBridgePath,
+          liveSurfaceMode,
+        },
+        ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
+        className: classes || undefined,
+      };
+    },
+  );
   const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
   const edges = layout.links.map(
     ({ source, target, origin, provenance, replayVerified, action }) => {

@@ -59,14 +59,11 @@ export function CaptureCard({
 }) {
   const { t } = useI18n();
   const [liveFallback, setLiveFallback] = useState(false);
+  const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
   const liveUrl =
     liveSurfaceMode === "live" && !liveFallback
       ? (resolveLiveBridgeUrl(liveBridgePath, screen.path) ??
         resolveLiveSurfaceUrl(liveBaseUrl, screen.path))
-      : null;
-  const liveTransform =
-    liveUrl && cardWidth && frameHeight
-      ? computeLiveFrameTransform(cell?.width ?? 1280, cardWidth, frameHeight)
       : null;
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
@@ -79,6 +76,17 @@ export function CaptureCard({
     afterRunKey,
     fallbackSrc,
   );
+  const activeLoaded = resolvedSrc && loadedSize?.src === resolvedSrc ? loadedSize : null;
+  const naturalW = cell?.imageWidth ?? activeLoaded?.w;
+  const naturalH = cell?.imageHeight ?? activeLoaded?.h;
+  const effectiveFrameHeight =
+    !liveUrl && cardWidth && naturalW && naturalH
+      ? Math.max(240, Math.round(cardWidth * (naturalH / naturalW)))
+      : frameHeight;
+  const liveTransform =
+    liveUrl && cardWidth && effectiveFrameHeight
+      ? computeLiveFrameTransform(cell?.width ?? 1280, cardWidth, effectiveFrameHeight)
+      : null;
   const diffClass = screenDiff ? ` diff-${screenDiff.kind}` : "";
   const renderChangeCount = screenDiff?.renderDiff?.changes.length ?? 0;
   const diffBadgeText = screenDiff
@@ -94,8 +102,8 @@ export function CaptureCard({
     : null;
   const showRenderBoxes =
     diffVisualMode === "render" && Boolean(screenDiff && renderChangeCount > 0);
-  const capW = Math.max(1, screenDiff?.captureWidth ?? 1280);
-  const capH = Math.max(1, screenDiff?.captureHeight ?? 800);
+  const capW = Math.max(1, screenDiff?.captureWidth ?? naturalW ?? cell?.width ?? 1280);
+  const capH = Math.max(1, screenDiff?.captureHeight ?? naturalH ?? effectiveFrameHeight ?? 800);
   return (
     <article
       className={
@@ -118,7 +126,11 @@ export function CaptureCard({
       <div
         className="capture-frame"
         style={
-          cardWidth && frameHeight ? { aspectRatio: `${cardWidth} / ${frameHeight}` } : undefined
+          cardWidth && effectiveFrameHeight
+            ? { aspectRatio: `${cardWidth} / ${effectiveFrameHeight}` }
+            : naturalW && naturalH
+              ? { aspectRatio: `${naturalW} / ${naturalH}` }
+              : undefined
         }
       >
         {liveUrl && liveTransform ? (
@@ -135,7 +147,22 @@ export function CaptureCard({
             }}
           />
         ) : resolvedSrc ? (
-          <img loading="lazy" decoding="async" alt="" src={resolvedSrc} />
+          <img
+            loading="lazy"
+            decoding="async"
+            alt=""
+            src={resolvedSrc}
+            onLoad={(event) => {
+              const img = event.currentTarget;
+              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                setLoadedSize({
+                  src: resolvedSrc,
+                  w: img.naturalWidth,
+                  h: img.naturalHeight,
+                });
+              }
+            }}
+          />
         ) : (
           <div className="missing-frame-copy">
             <span>{cell ? "Missing image" : "No capture at this width"}</span>
@@ -179,8 +206,8 @@ export function CaptureCard({
             {designFindings.slice(0, 24).map((finding, idx) => {
               const rect = finding.rect;
               if (rect.width <= 0 || rect.height <= 0) return null;
-              const baseW = Math.max(1, cell?.width ?? capW);
-              const baseH = Math.max(1, Math.round(baseW * 0.75));
+              const baseW = Math.max(1, naturalW ?? cell?.width ?? capW);
+              const baseH = Math.max(1, naturalH ?? effectiveFrameHeight ?? capH);
               const leftPct = Math.max(0, Math.min(100, (rect.x / baseW) * 100));
               const topPct = Math.max(0, Math.min(100, (rect.y / baseH) * 100));
               const wPct = Math.max(1, Math.min(100 - leftPct, (rect.width / baseW) * 100));

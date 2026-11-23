@@ -89,3 +89,71 @@ test("nodeMetrics sizes map cards 1:1 with capture width and spaces columns with
     assert.ok(xs[i]! - xs[i - 1]! >= desktop.cardWidth, "columns must not overlap at 1:1 width");
   }
 });
+
+test("layoutMap sizes tall full-page captures to their real aspect ratio without vertical overlap", () => {
+  const tallArchive: ScreenMap = {
+    screens: [
+      {
+        id: "home",
+        path: "/",
+        cells: [
+          {
+            path: "/",
+            width: 1280,
+            status: "verified",
+            image: "home.png",
+            imageWidth: 1280,
+            imageHeight: 800,
+          },
+        ],
+      },
+      {
+        id: "orders",
+        path: "/orders",
+        cells: [
+          {
+            path: "/orders",
+            width: 1280,
+            status: "verified",
+            image: "orders.png",
+            imageWidth: 1280,
+            imageHeight: 3200,
+          },
+        ],
+      },
+      {
+        id: "detail",
+        path: "/orders/1",
+        cells: [
+          {
+            path: "/orders/1",
+            width: 1280,
+            status: "verified",
+            image: "detail.png",
+            imageWidth: 1280,
+            imageHeight: 1600,
+          },
+        ],
+      },
+    ],
+    links: [
+      { source: "home", target: "orders", provenance: "verified", replayVerified: true },
+      { source: "home", target: "detail", provenance: "verified", replayVerified: true },
+    ],
+  };
+
+  const plan = layoutMap(tallArchive, 1280, "overview");
+  const ordersNode = plan.nodes.find((n) => n.screen.id === "orders")!;
+  const detailNode = plan.nodes.find((n) => n.screen.id === "detail")!;
+  assert.equal(ordersNode.frameHeight, 3200);
+  assert.equal(detailNode.frameHeight, 1600);
+  // Same column siblings must never overlap vertically when the upper screen is 3200px tall.
+  const [top, bottom] =
+    ordersNode.position.y < detailNode.position.y
+      ? [ordersNode, detailNode]
+      : [detailNode, ordersNode];
+  assert.ok(
+    bottom.position.y >= top.position.y + top.frameHeight + 120,
+    `expected bottom node (${bottom.position.y}) below top node (${top.position.y} + ${top.frameHeight})`,
+  );
+});

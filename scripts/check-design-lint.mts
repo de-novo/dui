@@ -61,6 +61,7 @@ try {
     <div style="width:320px;overflow-x:auto;margin-top:12px">
       <div id="scrolled-cell" style="width:600px;height:32px;color:#111111;background:#ffffff">Horizontally scrollable content</div>
     </div>
+    <section style="height:1800px;margin-top:24px;color:#111111;background:#ffffff">Tall Below-the-Fold Section</section>
   </body>
 </html>`,
   );
@@ -112,12 +113,28 @@ try {
     `false-positive horizontal-overflow on #scrolled-cell: ${JSON.stringify(mobileFindings)}`,
   );
 
+  // Full-page screenshot verification: tall 1800px section must be captured beyond the 800px fold
+  const report = JSON.parse(fs.readFileSync(path.join(outDir, "report.json"), "utf8")) as {
+    cells: { width: number; image?: string }[];
+  };
+  const desktopCell = report.cells.find((c) => c.width === 1280 && c.image);
+  assert.ok(desktopCell?.image, "expected desktop capture PNG");
+  const pngHeader = fs.readFileSync(path.join(outDir, desktopCell.image));
+  const pngWidth = pngHeader.readUInt32BE(16);
+  const pngHeight = pngHeader.readUInt32BE(20);
+  assert.equal(pngWidth, 1280, "full-page screenshot preserves capture width");
+  assert.ok(
+    pngHeight >= 1800,
+    `expected full-page screenshot height >= 1800px, got ${pngHeight}px`,
+  );
+
   console.log(
     JSON.stringify({
       status: "ok",
       parallelVerifiedCells: audit.summary.verifiedCells,
       designFindingsTotal: audit.designAudit.total,
       mobileDefectKinds: [...kinds].sort(),
+      fullPagePng: { width: pngWidth, height: pngHeight },
     }),
   );
 } finally {

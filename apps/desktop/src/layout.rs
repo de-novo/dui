@@ -8,7 +8,6 @@ pub struct NodeMetrics {
     pub card_width: f32,
     pub frame_height: f32,
     pub caption_height: f32,
-    pub card_height: f32,
     pub col_gap: f32,
     pub row_gap: f32,
 }
@@ -18,6 +17,8 @@ pub struct LayoutNode {
     pub screen_idx: usize,
     pub x: f32,
     pub y: f32,
+    pub frame_height: f32,
+    pub card_height: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -48,10 +49,32 @@ pub fn node_metrics(capture_width: u32) -> NodeMetrics {
         card_width: w,
         frame_height,
         caption_height,
-        card_height,
         col_gap,
         row_gap,
     }
+}
+
+fn screen_frame_height(screen: &ScreenItem, capture_width: u32, metrics: NodeMetrics) -> f32 {
+    let cell = screen
+        .cells
+        .iter()
+        .find(|c| c.width_px == capture_width && c.image_width.is_some() && c.image_height.is_some())
+        .or_else(|| {
+            screen
+                .cells
+                .iter()
+                .find(|c| c.image_width.is_some() && c.image_height.is_some())
+        });
+    if let Some(c) = cell
+        && let (Some(iw), Some(ih)) = (c.image_width, c.image_height)
+        && iw > 0
+        && ih > 0
+    {
+        return (metrics.card_width * (ih as f32 / iw as f32))
+            .round()
+            .max(240.0);
+    }
+    metrics.frame_height
 }
 
 pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
@@ -65,6 +88,15 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
             content_height: 0.0,
         };
     }
+
+    let screen_frame_heights: Vec<f32> = screens
+        .iter()
+        .map(|sc| screen_frame_height(sc, capture_width, metrics))
+        .collect();
+    let screen_card_heights: Vec<f32> = screen_frame_heights
+        .iter()
+        .map(|fh| fh + metrics.caption_height)
+        .collect();
 
     let mut path_to_idx: BTreeMap<&str, usize> = BTreeMap::new();
     for (i, sc) in screens.iter().enumerate() {
@@ -124,7 +156,6 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
     }
 
     let step_x = metrics.card_width + metrics.col_gap;
-    let step_y = metrics.card_height + metrics.row_gap;
     let mut nodes: Vec<LayoutNode> = Vec::with_capacity(screens.len());
     let max_shelf_cols = 6usize;
     let mut shelf_col = 0usize;
@@ -155,17 +186,18 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
             cols.entry(col).or_default().push(idx);
         }
         let max_rows_per_band = if capture_width <= 480 { 3 } else { 4 };
-        let mut local_positions: Vec<(usize, usize, usize)> = Vec::new();
+        let mut local_positions: Vec<(usize, usize, f32)> = Vec::new();
         let mut comp_cols = 0usize;
-        let mut comp_rows = 1usize;
+        let mut comp_height: f32 = 0.0;
         for list in cols.into_values() {
             let sub_cols = list.len().div_ceil(max_rows_per_band).max(1);
-            let rows_here = list.len().div_ceil(sub_cols).max(1);
-            comp_rows = comp_rows.max(rows_here);
+            let mut col_y = vec![0.0_f32; sub_cols];
             for (i, idx) in list.into_iter().enumerate() {
                 let sc = i % sub_cols;
-                let sr = i / sub_cols;
-                local_positions.push((idx, comp_cols + sc, sr));
+                let y = col_y[sc];
+                local_positions.push((idx, comp_cols + sc, y));
+                col_y[sc] += screen_card_heights[idx] + metrics.row_gap;
+                comp_height = comp_height.max(col_y[sc]);
             }
             comp_cols += sub_cols;
         }
@@ -174,15 +206,17 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
             shelf_y += shelf_row_height + metrics.row_gap * 0.6;
             shelf_row_height = 0.0;
         }
-        for (idx, lc, lr) in local_positions {
+        for (idx, lc, local_y) in local_positions {
             nodes.push(LayoutNode {
                 screen_idx: idx,
                 x: (shelf_col + lc) as f32 * step_x,
-                y: shelf_y + lr as f32 * step_y,
+                y: shelf_y + local_y,
+                frame_height: screen_frame_heights[idx],
+                card_height: screen_card_heights[idx],
             });
         }
         shelf_col += comp_cols;
-        shelf_row_height = shelf_row_height.max(comp_rows as f32 * step_y);
+        shelf_row_height = shelf_row_height.max(comp_height);
     }
 
     let cursor_y = if shelf_row_height > 0.0 {
@@ -191,17 +225,21 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
         shelf_y
     };
 
-    // Arrange isolated screens in a balanced landscape grid matching the viewport aspect.
+    // Arrange isolated screens in a balanced landscape grid respecting each card's real height.
     if !isolated.is_empty() {
         let target_cols = ((isolated.len() as f32).sqrt().ceil() as usize).clamp(4, 6);
+        let mut col_y = vec![cursor_y; target_cols];
         for (i, idx) in isolated.into_iter().enumerate() {
             let col = i % target_cols;
-            let row = i / target_cols;
+            let y = col_y[col];
             nodes.push(LayoutNode {
                 screen_idx: idx,
                 x: col as f32 * step_x,
-                y: cursor_y + row as f32 * step_y,
+                y,
+                frame_height: screen_frame_heights[idx],
+                card_height: screen_card_heights[idx],
             });
+            col_y[col] += screen_card_heights[idx] + metrics.row_gap;
         }
     }
 
@@ -211,7 +249,7 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
     let mut max_y: f32 = 0.0;
     for n in &nodes {
         max_x = max_x.max(n.x + metrics.card_width);
-        max_y = max_y.max(n.y + metrics.card_height);
+        max_y = max_y.max(n.y + n.card_height);
     }
 
     MapLayout {
@@ -260,8 +298,53 @@ mod tests {
                 let a = &layout.nodes[i];
                 let b = &layout.nodes[j];
                 let overlap_x = (a.x - b.x).abs() < layout.metrics.card_width;
-                let overlap_y = (a.y - b.y).abs() < layout.metrics.card_height;
+                let overlap_y = a.y < b.y + b.card_height && b.y < a.y + a.card_height;
                 assert!(!(overlap_x && overlap_y), "nodes {i} and {j} overlap");
+            }
+        }
+    }
+
+    #[test]
+    fn layout_sizes_tall_full_page_screens_without_vertical_overlap() {
+        use crate::store::CellItem;
+
+        let make_tall = |path: &str, h: u32| ScreenItem {
+            id: path.into(),
+            path: path.into(),
+            cells: vec![CellItem {
+                id: format!("c-{path}"),
+                state_id: "s0".into(),
+                width_px: 1280,
+                locale: None,
+                status_kind: "verified".into(),
+                reason: None,
+                observed_path: Some(path.into()),
+                http_errors: Vec::new(),
+                blob_id: None,
+                blob_path: None,
+                image_width: Some(1280),
+                image_height: Some(h),
+            }],
+            outgoing: Vec::new(),
+        };
+
+        let screens = vec![
+            make_tall("/a", 3200),
+            make_tall("/b", 800),
+            make_tall("/c", 1600),
+            make_tall("/d", 800),
+            make_tall("/e", 2400),
+        ];
+        let layout = compute_layout(&screens, 1280);
+        assert_eq!(layout.nodes[0].frame_height, 3200.0);
+        assert_eq!(layout.nodes[4].frame_height, 2400.0);
+        for i in 0..layout.nodes.len() {
+            for j in (i + 1)..layout.nodes.len() {
+                let a = &layout.nodes[i];
+                let b = &layout.nodes[j];
+                let overlap_x = (a.x - b.x).abs() < layout.metrics.card_width;
+                let overlap_y = a.y < b.y + b.card_height && b.y < a.y + a.card_height;
+                assert!(!(overlap_x && overlap_y), "tall nodes {i} and {j} overlap");
             }
         }
     }

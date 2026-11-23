@@ -179,11 +179,17 @@ try {
 
     const graphRes = await fetch(`${url}/archive/graph.json?run=${runKey}`);
     assert.equal(graphRes.status, 200);
-    const graph = (await graphRes.json()) as { cells: { image?: string }[] };
+    const graph = (await graphRes.json()) as {
+      cells: { image?: string; imageWidth?: number; imageHeight?: number }[];
+    };
     assert(graph.cells.length > 0);
-
-    const firstImg = graph.cells.find((c) => c.image)?.image;
-    assert(firstImg);
+    const firstCellWithImg = graph.cells.find((c) => c.image);
+    assert(firstCellWithImg?.image);
+    assert(
+      (firstCellWithImg.imageWidth ?? 0) > 0 && (firstCellWithImg.imageHeight ?? 0) > 0,
+      "archive graph.json exposes real PNG imageWidth and imageHeight",
+    );
+    const firstImg = firstCellWithImg.image;
     const imgRes = await fetch(`${url}/archive/${encodeURIComponent(firstImg)}?run=${runKey}`);
     assert.equal(imgRes.status, 200);
     assert.equal(imgRes.headers.get("content-type"), "image/png");

@@ -915,7 +915,102 @@ impl Browser {
             )?;
             v["localeAudit"] = audit["result"]["value"].clone();
         }
-        let data = self.call(s, "Page.captureScreenshot", json!({"format":"png"}))?;
+        const MAX_FULL_PAGE_HEIGHT: u32 = 12_000;
+        let metrics_expr = r#"(() => {
+            const vpH = Math.max(1, Math.round(window.innerHeight || 800));
+            const docH = Math.ceil(Math.max(
+                vpH,
+                document.documentElement ? document.documentElement.scrollHeight : 0,
+                document.body ? document.body.scrollHeight : 0
+            ));
+            let shellH = 0;
+            if (docH <= vpH + 8) {
+                const candidates = document.querySelectorAll('main, [role="main"], [data-dui-scroll-root], body > div, body > div > div, body > div > div > div');
+                for (const el of candidates) {
+                    if (!(el instanceof HTMLElement)) continue;
+                    const cs = getComputedStyle(el);
+                    if (cs.overflowY !== 'auto' && cs.overflowY !== 'scroll') continue;
+                    if (el.clientHeight >= vpH * 0.4 && el.scrollHeight > el.clientHeight + 40) {
+                        const needed = Math.ceil(vpH + (el.scrollHeight - el.clientHeight));
+                        if (needed > shellH) shellH = needed;
+                    }
+                }
+            }
+            return { vpH, docH, shellH };
+        })()"#;
+        let (vp_h, doc_h, shell_h) = self
+            .call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": metrics_expr, "returnByValue": true}),
+            )
+            .ok()
+            .and_then(|res| {
+                let val = &res["result"]["value"];
+                let vp = val["vpH"].as_u64()? as u32;
+                let doc = val["docH"].as_u64()? as u32;
+                let shell = val["shellH"].as_u64().unwrap_or(0) as u32;
+                Some((vp.max(1), doc.max(vp), shell))
+            })
+            .unwrap_or((800, 800, 0));
+
+        let expanded_shell = shell_h > doc_h;
+        let target_h = if expanded_shell {
+            shell_h.clamp(vp_h, MAX_FULL_PAGE_HEIGHT)
+        } else {
+            doc_h.clamp(vp_h, MAX_FULL_PAGE_HEIGHT)
+        };
+
+        if expanded_shell {
+            let _ = self.call(
+                s,
+                "Emulation.setDeviceMetricsOverride",
+                json!({"width": width, "height": target_h, "deviceScaleFactor": 1, "mobile": false}),
+            );
+            let _ = self.call(
+                s,
+                "Runtime.evaluate",
+                json!({
+                    "expression": "new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))",
+                    "awaitPromise": true,
+                    "returnByValue": true
+                }),
+            );
+            if let Ok(refreshed) = self.call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": &expr, "awaitPromise": true, "returnByValue": true}),
+            ) && let Some(tree) = refreshed["result"]["value"]
+                .get("renderTree")
+                .filter(|t| t.is_array())
+            {
+                v["renderTree"] = tree.clone();
+            }
+        }
+
+        let shot_params = if target_h > vp_h {
+            json!({
+                "format": "png",
+                "captureBeyondViewport": true,
+                "clip": {
+                    "x": 0,
+                    "y": 0,
+                    "width": width,
+                    "height": target_h,
+                    "scale": 1
+                }
+            })
+        } else {
+            json!({"format": "png"})
+        };
+        let data = self.call(s, "Page.captureScreenshot", shot_params)?;
+        if expanded_shell {
+            let _ = self.call(
+                s,
+                "Emulation.setDeviceMetricsOverride",
+                json!({"width": width, "height": 800, "deviceScaleFactor": 1, "mobile": false}),
+            );
+        }
         fs::write(
             png,
             STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?,

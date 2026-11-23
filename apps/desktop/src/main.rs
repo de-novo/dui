@@ -389,7 +389,7 @@ impl DuiDesktopView {
             .or_else(|| layout.nodes.first())
         {
             let cx_world = node.x + layout.metrics.card_width * 0.5;
-            let cy_world = node.y + layout.metrics.card_height * 0.5;
+            let cy_world = node.y + node.card_height.min(900.0) * 0.5;
             self.pan_x = self.viewport_w * 0.5 - cx_world;
             self.pan_y = self.viewport_h * 0.5 - cy_world;
         }
@@ -1472,15 +1472,15 @@ impl DuiDesktopView {
         let card_w = (metrics.card_width * zoom).max(16.0);
         let pad_px = (card_w * 0.04).clamp(4.0, 12.0);
         let inner_w = (card_w - pad_px * 2.0).max(8.0);
-        let frame_h = (metrics.frame_height * zoom).max(10.0);
         let caption_h = (metrics.caption_height * zoom).max(18.0);
-        let card_h = frame_h + caption_h + pad_px * 2.0;
 
-        let mut node_rects: BTreeMap<usize, (f32, f32)> = BTreeMap::new();
+        let mut node_rects: BTreeMap<usize, (f32, f32, f32, f32)> = BTreeMap::new();
         for node in &layout.nodes {
+            let n_frame_h = (node.frame_height * zoom).max(10.0);
+            let n_card_h = n_frame_h + caption_h + pad_px * 2.0;
             node_rects.insert(
                 node.screen_idx,
-                (pan_x + node.x * zoom, pan_y + node.y * zoom),
+                (pan_x + node.x * zoom, pan_y + node.y * zoom, n_frame_h, n_card_h),
             );
         }
 
@@ -1528,7 +1528,7 @@ impl DuiDesktopView {
                 // 2. Orthogonal smooth-step connector edges; dim unrelated edges when focus is active
                 let base_stroke_w = (1.6 * zoom.sqrt()).clamp(1.2, 2.5);
                 for edge in &edges_for_paint {
-                    let (Some(&(ax, ay)), Some(&(bx, by))) = (
+                    let (Some(&(ax, ay, _, a_card_h)), Some(&(bx, by, _, b_card_h))) = (
                         node_rects_for_paint.get(&edge.from_idx),
                         node_rects_for_paint.get(&edge.to_idx),
                     ) else {
@@ -1545,14 +1545,14 @@ impl DuiDesktopView {
 
                     let (sx, sy, tx, ty, horizontal) = if (bx - ax).abs() >= (by - ay).abs() {
                         if bx >= ax {
-                            (ax + card_w, ay + card_h * 0.5, bx, by + card_h * 0.5, true)
+                            (ax + card_w, ay + a_card_h * 0.5, bx, by + b_card_h * 0.5, true)
                         } else {
-                            (ax, ay + card_h * 0.5, bx + card_w, by + card_h * 0.5, true)
+                            (ax, ay + a_card_h * 0.5, bx + card_w, by + b_card_h * 0.5, true)
                         }
                     } else if by >= ay {
-                        (ax + card_w * 0.5, ay + card_h, bx + card_w * 0.5, by, false)
+                        (ax + card_w * 0.5, ay + a_card_h, bx + card_w * 0.5, by, false)
                     } else {
-                        (ax + card_w * 0.5, ay, bx + card_w * 0.5, by + card_h, false)
+                        (ax + card_w * 0.5, ay, bx + card_w * 0.5, by + b_card_h, false)
                     };
 
                     let is_verified = edge.source == "verified";
@@ -1621,7 +1621,7 @@ impl DuiDesktopView {
             if canvas_diff_active && canvas_diff_changed_only && screen_diff.is_none() {
                 continue;
             }
-            let (left, top) = node_rects[&idx];
+            let (left, top, frame_h, card_h) = node_rects[&idx];
             let is_selected = focus_active && idx == selected_idx;
             let is_related = focus_active && !is_selected && related_indices.contains(&idx);
             let is_dimmed = (focus_active && !related_indices.contains(&idx))
@@ -1726,8 +1726,17 @@ impl DuiDesktopView {
                 .unwrap_or_default();
             let design_finding_count = screen_design_findings.len();
             if self.show_design_overlay && !screen_design_findings.is_empty() {
-                let cw = self.selected_width.max(1) as f32;
-                let ch = (cw * 0.75).max(1.0);
+                let active_cell_dims = self
+                    .cell_for_width(screen)
+                    .and_then(|c| c.image_width.zip(c.image_height));
+                let cw = active_cell_dims
+                    .map(|(w, _)| w as f32)
+                    .unwrap_or(self.selected_width.max(1) as f32)
+                    .max(1.0);
+                let ch = active_cell_dims
+                    .map(|(_, h)| h as f32)
+                    .unwrap_or(node.frame_height)
+                    .max(1.0);
                 for finding in screen_design_findings.iter().take(24) {
                     let rect = finding.rect;
                     if rect.width <= 0 || rect.height <= 0 {

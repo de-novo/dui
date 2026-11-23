@@ -2,7 +2,7 @@ import type { Screen, ScreenMap } from "../../data/overview";
 
 type Link = ScreenMap["links"][number];
 type Point = { x: number; y: number };
-type Placed = { screen: Screen; position: Point };
+type Placed = { screen: Screen; position: Point; frameHeight: number };
 type Layout = { nodes: Placed[]; links: Link[] };
 
 export type NodeMetrics = {
@@ -23,17 +23,29 @@ export function nodeMetrics(captureWidth: number): NodeMetrics {
   return { cardWidth, frameHeight, column, row };
 }
 
+export function screenFrameHeight(screen: Screen, width: number, metrics: NodeMetrics): number {
+  const cell = (screen.entries ?? screen.cells).find((c) => c.width === width);
+  if (cell?.imageWidth && cell?.imageHeight && cell.imageWidth > 0 && cell.imageHeight > 0) {
+    return Math.max(240, Math.round(metrics.cardWidth * (cell.imageHeight / cell.imageWidth)));
+  }
+  return metrics.frameHeight;
+}
+
 function neighborhood(
   screens: Screen[],
   links: Link[],
   focus: Screen,
+  width: number,
   metrics: NodeMetrics,
 ): Layout {
-  const { column, row } = metrics;
+  const { column } = metrics;
+  const rowGap = metrics.row - metrics.frameHeight;
+  const heightOf = (s: Screen) => screenFrameHeight(s, width, metrics);
   const incident = links.filter((e) => e.source === focus.id || e.target === focus.id);
   const incoming = new Set(incident.filter((e) => e.target === focus.id).map((e) => e.source));
   const outgoing = new Set(incident.filter((e) => e.source === focus.id).map((e) => e.target));
-  const nodes = [{ screen: focus, position: { x: 0, y: 0 } }];
+  const focusH = heightOf(focus);
+  const nodes: Placed[] = [{ screen: focus, position: { x: 0, y: 0 }, frameHeight: focusH }];
   // A bidirectional neighbor appears once, with two independently directed arrows.
   const otherScreens = screens.filter((screen) => screen.id !== focus.id);
   const left = otherScreens.filter((s) => incoming.has(s.id) && !outgoing.has(s.id));
@@ -42,12 +54,20 @@ function neighborhood(
     [left, -column],
     [right, column],
   ] as const) {
-    group.forEach((screen, i) =>
+    const boxes = group.map((s) => {
+      const fh = heightOf(s);
+      return { screen: s, frameHeight: fh, boxHeight: fh + rowGap };
+    });
+    const totalH = boxes.reduce((sum, b) => sum + b.boxHeight, 0);
+    let cursorY = (focusH + rowGap - totalH) / 2;
+    for (const item of boxes) {
       nodes.push({
-        screen,
-        position: { x, y: (i - (group.length - 1) / 2) * row },
-      }),
-    );
+        screen: item.screen,
+        position: { x, y: Math.round(cursorY) },
+        frameHeight: item.frameHeight,
+      });
+      cursorY += item.boxHeight;
+    }
   }
   return { nodes, links: incident };
 }
@@ -59,12 +79,15 @@ export function layoutMap(
 ): Layout & { total: number; metrics: NodeMetrics } {
   const metrics = nodeMetrics(width);
   const { column, row } = metrics;
+  const rowGap = row - metrics.frameHeight;
   const screens = [...archive.screens].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const links = archive.links.filter((e) => !e.observedWidths || e.observedWidths.includes(width));
   const focus = screens.find((s) => mode === "focus:" + s.id);
   if (focus)
-    return { ...neighborhood(screens, links, focus, metrics), total: links.length, metrics };
+    return { ...neighborhood(screens, links, focus, width, metrics), total: links.length, metrics };
 
+  const frameHeights = new Map(screens.map((s) => [s.id, screenFrameHeight(s, width, metrics)]));
+  const boxHeights = new Map(screens.map((s) => [s.id, frameHeights.get(s.id)! + rowGap]));
   const neighbors = new Map(screens.map((s) => [s.id, new Map<string, Link>()]));
   // Prefer the observed forward edge when either direction can join the same pair.
   for (const e of links) neighbors.get(e.source)!.set(e.target, e);
@@ -94,62 +117,62 @@ export function layoutMap(
         queue.push({ id });
       }
     }
-    // Pack wide sibling groups into short columns instead of one long strip.
-    const frames = new Map<string, { width: number; height: number; center: number }>();
-    const offsets = new Map<string, Point>();
+    // Pack wide sibling groups into short columns using each node's real vertical footprint.
+    const frames = new Map<string, { cols: number; heightPx: number; selfOffsetY: number }>();
+    const offsets = new Map<string, { col: number; yPx: number }>();
     for (const { id } of [...queue].reverse()) {
+      const selfBoxH = boxHeights.get(id)!;
       const branches = children.get(id)!;
-      const bandHeight =
-        branches.length <= 4
-          ? Infinity
-          : Math.ceil(
-              Math.sqrt(
-                (branches.reduce((sum, child) => sum + frames.get(child)!.height, 0) * column) /
-                  row,
-              ),
-            );
-      let x = 1,
-        y = 0,
-        bandWidth = 0,
-        height = 1;
+      if (branches.length === 0) {
+        frames.set(id, { cols: 1, heightPx: selfBoxH, selfOffsetY: 0 });
+        continue;
+      }
+      const totalBranchH = branches.reduce((sum, child) => sum + frames.get(child)!.heightPx, 0);
+      const bandHeightPx =
+        branches.length <= 4 ? Infinity : Math.max(selfBoxH, Math.sqrt(totalBranchH * column));
+      let col = 1,
+        yPx = 0,
+        bandCols = 0,
+        heightPx = selfBoxH;
       for (const child of branches) {
         const frame = frames.get(child)!;
-        if (y && y + frame.height > bandHeight) {
-          x += bandWidth;
-          bandWidth = 0;
-          y = 0;
+        if (yPx > 0 && yPx + frame.heightPx > bandHeightPx) {
+          col += bandCols;
+          bandCols = 0;
+          yPx = 0;
         }
-        offsets.set(child, { x, y });
-        bandWidth = Math.max(bandWidth, frame.width);
-        y += frame.height;
-        height = Math.max(height, y);
+        offsets.set(child, { col, yPx });
+        bandCols = Math.max(bandCols, frame.cols);
+        yPx += frame.heightPx;
+        heightPx = Math.max(heightPx, yPx);
       }
       frames.set(id, {
-        width: x + bandWidth,
-        height,
-        center: (height - 1) / 2,
+        cols: col + bandCols,
+        heightPx,
+        selfOffsetY: Math.round((heightPx - selfBoxH) / 2),
       });
     }
-    offsets.set(root.id, { x: 0, y: 0 });
-    const nodes = queue.map(({ id }) => {
+    offsets.set(root.id, { col: 0, yPx: 0 });
+    const nodes: Placed[] = queue.map(({ id }) => {
       const offset = offsets.get(id)!;
       for (const child of children.get(id)!) {
         const local = offsets.get(child)!;
-        offsets.set(child, { x: offset.x + local.x, y: offset.y + local.y });
+        offsets.set(child, { col: offset.col + local.col, yPx: offset.yPx + local.yPx });
       }
       return {
         screen: byId.get(id)!,
         position: {
-          x: offset.x * column,
-          y: (offset.y + frames.get(id)!.center) * row,
+          x: offset.col * column,
+          y: offset.yPx + frames.get(id)!.selfOffsetY,
         },
+        frameHeight: frameHeights.get(id)!,
       };
     });
     const frame = frames.get(root.id)!;
     blocks.push({
       nodes,
-      width: frame.width * column,
-      height: frame.height * row,
+      width: frame.cols * column,
+      height: frame.heightPx,
     });
   }
   const targetWidth = Math.sqrt(blocks.reduce((a, b) => a + b.width * b.height, 0) * 1.6);
@@ -167,6 +190,7 @@ export function layoutMap(
       nodes.push({
         screen: n.screen,
         position: { x: x + n.position.x, y: y + n.position.y },
+        frameHeight: n.frameHeight,
       });
     x += block.width;
     shelfHeight = Math.max(shelfHeight, block.height);

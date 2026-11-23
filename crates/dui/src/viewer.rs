@@ -606,6 +606,19 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
         .collect()
 }
 
+fn read_png_dimensions(path: &Path) -> Option<(u32, u32)> {
+    use std::io::Read;
+    let mut file = fs::File::open(path).ok()?;
+    let mut header = [0u8; 24];
+    file.read_exact(&mut header).ok()?;
+    if &header[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return None;
+    }
+    let width = u32::from_be_bytes([header[16], header[17], header[18], header[19]]);
+    let height = u32::from_be_bytes([header[20], header[21], header[22], header[23]]);
+    (width > 0 && height > 0).then_some((width, height))
+}
+
 fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
     let mut graph: Value =
         serde_json::from_slice(&fs::read(root.join("graph.json")).map_err(|e| e.to_string())?)
@@ -620,6 +633,15 @@ fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
 
     let mut cells = Vec::with_capacity(captures.len());
     let mut images = BTreeSet::new();
+    let mut dims_cache: BTreeMap<String, Option<(u32, u32)>> = BTreeMap::new();
+    let mut png_dims = |img: &str| -> Option<(u32, u32)> {
+        if let Some(cached) = dims_cache.get(img) {
+            return *cached;
+        }
+        let found = read_png_dimensions(&root.join(img));
+        dims_cache.insert(img.to_owned(), found);
+        found
+    };
     for item in &captures {
         let mut cell = json!({
             "path": item["path"],
@@ -646,15 +668,23 @@ fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
             && is_safe_png_name(img)
         {
             images.insert(img.to_owned());
+            if let Some((iw, ih)) = png_dims(img) {
+                cell["imageWidth"] = json!(iw);
+                cell["imageHeight"] = json!(ih);
+            }
         }
         cells.push(cell);
     }
-    if let Some(overview) = graph["overview"].as_array() {
+    if let Some(overview) = graph["overview"].as_array_mut() {
         for item in overview {
-            if let Some(img) = item["image"].as_str()
-                && is_safe_png_name(img)
+            if let Some(img) = item["image"].as_str().map(str::to_owned)
+                && is_safe_png_name(&img)
             {
-                images.insert(img.to_owned());
+                images.insert(img.clone());
+                if let Some((iw, ih)) = png_dims(&img) {
+                    item["imageWidth"] = json!(iw);
+                    item["imageHeight"] = json!(ih);
+                }
             }
         }
     }
