@@ -1,6 +1,5 @@
 mod i18n;
 mod layout;
-mod live_client;
 mod store;
 mod tokens;
 
@@ -25,7 +24,6 @@ use gpui_kit::{
 };
 use i18n::UiLang;
 use layout::{MapLayout, compute_layout};
-use live_client::LiveSessionState;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -45,7 +43,6 @@ use tokens::Palette;
 enum ViewMode {
     Overview,
     Detail,
-    Live,
     Diff,
 }
 
@@ -53,7 +50,6 @@ impl ViewMode {
     fn parse(raw: &str) -> Self {
         match raw.trim().to_ascii_lowercase().as_str() {
             "detail" => Self::Detail,
-            "live" => Self::Live,
             "diff" => Self::Diff,
             _ => Self::Overview,
         }
@@ -120,8 +116,6 @@ struct DuiDesktopView {
     comment_input: Entity<InputState>,
     comment_target: CommentTargetChoice,
     error_message: Option<String>,
-    // Active `dui live` session
-    live_session: Option<LiveSessionState>,
     // Cached diff entries for current (before, after) pair
     diff_cache_key: Option<(usize, usize)>,
     diff_entries: Vec<DiffCellEntry>,
@@ -133,14 +127,6 @@ struct DuiDesktopView {
     render_trees_run: Option<usize>,
     render_trees: RunRenderTrees,
     selected_element_id: Option<String>,
-}
-
-impl Drop for DuiDesktopView {
-    fn drop(&mut self) {
-        if let Some(session) = self.live_session.take() {
-            live_client::close_session(&session.session_id);
-        }
-    }
 }
 
 fn route_short_name(path: &str) -> String {
@@ -258,7 +244,6 @@ impl DuiDesktopView {
             comment_input,
             comment_target: CommentTargetChoice::Screen,
             error_message: None,
-            live_session: None,
             diff_cache_key: None,
             diff_entries: Vec::new(),
             canvas_diff_enabled: opts.canvas_diff,
@@ -558,43 +543,6 @@ impl DuiDesktopView {
         }
     }
 
-    fn open_live_session(&mut self, cx: &mut Context<Self>) {
-        if let Some(prev) = self.live_session.take() {
-            live_client::close_session(&prev.session_id);
-        }
-        let Some(run) = self.active_run().cloned() else {
-            return;
-        };
-        let Some(cell) = self.active_cell().cloned() else {
-            return;
-        };
-        let (Some(project), Some(run_dir)) = (run.project_path.as_deref(), run.run_dir.as_deref())
-        else {
-            self.error_message = Some("Local project checkout unavailable for live session".into());
-            cx.notify();
-            return;
-        };
-        match live_client::open_session(project, run_dir, &cell.state_id, cell.width_px) {
-            Ok(session) => {
-                self.live_session = Some(session);
-                self.view_mode = ViewMode::Live;
-                self.error_message = None;
-            }
-            Err(err) => {
-                self.error_message = Some(format!("Live session: {err}"));
-            }
-        }
-        cx.notify();
-    }
-
-    fn close_live_session(&mut self, return_mode: ViewMode, cx: &mut Context<Self>) {
-        if let Some(session) = self.live_session.take() {
-            live_client::close_session(&session.session_id);
-        }
-        self.view_mode = return_mode;
-        cx.notify();
-    }
-
     fn handle_key_down(
         &mut self,
         event: &KeyDownEvent,
@@ -615,9 +563,6 @@ impl DuiDesktopView {
                 if self.picker_open || self.options_open {
                     self.picker_open = false;
                     self.options_open = false;
-                } else if self.view_mode == ViewMode::Live {
-                    self.close_live_session(ViewMode::Detail, cx);
-                    return;
                 } else if self.full_1x_detail {
                     self.full_1x_detail = false;
                 } else if self.view_mode == ViewMode::Detail {
@@ -3422,266 +3367,6 @@ impl DuiDesktopView {
     }
 
     /// Live session preview + typed state editor matching `apps/canvas` LiveStage & LiveInspector.
-    fn render_live_stage(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
-        let p = self.pal();
-        let tr = i18n::strings(self.lang);
-        let Some(session) = self.live_session.as_ref() else {
-            return div().id("live-stage-empty").flex_1().h_full();
-        };
-        let screen_path = self
-            .active_screen()
-            .map(|s| s.path.clone())
-            .unwrap_or_else(|| "/".into());
-
-        let preview = if let Some(ri) = session.frame.clone() {
-            let dims = ri.size(0);
-            let w = (dims.width.0 as f32).min(960.0);
-            let h = (dims.height.0 as f32).min(1200.0);
-            div()
-                .id("live-frame-scroll")
-                .flex_1()
-                .h_full()
-                .overflow_y_scroll()
-                .p_6()
-                .flex()
-                .items_start()
-                .justify_center()
-                .child(
-                    div()
-                        .p_2()
-                        .rounded_xl()
-                        .border_1()
-                        .border_color(p.capture_rim)
-                        .bg(p.capture_surface)
-                        .shadow_lg()
-                        .child(img(ImageSource::Render(ri)).w(px(w)).h(px(h))),
-                )
-        } else {
-            div()
-                .id("live-frame-missing")
-                .flex_1()
-                .h_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(Label::new("Waiting for live frame…").text_color(p.muted_foreground))
-        };
-
-        let mut controls_col = div().flex().flex_col().gap_3();
-        let editable_controls: Vec<_> = session.controls.iter().filter(|c| c.editable).collect();
-        if editable_controls.is_empty() {
-            controls_col = controls_col.child(
-                Label::new(tr.no_editable_states)
-                    .text_xs()
-                    .text_color(p.muted_foreground),
-            );
-        } else {
-            for (idx, ctrl) in editable_controls.iter().enumerate() {
-                let inst = ctrl.instance.clone();
-                let slot = ctrl.slot.clone();
-                let mut opts_row = div().flex().flex_wrap().gap_1();
-                for (o_idx, opt) in ctrl.options.iter().enumerate() {
-                    let active = *opt == ctrl.value;
-                    let opt_val = opt.clone();
-                    let inst_c = inst.clone();
-                    let slot_c = slot.clone();
-                    let opt_label = match opt {
-                        Value::Bool(true) => "On".to_owned(),
-                        Value::Bool(false) => "Off".to_owned(),
-                        Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    };
-                    opts_row = opts_row.child(
-                        Button::new(format!("live-opt-{idx}-{o_idx}"))
-                            .label(opt_label)
-                            .when(active, |b| b.primary())
-                            .when(!active, |b| b.outline())
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                if let Some(s) = this.live_session.as_mut()
-                                    && let Err(e) = live_client::set_control(
-                                        s,
-                                        &inst_c,
-                                        &slot_c,
-                                        opt_val.clone(),
-                                    )
-                                {
-                                    s.error = Some(e);
-                                }
-                                cx.notify();
-                            })),
-                    );
-                }
-
-                let changed = ctrl.value != ctrl.initial_value;
-                controls_col = controls_col.child(
-                    div()
-                        .id(format!("live-ctrl-{idx}"))
-                        .p_2()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(p.glass_line)
-                        .bg(p.glass_surface)
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .child(
-                                    Label::new(format!("{} · {}", ctrl.owner, ctrl.label))
-                                        .text_xs()
-                                        .font_semibold()
-                                        .text_color(p.foreground),
-                                )
-                                .when(changed, |el| {
-                                    let inst_r = inst.clone();
-                                    let slot_r = slot.clone();
-                                    el.child(
-                                        Button::new(format!("live-reset-{idx}"))
-                                            .label(tr.reset)
-                                            .ghost()
-                                            .on_click(cx.listener(move |this, _, _, cx| {
-                                                if let Some(s) = this.live_session.as_mut()
-                                                    && let Err(e) = live_client::reset_control(
-                                                        s, &inst_r, &slot_r,
-                                                    )
-                                                {
-                                                    s.error = Some(e);
-                                                }
-                                                cx.notify();
-                                            })),
-                                    )
-                                }),
-                        )
-                        .child(opts_row),
-                );
-            }
-        }
-
-        let live_inspector = div()
-            .id("live-inspector-wrapper")
-            .w(px(332.0))
-            .h_full()
-            .flex_shrink_0()
-            .p_2()
-            .child(
-                div()
-                    .id("live-inspector-panel")
-                    .size_full()
-                    .p_4()
-                    .rounded_xl()
-                    .border_1()
-                    .border_color(p.glass_line)
-                    .bg(p.glass)
-                    .shadow_lg()
-                    .overflow_y_scroll()
-                    .flex()
-                    .flex_col()
-                    .gap_3()
-                    .child(
-                        div()
-                            .flex()
-                            .items_start()
-                            .justify_between()
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_1()
-                                    .child(
-                                        Label::new(route_short_name(&screen_path))
-                                            .text_base()
-                                            .font_bold()
-                                            .text_color(p.foreground),
-                                    )
-                                    .child(
-                                        Label::new(format!(
-                                            "{} · {} px · rev {}",
-                                            tr.live_controls, session.width_px, session.revision
-                                        ))
-                                        .text_xs()
-                                        .text_color(p.muted_foreground),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .id("live-close-btn")
-                                    .w(px(28.0))
-                                    .h(px(28.0))
-                                    .rounded_md()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .cursor_pointer()
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(|this, _, _, cx| {
-                                            this.close_live_session(ViewMode::Detail, cx);
-                                        }),
-                                    )
-                                    .child(
-                                        Label::new("✕").text_sm().text_color(p.muted_foreground),
-                                    ),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .id("live-save-snapshot-btn")
-                            .w_full()
-                            .py_2()
-                            .rounded_md()
-                            .bg(p.primary)
-                            .cursor_pointer()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(|this, _, _, cx| {
-                                    if let Some(s) = this.live_session.as_mut() {
-                                        match live_client::save_session(s) {
-                                            Ok(_) => {
-                                                this.reload(cx);
-                                            }
-                                            Err(e) => {
-                                                s.error = Some(e);
-                                                cx.notify();
-                                            }
-                                        }
-                                    }
-                                }),
-                            )
-                            .child(
-                                Label::new(if session.saved_run_id.is_some() {
-                                    tr.saved_snapshot
-                                } else {
-                                    tr.save_snapshot
-                                })
-                                .text_xs()
-                                .font_semibold()
-                                .text_color(p.primary_foreground),
-                            ),
-                    )
-                    .when_some(session.error.clone(), |el, err| {
-                        el.child(Label::new(err).text_xs().text_color(p.primary))
-                    })
-                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
-                    .child(controls_col),
-            );
-
-        div()
-            .id("desktop-live-layout")
-            .flex_1()
-            .h_full()
-            .flex()
-            .flex_row()
-            .child(preview)
-            .child(live_inspector)
-    }
-
-    /// Capture Diff view matching `/tmp/obora-dui-diff.png` 1:1.
     fn render_diff_stage(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let p = self.pal();
         let tr = i18n::strings(self.lang);
@@ -4222,7 +3907,6 @@ impl Render for DuiDesktopView {
             body = body.flex().flex_row().child(rail);
             body = match self.view_mode {
                 ViewMode::Detail => body.child(self.render_detail_stage(cx)),
-                ViewMode::Live => body.child(self.render_live_stage(cx)),
                 ViewMode::Diff => body.child(self.render_diff_stage(cx)),
                 ViewMode::Overview => body.child(self.render_overview_stage(false, cx)),
             };
