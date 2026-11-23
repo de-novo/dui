@@ -43,6 +43,46 @@
     },
     {
       "package": "react-router",
+      "symbol": "createHashRouter",
+      "kind": "route"
+    },
+    {
+      "package": "react-router",
+      "symbol": "createMemoryRouter",
+      "kind": "route"
+    },
+    {
+      "package": "react-router",
+      "symbol": "Route",
+      "kind": "route"
+    },
+    {
+      "package": "react-router",
+      "symbol": "useSearchParams",
+      "kind": "search"
+    },
+    {
+      "package": "react-router-dom",
+      "symbol": "createBrowserRouter",
+      "kind": "route"
+    },
+    {
+      "package": "react-router-dom",
+      "symbol": "createHashRouter",
+      "kind": "route"
+    },
+    {
+      "package": "react-router-dom",
+      "symbol": "createMemoryRouter",
+      "kind": "route"
+    },
+    {
+      "package": "react-router-dom",
+      "symbol": "Route",
+      "kind": "route"
+    },
+    {
+      "package": "react-router-dom",
       "symbol": "useSearchParams",
       "kind": "search"
     },
