@@ -135,7 +135,7 @@ export function CaptureCard({
             }}
           />
         ) : resolvedSrc ? (
-          <img loading="lazy" alt="" src={resolvedSrc} />
+          <img loading="lazy" decoding="async" alt="" src={resolvedSrc} />
         ) : (
           <div className="missing-frame-copy">
             <span>{cell ? "Missing image" : "No capture at this width"}</span>

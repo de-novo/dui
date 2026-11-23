@@ -56,6 +56,41 @@ dui update
 
 Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/binary-install.md)
 
+## Quickstart & CLI usage
+
+Run `dui --help` anytime for the full grouped command reference. Most projects only need **four commands**:
+
+```sh
+# 1. Auto-discover screens from router / links and capture (reads optional dui.json)
+dui map
+
+# 2. (Optional) Capture an authenticated browser session (form / MFA / OAuth)
+dui auth login http://localhost:5173/login --out auth-state.json
+
+# 3. Inspect on the 2D canvas (add --live to mount real loopback components)
+dui open
+dui open --live
+
+# 4. Compare branches and generate a PR Markdown summary / audit report
+dui diff --base main --markdown
+dui audit <run-dir>
+```
+
+### `dui map` vs `dui run`
+
+| Command | When to use |
+| --- | --- |
+| `dui map [PROJECT]` | **Default for apps with a router** (TanStack Router, React Router 7/8, or links). Automatically discovers screens, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and captures everything. |
+| `dui run [PROJECT] [MANIFEST]` | **Explicit manifest capture.** Runs `dui.json` directly (omitting arguments defaults to `.` / `dui.json`, and falls back to `dui map` if no explicit `path` or `host` is set). |
+
+| Group | Command | Purpose |
+| --- | --- | --- |
+| Capture | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | Discover/capture screens or print compiler facts without launching a browser |
+| Auth | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | Save Playwright-compatible `storageState.json` (`0600`) for authenticated routes |
+| View & Live | `dui open [--live \| --live-url URL]` · `dui desktop` · `dui live JSON` | Embedded 2D web canvas (with live component mount & `Alt+Click` inspect) or native GPUI viewer |
+| Diff & Quality | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage + 6-rule Design & A11y Audit, review comments |
+| Tools | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | Official compiler probes, archive history, cache GC, self-update, MCP stdio server |
+
 ## Discover screens
 
 From an installed Vite app, run:

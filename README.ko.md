@@ -56,6 +56,41 @@ dui update
 
 설치 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. [바이너리 설치 안내](docs/binary-install.md)
 
+## 빠른 시작 및 CLI 사용법
+
+터미널에서 `dui --help`를 실행하면 전체 명령어를 그룹별로 확인할 수 있다. 대부분의 프로젝트는 **네 가지 명령**만으로 충분하다.
+
+```sh
+# 1. 라우터·링크에서 화면을 자동 발견해 캡처 (프로젝트 루트 dui.json 자동 병합)
+dui map
+
+# 2. (선택) 로그인이 필요한 앱 세션 캡처 (폼·MFA·OAuth 지원)
+dui auth login http://localhost:5173/login --out auth-state.json
+
+# 3. 2D 캔버스에서 확인 (--live를 붙이면 실제 루프백 컴포넌트를 직접 마운트)
+dui open
+dui open --live
+
+# 4. 브랜치 비교 PR 마크다운 요약 및 커버리지·디자인 결함 감사
+dui diff --base main --markdown
+dui audit <run-dir>
+```
+
+### `dui map` vs `dui run`
+
+| 명령어 | 언제 쓰나 |
+| --- | --- |
+| `dui map [PROJECT]` | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · 링크). 화면을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 한 번에 캡처한다. |
+| `dui run [PROJECT] [MANIFEST]` | **명시적 매니페스트 직접 캡처.** `dui.json` 설정 그대로 실행한다(인자를 생략하면 `.` / `dui.json`을 사용하며, 명시적 `path`/`host`가 없으면 `dui map`으로 자동 발견). |
+
+| 분류 | 명령어 | 역할 |
+| --- | --- | --- |
+| 캡처 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 화면 자동 발견·캡처 또는 브라우저 없이 컴파일러 사실/목 출력 |
+| 인증 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 인증된 화면 캡처용 `storageState.json` 저장(`0600`) |
+| 뷰어 · 라이브 | `dui open [--live \| --live-url URL]` · `dui desktop` · `dui live JSON` | 내장 2D 웹 캔버스(라이브 마운트·`Alt+클릭` 요소 선택) 또는 네이티브 GPUI 뷰어 |
+| 비교 · 품질 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 요소/픽셀 Diff, 99% 커버리지·6종 디자인 결함 감사, 리뷰 코멘트 |
+| 도구 | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | 공식 컴파일러 진단, 아카이브 목록, 캐시 정리, 업데이트, MCP 서버 |
+
 ## 화면 자동 발견
 
 의존성을 설치한 Vite 앱에서 실행한다.
