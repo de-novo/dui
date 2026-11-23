@@ -408,6 +408,21 @@ declare var __duiProbe: {
       }
       return false;
     };
+    const isVerticallyClipped = (el: Element, rect: DOMRect): boolean => {
+      let cur = el.parentElement;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        const pcs = getComputedStyle(cur);
+        const oy = pcs.overflowY;
+        if (oy === "auto" || oy === "scroll" || oy === "hidden" || oy === "clip") {
+          const pr = cur.getBoundingClientRect();
+          if (rect.bottom > pr.bottom + 2 || rect.top < pr.top - 2) {
+            return true;
+          }
+        }
+        cur = cur.parentElement;
+      }
+      return false;
+    };
     const tagCounts = new Map<string, number>();
     const elToId = new WeakMap<Element, string>();
     const domParentIds = new WeakMap<Element, string>();
@@ -552,6 +567,12 @@ declare var __duiProbe: {
         isHorizontallyClipped(el, viewportW)
       ) {
         attributes["data-dui-clipped-x"] = "true";
+      }
+      if (isVerticallyClipped(el, rect)) {
+        attributes["data-dui-clipped-y"] = "true";
+      }
+      if (cs.display === "inline" && el.getClientRects().length > 1) {
+        attributes["data-dui-multiline-inline"] = "true";
       }
       if (el.parentElement) {
         let dp = domParentIds.get(el.parentElement);
