@@ -76,8 +76,7 @@ h2 {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.rail,
-.screen-card {
+.rail {
   backdrop-filter: blur(var(--blur));
 }
 .glass-panel {
@@ -564,6 +563,8 @@ h2 {
   margin-top: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--glass-line);
+  min-width: 0;
+  max-width: 100%;
 }
 .inspector-section h3,
 .control-group h3 {
@@ -1630,11 +1631,15 @@ h2 {
 .element-inspector {
   display: grid;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 .element-inspector-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 .element-count-pill {
   font-size: 11px;
@@ -1722,6 +1727,9 @@ h2 {
   display: grid;
   gap: 8px;
   padding: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--card);
@@ -1730,13 +1738,16 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 .element-spec-title code {
   font-weight: 600;
   color: var(--foreground);
+  overflow-wrap: anywhere;
 }
 .element-spec-title span {
   color: var(--muted-foreground);
@@ -1813,6 +1824,7 @@ h2 {
   display: grid;
   gap: 4px;
   margin: 0;
+  min-width: 0;
   font-size: 11px;
 }
 .element-prop-row {
@@ -1820,10 +1832,12 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 .element-props-grid dt {
   color: var(--muted-foreground);
   font-family: var(--font-mono);
+  flex-shrink: 0;
 }
 .element-props-grid dd {
   margin: 0;
@@ -1832,10 +1846,15 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.element-prop-value {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 180px;
+  min-width: 0;
 }
 .color-swatch {
   display: inline-block;

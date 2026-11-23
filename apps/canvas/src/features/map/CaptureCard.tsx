@@ -148,8 +148,6 @@ export function CaptureCard({
           />
         ) : resolvedSrc ? (
           <img
-            loading="lazy"
-            decoding="async"
             alt=""
             src={resolvedSrc}
             onLoad={(event) => {
