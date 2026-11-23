@@ -127,8 +127,6 @@ export type Messages = {
   noComments: string;
   commentFailed: string;
   auditOpenCommentsLabel: (count: number) => string;
-  auditDesignIssuesLabel: (count: number) => string;
-  designIssuesTitle: string;
   elementInspectorTitle: string;
   boxModelLabel: string;
   elementAttributesLabel: string;
@@ -253,8 +251,6 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "No review comments on this screen yet.",
     commentFailed: "Could not save review comments.",
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
-    auditDesignIssuesLabel: (count) => `${count} design ${count === 1 ? "issue" : "issues"}`,
-    designIssuesTitle: "Design & a11y checks",
     elementInspectorTitle: "Element inspector",
     boxModelLabel: "Box model",
     elementAttributesLabel: "Attributes",
@@ -378,8 +374,6 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "此界面暂无评审评论。",
     commentFailed: "无法保存评审评论。",
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
-    auditDesignIssuesLabel: (count) => `${count} 项设计问题`,
-    designIssuesTitle: "设计与无障碍检查",
     elementInspectorTitle: "元素检查器",
     boxModelLabel: "盒模型",
     elementAttributesLabel: "元素属性",
@@ -503,8 +497,6 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "이 화면에 등록된 코멘트가 없습니다.",
     commentFailed: "코멘트를 불러오거나 저장할 수 없습니다.",
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
-    auditDesignIssuesLabel: (count) => `디자인 결함 ${count}건`,
-    designIssuesTitle: "디자인 · 접근성 진단",
     elementInspectorTitle: "요소 인스펙터",
     boxModelLabel: "박스 모델",
     elementAttributesLabel: "요소 속성",
