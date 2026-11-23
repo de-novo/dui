@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-11-23
+
+### Added
+
+- 通用认证会话支持（`storageState.json`、`localStorage`、`sessionStorage`、`extraHeaders`、支持 chunked 响应的 `POST authFlow`、`env:` 密钥间接引用与脱敏、按认证隔离缓存键）以及 GitHub PR 评论用 `dui diff ... --markdown` 输出 ([#128](https://github.com/de-novo/dui/pull/128))。
+- iOS Simulator 表面适配器（`host: "ios"`，`xcrun simctl` 截图 + XCUI 无障碍树 → `RenderNodeSnapshot`），无环境时如实报告 `macos-required` / `no-ios-simulator` ([#123](https://github.com/de-novo/dui/pull/123))。
+- GPUI 桌面查看器（`apps/desktop`）补齐交互式元素检查器、嵌套盒模型图与设计缺陷叠加层 ([#122](https://github.com/de-novo/dui/pull/122))。
+
+### Changed
+
+- 将 TypeScript 编译器预言机的 Node 运行时要求从硬编码 Node 26 放宽至 Node 22+ LTS（`22` / `24` / `26+`） ([#126](https://github.com/de-novo/dui/pull/126))。
+- 将 `designAudit` 缺陷按 `(kind, path, width, nodeId)` 去重并附带 `occurrences` 与 `rawTotal`，同时收紧重叠、触控目标与间距偏差启发式以减少误报 ([#126](https://github.com/de-novo/dui/pull/126))。
+- 将工作区包版本同步为 `0.1.0`，与 `apps/desktop` 保持一致。
+
+### Fixed
+
+- 将主页面文档 HTTP `4xx`/`5xx`（如 404、500）响应明确判为 `unverified`（`http-error`），同时忽略附带 `/favicon.ico` 404 ([#126](https://github.com/de-novo/dui/pull/126))。
+- 修复 TUI 捕获（`htop`、`fzf`）中的 VT100 `CSI b`（`REP`）/ `CSI X`（`ECH`）、块状字符（`▌` `▏` `█`）、小写 `p`/`q` 字形对齐与文本单元对比度采样 ([#117](https://github.com/de-novo/dui/pull/117))。
+
+## [v0.0.9] - 2026-11-23
+
+### Added
+
+- Android 移动表面适配器（`host: "android"`，`adb screencap` + `uiautomator` XML → `RenderNodeSnapshot`） ([#111](https://github.com/de-novo/dui/pull/111))。
+- Electron 45 桌面适配器（`host: "electron"` + `ipcMocks`）以及 GPUI AccessKit → `RenderNodeSnapshot` 渲染树差异对比 ([#112](https://github.com/de-novo/dui/pull/112))。
+- Radix UI 1 / shadcn/ui 4 声明式 `control` 规则包与 Next.js 16 App Router 宿主（含 Server Component 边界报告） ([#113](https://github.com/de-novo/dui/pull/113))。
+- 6 类设计与无障碍缺陷自动检测引擎（AI 结构化 JSON + 2D 画布叠加层）与多工作线程并行宽度捕获（`concurrency`） ([#114](https://github.com/de-novo/dui/pull/114))。
+- 开发者工具风格元素检查器、嵌套盒模型叠加层（`margin`、`padding`、`border`、`gap`、`borderRadius`、属性）与元素间距红线标尺 ([#115](https://github.com/de-novo/dui/pull/115))。
+
+## [v0.0.8] - 2026-11-23
+
+### Added
+
+- 多表面抽象基础（`SurfaceRegistry`、`NoopOracle`、含盒模型与属性的统一 `RenderNodeSnapshot` IR） ([#107](https://github.com/de-novo/dui/pull/107), [#108](https://github.com/de-novo/dui/pull/108))。
+- 不依赖特定打包器的 Universal Web 宿主（`static` / `url` / `command`） ([#109](https://github.com/de-novo/dui/pull/109))。
+- Universal TUI 适配器（`host: "pty"`，纯 VT100/ANSI 仿真器 → `RenderNodeSnapshot` + 等宽 PNG） ([#110](https://github.com/de-novo/dui/pull/110))。
+
+## [v0.0.7] - 2026-11-22
+
+### Added
+
+- 真实 API 代理模式（`apiMode: "live"` / `"hybrid"`，默认拦截写操作）、分支对比（`dui diff --base`）、元素级 `renderDiff` + 延迟像素差异与 2D 画布内联分支变更高亮 ([#81](https://github.com/de-novo/dui/pull/81), [#85](https://github.com/de-novo/dui/pull/85), [#88](https://github.com/de-novo/dui/pull/88), [#92](https://github.com/de-novo/dui/pull/92))。
+- 扩展声明式 P2 规则包（Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、valibot 1），移除人为 `stateBudget` 上限改用确定性收敛 ([#90](https://github.com/de-novo/dui/pull/90), [#94](https://github.com/de-novo/dui/pull/94))。
+
 ## [v0.0.6] - 2026-11-22
 
 ### Added
