@@ -343,9 +343,16 @@ export function auditLiveRenderTree(
 
   for (let i = 0; i < interactiveNodes.length; i++) {
     const a = interactiveNodes[i];
+    const aAttrs = a.attributes ?? {};
+    if (aAttrs["data-dui-clipped-y"] === "true" || aAttrs["data-dui-multiline-inline"] === "true") {
+      continue;
+    }
     for (let j = i + 1; j < interactiveNodes.length; j++) {
       const b = interactiveNodes[j];
+      const bAttrs = b.attributes ?? {};
       if (
+        bAttrs["data-dui-clipped-y"] === "true" ||
+        bAttrs["data-dui-multiline-inline"] === "true" ||
         isAncestorNode(parentMap, a.id, b.id) ||
         isAncestorNode(parentMap, b.id, a.id) ||
         rectContains(a.rect, b.rect) ||

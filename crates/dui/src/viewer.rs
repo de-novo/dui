@@ -192,6 +192,19 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
       }
       return false;
     };
+    const isClippedY = (el, rect) => {
+      let cur = el.parentElement;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        const pcs = getComputedStyle(cur);
+        const oy = pcs.overflowY;
+        if (oy === "auto" || oy === "scroll" || oy === "hidden" || oy === "clip") {
+          const pr = cur.getBoundingClientRect();
+          if (rect.bottom > pr.bottom + 2 || rect.top < pr.top - 2) return true;
+        }
+        cur = cur.parentElement;
+      }
+      return false;
+    };
     const els = root.querySelectorAll("*");
     let idx = 0;
     for (const el of els) {
@@ -268,6 +281,12 @@ const LIVE_TELEMETRY_BRIDGE_SCRIPT: &str = r#"<script data-dui-live-bridge="1">(
       const rx = Math.round(rect.x);
       if (vpW > 0 && (rx < -2 || rx + w > vpW + 2) && isClippedX(el)) {
         attrs["data-dui-clipped-x"] = "true";
+      }
+      if (isClippedY(el, rect)) {
+        attrs["data-dui-clipped-y"] = "true";
+      }
+      if (cs.display === "inline" && el.getClientRects().length > 1) {
+        attrs["data-dui-multiline-inline"] = "true";
       }
       out.push({
         id,

@@ -29,6 +29,17 @@ pub(crate) fn store(path: &Path, data: &Value) -> Result<(), (u8, Value)> {
     Ok(())
 }
 pub fn analyze(project: &Path, spec: &Path) -> Reply {
+    if let Ok(bytes) = fs::read(spec)
+        && let Ok(manifest) = serde_json::from_slice::<Value>(&bytes)
+    {
+        let surface_id = dui_core::surface::resolve_surface_id(&manifest);
+        if surface_id != dui_core::surface::SURFACE_VITE_WEB {
+            let registry = crate::surface::SurfaceRegistry::default_registry();
+            if let Some(adapter) = registry.find(surface_id) {
+                return analyze_with_oracle(adapter.oracle(), project, spec);
+            }
+        }
+    }
     analyze_with_oracle(&TypeScript, project, spec)
 }
 

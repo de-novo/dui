@@ -239,6 +239,16 @@ fn is_horizontally_clipped(node: &RenderNodeSnapshot) -> bool {
         .is_some_and(|v| v == "true")
 }
 
+fn is_overlap_exempt(node: &RenderNodeSnapshot) -> bool {
+    node.attributes
+        .get("data-dui-clipped-y")
+        .is_some_and(|v| v == "true")
+        || node
+            .attributes
+            .get("data-dui-multiline-inline")
+            .is_some_and(|v| v == "true")
+}
+
 fn is_disabled(node: &RenderNodeSnapshot) -> bool {
     node.attributes.contains_key("disabled")
         || node
@@ -365,6 +375,55 @@ fn oklab_to_srgb(l: f64, a: f64, b: f64) -> (f64, f64, f64) {
     )
 }
 
+fn cie_lab_to_srgb(l: f64, a: f64, b: f64) -> (f64, f64, f64) {
+    const KAPPA: f64 = 24_389.0 / 27.0;
+    const EPSILON: f64 = 216.0 / 24_389.0;
+    const D50_X: f64 = 0.3457 / 0.3585;
+    const D50_Y: f64 = 1.0;
+    const D50_Z: f64 = (1.0 - 0.3457 - 0.3585) / 0.3585;
+
+    let fy = (l + 16.0) / 116.0;
+    let fx = a / 500.0 + fy;
+    let fz = fy - b / 200.0;
+
+    let fx3 = fx * fx * fx;
+    let fz3 = fz * fz * fz;
+    let xr = if fx3 > EPSILON {
+        fx3
+    } else {
+        (116.0 * fx - 16.0) / KAPPA
+    };
+    let yr = if l > KAPPA * EPSILON {
+        fy * fy * fy
+    } else {
+        l / KAPPA
+    };
+    let zr = if fz3 > EPSILON {
+        fz3
+    } else {
+        (116.0 * fz - 16.0) / KAPPA
+    };
+
+    let x50 = xr * D50_X;
+    let y50 = yr * D50_Y;
+    let z50 = zr * D50_Z;
+
+    // Bradford chromatic adaptation D50 -> D65 (W3C CSS Color 4)
+    let x65 = 0.955_473_452_7 * x50 - 0.023_098_536_9 * y50 + 0.063_259_308_7 * z50;
+    let y65 = -0.028_369_706_9 * x50 + 1.009_995_458_0 * y50 + 0.021_041_398_9 * z50;
+    let z65 = 0.012_314_001_7 * x50 - 0.020_507_696_4 * y50 + 1.330_365_936_6 * z50;
+
+    let r_lin = 3.240_969_941_9 * x65 - 1.537_383_177_6 * y65 - 0.498_610_760_3 * z65;
+    let g_lin = -0.969_243_636_3 * x65 + 1.875_967_501_5 * y65 + 0.041_555_057_4 * z65;
+    let b_lin = 0.055_630_079_7 * x65 - 0.203_976_958_9 * y65 + 1.056_971_514_2 * z65;
+
+    (
+        linear_to_srgb_255(r_lin),
+        linear_to_srgb_255(g_lin),
+        linear_to_srgb_255(b_lin),
+    )
+}
+
 fn parse_css_rgba(raw: &str) -> Option<(f64, f64, f64, f64)> {
     let trimmed = raw.trim();
     if let Some(inner) = trimmed
@@ -439,6 +498,52 @@ fn parse_css_rgba(raw: &str) -> Option<(f64, f64, f64, f64)> {
             None => 1.0,
         };
         let (r, g, bl) = oklab_to_srgb(l, c * h_rad.cos(), c * h_rad.sin());
+        return Some((r, g, bl, alpha));
+    }
+
+    if let Some(inner) = trimmed
+        .strip_prefix("lab(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (coords, alpha_part) = match inner.split_once('/') {
+            Some((l, r)) => (l, Some(r)),
+            None => (inner, None),
+        };
+        let parts: Vec<&str> = coords.split_whitespace().collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let l = parse_unit_or_pct(parts[0], 100.0)?;
+        let a = parse_unit_or_pct(parts[1], 125.0)?;
+        let b = parse_unit_or_pct(parts[2], 125.0)?;
+        let alpha = match alpha_part {
+            Some(ap) => parse_alpha(ap)?,
+            None => 1.0,
+        };
+        let (r, g, bl) = cie_lab_to_srgb(l, a, b);
+        return Some((r, g, bl, alpha));
+    }
+
+    if let Some(inner) = trimmed
+        .strip_prefix("lch(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (coords, alpha_part) = match inner.split_once('/') {
+            Some((l, r)) => (l, Some(r)),
+            None => (inner, None),
+        };
+        let parts: Vec<&str> = coords.split_whitespace().collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let l = parse_unit_or_pct(parts[0], 100.0)?;
+        let c = parse_unit_or_pct(parts[1], 150.0)?;
+        let h_rad = parse_angle_rad(parts[2])?;
+        let alpha = match alpha_part {
+            Some(ap) => parse_alpha(ap)?,
+            None => 1.0,
+        };
+        let (r, g, bl) = cie_lab_to_srgb(l, c * h_rad.cos(), c * h_rad.sin());
         return Some((r, g, bl, alpha));
     }
 
@@ -645,6 +750,7 @@ pub fn lint_render_tree(nodes: &[RenderNodeSnapshot], viewport_width: u32) -> De
             n.rect.width > 0
                 && n.rect.height > 0
                 && !is_container_tag(&n.tag)
+                && !is_overlap_exempt(n)
                 && !matches!(n.tag.as_str(), "tui-row" | "svg" | "img" | "label")
         })
         .collect();
@@ -1209,5 +1315,110 @@ mod tests {
         );
         assert_eq!(audit.findings[0].kind, DesignDefectKind::LowContrast);
         assert_eq!(audit.findings[0].node_id, "p#muted");
+    }
+
+    #[test]
+    fn evaluates_cie_lab_lch_contrast_and_excludes_clipped_y_and_multiline_inline_overlap() {
+        let low_lab = node(
+            "p#low-lab",
+            "p",
+            "Faint lab text",
+            RenderRect {
+                x: 16,
+                y: 16,
+                width: 200,
+                height: 20,
+            },
+            BTreeMap::from([
+                ("color".into(), "lab(75 0 0)".into()),
+                ("backgroundColor".into(), "lab(96 0 0)".into()),
+                ("fontSize".into(), "14px".into()),
+            ]),
+        );
+        let high_lab = node(
+            "p#high-lab",
+            "p",
+            "Crisp lab text",
+            RenderRect {
+                x: 16,
+                y: 48,
+                width: 200,
+                height: 20,
+            },
+            BTreeMap::from([
+                ("color".into(), "lab(98.26 0 0)".into()),
+                ("backgroundColor".into(), "lch(8 0 0)".into()),
+                ("fontSize".into(), "14px".into()),
+            ]),
+        );
+        // Vertically clipped scrollable sidebar item overlapping pinned footer button -> must NOT flag
+        let mut scrolled_item = node(
+            "a#scrolled",
+            "a",
+            "Products",
+            RenderRect {
+                x: 8,
+                y: 732,
+                width: 255,
+                height: 32,
+            },
+            BTreeMap::from([("display".into(), "flex".into())]),
+        );
+        scrolled_item
+            .attributes
+            .insert("data-dui-clipped-y".into(), "true".into());
+        let footer_btn = node(
+            "button#footer",
+            "button",
+            "Account",
+            RenderRect {
+                x: 8,
+                y: 744,
+                width: 255,
+                height: 48,
+            },
+            BTreeMap::new(),
+        );
+        // Wrapped multi-line inline links whose bounding boxes intersect -> must NOT flag
+        let mut link_a = node(
+            "a#terms",
+            "a",
+            "Terms of Service",
+            RenderRect {
+                x: 40,
+                y: 600,
+                width: 260,
+                height: 36,
+            },
+            BTreeMap::from([("display".into(), "inline".into())]),
+        );
+        link_a
+            .attributes
+            .insert("data-dui-multiline-inline".into(), "true".into());
+        let link_b = node(
+            "a#privacy",
+            "a",
+            "Privacy Policy",
+            RenderRect {
+                x: 120,
+                y: 618,
+                width: 100,
+                height: 18,
+            },
+            BTreeMap::from([("display".into(), "inline".into())]),
+        );
+
+        let audit = lint_render_tree(
+            &[low_lab, high_lab, scrolled_item, footer_btn, link_a, link_b],
+            1280,
+        );
+        assert_eq!(
+            audit.findings.len(),
+            1,
+            "expected only low_lab LowContrast, got {:?}",
+            audit.findings
+        );
+        assert_eq!(audit.findings[0].kind, DesignDefectKind::LowContrast);
+        assert_eq!(audit.findings[0].node_id, "p#low-lab");
     }
 }
