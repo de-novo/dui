@@ -363,7 +363,21 @@ h2 {
 }
 .map .react-flow__edge-path {
   vector-effect: non-scaling-stroke;
-  stroke-width: 1.15;
+  stroke-width: 1.25;
+  transition: opacity 160ms ease;
+}
+.map-edge-label {
+  position: absolute;
+  pointer-events: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  z-index: 12;
 }
 .map .react-flow__controls {
   margin-inline-start: calc(var(--rail-space) + 12px);

@@ -18,8 +18,8 @@ export function nodeMetrics(captureWidth: number): NodeMetrics {
     Number.isFinite(captureWidth) && captureWidth > 0 ? captureWidth : 375,
   );
   const frameHeight = Math.round(cardWidth * (cardWidth <= 500 ? 1.6 : 0.625));
-  const column = cardWidth + Math.max(120, Math.round(cardWidth * 0.14));
-  const row = frameHeight + Math.max(160, Math.round(frameHeight * 0.2));
+  const column = cardWidth + Math.max(220, Math.round(cardWidth * 0.22));
+  const row = frameHeight + Math.max(200, Math.round(frameHeight * 0.26));
   return { cardWidth, frameHeight, column, row };
 }
 

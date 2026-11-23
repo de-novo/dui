@@ -43,8 +43,8 @@ pub fn node_metrics(capture_width: u32) -> NodeMetrics {
     let frame_height = (w * aspect).round();
     let caption_height = (w * 0.085).clamp(44.0, 96.0).round();
     let card_height = frame_height + caption_height;
-    let col_gap = (w * 0.24).max(160.0).round();
-    let row_gap = (card_height * 0.26).max(260.0).round();
+    let col_gap = (w * 0.28).max(220.0).round();
+    let row_gap = (card_height * 0.28).max(280.0).round();
     NodeMetrics {
         card_width: w,
         frame_height,
