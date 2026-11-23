@@ -6,6 +6,7 @@ mod audit;
 mod cache;
 mod chromium;
 mod comments;
+mod compiler_oracle;
 mod diff;
 mod electron;
 mod gpui;
@@ -199,6 +200,11 @@ fn is_supported_ts(version: &str) -> bool {
 
 fn run() -> Reply {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if let [cmd] = args.as_slice()
+        && cmd == "toolchains"
+    {
+        return Ok(compiler_oracle::probe_all_toolchains_json());
+    }
     if let [cmd] = args.as_slice()
         && cmd == "live-owner"
     {

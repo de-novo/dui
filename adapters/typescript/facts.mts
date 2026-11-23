@@ -114,6 +114,8 @@ for (const [name, major] of Object.entries({
   "@radix-ui/react-dropdown-menu": 1,
   "@radix-ui/react-switch": 1,
   "@radix-ui/react-checkbox": 1,
+  ink: 5,
+  "expo-router": 5,
 })) {
   const actual = readInstalledPackageVersion(name);
   if (actual === null) continue;
@@ -688,6 +690,7 @@ try {
             const stateProps = [
               "open",
               "defaultOpen",
+              "visible",
               "value",
               "defaultValue",
               "checked",

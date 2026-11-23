@@ -230,6 +230,56 @@
       "package": "radix-ui",
       "symbol": "Checkbox",
       "kind": "control"
+    },
+    {
+      "package": "ink",
+      "symbol": "useInput",
+      "kind": "slot"
+    },
+    {
+      "package": "ink",
+      "symbol": "useFocus",
+      "kind": "control"
+    },
+    {
+      "package": "react-native",
+      "symbol": "Modal",
+      "kind": "control"
+    },
+    {
+      "package": "react-native",
+      "symbol": "Switch",
+      "kind": "control"
+    },
+    {
+      "package": "react-native",
+      "symbol": "TextInput",
+      "kind": "control"
+    },
+    {
+      "package": "react-native",
+      "symbol": "useColorScheme",
+      "kind": "query"
+    },
+    {
+      "package": "expo-router",
+      "symbol": "useLocalSearchParams",
+      "kind": "search"
+    },
+    {
+      "package": "expo-router",
+      "symbol": "useGlobalSearchParams",
+      "kind": "search"
+    },
+    {
+      "package": "expo-router",
+      "symbol": "Tabs",
+      "kind": "control"
+    },
+    {
+      "package": "expo-router",
+      "symbol": "Stack",
+      "kind": "route"
     }
   ]
 }

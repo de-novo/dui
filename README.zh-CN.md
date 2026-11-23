@@ -15,8 +15,8 @@
 | 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2、Go |
 | Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 19、Vite 8、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
 | 桌面应用 | GPUI (`gpui-pre` 0.3.x、`gpui-kit` / `gpui-component` 0.10.x，Metal + AccessKit `renderTree`)、Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
-| 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator` → `RenderNodeSnapshot`)、iOS (`xcrun simctl` + XCUI → `RenderNodeSnapshot`) | Jetpack Compose / Kotlin 2、SwiftUI / Swift 6、React Native 0.88 / Expo 58、Flutter 3 / Dart 3 编译器深度分析 |
-| 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG) | Ratatui (Rust)、Ink (TS/React)、Bubble Tea (Go) |
+| 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | Jetpack Compose (`kotlinc` 2)、SwiftUI (`swiftc` 6)、Flutter (`dart` 3) 深度状态计划 |
+| 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG)、Ink 5 (`tsc` 规则包) | Ratatui (`rustc`)、Bubble Tea (`go`) 深度状态计划 |
 | 路由与 URL 状态 | TanStack Router 1、TanStack Start 1、React Router 8、Next.js App Router (`app/**/page.tsx`)、标准 Web `URLSearchParams` | Android Intent 与深度链接编译器分析 |
 | 状态、表单与模式 | React `useState`、TanStack Query 5、Zustand 5、Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、zod 4、valibot 1、Radix UI 1 / shadcn/ui 4 | — |
 
