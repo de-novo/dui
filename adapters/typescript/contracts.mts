@@ -34,6 +34,7 @@ export interface Scope {
 export interface Manifest extends Scope {
   additionalScopes?: Scope[];
   appRoot?: string;
+  host?: string;
   rulePacks?: string[];
 }
 export interface Rule {

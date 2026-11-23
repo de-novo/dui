@@ -89,10 +89,25 @@ function readInstalledPackageVersion(name: string): string | null {
     return null;
   }
 }
-for (const [name, majors] of Object.entries<number | number[]>({
-  react: 19,
-  "react-dom": 19,
-  vite: [7, 8],
+// Hard version gates apply ONLY to the host/runtime layers whose APIs dui invokes directly.
+// Newer stable majors are always accepted (`major >= minMajor`).
+const CORE_MIN_MAJORS: Record<string, number> = {
+  react: 18,
+  "react-dom": 18,
+  vite: 7,
+  ...(spec.host === "next" ? { next: 16 } : {}),
+};
+for (const [name, minMajor] of Object.entries(CORE_MIN_MAJORS)) {
+  const actual = readInstalledPackageVersion(name);
+  if (actual === null) continue;
+  if (!/^\d+\.\d+\.\d+$/.test(actual) || Number(actual.split(".")[0]) < minMajor) {
+    unsupported(`${name} requires stable ${minMajor}.x+; found ${actual}`);
+  }
+  versions[name] = actual;
+}
+// Ecosystem / rule-pack libraries are analyzed through the official TypeScript compiler without
+// coupling dui to a fixed library major. Record their versions and emit non-fatal notes only.
+const TESTED_ECOSYSTEM_BASELINES: Record<string, number> = {
   "@tanstack/react-router": 1,
   "@tanstack/react-start": 1,
   "@tanstack/react-query": 5,
@@ -103,7 +118,8 @@ for (const [name, majors] of Object.entries<number | number[]>({
   xstate: 5,
   "react-hook-form": 7,
   valibot: 1,
-  "react-router": [7, 8],
+  "react-router": 7,
+  "react-router-dom": 7,
   next: 16,
   "radix-ui": 1,
   "@radix-ui/react-dialog": 1,
@@ -116,15 +132,33 @@ for (const [name, majors] of Object.entries<number | number[]>({
   "@radix-ui/react-checkbox": 1,
   ink: 5,
   "expo-router": 5,
-})) {
+};
+const versionNotes: { package: string; version: string; note: string }[] = [];
+const rulePackages = new Set([
+  ...Object.keys(TESTED_ECOSYSTEM_BASELINES),
+  ...rules.map((r) => r.package),
+]);
+for (const name of [...rulePackages].sort()) {
+  if (name in CORE_MIN_MAJORS) continue;
   const actual = readInstalledPackageVersion(name);
   if (actual === null) continue;
-  const allowed = Array.isArray(majors) ? majors : [majors];
-  if (!/^\d+\.\d+\.\d+$/.test(actual) || !allowed.includes(Number(actual.split(".")[0]))) {
-    const label = allowed.map((m) => `${m}.x`).join(" or ");
-    unsupported(name + " requires stable " + label + "; found " + actual);
-  }
   versions[name] = actual;
+  const baseline = TESTED_ECOSYSTEM_BASELINES[name];
+  if (baseline !== undefined) {
+    if (!/^\d+\.\d+\.\d+$/.test(actual)) {
+      versionNotes.push({
+        package: name,
+        version: actual,
+        note: `non-stable version; tested baseline is ${baseline}.x+`,
+      });
+    } else if (Number(actual.split(".")[0]) < baseline) {
+      versionNotes.push({
+        package: name,
+        version: actual,
+        note: `below tested baseline ${baseline}.x+; continuing via official compiler types`,
+      });
+    }
+  }
 }
 async function loadOfficial(part: string) {
   for (const prefix of ["typescript/", "typescript/unstable/"]) {
@@ -766,6 +800,7 @@ try {
           .map(([k, v]) => [k, [...v].sort()]),
       ),
       versions,
+      ...(versionNotes.length ? { versionNotes } : {}),
       compiler: compiler.version,
       diagnostics: allDiagnostics,
       facts: [...unique.values()].sort(

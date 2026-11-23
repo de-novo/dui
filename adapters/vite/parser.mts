@@ -70,8 +70,8 @@ interface TsSyntaxEnums {
 
 export function assertSupportedViteVersion(version: string): number {
   const major = Number(version.split(".")[0]);
-  if (!/^\d+\.\d+\.\d+$/.test(version) || (major !== 7 && major !== 8)) {
-    throw Error("Vite 7 or 8 required; found " + version);
+  if (!/^\d+\.\d+\.\d+$/.test(version) || major < 7) {
+    throw Error("Vite 7.x+ required; found " + version);
   }
   return major;
 }

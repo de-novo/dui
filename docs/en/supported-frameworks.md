@@ -9,7 +9,7 @@ Versions were checked on 2026-11-20 (KST) against the official source linked in 
 ## Rules applied
 
 1. **Official compiler only.** Types come from the compiler the project already uses (`tsc`, `rustc`, `swiftc`, `kotlinc`, `dart`).
-2. **Latest stable major only.** One baseline per stack. Newer versions are always supported; the baseline moves up only in a new dui major. For 0.x projects the "major" is the 0.minor line.
+2. **Compiler & host baselines only (`>=` baseline).** Hard version gates apply only to the compiler and host/UI runtime whose APIs dui invokes directly (`tsc`, `vite` 7+, `react` 18+, `next` 16+). Newer stable majors are always supported. Declarative rule-pack libraries (routers, stores, forms, schemas, headless UI kits) are analyzed through the official compiler without blocking scans on library version differences.
 3. **Typed languages only.**
 4. **Rendering limits are stated.** Apple targets need a Mac to render. A stack can be analyzed but not rendered; those cells are reported as `unrenderable`.
 5. **AI-native.** An AI drives the CLI and MCP server; people review the canvas.
