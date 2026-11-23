@@ -17,7 +17,27 @@ pub struct Intent<'a> {
 pub enum Failure {
     MissingStateAssertion,
     MissingScreenAssertion,
+    HttpError,
     AssertFailed,
+}
+
+/// Inspect `observed["responses"]` for the primary navigated document status code.
+/// Returns `Some(status)` if the navigated document responded with HTTP 4xx/5xx,
+/// ignoring ancillary subresources like `/favicon.ico`.
+pub fn document_http_error(expected_path: &str, observed: &Value) -> Option<u64> {
+    let responses = observed["responses"].as_object()?;
+    let obs_path = observed["path"].as_str().unwrap_or(expected_path);
+    let (obs_base, _) = parse_url_parts(obs_path);
+    let (exp_base, _) = parse_url_parts(expected_path);
+    for candidate in [obs_path, expected_path, obs_base, exp_base] {
+        if candidate.is_empty() {
+            continue;
+        }
+        if let Some(code) = responses.get(candidate).and_then(Value::as_u64) {
+            return (code >= 400).then_some(code);
+        }
+    }
+    None
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -98,6 +118,9 @@ impl Intent<'_> {
     }
 
     pub fn observation_failure(&self, observed: &Value) -> Option<Failure> {
+        if document_http_error(self.path, observed).is_some() {
+            return Some(Failure::HttpError);
+        }
         let values = observed["slots"].as_object();
         let values_match = self
             .inputs
@@ -226,5 +249,57 @@ mod tests {
 
         let redirect = analyze_url_match("/admin", "/login?next=%2Fadmin");
         assert!(!redirect.matched);
+    }
+
+    #[test]
+    fn rejects_404_and_500_document_responses_while_ignoring_favicon_404() {
+        let intent = Intent {
+            path: "/missing",
+            width: 1280,
+            inputs: &BTreeMap::new(),
+            assertions: &[],
+            required_requests: &[],
+            analyzed: true,
+            expects_probe: false,
+        };
+        let page_404 = serde_json::json!({
+            "ready": true,
+            "settled": true,
+            "path": "/missing",
+            "width": 1280,
+            "slots": {},
+            "assertions": [],
+            "responseChecks": {},
+            "responses": {"/missing": 404}
+        });
+        assert_eq!(intent.failure(&page_404), Some(Failure::HttpError));
+
+        let ok_intent = Intent {
+            path: "/home",
+            ..intent
+        };
+        let page_200_with_missing_favicon = serde_json::json!({
+            "ready": true,
+            "settled": true,
+            "path": "/home",
+            "width": 1280,
+            "slots": {},
+            "assertions": [],
+            "responseChecks": {},
+            "responses": {"/home": 200, "/favicon.ico": 404}
+        });
+        assert_eq!(ok_intent.failure(&page_200_with_missing_favicon), None);
+
+        let page_500 = serde_json::json!({
+            "ready": true,
+            "settled": true,
+            "path": "/home",
+            "width": 1280,
+            "slots": {},
+            "assertions": [],
+            "responseChecks": {},
+            "responses": {"/home": 500}
+        });
+        assert_eq!(ok_intent.failure(&page_500), Some(Failure::HttpError));
     }
 }
