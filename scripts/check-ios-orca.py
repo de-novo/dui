@@ -1,4 +1,5 @@
 """Instrument a disposable upstream checkout, or capture that build on a fresh iPhone."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -55,6 +56,7 @@ def capture(app, checker, output):
             if route != "/":
                 subprocess.run([*simctl, "openurl", udid, "orca://" + route.lstrip("/")], check=True)
             deadline = time.monotonic() + 120
+            state = None
             while time.monotonic() < deadline:
                 time.sleep(1)
                 try:
@@ -73,15 +75,17 @@ def capture(app, checker, output):
                     raise ValueError(f"PNG {width}×{height} disagrees with iOS screen {screen}")
                 if json.loads(state_file.read_text()) != state:
                     continue
-                (output / filename).write_bytes(frame.read_bytes())
+                pixels = frame.read_bytes()
+                (output / filename).write_bytes(pixels)
                 recordings.append({
                     "runtime": "ios", "observedPath": route, "width": state["width"],
                     "height": state["height"], "scale": state["scale"], "image": filename,
                     "imageWidth": width, "imageHeight": height, "visibleText": witness,
+                    "sha256": hashlib.sha256(pixels).hexdigest(),
                 })
                 break
             else:
-                raise RuntimeError(f"Timed out waiting for {route} to display {witness!r}")
+                raise RuntimeError(f"Timed out waiting for {route} to display {witness!r}; last observation: {state}")
     evidence = {"revision": REVISION, "device": os.environ["DUI_IOS_DEVICE"],
                 "simulatorRuntime": os.environ["DUI_IOS_RUNTIME"], "captures": recordings}
     print(json.dumps(evidence, indent=2))

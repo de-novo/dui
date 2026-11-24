@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: orca-ios-capture-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   capture:
     runs-on: xcode-27
