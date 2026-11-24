@@ -408,6 +408,7 @@ async function captureOssProject(
 }
 
 async function main() {
+  fs.copyFileSync(path.join(root, "scripts/install"), path.join(root, "site/install"));
   const demoDir = path.join(root, "site", "demo");
   const archiveDir = path.join(demoDir, "archive");
   fs.rmSync(demoDir, { recursive: true, force: true });

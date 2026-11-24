@@ -38,7 +38,7 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 macOS와 Linux에서는 아래 명령 하나로 최신 릴리스 태그(`vX.Y.Z`, 태그가 없으면 `main`)를 클론해 소스에서 빌드·설치한다. 특정 태그를 고정하려면 `DUI_TAG=v0.0.1`을 지정한다.
 
 ```sh
-curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
+curl -fsSL https://dui.sh/install | sh
 ```
 
 Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도구를 사용한다. 설치기는 내 컴퓨터에서 dui를 빌드하고, 설치 경로(기본 `~/.local/bin`)를 셸 `PATH`에 자동 등록(원치 않으면 `DUI_NO_MODIFY_PATH=1`)하며 가능하면 현재 `PATH`의 쓰기 가능한 경로에 심볼릭 링크를 만들어 바로 `dui` 명령어를 쓸 수 있게 한다. Rust나 Node.js 26 및 npm이 없으면 빌드에 필요한 도구를 임시로 받아 사용한 뒤 정리한다.
