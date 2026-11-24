@@ -13,6 +13,7 @@ on:
       - "apps/canvas/src/**"
       - "scripts/check-native-map*.mts"
       - "scripts/check-map-url.mts"
+      - "scripts/chromium-page.mts"
       - ".github/workflows/native-map.yml"
   workflow_dispatch:
 permissions:
@@ -65,6 +66,8 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/t3-syntax" --no-audit --no-fund --ignore-scripts typescript@6.0.3
           ln -s "$RUNNER_TEMP/t3-syntax/node_modules" .t3code/apps/mobile/node_modules
           ln -s "$GITHUB_WORKSPACE/node_modules" .orca/mobile/node_modules
-          export DUI_CHROMIUM="$(command -v google-chrome)"
+          DUI_CHROMIUM="$(command -v google-chrome)"
+          export DUI_CHROMIUM
+          "$DUI_CHROMIUM" --version
           node scripts/check-native-map.mts .t3code/apps/mobile .orca/mobile .samples/compass_app/app
           node scripts/check-map-url.mts
