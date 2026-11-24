@@ -6,6 +6,7 @@ on:
       - "crates/dui/src/main.rs"
       - "crates/dui/src/analysis.rs"
       - "crates/dui/src/native_map.rs"
+      - "crates/dui/src/native_capture.rs"
       - "crates/dui/src/screen_map.rs"
       - "crates/dui/src/universal_web.rs"
       - "crates/dui-core/src/model/capture.rs"

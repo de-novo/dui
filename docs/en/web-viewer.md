@@ -14,9 +14,28 @@ Build the client during the dui build and embed the shell and hashed assets in t
 
 Run `dui map . --url http://localhost:4200/` to map a running local web app. dui starts at that address and follows same-origin links using the existing Chromium capture and layout checks. This works across web frameworks, including Angular. Source analysis of framework-specific routes, guards, component inputs and states requires rules for the project's compiler and router.
 
+Run `dui map . --build-dir dist` after building a static deployment. dui serves that directory on a temporary loopback port and captures the reachable pages at 375 and 1280 px by default. Set `path` in `dui.json` for a different HTML entry and `spaFallback: true` for a history router served from `index.html`. Vue Router, SvelteKit with adapter-static, Astro static output and Preact with preact-iso share this path. Use `--url` for a deployment that requires a running application server. Pages behind authentication or without a reachable link need project-supplied entry points or session data.
+
 Run `dui map PATH` on a React Navigation, Expo Router or Flutter app package to map its route declarations without a device. React Navigation and Expo Router use the project's TypeScript installation. Flutter uses the Dart SDK and a locked analyzer package which dui prepares in its own cache on first use. Point at the app package within a monorepo or select it with `appRoot` in `dui.json`.
 
 Open the resulting archive with `dui open`. Source cards identify the declaration and its file and line. Named registrations can have a navigation key instead of a URL. Conditional and parameterized routes keep their expressions or patterns. Unresolved declarations appear in the discovery limitations. Source-only maps have zero attempted captures. Native appearance, transitions and runtime coverage require capture evidence.
+
+When a recorder has opened a native route, save its PNG and write the following JSON alongside it. Copy the snapshot ID and the matching declaration ID from the source run that corresponds to the recorded build. The recorder supplies the actual route and logical viewport width. `runtime` accepts `android`, `ios`, `web` and `desktop`.
+
+```json
+{
+  "sourceSnapshot": "<snapshot.id>",
+  "captures": [{
+    "screenId": "<graph.nodes[].id>",
+    "runtime": "android",
+    "observedPath": "/settings",
+    "width": 393,
+    "image": "settings.png"
+  }]
+}
+```
+
+Run `dui map attach SOURCE_RUN recordings.json` against the original local source archive, then open the new output with `dui open`. Each attached card keeps its source location and shows the recorded image. The archive records the PNG dimensions, runtime and observed route. An imported image is marked `unverified` because its association comes from the recorder. Automated coverage counts stay at zero. Use one capture per declaration, runtime and width in a recording set.
 
 For iOS evidence, install the app’s simulator build on an iPhone simulator and capture a route after checking that its expected content is visible. Record the logical width, PNG dimensions, route and app revision. The simulator checks use public sample data. A standard run verifies the images on the runner. Explicitly requested fixture exports contain PNGs and expire after one day.
 

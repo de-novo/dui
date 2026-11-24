@@ -192,12 +192,11 @@ impl DuiDesktopView {
             .screen_path
             .as_deref()
             .and_then(|target| {
-                workspace
-                    .runs
-                    .get(selected_run)?
-                    .screens
+                let screens = &workspace.runs.get(selected_run)?.screens;
+                screens
                     .iter()
-                    .position(|s| s.path == target || s.path.ends_with(target))
+                    .position(|s| s.path == target)
+                    .or_else(|| screens.iter().position(|s| s.path.ends_with(target)))
             })
             .unwrap_or(0);
 

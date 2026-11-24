@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { verifyAttachedRecordings } from "./check-native-map-recordings.mts";
 import { verifyNativeMapViewer } from "./check-native-map-viewer.mts";
 
 const binary = process.env.DUI_BIN || resolve(import.meta.dirname, "../target/debug/dui");
@@ -97,6 +98,7 @@ for (const [index, arg] of projects.entries()) {
     db.close();
   }
   await verifyNativeMapViewer(report.output);
+  if (samples[index] === "expo") await verifyAttachedRecordings(report.output);
   console.log(
     `Verified ${graph.nodes.length} declared screens and zero native captures in ${project}`,
   );

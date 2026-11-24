@@ -1,0 +1,28 @@
+---
+import pages from "../../pages.json";
+import "../../../screen.css";
+
+export function getStaticPaths() {
+  return pages.map((page) => ({
+    params: { path: page.path.slice(1) || undefined },
+    props: { page, next: pages.find((entry) => entry.path === page.next) },
+  }));
+}
+
+const { page, next } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{page.heading}</title>
+  </head>
+  <body>
+    <main>
+      <h1>{page.heading}</h1>
+      <p>{page.body}</p>
+      <a href={next.path}>{next.heading}</a>
+    </main>
+  </body>
+</html>

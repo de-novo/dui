@@ -4,6 +4,8 @@
 
 dui 通过项目官方编译器读取类型，自动生成模拟数据并在真实渲染环境中按状态与视口宽度捕获 Web、桌面、移动端和 TUI 界面。使用内置 2D 画布（`dui open`）或原生 GPUI 桌面查看器（`dui desktop`）浏览界面地图、实时挂载组件与变更对比，并通过 CLI / MCP 向 AI 代理输出结构化 JSON。
 
+**目标。** 如今策划文档、Figma 设计和代码是分散的事实来源。dui 让代码本身成为开发与 UI 工作的单一事实来源：界面地图由代码生成，UI 修改再写回同一份代码。
+
 [产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md) · [完整支持栈列表](docs/zh-CN/supported-frameworks.md)
 
 ## 可分析范围

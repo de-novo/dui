@@ -73,20 +73,20 @@ export async function verifyNativeMapViewer(archiveDir: string) {
           continue;
         }
         const surface = mobile ? ".mobile-deck-card" : ".react-flow__node";
-        await waitFor(surface + " .native-source-evidence");
+        await waitFor(surface);
         const cards =
           (await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(surface)}), el => ({
           id: el.dataset.screenId || el.dataset.id,
           text: el.textContent,
           dynamic: Array.from(el.querySelectorAll('.native-source-evidence > span')).some(row => row.textContent === 'Dynamic route'),
           unverified: Boolean(el.querySelector('[data-status="unverified"]')),
-          images: el.querySelectorAll('img').length,
+          images: Array.from(el.querySelectorAll('img'), im => new URL(im.src).pathname.split('/').pop()),
         }))`)) as Array<{
             id: string;
             text: string;
             unverified: boolean;
             dynamic: boolean;
-            images: number;
+            images: string[];
           }>;
         const byId = new Map(cards.map((card) => [card.id, card]));
         assert.equal(cards.length, screens.length);
@@ -94,8 +94,15 @@ export async function verifyNativeMapViewer(archiveDir: string) {
           const source = screen.nativeSource;
           assert(source, screen.path);
           const card = byId.get(screen.id);
-          assert(card?.unverified, screen.path);
-          assert.equal(card.images, 0);
+          assert(card, screen.path);
+          const files = screen.cells.flatMap((cell) => (cell.image ? [cell.image] : []));
+          if (files.length) {
+            assert.equal(card.images.length, 1, screen.path);
+            assert(files.includes(card.images[0]!), screen.path);
+            continue;
+          }
+          assert(card.unverified, screen.path);
+          assert.equal(card.images.length, 0);
           assert(card.text.includes(source.name));
           assert(card.text.includes(source.source + ":" + source.line));
           assert.equal(card.dynamic, source.dynamic === true);
@@ -103,7 +110,9 @@ export async function verifyNativeMapViewer(archiveDir: string) {
         }
         assert.equal(await evaluate("document.documentElement.scrollWidth <= innerWidth"), true);
         const selected =
-          screens.find((s) => s.nativeSource?.condition || s.nativeSource?.dynamic) ?? screens[0];
+          screens.find((s) => s.cells.some((c) => c.image)) ??
+          screens.find((s) => s.nativeSource?.condition || s.nativeSource?.dynamic) ??
+          screens[0];
         const selector = surface + (mobile ? " button" : "");
         await evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(el => {
           const card = el.closest(${JSON.stringify(surface)});
@@ -124,12 +133,26 @@ export async function verifyNativeMapViewer(archiveDir: string) {
           await evaluate("new URLSearchParams(location.search).get('screen')"),
           selected.id,
         );
-        assert.equal(
-          await evaluate(
-            "document.querySelectorAll('.inspector img, .inspector .cell-row, .inspector > label select').length",
-          ),
-          0,
-        );
+        if (selected.cells.some((c) => c.image)) {
+          const selector =
+            surface +
+            (mobile ? "[data-screen-id=" : "[data-id=") +
+            JSON.stringify(selected.id) +
+            "] img";
+          await evaluate(`(async () => {
+            const img = document.querySelector(${JSON.stringify(selector)});
+            img.loading = 'eager';
+            await img.decode();
+            if (!img.naturalWidth) throw Error('The selected image is empty');
+          })()`);
+        } else {
+          assert.equal(
+            await evaluate(
+              "document.querySelectorAll('.inspector img, .inspector .cell-row, .inspector > label select').length",
+            ),
+            0,
+          );
+        }
         assert.equal(await evaluate("document.documentElement.scrollWidth <= innerWidth"), true);
         if (mobile) {
           await evaluate(
@@ -138,12 +161,12 @@ export async function verifyNativeMapViewer(archiveDir: string) {
           await evaluate(
             "Array.from(document.querySelectorAll('[role=tab]')).find(el => el.textContent.trim() === '2D Map').click()",
           );
-          await waitFor(".react-flow__node .native-source-evidence");
+          await waitFor(".react-flow__node");
           assert.equal(
             await evaluate(
               "document.querySelectorAll('.react-flow__node .native-source-evidence').length",
             ),
-            screens.length,
+            screens.filter((s) => !s.cells.some((c) => c.image)).length,
           );
         }
       }

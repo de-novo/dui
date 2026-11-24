@@ -14,9 +14,28 @@ dui 빌드에서 클라이언트를 빌드하고 진입 페이지와 해시가 �
 
 실행 중인 로컬 웹 앱은 `dui map . --url http://localhost:4200/`로 지도화한다. dui는 지정한 주소에서 시작해 같은 출처의 링크를 따라가고 Chromium에서 캡처와 레이아웃 검사를 수행한다. Angular를 포함한 웹 프레임워크가 이 경로를 공유한다. 라우트, 가드, 컴포넌트 입력과 상태를 소스에서 찾으려면 프로젝트의 컴파일러와 라우터에 맞는 규칙이 필요하다.
 
+정적 배포 파일을 빌드한 뒤 `dui map . --build-dir dist`를 실행한다. dui가 해당 디렉터리를 임시 로컬 포트로 제공하고, 링크로 도달한 페이지를 기본 375 px와 1280 px에서 캡처한다. 시작 HTML이 다르면 `dui.json`에 `path`를 지정한다. 히스토리 라우터가 `index.html`로 요청을 처리하면 `spaFallback: true`를 지정한다. Vue Router, adapter-static을 사용하는 SvelteKit, Astro 정적 빌드, preact-iso를 사용하는 Preact가 이 경로를 공유한다. 실행 중인 앱 서버가 필요한 배포에는 `--url`을 사용한다. 로그인하거나 별도 링크로 들어가야 하는 페이지에는 프로젝트의 진입 경로나 세션 데이터가 필요하다.
+
 React Navigation, Expo Router, Flutter 앱의 패키지에서 `dui map PATH`를 실행하면 기기 없이 라우트 선언을 지도에서 볼 수 있다. React Navigation과 Expo Router는 프로젝트에 설치된 TypeScript를 사용한다. Flutter는 Dart SDK를 사용하며 첫 실행 시 dui가 고정 버전 분석기를 자체 캐시에 준비한다. 모노레포에서는 앱 패키지 경로를 전달하거나 `dui.json`에 `appRoot`를 지정한다.
 
 `dui open`으로 결과를 연다. 소스 카드에는 선언 이름과 파일, 줄 번호가 표시된다. 이름으로 등록한 화면에는 내비게이션 키가 표시될 수 있다. 조건부 경로는 조건식을, 매개변수 경로는 패턴을 유지한다. 해석할 수 없었던 선언은 탐색 한계에 표시된다. 소스 전용 지도의 캡처 시도는 0건이다. 네이티브 외형과 전환, 런타임 검증률은 실제 캡처 근거가 필요하다.
+
+레코더가 네이티브 라우트를 열면 PNG와 아래 형식의 JSON을 같은 디렉터리에 저장한다. 녹화한 빌드에 해당하는 소스 지도의 스냅샷 ID와 해당 선언 ID를 사용한다. 레코더는 실제로 열린 경로와 논리적 화면 폭을 기록한다. `runtime` 값은 `android`, `ios`, `web`, `desktop` 중 하나다.
+
+```json
+{
+  "sourceSnapshot": "<snapshot.id>",
+  "captures": [{
+    "screenId": "<graph.nodes[].id>",
+    "runtime": "android",
+    "observedPath": "/settings",
+    "width": 393,
+    "image": "settings.png"
+  }]
+}
+```
+
+로컬에 저장된 원본 소스 지도로 `dui map attach SOURCE_RUN recordings.json`을 실행한 뒤 새 결과를 `dui open`으로 연다. 이미지가 연결된 카드는 소스 위치와 함께 캡처를 보여 준다. 아카이브에는 PNG 크기, 실행 환경, 실제 경로가 남는다. 화면과 이미지의 관계는 레코더가 관찰했으므로 가져온 이미지는 `unverified`로 표시한다. 자동 검증 집계는 0으로 유지한다. 한 파일에서 선언·실행 환경·화면 폭이 같은 조합에는 캡처 하나를 사용한다.
 
 iOS 증거를 수집할 때는 iPhone 시뮬레이터에 앱의 시뮬레이터 빌드를 설치하고, 라우트의 예상 콘텐츠가 보이면 캡처한다. 논리적 화면 폭, PNG 크기, 실제 경로와 앱의 리비전을 기록한다. 시뮬레이터 검사는 공개 샘플 데이터를 사용한다. 기본 실행은 러너에서 이미지를 검증한다. 명시적으로 요청한 경우 PNG만 내보내며 보관 기간은 하루다.
 
