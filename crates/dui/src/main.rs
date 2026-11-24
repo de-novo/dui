@@ -3,6 +3,7 @@ mod android;
 mod archive;
 use archive::Capture;
 mod chromium;
+mod design_audit;
 mod electron;
 mod gpui;
 mod host;
@@ -374,7 +375,7 @@ DIFF & QUALITY
   dui diff BEFORE AFTER [--markdown]      Compare two runs (element renderDiff + lazy pixel overlay)
   dui diff --base BRANCH [--markdown]     Compare current worktree run against a base branch
       --regressions-only                  Report newly failing verification checks (exit 5 if any)
-  dui audit RUN_DIR [--goal PERCENT]      Check coverage goal, gaps, and unresolved review comments
+  dui audit RUN_DIR [--goal PERCENT] [--design MANIFEST]  Audit coverage and optional project design rules
   dui comment <add|list|resolve|reopen>   Manage review comments anchored to screens/cells
 
 TOOLS
@@ -556,17 +557,7 @@ fn run() -> Reply {
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "audit"
     {
-        return match tail {
-            [run_dir] => audit::audit_run(Path::new(run_dir), None),
-            [run_dir, flag, goal_raw] if flag == "--goal" => {
-                let goal: f64 = goal_raw
-                    .to_str()
-                    .and_then(|s| s.parse().ok())
-                    .ok_or_else(|| failure(2, "invalid --goal percentage"))?;
-                audit::audit_run(Path::new(run_dir), Some(goal))
-            }
-            _ => Err(failure(2, "expected audit RUN_DIR [--goal PERCENT]")),
-        };
+        return design_audit::command(tail);
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "auth"

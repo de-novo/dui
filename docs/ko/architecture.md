@@ -254,6 +254,27 @@ flowchart BT
 6. **픽스처**: `stacks.toml`의 모든 항목에 픽스처와 검토된 스냅샷이 있다.
 7. **웹과 개발 도구 소스**: Oxlint로 TypeScript, React 훅, JSX 접근성을 검사하고 Oxfmt로 TypeScript와 CSS 서식을 검사한다. 로컬과 PR 모두 `npm run check:style`을 실행한다. 서식은 `npm run format`으로 적용한다.
 
+### 6.3 프로젝트 디자인 검사
+
+호출자가 `dui audit RUN_DIR --design MANIFEST`로 신뢰하는 설정 파일을 지정할 때 CLI가 프로젝트 코드를 실행한다. 캡처 설정에 다음 필드를 추가한다.
+
+```json
+{ "designSpec": "./tokens.json", "plugins": ["./token-check.mjs"] }
+```
+
+경로는 설정 파일이 있는 디렉터리 안에서 해석한다. CLI는 비어 있지 않은 렌더 트리가 있는 검증된 셀마다 설정 순서대로 플러그인을 호출한다. Node.js로 `.mjs` 파일을 실행하고 다른 실행 파일은 직접 호출한다. 플러그인은 호출자의 로컬 권한으로 실행되며, 표준 입력으로 JSON 객체 하나를 받고 표준 출력에 JSON 객체 하나를 쓴다.
+
+- 입력 필드는 `version`(1), `index`(0부터 시작하는 셀 순번), `path`, `width`, `state`, `locale`, `scenario`, `renderTree`, `designSpec`이다. 명세에는 설정한 `path`와 `content`가 있다. `.json`은 JSON으로 파싱하고 `DESIGN.md` 등은 UTF-8 텍스트로 읽는다.
+- 출력에는 `findings`와 선택적인 사유 목록 `unverified`가 있다. 각 발견 항목은 `rule`, `severity`(`info`, `warning`, `error`), `nodeId`, `rect`, `summary`, `measured`, `expected`, 선택적인 `specRef`를 담는다. 노드 ID와 사각형은 캡처된 동일 노드와 일치해야 한다.
+- 커버리지 보고서의 `designAudit`에 셀 위치와 플러그인 경로가 기록된다. 통과하면 종료 코드 0, 발견 항목이 있거나 근거가 부족하면 5, 설정이 잘못되면 2, 플러그인 실패·응답 오류·30초 시간 초과는 3이다.
+
+[예제 검사기](../../examples/design-audit/token-check.mjs)는 [프로젝트 명세](../../examples/design-audit/tokens.json)에서 태그, 계산된 스타일 속성, 토큰을 읽는다. 계산된 스타일 문자열과 여섯 자리 sRGB 16진수 색상을 지원한다.
+
+```sh
+dui run examples/design-audit examples/design-audit/dui.json ./capture
+dui audit ./capture --design examples/design-audit/dui.json
+```
+
 ## 7. M0와 M1 완료 조건
 
 **M0 — 손으로 고른 상태로 실제 렌더 경로를 증명한다.** obora가 TS 7 기준선을 맞춘 뒤 obora-web 검수 화면 하나로 한다.

@@ -252,6 +252,27 @@ Arrows point from the user to the provider. Adapters have no arrows between them
 6. **Fixtures**: every `stacks.toml` entry has a fixture and reviewed snapshots.
 7. **Web and tooling sources**: Oxlint checks TypeScript, React hooks and JSX accessibility. Oxfmt checks TypeScript and CSS formatting. Local and PR checks use `npm run check:style`. Apply formatting with `npm run format`.
 
+### 6.3 Project-owned design audit
+
+The CLI runs project code only when the caller explicitly supplies a trusted manifest with `dui audit RUN_DIR --design MANIFEST`. Add these fields to the capture manifest.
+
+```json
+{ "designSpec": "./tokens.json", "plugins": ["./token-check.mjs"] }
+```
+
+Paths resolve inside the manifest directory. The CLI uses Node.js to invoke each plugin once per verified cell with a non-empty render tree, in manifest order. It runs `.mjs` files with Node.js and other executables directly. Plugins have the caller's local permissions. Each receives one JSON object on stdin and writes one JSON object to stdout.
+
+- Input fields are `version` (1), `index` (zero-based cell position), `path`, `width`, `state`, `locale`, `scenario`, `renderTree` and `designSpec`. The spec contains its configured `path` and `content`, parsed as JSON for `.json` files or read as UTF-8 text for files such as `DESIGN.md`.
+- Output contains `findings` and optionally `unverified`, a list of reasons. Each finding carries `rule`, `severity` (`info`, `warning`, or `error`), `nodeId`, `rect`, `summary`, `measured`, `expected` and an optional `specRef`. The node ID and rectangle must match the same captured node.
+- The coverage report gains a `designAudit` object with cell locations and plugin paths. A clean check returns 0. Any finding or missing evidence returns 5. Invalid configuration returns 2. A failed plugin, malformed response or 30-second plugin timeout returns 3.
+
+The [reference checker](../../examples/design-audit/token-check.mjs) reads its tag, computed-style property and token from the [project spec](../../examples/design-audit/tokens.json). It accepts computed-style strings and six-digit sRGB hex colors.
+
+```sh
+dui run examples/design-audit examples/design-audit/dui.json ./capture
+dui audit ./capture --design examples/design-audit/dui.json
+```
+
 ## 7. M0 and M1 gates
 
 **M0 — prove the real render path with hand-picked states.** One obora-web review screen, after obora meets the TS 7 baseline.

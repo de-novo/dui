@@ -75,6 +75,7 @@ jobs:
           npm run check:transitions
           npm run check:comments
           npm run check:audit
+          npm run check:design-audit
           npm run check:query-params
           npm run check:p2-rules
           npm run check:real-api
