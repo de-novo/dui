@@ -15,6 +15,7 @@ import http from "node:http";
 import path from "node:path";
 
 import { withChromiumPage } from "./chromium-page.mts";
+import { verifyMapControls } from "./verify-map-controls.mts";
 import { verifyViewerThemes, viewerViewports } from "./verify-viewer-themes.mts";
 
 const root = process.cwd();
@@ -332,6 +333,8 @@ async function verifyRenderedPages(port: number, firstRunKey?: string) {
         throw new Error(`Self-dogfood gate failed (${c.name}): ${val.brokenImgs} broken images`);
       }
     }
+    const demo = checks.find((check) => check.verifyThemes);
+    if (demo) results.push({ mapControls: await verifyMapControls(page, demo.url) });
     return results;
   });
 }

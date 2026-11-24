@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { findChrome, withChromiumPage } from "./chromium-page.mts";
+import { verifyMapControls } from "./verify-map-controls.mts";
 import { verifyViewerThemes, viewerViewports } from "./verify-viewer-themes.mts";
 
 const root = resolve(import.meta.dirname, "..");
@@ -204,7 +205,7 @@ try {
     );
     assert(dom.includes("Archive"), "expected embedded viewer React UI to mount in Chrome");
 
-    const themes = await withChromiumPage(async (page) => {
+    const viewerChecks = await withChromiumPage(async (page) => {
       const results = [];
       for (const { width, height, mobile, requireSelector } of viewerViewports) {
         await page.call("Emulation.setDeviceMetricsOverride", {
@@ -215,7 +216,7 @@ try {
         });
         results.push({ width, themes: await verifyViewerThemes(page, url, requireSelector) });
       }
-      return results;
+      return { themes: results, mapControls: await verifyMapControls(page, url) };
     });
 
     console.log(
@@ -228,7 +229,7 @@ try {
         cellsServed: graph.cells.length,
         legacyHtmlRemoved: true,
         chromeRenderedEmbeddedViewer: true,
-        themes,
+        ...viewerChecks,
       }),
     );
   } finally {

@@ -237,15 +237,6 @@ h2 {
   --panel-space: calc(var(--panel-width) + var(--space-4));
   display: flex;
 }
-.map-options {
-  position: absolute;
-  bottom: 0.75rem;
-  right: 0.75rem;
-  z-index: 4;
-}
-.workspace:has(.inspector) .map-options {
-  right: calc(var(--panel-width) + var(--space-4));
-}
 .overview-layer {
   position: absolute;
   inset: 0 0 0 calc(0px - var(--rail-space));
@@ -389,8 +380,37 @@ h2 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
   z-index: 12;
 }
+.map .react-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+}
+.map-toolbar {
+  grid-row: 2;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: var(--space-2);
+  margin-inline: calc(var(--rail-space) + var(--space-3)) var(--space-3);
+  pointer-events: none;
+}
+.map-toolbar > * {
+  pointer-events: auto;
+}
+.workspace:has(.inspector) .map-toolbar {
+  margin-inline-end: var(--panel-space);
+}
 .map .react-flow__controls {
-  margin-inline-start: calc(var(--rail-space) + 12px);
+  position: static;
+  margin: 0;
+}
+.map .react-flow__attribution {
+  position: static;
+  grid-row: 3;
+  justify-self: end;
+  margin-block: var(--space-1) env(safe-area-inset-bottom, 0px);
+  margin-inline-end: env(safe-area-inset-right, 0px);
 }
 .map .react-flow__controls-button {
   padding: 4px;
@@ -981,9 +1001,6 @@ h2 {
 @media (max-width: 600px) {
   .workspace:has(.inspector) {
     flex-direction: column;
-  }
-  .workspace:has(.inspector) .map-options {
-    right: 0.75rem;
   }
   .live-overlay {
     flex-direction: column;
@@ -2055,26 +2072,27 @@ h2 {
     white-space: nowrap;
   }
 
+  .map-toolbar {
+    margin-inline: max(var(--space-2), env(safe-area-inset-left, 0px))
+      max(var(--space-2), env(safe-area-inset-right, 0px));
+    align-items: stretch;
+  }
+
   .map .react-flow__controls {
-    margin-inline-start: 0;
-    left: 8px;
-    bottom: 8px;
-    display: flex;
-    flex-direction: row;
+    min-width: 0;
     border-radius: 10px;
     overflow: hidden;
   }
 
   .map .react-flow__controls-button {
-    width: 34px;
-    height: 34px;
+    width: var(--control-height);
+    height: 100%;
+    min-height: var(--control-height);
   }
 
   .map-options {
-    right: 8px;
-    bottom: 8px;
-    min-height: 36px;
-    padding-inline: 12px;
+    padding-inline: var(--space-3);
+    height: auto;
     border-radius: 10px;
   }
 
@@ -2103,10 +2121,8 @@ h2 {
     flex: none;
   }
 
-  .workspace:has(.inspector) .map-options,
-  .workspace:has(.inspector) .react-flow__controls {
-    opacity: 0;
-    pointer-events: none;
+  .workspace:has(.inspector) .map-toolbar {
+    visibility: hidden;
   }
 
   .inspector-actions {
@@ -2135,10 +2151,6 @@ h2 {
     pointer-events: auto;
   }
 
-  .workspace.mobile-deck-active .map-options {
-    display: none;
-  }
-
   .mobile-deck {
     flex: 1;
     min-height: 0;
@@ -2152,6 +2164,7 @@ h2 {
   }
 
   .mobile-deck-toolbar {
+    flex-wrap: wrap;
     position: sticky;
     top: 0;
     z-index: 6;
@@ -2206,6 +2219,7 @@ h2 {
   }
 
   .mobile-width-pills {
+    flex-wrap: wrap;
     display: inline-flex;
     align-items: center;
     gap: 4px;

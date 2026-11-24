@@ -56,6 +56,7 @@ Apply the saved theme before the first viewer paint. With the system setting, fo
 - **Controls** — Use `Button` for panel actions (default, primary or icon). Give icon-only controls accessible names. Reserve the focus outline for keyboard navigation. Selection uses placement and weight.
 - **Evidence** — Use `CaptureCard` in both map views. Fit the original image inside the frame and name the route beneath it. Count reviewable issues on the card; read the recorded verdict and reason in the inspector.
 - **Navigation** — Keep the rail order fixed: workspace, theme, collapse. Screen lookup stays on the map. Selecting a screen enlarges it and pages through its observed neighbors two at a time. Closing details restores the overview viewport.
+- **Map controls** — Navigation and Map options share a bottom edge above the attribution. On phones the controls share one row, and deck controls wrap as needed. An overview fitted to the map follows viewport and rail size changes. Manual pan and zoom remain in place until the user chooses Fit view.
 
 Check the actual viewer at 375 and 1280 px in both themes. Inspect an overview and a selected screen. Confirm all connected screens remain reachable, arrow directions match the archive, image colors are intact and keyboard focus returns on close.
 

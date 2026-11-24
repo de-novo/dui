@@ -266,6 +266,29 @@ function MapView({
               <Suspense fallback={<output>{t.loadingMap}</output>}>
                 <ScreenMap
                   desktop={!isMobile}
+                  mapOptions={
+                    <Button
+                      className="map-options"
+                      variant="outline"
+                      ref={optionsButton}
+                      aria-haspopup="dialog"
+                      aria-expanded={optionsOpen}
+                      onClick={() => setOptionsOpen(true)}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
+                        <circle cx="10" cy="6" r="2" />
+                        <circle cx="14" cy="14" r="2" />
+                      </svg>{" "}
+                      {t.mapOptions}
+                    </Button>
+                  }
                   openSearch={openSearch}
                   railInset={railInset}
                   archive={visibleArchive}
@@ -437,28 +460,6 @@ function MapView({
             </Button>
           </section>
         )}
-
-        <Button
-          className="map-options"
-          variant="outline"
-          ref={optionsButton}
-          aria-haspopup="dialog"
-          aria-expanded={optionsOpen}
-          onClick={() => setOptionsOpen(true)}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
-            <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
-            <circle cx="10" cy="6" r="2" />
-            <circle cx="14" cy="14" r="2" />
-          </svg>{" "}
-          {t.mapOptions}
-        </Button>
       </div>
 
       {showDetails && (
