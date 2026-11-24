@@ -4,12 +4,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import plistlib
 import re
 import shutil
 import subprocess
 import tempfile
-import time
 from ios_simulator import fresh_iphone
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,36 +20,12 @@ def read(*args):
     return subprocess.check_output(args, text=True).strip()
 
 
-def capture_on_simulator(app_bundle, phone):
-    with (app_bundle / "Info.plist").open("rb") as source:
-        bundle_id = plistlib.load(source)["CFBundleIdentifier"]
-    simctl = ["xcrun", "simctl"]
-    print(f"Installing {bundle_id} on {phone.name}", flush=True)
-    subprocess.run([*simctl, "install", phone.udid, app_bundle], check=True, timeout=180)
-    container = subprocess.check_output(
-        [*simctl, "get_app_container", phone.udid, bundle_id, "data"], text=True, timeout=30
-    ).strip()
-    capture = Path(container) / "Documents/dui-capture"
-    if not container or capture.exists():
-        raise RuntimeError("Expected a fresh Compass app data container")
-    print(f"Launching {bundle_id} and waiting for the integration test", flush=True)
-    subprocess.run([*simctl, "launch", phone.udid, bundle_id], check=True, timeout=90,
-                   env={**os.environ, "SIMCTL_CHILD_COMPASS_CAPTURE_OUTPUT": str(capture)})
-    result = capture / "result.json"
-    deadline = time.monotonic() + 300
-    reported = set()
-    while not result.is_file():
-        frames = {p.name for p in capture.glob("*.png")}
-        if new_frames := frames - reported:
-            print(f"Captured {', '.join(sorted(new_frames))}", flush=True)
-            reported.update(new_frames)
-        if time.monotonic() >= deadline:
-            raise TimeoutError(f"Compass did not finish. Captured frames: {sorted(reported)}")
-        time.sleep(1)
-    report = json.loads(result.read_text())
-    if report["passed"] is not True:
-        raise RuntimeError(f"Compass integration test failed: {report['failures']}")
-    return capture, report["screens"]
+def test_attachment(attachments, manifest, name):
+    matches = [entry for test in manifest for entry in test["attachments"]
+               if entry["suggestedHumanReadableName"].startswith(name)]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one XCTest attachment for {name}, found {len(matches)}")
+    return attachments / matches[0]["exportedFileName"]
 
 
 def main():
@@ -80,12 +54,25 @@ def main():
             app = checkout / "compass_app/app"
             target = "integration_test/dui_capture_test.dart"
             shutil.copyfile(FIXTURE / "capture_test.dart", app / target)
-            subprocess.run(["flutter", "build", "ios", "--debug", "--simulator", "--target", target],
-                           cwd=app, check=True)
-            bundles = list((app / "build/ios/iphonesimulator").glob("*.app"))
-            if len(bundles) != 1:
-                raise RuntimeError(f"Expected one simulator app, found {bundles}")
-            capture, rows = capture_on_simulator(bundles[0], phone)
+            shutil.copyfile(FIXTURE / "RunnerTests.swift", app / "ios/RunnerTests/RunnerTests.swift")
+            subprocess.run(["flutter", "build", "ios", "--debug", "--simulator", "--config-only",
+                            "--target", target], cwd=app, check=True)
+            result = Path(temp) / "Compass.xcresult"
+            print(f"Running Compass widget checks inside XCTest on {phone.name}", flush=True)
+            subprocess.run(["xcodebuild", "test", "-workspace", "ios/Runner.xcworkspace",
+                            "-scheme", "Runner", "-configuration", "Debug", "-sdk", "iphonesimulator",
+                            "-destination", f"platform=iOS Simulator,id={phone.udid}",
+                            "-derivedDataPath", str(Path(temp) / "build"), "-parallel-testing-enabled", "NO",
+                            "-only-testing:RunnerTests/RunnerTests/testCompassScreens",
+                            "-resultBundlePath", result], cwd=app, check=True)
+            attachments = Path(temp) / "attachments"
+            subprocess.run(["xcrun", "xcresulttool", "export", "attachments",
+                            "--path", result, "--output-path", attachments], check=True)
+            manifest = json.loads((attachments / "manifest.json").read_text())
+            report = json.loads(test_attachment(attachments, manifest, "dui-compass-result").read_text())
+            if report["passed"] is not True:
+                raise RuntimeError(f"Compass integration test failed: {report['failures']}")
+            rows = report["screens"]
             checker = Path(temp) / "check-image"
             subprocess.run(["xcrun", "swiftc", ROOT / "scripts/check-ios-screenshot.swift", "-o", checker], check=True)
             expected = {"/", "/search", "/results", "/activities", "/booking", "/booking/:id", "/login"}
@@ -100,7 +87,8 @@ def main():
                        "|---|---|---|---|---|---|"]
             for row in rows:
                 image = output / (row["name"] + ".png")
-                shutil.copyfile(capture / image.name, image)
+                frame = test_attachment(attachments, manifest, "dui-compass-frame-" + row["name"])
+                shutil.copyfile(frame, image)
                 witness = [row["witness"]] if row["route"] == "/" else []
                 w, h = map(int, read(checker, image, *witness).split())
                 ratio = row["devicePixelRatio"]

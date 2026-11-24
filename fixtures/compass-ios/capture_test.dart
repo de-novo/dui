@@ -13,9 +13,14 @@ import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  final output = Directory(Platform.environment['COMPASS_CAPTURE_OUTPUT']!)
+  final output = Directory('${Directory.systemTemp.path}/dui-capture')
     ..createSync(recursive: true);
+  final progress = File('${output.path}/progress.txt');
+  progress.writeAsStringSync(
+    'Starting Flutter integration binding',
+    flush: true,
+  );
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   final screens = <Map<String, Object>>[];
   unawaited(
     binding.allTestsPassed.future.then((passed) {
@@ -41,6 +46,7 @@ void main() {
       String witness, {
       String? declaration,
     }) async {
+      progress.writeAsStringSync('Waiting for $path: $witness', flush: true);
       final label = find.text(witness);
       final timer = Stopwatch()..start();
       while (label.evaluate().isEmpty &&
@@ -61,6 +67,7 @@ void main() {
       final view = View.of(context);
       final size = view.physicalSize / view.devicePixelRatio;
       expect((Offset.zero & size).overlaps(tester.getRect(target)), isTrue);
+      progress.writeAsStringSync('Capturing $path', flush: true);
       final bytes = await binding.takeScreenshot(slug);
       expect(bytes.length, greaterThan(1000));
       await File('${output.path}/$slug.png').writeAsBytes(bytes, flush: true);
