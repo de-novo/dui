@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import plistlib
 import re
 import shutil
 import subprocess
@@ -24,6 +25,46 @@ SCENES = (
 
 def output(*command):
     return subprocess.check_output(command, text=True).strip()
+
+
+def simulator_keychain_groups(app):
+    executable = app / plistlib.loads((app / "Info.plist").read_bytes())["CFBundleExecutable"]
+    # Xcode places simulator entitlements in a Mach-O section of the arm64 executable.
+    listing = output("xcrun", "otool", "-l", executable)
+    section = re.search(r"sectname __entitlements\s+segname __TEXT\s+addr \S+\s+size (0x[0-9a-fA-F]+)\s+offset (\d+)", listing)
+    if section is None:
+        signature = subprocess.run(["codesign", "--display", "--entitlements", "-", "--xml", executable], capture_output=True)
+        if not signature.stdout.startswith(b"<?xml"):
+            return []
+        entitlements = plistlib.loads(signature.stdout)
+    else:
+        size, offset = section.groups()
+        with executable.open("rb") as data:
+            data.seek(int(offset))
+            entitlements = plistlib.loads(data.read(int(size, 16)).rstrip(b"\x00"))
+    return entitlements.get("keychain-access-groups") or [entitlements.get("application-identifier")]
+
+
+def prepare_simulator_keychain(app):
+    if any(simulator_keychain_groups(app)):
+        return
+    # T3 persists the fixture's device ID and pairing in the simulator Keychain.
+    # Let Xcode generate its simulated entitlements with a local ad-hoc identity.
+    derived = app.parents[3]
+    mobile = app.parents[5]
+    with tempfile.TemporaryDirectory() as tmp:
+        config = Path(tmp) / "simulator.xcconfig"
+        config.write_text("CODE_SIGN_IDENTITY[sdk=iphonesimulator*] = -\n"
+                          "CODE_SIGNING_ALLOWED[sdk=iphoneos*] = NO\n"
+                          "PROVISIONING_PROFILE_SPECIFIER =\n")
+        subprocess.run(["xcodebuild", "-quiet", "-workspace", mobile / "ios/T3Code.xcworkspace",
+                        "-scheme", "T3Code", "-configuration", "Release", "-sdk", "iphonesimulator",
+                        "-derivedDataPath", derived, "ARCHS=arm64", "ONLY_ACTIVE_ARCH=YES", "build"],
+                       env=dict(os.environ, XCODE_XCCONFIG_FILE=str(config)), check=True)
+    if not any(simulator_keychain_groups(app)):
+        raise RuntimeError("The iOS simulator executable still lacks Keychain entitlements")
+    # Only this constant can leave the private build log.
+    print("Simulator Keychain ready via local ad-hoc identity", flush=True)
 
 
 def install_route_observer(source):
@@ -56,7 +97,8 @@ def observe_startup(udid, temporary, device_data):
     image = temporary / "startup.png"
     capture = subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", image], capture_output=True)
     if capture.returncode == 0:
-        seen = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", "11"], capture_output=True, text=True)
+        seen = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", "11"],
+                              capture_output=True, text=True, errors="replace", timeout=20)
         labels = ("development servers", "add environment", "connect", "remote-first", "review changes",
                   "uncaught error", "failed to load", "welcome", "home screen")
         recognized = [label for label in labels if label in seen.stdout.lower()]
@@ -90,8 +132,12 @@ def run_capture(source, temporary, udid, device_data):
     original = source / "scripts/mobile-showcase.ts"
     driver = original.with_name(".dui-ios-showcase.ts")
     harness = original.read_text()
-    if harness.count('"Debug"') != 1 or harness.count("Debug-iphonesimulator") != 1:
+    product_hook = "return IOS_APP_PATH;"
+    if harness.count('"Debug"') != 1 or harness.count("Debug-iphonesimulator") != 1 or harness.count(product_hook) != 1:
         raise ValueError("The pinned driver's iOS build configuration changed")
+    helper = json.dumps(str(Path(__file__).resolve()))
+    inspect = f'await runCommand("python3", [{helper}, "--check-simulator-keychain", IOS_APP_PATH], {{ env: MOBILE_BUILD_ENV }});'
+    harness = harness.replace(product_hook, inspect + "\n  " + product_hook)
     driver.write_text(harness.replace('"Debug"', '"Release"').replace("Debug-iphonesimulator", "Release-iphonesimulator"))
     install_route_observer(source)
     log = temporary / "showcase.log"
@@ -107,7 +153,10 @@ def run_capture(source, temporary, udid, device_data):
             if observe_at is None and any(device_data.glob("Containers/Data/Application/*/Library/Caches/T3ShowcaseScene")):
                 observe_at = time.monotonic() + 45
             if observe_at is not None and time.monotonic() >= observe_at:
-                observe_startup(udid, temporary, device_data)
+                try:
+                    observe_startup(udid, temporary, device_data)
+                except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                    print(f"Optional launch diagnostic unavailable ({type(exc).__name__})", flush=True)
                 observe_at = time.monotonic() + 90
             if environment is None:
                 for path in temporary.glob("t3-mobile-showcase-*/environments/moonbase-terminal/userdata/environment-id"):
@@ -116,10 +165,13 @@ def run_capture(source, temporary, udid, device_data):
                     except (FileNotFoundError, ValueError):
                         pass
             time.sleep(1)
+    log_text = log.read_text(errors="replace")
+    if "Simulator Keychain ready via local ad-hoc identity" in log_text:
+        print("Simulator Keychain ready via local ad-hoc identity", flush=True)
     if process.returncode:
         # Only emit diagnostics. The full harness log can contain ephemeral pairing URLs.
-        lines = [line[:750] for line in log.read_text(errors="replace").splitlines()
-                 if re.search(r"\berror:|failed|timed out|ENOSPC|not found|\[!\]", line, re.I)
+        lines = [line[:750] for line in log_text.splitlines()
+                 if re.search(r"error:|failed|timed out|ENOSPC|not found|\[!\]", line, re.I)
                  and not re.search(r"warning:|NSError|token|pairing|credential|://|authorization|password", line, re.I)]
         print("\n".join(lines[-30:]), file=sys.stderr)
         raise RuntimeError(f"T3 Code showcase exited with {process.returncode}")
@@ -185,4 +237,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 3 and sys.argv[1] == "--check-simulator-keychain":
+        prepare_simulator_keychain(Path(sys.argv[2]).resolve())
+    else:
+        main()
