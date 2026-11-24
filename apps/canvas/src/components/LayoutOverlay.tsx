@@ -1,5 +1,10 @@
-import type { RenderNode } from "../../data/overview";
-import { edgePosition, type AlignmentChange, type AlignmentEdge } from "../../model/layoutGuides";
+import type { RenderNode } from "../data/overview";
+import {
+  edgePosition,
+  type AlignmentChange,
+  type AlignmentEdge,
+  type GuideLine,
+} from "../model/layoutGuides";
 
 export function LayoutOverlay({
   width,
@@ -8,6 +13,7 @@ export function LayoutOverlay({
   frames,
   guides,
   selected,
+  referenceLines = [],
   change,
 }: {
   width: number;
@@ -15,18 +21,22 @@ export function LayoutOverlay({
   nodes: RenderNode[];
   frames: boolean;
   guides: boolean;
-  selected: RenderNode | null;
+  selected?: RenderNode | null;
+  referenceLines?: GuideLine[];
   change?: AlignmentChange;
 }) {
-  const lines: { node: RenderNode; edge: AlignmentEdge }[] = [];
+  const lines: GuideLine[] = guides ? [...referenceLines] : [];
+  function addLine(node: RenderNode, edge: AlignmentEdge) {
+    lines.push({
+      vertical: edge === "left" || edge === "right" || edge === "center",
+      position: edgePosition(node, edge),
+    });
+  }
   if (guides && change) {
-    lines.push(
-      { node: change.first, edge: change.edge },
-      { node: change.second, edge: change.edge },
-    );
+    addLine(change.first, change.edge);
+    addLine(change.second, change.edge);
   } else if (guides && selected) {
-    for (const edge of ["top", "bottom", "left", "right"] as const)
-      lines.push({ node: selected, edge });
+    for (const edge of ["top", "bottom", "left", "right"] as const) addLine(selected, edge);
   }
   return (
     <svg
@@ -49,9 +59,7 @@ export function LayoutOverlay({
         </g>
       )}
       <g className="layout-guide-lines">
-        {lines.map(({ node, edge }, index) => {
-          const value = edgePosition(node, edge);
-          const vertical = edge === "left" || edge === "right" || edge === "center";
+        {lines.map(({ vertical, position: value }, index) => {
           return (
             <line
               key={index}

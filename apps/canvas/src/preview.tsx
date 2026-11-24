@@ -12,6 +12,7 @@ import {
 } from "./data/archiveUrls";
 import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
+import { MapGuideOptions } from "./features/map/MapCardGuides";
 import { ScreenSearch } from "./features/map/ScreenSearch";
 import { ScreenInspector } from "./features/inspector/ScreenInspector";
 import { routeName } from "./features/map/CaptureCard";
@@ -70,6 +71,7 @@ function MapView({
   const screen = archive.screens.find((s) => s.id === selectedId);
   const { cells, cell } = resolveCell(screen, width, state, locale);
 
+  const [mapGuides, setMapGuides] = useState({ frames: false, guides: false });
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => matchMedia("(max-width: 768px)").matches);
   const [mobileView, setMobileView] = useState<MobileViewMode>("deck");
@@ -265,48 +267,50 @@ function MapView({
           <div ref={overviewLayer} className="overview-layer">
             {railInset !== undefined && (
               <Suspense fallback={<output>{t.loadingMap}</output>}>
-                <ScreenMap
-                  desktop={!isMobile}
-                  mapOptions={
-                    <Button
-                      className="map-options"
-                      variant="outline"
-                      ref={optionsButton}
-                      aria-haspopup="dialog"
-                      aria-expanded={optionsOpen}
-                      onClick={() => setOptionsOpen(true)}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
+                <MapGuideOptions.Provider value={mapGuides}>
+                  <ScreenMap
+                    desktop={!isMobile}
+                    mapOptions={
+                      <Button
+                        className="map-options"
+                        variant="outline"
+                        ref={optionsButton}
+                        aria-haspopup="dialog"
+                        aria-expanded={optionsOpen}
+                        onClick={() => setOptionsOpen(true)}
                       >
-                        <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
-                        <circle cx="10" cy="6" r="2" />
-                        <circle cx="14" cy="14" r="2" />
-                      </svg>{" "}
-                      {t.mapOptions}
-                    </Button>
-                  }
-                  openSearch={openSearch}
-                  railInset={railInset}
-                  archive={visibleArchive}
-                  width={width}
-                  mode={mode}
-                  selectedId={selectedId}
-                  focusActive={showDetails}
-                  openCommentsByPath={openCommentsByPath(audit)}
-                  diffsByPath={diffsByPath}
-                  diffActive={diffActive}
-                  diffVisualMode={diffVisualMode}
-                  beforeRunKey={compareBeforeKey || undefined}
-                  afterRunKey={run.key}
-                  imageUrl={(name) => archiveUrl(name, run)}
-                  select={select}
-                  onClearSelection={returnToOverview}
-                />
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        >
+                          <path d="M3 6h5m4 0h5M3 14h9m4 0h1" />
+                          <circle cx="10" cy="6" r="2" />
+                          <circle cx="14" cy="14" r="2" />
+                        </svg>{" "}
+                        {t.mapOptions}
+                      </Button>
+                    }
+                    openSearch={openSearch}
+                    railInset={railInset}
+                    archive={visibleArchive}
+                    width={width}
+                    mode={mode}
+                    selectedId={selectedId}
+                    focusActive={showDetails}
+                    openCommentsByPath={openCommentsByPath(audit)}
+                    diffsByPath={diffsByPath}
+                    diffActive={diffActive}
+                    diffVisualMode={diffVisualMode}
+                    beforeRunKey={compareBeforeKey || undefined}
+                    afterRunKey={run.key}
+                    imageUrl={(name) => archiveUrl(name, run)}
+                    select={select}
+                    onClearSelection={returnToOverview}
+                  />
+                </MapGuideOptions.Provider>
               </Suspense>
             )}
           </div>
@@ -517,10 +521,13 @@ function MapView({
         />
       )}
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
-        <DialogContent finalFocus={() => (showOverview ? optionsButton.current : dismiss.current)}>
+        <DialogContent
+          className="map-options-dialog"
+          finalFocus={() => (showOverview ? optionsButton.current : dismiss.current)}
+        >
           <DialogTitle>{t.mapOptions}</DialogTitle>
           <label>
-            Find screen
+            {t.findScreen}
             <select
               value=""
               onChange={(e) => {
@@ -530,7 +537,7 @@ function MapView({
                 }
               }}
             >
-              <option value="">Select a screen</option>
+              <option value="">{t.selectMapScreen}</option>
               {archive.screens.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.path}
@@ -539,7 +546,7 @@ function MapView({
             </select>
           </label>
           <label>
-            Connections
+            {t.mapConnections}
             <select
               value={mode}
               onChange={(e) =>
@@ -548,9 +555,9 @@ function MapView({
                 })
               }
             >
-              <option value="overview">Overview</option>
-              <option value="all">All links</option>
-              <optgroup label="Links to and from a screen">
+              <option value="overview">{t.overview}</option>
+              <option value="all">{t.allMapLinks}</option>
+              <optgroup label={t.screenMapLinks}>
                 {archive.screens.map((s) => (
                   <option key={s.id} value={"focus:" + s.id}>
                     {s.path}
@@ -560,8 +567,12 @@ function MapView({
             </select>
           </label>
           <label>
-            Capture width
-            <select value={width} onChange={(e) => update({ width: e.target.value, state: null })}>
+            {t.mapCaptureWidth}
+            <select
+              data-map-capture-width=""
+              value={width}
+              onChange={(e) => update({ width: e.target.value, state: null })}
+            >
               {widths.map((w) => (
                 <option key={w} value={w}>
                   {w} px
@@ -569,6 +580,27 @@ function MapView({
               ))}
             </select>
           </label>
+          <fieldset className="map-guide-options">
+            <legend>{t.allMapCards}</legend>
+            <div className="layout-tools">
+              <Button
+                size="sm"
+                variant="outline"
+                aria-pressed={mapGuides.frames}
+                onClick={() => setMapGuides((current) => ({ ...current, frames: !current.frames }))}
+              >
+                {t.elementFrames}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-pressed={mapGuides.guides}
+                onClick={() => setMapGuides((current) => ({ ...current, guides: !current.guides }))}
+              >
+                {t.alignmentGuides}
+              </Button>
+            </div>
+          </fieldset>
           {runs.length >= 2 && (
             <Button
               variant="outline"

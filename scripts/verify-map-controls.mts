@@ -42,6 +42,93 @@ async function checkMapControls(mobile: boolean) {
       }
     }
   }
+  async function verifyGuides(dialog: HTMLElement) {
+    const [frames, guides] = dialog.querySelectorAll<HTMLButtonElement>(
+      ".map-guide-options button",
+    );
+    const images = () =>
+      Array.from(document.querySelectorAll<HTMLImageElement>(".react-flow__node .screen-card img"));
+    const firstImage = images()[0];
+    if (!firstImage || !frames || !guides) throw Error("Missing map cards or guide switches");
+    if (document.querySelector(".screen-card .layout-overlay"))
+      throw Error("Map guides must start off");
+    const source = new URL(firstImage.src);
+    const graphUrl = new URL("graph.json", source);
+    graphUrl.search = source.search;
+    const graph = await (await fetch(graphUrl)).json();
+    type RecordCell = {
+      path: string;
+      image?: string;
+      renderTree?: { rect: { x: number; y: number; width: number; height: number } }[];
+    };
+    const cells: RecordCell[] = graph.cells ?? graph.overview;
+    frames.click();
+    await frame();
+    async function checkProjection() {
+      const shown = images();
+      await Promise.all(shown.map((img) => img.decode()));
+      await frame();
+      for (const img of shown) {
+        const card = img.closest<HTMLElement>(".screen-card")!;
+        const file = decodeURIComponent(new URL(img.src).pathname.split("/").at(-1)!);
+        const matches = cells.filter((c) => c.path === card.title && c.image === file);
+        const svg = card.querySelector<SVGSVGElement>(".layout-overlay");
+        if (matches.length !== 1) continue;
+        const nodes = matches[0].renderTree ?? [];
+        if (!nodes.length) {
+          if (svg) throw Error("Overlay on a card without geometry");
+          continue;
+        }
+        if (!svg || getComputedStyle(svg).pointerEvents !== "none")
+          throw Error("Missing or interactive map overlay on " + card.title);
+        const rects = svg.querySelectorAll<SVGRectElement>(".layout-frames rect");
+        if (rects.length !== nodes.length)
+          throw Error("Map frame count differs from capture on " + card.title);
+        for (const [i, rect] of rects.entries()) {
+          for (const key of ["x", "y", "width", "height"] as const) {
+            if (rect[key].baseVal.value !== nodes[i].rect[key])
+              throw Error("Map frame differs from recorded " + key);
+          }
+        }
+        const a = img.getBoundingClientRect(),
+          b = svg.getBoundingClientRect();
+        if ((["width", "height", "x", "y"] as const).some((key) => Math.abs(a[key] - b[key]) > 1))
+          throw Error("Map overlay shifted away from capture");
+      }
+    }
+    await checkProjection();
+    const widths = dialog.querySelector<HTMLSelectElement>("[data-map-capture-width]")!;
+    const originalWidth = widths.value;
+    const nextWidth = Array.from(widths.options).find((o) => o.value !== originalWidth);
+    if (nextWidth) {
+      for (const width of [nextWidth.value, originalWidth]) {
+        widths.value = width;
+        widths.dispatchEvent(new Event("change", { bubbles: true }));
+        await frame();
+        await checkProjection();
+      }
+    }
+    guides.click();
+    await frame();
+    if (
+      frames.getAttribute("aria-pressed") !== "true" ||
+      guides.getAttribute("aria-pressed") !== "true"
+    )
+      throw Error("Map overlays are not independent");
+    const countLines = () =>
+      document.querySelectorAll(".screen-card .layout-guide-lines line").length;
+    const referenceCount = countLines();
+    frames.click();
+    await frame();
+    if (countLines() !== referenceCount)
+      throw Error("Switching frames changed the alignment guides");
+    if (document.querySelector(".screen-card .layout-frames"))
+      throw Error("Map frames did not switch off");
+    guides.click();
+    await frame();
+    if (document.querySelector(".screen-card .layout-overlay"))
+      throw Error("Map guide overlay did not switch off");
+  }
   const language = await waitFor<HTMLSelectElement>(
     '.rail select:has(option[value="' + CSS.escape(document.documentElement.lang) + '"])',
   );
@@ -114,6 +201,7 @@ async function checkMapControls(mobile: boolean) {
     const dialog = close.closest<HTMLElement>('[role="dialog"]')!;
     await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
     checkTargets("options", [...dialog.querySelectorAll("select, button")]);
+    if (locale === original) await verifyGuides(dialog);
     close.focus();
     close.click();
     await waitFor('.map-options[aria-expanded="false"]:focus');

@@ -1,6 +1,7 @@
 import {
   Fragment,
   useCallback,
+  useContext,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -9,10 +10,12 @@ import {
   useState,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { Search, Map as MapIcon } from "lucide-react";
 import { useI18n } from "../../i18n/LocaleContext";
+import { MapGuideOptions } from "./MapCardGuides";
 import { CaptureCard } from "./CaptureCard";
 import { clearLane, layoutMap } from "./layout";
 import {
@@ -96,6 +99,17 @@ function ResponsiveOverview({
   useLayoutEffect(() => {
     if (ready && width && height) refit();
   }, [ready, width, height, padding]);
+  return null;
+}
+
+// React Flow scales the entire card, including SVG strokes. Keep guides legible
+// at overview zoom without rerendering every card when the camera moves.
+function MapGuideScale({ root }: { root: RefObject<HTMLDivElement | null> }) {
+  const { frames, guides } = useContext(MapGuideOptions);
+  const zoom = useViewportStore((state) => (frames || guides ? state.transform[2] : 1));
+  useLayoutEffect(() => {
+    root.current?.style.setProperty("--map-guide-unit", 1 / zoom + "px");
+  }, [root, zoom]);
   return null;
 }
 
@@ -366,6 +380,7 @@ export function ScreenMap({
   onClearSelection?: () => void;
 }) {
   const { t } = useI18n();
+  const flowElement = useRef<HTMLDivElement>(null);
   const [miniMap, setMiniMap] = useState(false);
   const [heights, setHeights] = useState<ReadonlyMap<string, number>>(() => new Map());
   const measureNodes = useCallback<OnNodesChange<CardNode>>((changes) => {
@@ -588,6 +603,7 @@ export function ScreenMap({
 
   return (
     <ReactFlow
+      ref={flowElement}
       key={JSON.stringify([mode, width])}
       nodes={nodes}
       onNodesChange={measureNodes}
@@ -616,6 +632,7 @@ export function ScreenMap({
         if (focusActive) onClearSelection?.();
       }}
     >
+      <MapGuideScale root={flowElement} />
       <ResponsiveOverview
         padding={fitOptions.padding}
         measured={nodes.length > 0 && nodes.every((node) => heights.has(node.id))}
