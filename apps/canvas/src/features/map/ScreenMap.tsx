@@ -330,45 +330,63 @@ export function ScreenMap({
     }
     return set;
   }, [focusActive, selectedId, layout.links]);
-  const nodes: CardNode[] = layout.nodes.map(
-    ({ screen, position, frameHeight: nodeFrameHeight }) => {
-      const screenDiff = diffsByPath?.[screen.path];
-      const isSelected = screen.id === selectedId;
-      const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
-      const isDimmed = (dimming && !relatedIds.has(screen.id)) || (diffActive && !screenDiff);
-      const classes = [
-        mode === "focus:" + screen.id ? "focus-screen" : "",
-        isSelected ? "selected-screen" : "",
-        isRelated ? "related-screen" : "",
-        isDimmed ? "dimmed-screen" : "",
-        screenDiff ? `diff-node-${screenDiff.kind}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      return {
-        id: screen.id,
-        type: "screen",
-        position,
-        selected: isSelected,
-        data: {
-          screen,
-          width,
-          cardWidth,
-          frameHeight: nodeFrameHeight,
+  // React Flow remeasures new node objects. Hover changes only edge emphasis.
+  const nodes = useMemo<CardNode[]>(
+    () =>
+      layout.nodes.map(({ screen, position, frameHeight: nodeFrameHeight }) => {
+        const screenDiff = diffsByPath?.[screen.path];
+        const isSelected = screen.id === selectedId;
+        const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
+        const isDimmed = (dimming && !relatedIds.has(screen.id)) || (diffActive && !screenDiff);
+        const classes = [
+          mode === "focus:" + screen.id ? "focus-screen" : "",
+          isSelected ? "selected-screen" : "",
+          isRelated ? "related-screen" : "",
+          isDimmed ? "dimmed-screen" : "",
+          screenDiff ? `diff-node-${screenDiff.kind}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          id: screen.id,
+          type: "screen",
+          position,
           selected: isSelected,
-          related: isRelated,
-          dimmed: isDimmed,
-          openComments: openCommentsByPath?.[screen.path] ?? 0,
-          imageUrl,
-          screenDiff,
-          diffVisualMode,
-          beforeRunKey,
-          afterRunKey,
-        },
-        ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
-        className: classes || undefined,
-      };
-    },
+          data: {
+            screen,
+            width,
+            cardWidth,
+            frameHeight: nodeFrameHeight,
+            selected: isSelected,
+            related: isRelated,
+            dimmed: isDimmed,
+            openComments: openCommentsByPath?.[screen.path] ?? 0,
+            imageUrl,
+            screenDiff,
+            diffVisualMode,
+            beforeRunKey,
+            afterRunKey,
+          },
+          ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
+          className: classes || undefined,
+        };
+      }),
+    [
+      layout.nodes,
+      diffsByPath,
+      selectedId,
+      dimming,
+      relatedIds,
+      diffActive,
+      mode,
+      width,
+      cardWidth,
+      openCommentsByPath,
+      imageUrl,
+      diffVisualMode,
+      beforeRunKey,
+      afterRunKey,
+    ],
   );
   const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
   const cardRects = layout.nodes.map((n) => ({
