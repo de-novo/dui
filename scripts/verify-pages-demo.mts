@@ -1,0 +1,294 @@
+/**
+ * Self-dogfooding pre-deploy verification gate for `site/` and `site/demo/`.
+ *
+ * Verifies every exported showcase project and tests both mobile (390x844) and
+ * desktop (1440x920) viewports in real headless Chromium before GitHub Pages
+ * publishes the artifact:
+ * - Zero blank white captures (every project must have >= 2 cells with >= 10 renderTree nodes)
+ * - Every referenced PNG exists and is non-empty
+ * - Zero horizontal overflow (`scrollWidth <= innerWidth`) on `site/` and `site/demo/`
+ *   at both mobile (390px) and desktop (1440px)
+ * - Mobile `site/demo/` renders the MobileScreenDeck cards (`.mobile-deck-card`)
+ */
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+
+const root = process.cwd();
+const siteDir = path.join(root, "site");
+const demoDir = path.join(siteDir, "demo");
+const archiveDir = path.join(demoDir, "archive");
+
+function findChrome(): string {
+  const candidates = [
+    process.env.DUI_CHROMIUM,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].filter((c): c is string => Boolean(c));
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  throw new Error("Chrome/Chromium binary not found; set DUI_CHROMIUM");
+}
+
+function verifyArchives(): Array<{ key: string; cells: number; populated: number }> {
+  const runsPath = path.join(archiveDir, "runs.json");
+  if (!fs.existsSync(runsPath)) {
+    throw new Error(`Missing ${runsPath}; run npm run build:pages-demo first`);
+  }
+  const runs = JSON.parse(fs.readFileSync(runsPath, "utf8")) as Array<{ key: string }>;
+  if (runs.length === 0) throw new Error("runs.json is empty");
+
+  const summary: Array<{ key: string; cells: number; populated: number }> = [];
+  for (const run of runs) {
+    const dir = path.join(archiveDir, run.key);
+    const graphPath = path.join(dir, "graph.json");
+    if (!fs.existsSync(graphPath)) {
+      throw new Error(`Missing graph.json for ${run.key}`);
+    }
+    const graph = JSON.parse(fs.readFileSync(graphPath, "utf8")) as {
+      cells?: Array<{
+        image?: string | null;
+        renderTree?: unknown[];
+        width?: number;
+        path?: string;
+      }>;
+    };
+    const cells = graph.cells ?? [];
+    let populated = 0;
+    for (const cell of cells) {
+      if (cell.image) {
+        const imgPath = path.join(dir, cell.image);
+        if (!fs.existsSync(imgPath) || fs.statSync(imgPath).size < 1000) {
+          throw new Error(`Missing or empty PNG ${cell.image} in ${run.key}`);
+        }
+      }
+      if (Array.isArray(cell.renderTree) && cell.renderTree.length >= 10) {
+        populated += 1;
+      }
+    }
+    if (populated < 2) {
+      throw new Error(
+        `Self-dogfood gate failed: ${run.key} has only ${populated}/${cells.length} populated cells (blank capture detected)`,
+      );
+    }
+    summary.push({ key: run.key, cells: cells.length, populated });
+  }
+  return summary;
+}
+
+function mimeType(filePath: string): string {
+  if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
+  if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
+  if (filePath.endsWith(".js") || filePath.endsWith(".mjs"))
+    return "application/javascript; charset=utf-8";
+  if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
+  if (filePath.endsWith(".png")) return "image/png";
+  if (filePath.endsWith(".svg")) return "image/svg+xml";
+  return "application/octet-stream";
+}
+
+function startStaticServer(): Promise<{ server: http.Server; port: number }> {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      const urlPath = decodeURIComponent((req.url || "/").split("?")[0] || "/");
+      let rel = urlPath.replace(/^\/+/, "");
+      if (!rel || rel.endsWith("/")) rel += "index.html";
+      const filePath = path.resolve(siteDir, rel);
+      if (
+        !filePath.startsWith(siteDir) ||
+        !fs.existsSync(filePath) ||
+        fs.statSync(filePath).isDirectory()
+      ) {
+        res.writeHead(404);
+        res.end("Not Found");
+        return;
+      }
+      res.writeHead(200, { "content-type": mimeType(filePath) });
+      fs.createReadStream(filePath).pipe(res);
+    });
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address();
+      if (!addr || typeof addr === "string") {
+        reject(new Error("Failed to bind static server"));
+        return;
+      }
+      resolve({ server, port: addr.port });
+    });
+  });
+}
+
+async function verifyRenderedPages(port: number, firstRunKey: string) {
+  const chromeBin = findChrome();
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dui-pages-verify-"));
+  const debugPort = 9240 + Math.floor(Math.random() * 500);
+  const chrome = spawn(
+    chromeBin,
+    [
+      "--headless=new",
+      "--disable-gpu",
+      "--no-sandbox",
+      `--remote-debugging-port=${debugPort}`,
+      `--user-data-dir=${userDataDir}`,
+    ],
+    { stdio: "ignore" },
+  );
+
+  try {
+    let wsUrl: string | undefined;
+    for (let i = 0; i < 40; i++) {
+      try {
+        const targets = (await (
+          await fetch(`http://127.0.0.1:${debugPort}/json`)
+        ).json()) as Array<{
+          type: string;
+          webSocketDebuggerUrl?: string;
+        }>;
+        wsUrl = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
+        if (wsUrl) break;
+      } catch {
+        // Chrome still booting.
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!wsUrl) throw new Error("Failed to attach to headless Chrome CDP");
+
+    const ws = new WebSocket(wsUrl);
+    await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+    let msgId = 1;
+    const call = (method: string, params: Record<string, unknown> = {}) =>
+      new Promise<Record<string, unknown>>((resolve, reject) => {
+        const cur = msgId++;
+        const onMsg = (ev: MessageEvent) => {
+          const msg = JSON.parse(String(ev.data)) as {
+            id?: number;
+            result?: Record<string, unknown>;
+            error?: { message?: string };
+          };
+          if (msg.id !== cur) return;
+          ws.removeEventListener("message", onMsg);
+          if (msg.error) reject(new Error(msg.error.message || method));
+          else resolve(msg.result ?? {});
+        };
+        ws.addEventListener("message", onMsg);
+        ws.send(JSON.stringify({ id: cur, method, params }));
+      });
+
+    await call("Page.enable");
+
+    const checks: Array<{
+      name: string;
+      url: string;
+      width: number;
+      height: number;
+      mobile: boolean;
+      requireSelector: string;
+    }> = [
+      {
+        name: "landing-mobile",
+        url: `http://127.0.0.1:${port}/`,
+        width: 390,
+        height: 844,
+        mobile: true,
+        requireSelector: "[data-copy]",
+      },
+      {
+        name: "landing-desktop",
+        url: `http://127.0.0.1:${port}/`,
+        width: 1440,
+        height: 920,
+        mobile: false,
+        requireSelector: ".oss-card",
+      },
+      {
+        name: "demo-mobile-deck",
+        url: `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(firstRunKey)}`,
+        width: 390,
+        height: 844,
+        mobile: true,
+        requireSelector: ".mobile-deck-card img",
+      },
+      {
+        name: "demo-desktop-canvas",
+        url: `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(firstRunKey)}`,
+        width: 1440,
+        height: 920,
+        mobile: false,
+        requireSelector: ".screen-card img",
+      },
+    ];
+
+    const results: Array<Record<string, unknown>> = [];
+    for (const c of checks) {
+      await call("Emulation.setDeviceMetricsOverride", {
+        width: c.width,
+        height: c.height,
+        deviceScaleFactor: c.mobile ? 2 : 1,
+        mobile: c.mobile,
+      });
+      await call("Page.navigate", { url: c.url });
+      await new Promise((r) => setTimeout(r, 1500));
+      const evalRes = (await call("Runtime.evaluate", {
+        expression: `(() => {
+          const el = document.querySelector(${JSON.stringify(c.requireSelector)});
+          const rect = el ? el.getBoundingClientRect() : null;
+          const brokenImgs = Array.from(document.querySelectorAll('img')).filter(i => i.complete && i.naturalWidth === 0).length;
+          return {
+            innerWidth: window.innerWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            found: Boolean(el),
+            inViewportX: rect ? (rect.left >= 0 && rect.right <= window.innerWidth + 1) : false,
+            brokenImgs,
+          };
+        })()`,
+        returnByValue: true,
+      })) as { result?: { value?: Record<string, unknown> } };
+      const val = evalRes.result?.value ?? {};
+      results.push({ name: c.name, ...val });
+      if (!val.found) {
+        throw new Error(`Self-dogfood gate failed (${c.name}): missing ${c.requireSelector}`);
+      }
+      if (Number(val.scrollWidth) > Number(val.innerWidth) + 1) {
+        throw new Error(
+          `Self-dogfood gate failed (${c.name}): horizontal overflow scrollWidth=${val.scrollWidth} > innerWidth=${val.innerWidth}`,
+        );
+      }
+      if (!val.inViewportX) {
+        throw new Error(
+          `Self-dogfood gate failed (${c.name}): ${c.requireSelector} clipped outside viewport`,
+        );
+      }
+      if (Number(val.brokenImgs) > 0) {
+        throw new Error(`Self-dogfood gate failed (${c.name}): ${val.brokenImgs} broken images`);
+      }
+    }
+    ws.close();
+    return results;
+  } finally {
+    chrome.kill("SIGTERM");
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // Ignore temp profile cleanup race on exit.
+    }
+  }
+}
+
+async function main() {
+  const archiveSummary = verifyArchives();
+  const { server, port } = await startStaticServer();
+  try {
+    const rendered = await verifyRenderedPages(port, archiveSummary[0]!.key);
+    console.log(JSON.stringify({ status: "ok", archives: archiveSummary, rendered }, null, 2));
+  } finally {
+    server.close();
+  }
+}
+
+await main();

@@ -43,6 +43,7 @@ jobs:
           npm run build --prefix apps/canvas
           cargo build --release --locked
           npm run build:pages-demo
+          npm run verify:pages-demo
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site artifact
