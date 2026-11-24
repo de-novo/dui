@@ -10,6 +10,7 @@ mod host;
 mod ios;
 mod live;
 mod mcp;
+mod native_capture;
 mod native_map;
 mod nextjs;
 mod recheck;
@@ -352,6 +353,7 @@ dui — real UI state capture, screen map, and diff
 
 CAPTURE
   dui map [PROJECT] [--url URL | --build-dir DIR]   Map source, a running app or built web pages
+  dui map attach SOURCE_RUN RECORDINGS_JSON  Attach identified runtime PNGs to native source cards
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
@@ -432,6 +434,12 @@ fn run() -> Reply {
         && cmd == "map"
     {
         return match rest {
+            [cmd, source, recordings] if cmd == "attach" => {
+                native_capture::attach(Path::new(source), Path::new(recordings))
+            }
+            [cmd, ..] if cmd == "attach" => {
+                Err(failure(2, "expected map attach SOURCE_RUN RECORDINGS_JSON"))
+            }
             [] => screen_map::capture(Path::new(".")),
             [root] if root != "--url" && root != "--build-dir" => {
                 screen_map::capture(Path::new(root))

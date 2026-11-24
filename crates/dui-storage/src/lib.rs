@@ -389,6 +389,20 @@ impl SqliteStore {
             source_files,
         );
 
+        let mut native_screens = BTreeMap::new();
+        for node in graph["nodes"].as_array().into_iter().flatten() {
+            if node["kind"] == "screen"
+                && let Some(source) = node.get("nativeSource")
+            {
+                let declaration = serde_json::from_value(source.clone()).map_err(db_err)?;
+                let path = node["label"]
+                    .as_str()
+                    .ok_or_else(|| db_err("missing native route"))?;
+                let screen =
+                    Screen::new(path, ScreenOrigin::Native { declaration }).map_err(db_err)?;
+                native_screens.insert(screen.id().clone(), screen);
+            }
+        }
         let mut screens_by_path: BTreeMap<String, Screen> = BTreeMap::new();
         let mut states_by_id: BTreeMap<StateId, State> = BTreeMap::new();
         let mut cells = Vec::new();
@@ -401,7 +415,16 @@ impl SqliteStore {
                 .as_str()
                 .filter(|s| !s.trim().is_empty())
                 .unwrap_or("/");
-            let screen = if let Some(existing) = screens_by_path.get(path) {
+            let screen = if !native_screens.is_empty()
+                && let Some(raw_id) = raw["screenId"].as_str()
+            {
+                let id = ScreenId::parse(raw_id).map_err(db_err)?;
+                native_screens
+                    .get(&id)
+                    .filter(|s| s.path() == path)
+                    .ok_or_else(|| db_err("cell references an unknown native declaration"))?
+                    .clone()
+            } else if let Some(existing) = screens_by_path.get(path) {
                 existing.clone()
             } else {
                 let origin = match report["screenDiscovery"]["sources"].get(path) {
@@ -587,13 +610,7 @@ impl SqliteStore {
         }
 
         let mut screens: Vec<_> = screens_by_path.into_values().collect();
-        for node in graph["nodes"].as_array().into_iter().flatten() {
-            if node["kind"] == "screen" && let Some(source) = node.get("nativeSource") {
-                let declaration = serde_json::from_value(source.clone()).map_err(db_err)?;
-                let path = node["label"].as_str().ok_or_else(|| db_err("missing native route"))?;
-                screens.push(Screen::new(path, ScreenOrigin::Native { declaration }).map_err(db_err)?);
-            }
-        }
+        screens.extend(native_screens.into_values());
 
         let aggregate = RunAggregate::publish(
             run,

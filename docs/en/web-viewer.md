@@ -20,6 +20,23 @@ Run `dui map PATH` on a React Navigation, Expo Router or Flutter app package to 
 
 Open the resulting archive with `dui open`. Source cards identify the declaration and its file and line. Named registrations can have a navigation key instead of a URL. Conditional and parameterized routes keep their expressions or patterns. Unresolved declarations appear in the discovery limitations. Source-only maps have zero attempted captures. Native appearance, transitions and runtime coverage require capture evidence.
 
+When a recorder has opened a native route, save its PNG and write the following JSON alongside it. Copy the snapshot ID and the matching declaration ID from the source run that corresponds to the recorded build. The recorder supplies the actual route and logical viewport width. `runtime` accepts `android`, `ios`, `web` and `desktop`.
+
+```json
+{
+  "sourceSnapshot": "<snapshot.id>",
+  "captures": [{
+    "screenId": "<graph.nodes[].id>",
+    "runtime": "android",
+    "observedPath": "/settings",
+    "width": 393,
+    "image": "settings.png"
+  }]
+}
+```
+
+Run `dui map attach SOURCE_RUN recordings.json` against the original local source archive, then open the new output with `dui open`. Each attached card keeps its source location and shows the recorded image. The archive records the PNG dimensions, runtime and observed route. An imported image is marked `unverified` because its association comes from the recorder. Automated coverage counts stay at zero. Use one capture per declaration, runtime and width in a recording set.
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.
