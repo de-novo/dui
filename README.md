@@ -72,6 +72,7 @@ dui desktop
 
 # 4. Compare branches and generate a PR Markdown summary / coverage audit
 dui diff --base main --markdown
+dui diff --base main --regressions-only --markdown
 dui audit <run-dir>
 ```
 
@@ -88,7 +89,7 @@ dui audit <run-dir>
 | Retry failed cells | `dui recheck RUN [PROJECT [MANIFEST]]` | Re-render only unsuccessful cells from a capture and report which ones recovered |
 | Auth | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | Save Playwright-compatible `storageState.json` (`0600`) for authenticated routes |
 | View | `dui open [RUN_DIR]` · `dui desktop` | Embedded 2D web canvas or native GPUI desktop viewer |
-| Diff & Quality | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage audit, review comments |
+| Diff & Quality | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage audit, review comments |
 | Tools | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | Official compiler probes, archive history, cache GC, self-update, MCP stdio server |
 
 ## Discover screens

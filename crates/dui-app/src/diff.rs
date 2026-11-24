@@ -30,11 +30,9 @@ fn optional_json_file(path: &Path) -> Option<Value> {
 }
 
 fn load_cell_snapshots<S: AppStore>(
-    dir: &Path,
+    report: &Value,
     store: Option<&S>,
-) -> Result<(Option<Value>, Vec<DiffCellSnapshot>), (u8, Value)> {
-    let report = read_json_file(&dir.join("report.json"))?;
-    let snapshot = optional_json_file(&dir.join("snapshot.json"));
+) -> Result<Vec<DiffCellSnapshot>, (u8, Value)> {
     let report_hashes: BTreeMap<String, String> = report["sourceFileHashes"]
         .as_object()
         .map(|obj| {
@@ -98,6 +96,9 @@ fn load_cell_snapshots<S: AppStore>(
             width,
             locale,
             status,
+            screen_status: cell["observation"]["screenEvidence"]["screenStatus"]
+                .as_str()
+                .map(str::to_owned),
             reason,
             image,
             cache_key,
@@ -105,7 +106,7 @@ fn load_cell_snapshots<S: AppStore>(
             render_tree,
         });
     }
-    Ok((snapshot, out))
+    Ok(out)
 }
 
 fn decode_png_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>), String> {
@@ -188,9 +189,73 @@ pub fn compare_with_options<S: AppStore>(
     overlay_dir: Option<&Path>,
     include_pixels: bool,
 ) -> Reply {
-    let (before_snap, before_cells) = load_cell_snapshots(before, store)?;
-    let (after_snap, after_cells) = load_cell_snapshots(after, store)?;
+    compare_archives(
+        store,
+        before,
+        after,
+        Mode::Visual {
+            overlay_dir,
+            include_pixels,
+        },
+    )
+}
 
+#[derive(Clone, Copy)]
+pub enum Mode<'a> {
+    Visual {
+        overlay_dir: Option<&'a Path>,
+        include_pixels: bool,
+    },
+    RegressionsOnly,
+}
+
+struct Capture {
+    dir: PathBuf,
+    snapshot: Option<Value>,
+    report: Value,
+}
+
+impl Capture {
+    fn load(dir: &Path) -> Result<Self, (u8, Value)> {
+        Ok(Self {
+            dir: dir.to_owned(),
+            snapshot: optional_json_file(&dir.join("snapshot.json")),
+            report: read_json_file(&dir.join("report.json"))?,
+        })
+    }
+
+    fn provenance(&self) -> Value {
+        json!({"path":self.dir,"snapshot":self.snapshot})
+    }
+}
+
+pub fn compare_archives<S: AppStore>(
+    store: Option<&S>,
+    before: &Path,
+    after: &Path,
+    mode: Mode<'_>,
+) -> Reply {
+    compare_loaded(store, Capture::load(before)?, Capture::load(after)?, mode)
+}
+
+fn compare_loaded<S: AppStore>(
+    store: Option<&S>,
+    before: Capture,
+    after: Capture,
+    mode: Mode<'_>,
+) -> Reply {
+    let verification = dui_core::diff::regressions::compare(&before.report, &after.report)
+        .map_err(|e| failure(2, e))?;
+    let mut report = json!({"before":before.provenance(),"after":after.provenance(),"verification":verification});
+    let Mode::Visual {
+        overlay_dir,
+        include_pixels,
+    } = mode
+    else {
+        return Ok(report);
+    };
+    let before_cells = load_cell_snapshots(&before.report, store)?;
+    let after_cells = load_cell_snapshots(&after.report, store)?;
     let mut diff = diff_captures(&before_cells, &after_cells);
 
     for screen in &mut diff.screens {
@@ -215,8 +280,8 @@ pub fn compare_with_options<S: AppStore>(
             let Some(after_img) = cell.after.as_ref().and_then(|s| s.image.as_deref()) else {
                 continue;
             };
-            let before_path = before.join(before_img);
-            let after_path = after.join(after_img);
+            let before_path = before.dir.join(before_img);
+            let after_path = after.dir.join(after_img);
             let Ok((bw, bh, brgba)) = decode_png_rgba(&before_path) else {
                 continue;
             };
@@ -235,18 +300,9 @@ pub fn compare_with_options<S: AppStore>(
         }
     }
 
-    Ok(json!({
-        "before": {
-            "path": before.display().to_string(),
-            "snapshot": before_snap,
-        },
-        "after": {
-            "path": after.display().to_string(),
-            "snapshot": after_snap,
-        },
-        "summary": diff.summary,
-        "screens": diff.screens,
-    }))
+    report["summary"] = json!(diff.summary);
+    report["screens"] = json!(diff.screens);
+    Ok(report)
 }
 
 pub fn compare_branches_with_store<S: AppStore>(
@@ -257,9 +313,31 @@ pub fn compare_branches_with_store<S: AppStore>(
     resolved_head: &str,
     overlay_dir: Option<&Path>,
 ) -> Reply {
+    compare_branch_runs(
+        store,
+        home,
+        project_id_str,
+        (base_branch, resolved_head),
+        None,
+        Mode::Visual {
+            overlay_dir,
+            include_pixels: true,
+        },
+    )
+}
+
+pub fn compare_branch_runs<S: AppStore>(
+    store: &S,
+    home: &Path,
+    project_id_str: &str,
+    branches: (&str, &str),
+    app: Option<&str>,
+    mode: Mode<'_>,
+) -> Reply {
+    let (base_branch, resolved_head) = branches;
     let pid = ProjectId::parse(project_id_str).map_err(|e| failure(2, &e.to_string()))?;
 
-    let find_latest_run = |branch: &str| -> Result<PathBuf, (u8, Value)> {
+    let find_latest_run = |branch: &str| -> Result<Capture, (u8, Value)> {
         let runs = store
             .list_runs(&RunFilter {
                 project_id: Some(pid.clone()),
@@ -267,29 +345,35 @@ pub fn compare_branches_with_store<S: AppStore>(
                 ..RunFilter::default()
             })
             .map_err(|e| failure(3, &e.to_string()))?;
-        let summary = runs.first().ok_or_else(|| {
-            failure(
-                2,
-                &format!("no archived capture found for branch '{branch}' in project"),
-            )
-        })?;
-        let dir = home
-            .join("projects")
-            .join(summary.run.project_id().as_str())
-            .join("runs")
-            .join(summary.run.id().as_str());
-        if !dir.is_dir() {
-            return Err(failure(
-                2,
-                &format!("archived run directory missing for branch '{branch}'"),
-            ));
+        for summary in runs {
+            let dir = home
+                .join("projects")
+                .join(summary.run.project_id().as_str())
+                .join("runs")
+                .join(summary.run.id().as_str());
+            let capture = Capture::load(&dir)?;
+            if capture.report.get("recheck").is_some()
+                || capture.report.get("live").is_some()
+                || app.is_some_and(|a| {
+                    capture.snapshot.as_ref().and_then(|s| s["app"].as_str()) != Some(a)
+                })
+            {
+                continue;
+            }
+            return Ok(capture);
         }
-        Ok(dir)
+        Err(failure(
+            2,
+            &format!("no matching archived capture found for branch '{branch}' in project"),
+        ))
     };
 
-    let before_dir = find_latest_run(base_branch)?;
-    let after_dir = find_latest_run(resolved_head)?;
-    let mut reply = compare(Some(store), &before_dir, &after_dir, overlay_dir)?;
+    let mut reply = compare_loaded(
+        Some(store),
+        find_latest_run(base_branch)?,
+        find_latest_run(resolved_head)?,
+        mode,
+    )?;
     if let Some(obj) = reply.as_object_mut() {
         obj.insert("beforeBranch".into(), json!(base_branch));
         obj.insert("afterBranch".into(), json!(resolved_head));
@@ -548,7 +632,10 @@ mod tests {
         ) -> dui_core::storage::StoreResult<Vec<dui_core::model::BlobId>> {
             unimplemented!()
         }
-        fn delete_blob(&mut self, _: &dui_core::model::BlobId) -> dui_core::storage::StoreResult<()> {
+        fn delete_blob(
+            &mut self,
+            _: &dui_core::model::BlobId,
+        ) -> dui_core::storage::StoreResult<()> {
             unimplemented!()
         }
     }

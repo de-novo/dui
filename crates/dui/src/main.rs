@@ -88,8 +88,23 @@ mod diff {
 
     pub use dui_app::diff::changed_since_summary;
 
-    pub fn compare(before: &Path, after: &Path, overlay_dir: Option<&Path>) -> Reply {
-        compare_with_options(before, after, overlay_dir, true)
+    pub use dui_app::diff::Mode;
+    pub fn mode(regressions_only: bool, overlay_dir: Option<&Path>) -> Mode<'_> {
+        if regressions_only {
+            Mode::RegressionsOnly
+        } else {
+            Mode::Visual {
+                overlay_dir,
+                include_pixels: true,
+            }
+        }
+    }
+
+    pub fn compare(before: &Path, after: &Path, mode: Mode<'_>) -> Reply {
+        let store = archive::home_dir()
+            .ok()
+            .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
+        dui_app::diff::compare_archives(store.as_ref(), before, after, mode)
     }
 
     pub fn compare_with_options(
@@ -98,15 +113,13 @@ mod diff {
         overlay_dir: Option<&Path>,
         include_pixels: bool,
     ) -> Reply {
-        let store = archive::home_dir()
-            .ok()
-            .and_then(|home| SqliteStore::open(&home).ok().map(|(s, _)| s));
-        dui_app::diff::compare_with_options(
-            store.as_ref(),
+        compare(
             before,
             after,
-            overlay_dir,
-            include_pixels,
+            Mode::Visual {
+                overlay_dir,
+                include_pixels,
+            },
         )
     }
 
@@ -114,7 +127,7 @@ mod diff {
         project: &Path,
         base_branch: &str,
         head_branch: Option<&str>,
-        overlay_dir: Option<&Path>,
+        mode: Mode,
     ) -> Reply {
         let prov = archive::provenance(project)?;
         let project_id_str = prov["projectId"]
@@ -131,13 +144,13 @@ mod diff {
             })?;
         let home = archive::home_dir()?;
         let (store, _) = SqliteStore::open(&home).map_err(|e| failure(3, &e.to_string()))?;
-        dui_app::diff::compare_branches_with_store(
+        dui_app::diff::compare_branch_runs(
             &store,
             &home,
             project_id_str,
-            base_branch,
-            &resolved_head,
-            overlay_dir,
+            (base_branch, &resolved_head),
+            prov["app"].as_str(),
+            mode,
         )
     }
 }
@@ -360,6 +373,7 @@ VIEW
 DIFF & QUALITY
   dui diff BEFORE AFTER [--markdown]      Compare two runs (element renderDiff + lazy pixel overlay)
   dui diff --base BRANCH [--markdown]     Compare current worktree run against a base branch
+      --regressions-only                  Report newly failing verification checks (exit 5 if any)
   dui audit RUN_DIR [--goal PERCENT]      Check coverage goal, gaps, and unresolved review comments
   dui comment <add|list|resolve|reopen>   Manage review comments anchored to screens/cells
 
@@ -709,6 +723,7 @@ fn run() -> Reply {
         let mut head_branch: Option<&str> = None;
         let mut project_dir: Option<&Path> = None;
         let mut markdown_mode = false;
+        let mut regressions_only = false;
         let mut positional = Vec::new();
         let mut iter = tail.iter();
         while let Some(arg) = iter.next() {
@@ -732,6 +747,8 @@ fn run() -> Reply {
                     return Err(failure(2, "missing value for --project"));
                 };
                 project_dir = Some(Path::new(p));
+            } else if arg == "--regressions-only" {
+                regressions_only = true;
             } else if arg == "--markdown" {
                 markdown_mode = true;
             } else if arg == "--format" {
@@ -747,9 +764,10 @@ fn run() -> Reply {
                 positional.push(arg);
             }
         }
+        let mode = diff::mode(regressions_only, overlay_dir);
         let reply = if let Some(base) = base_branch {
             let proj = project_dir.unwrap_or_else(|| Path::new("."));
-            diff::compare_branches(proj, base, head_branch, overlay_dir)?
+            diff::compare_branches(proj, base, head_branch, mode)?
         } else {
             let (before, after) = match positional.as_slice() {
                 [before, after] => (Path::new(before), Path::new(after)),
@@ -760,13 +778,28 @@ fn run() -> Reply {
                     ));
                 }
             };
-            diff::compare(before, after, overlay_dir)?
+            diff::compare(before, after, mode)?
         };
-        if markdown_mode {
-            let md = dui_core::diff::format_diff_markdown(&reply);
-            return Ok(json!({"__rawStdout": md}));
-        }
-        return Ok(reply);
+        let exit_code = match (regressions_only, reply["verification"]["verdict"].as_str()) {
+            (true, Some("regressions")) => 5,
+            (true, Some("inconclusive")) => 2,
+            _ => 0,
+        };
+        let output = if markdown_mode {
+            let md = if regressions_only {
+                dui_core::diff::regressions::markdown(&reply)
+            } else {
+                dui_core::diff::format_diff_markdown(&reply)
+            };
+            json!({"__rawStdout":md})
+        } else {
+            reply
+        };
+        return if exit_code == 0 {
+            Ok(output)
+        } else {
+            Err((exit_code, output))
+        };
     }
     if let [cmd, tail @ ..] = args.as_slice()
         && cmd == "prune"

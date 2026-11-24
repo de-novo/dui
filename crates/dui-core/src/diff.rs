@@ -1,3 +1,5 @@
+pub mod regressions;
+
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -117,6 +119,8 @@ pub struct DiffCellSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screen_status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -133,6 +137,8 @@ pub struct DiffCellSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct CellSideSummary {
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screen_status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -145,6 +151,7 @@ impl From<&DiffCellSnapshot> for CellSideSummary {
     fn from(s: &DiffCellSnapshot) -> Self {
         Self {
             status: s.status.clone(),
+            screen_status: s.screen_status.clone(),
             reason: s.reason.clone(),
             image: s.image.clone(),
             cache_key: s.cache_key.clone(),
@@ -291,7 +298,10 @@ fn diff_source_files(
 }
 
 fn cells_unchanged(before: &DiffCellSnapshot, after: &DiffCellSnapshot) -> bool {
-    if before.status != after.status || before.reason != after.reason {
+    if before.status != after.status
+        || before.reason != after.reason
+        || before.screen_status != after.screen_status
+    {
         return false;
     }
     if before.image.is_some() || after.image.is_some() {
@@ -466,6 +476,16 @@ pub fn format_diff_markdown(diff: &serde_json::Value) -> String {
     out.push_str(&format!(
         "- **Cells**: **{changed}** changed · **{added}** added · **{removed}** removed · {unchanged} unchanged\n\n"
     ));
+
+    if let Some(verdict) = diff["verification"]["verdict"].as_str() {
+        match verdict {
+            "regressions" | "inconclusive" => {
+                out.push_str(&regressions::markdown(diff));
+                out.push('\n');
+            }
+            _ => out.push_str("No new verification regressions.\n\n"),
+        }
+    }
 
     let screens = diff["screens"].as_array();
     let mut rows = Vec::new();
@@ -902,6 +922,7 @@ mod tests {
             width,
             locale: None,
             status: status.to_owned(),
+            screen_status: None,
             reason: reason.map(str::to_owned),
             image: image.map(str::to_owned),
             cache_key: None,
