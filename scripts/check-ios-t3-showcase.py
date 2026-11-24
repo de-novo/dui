@@ -10,7 +10,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 import uuid
 
 
@@ -27,41 +26,79 @@ def output(*command):
     return subprocess.check_output(command, text=True).strip()
 
 
-def observe_startup(udid, temporary, recognizer):
+def install_route_observer(source):
+    coordinator = source / "apps/mobile/src/features/showcase/ShowcaseCaptureCoordinator.tsx"
+    code = coordinator.read_text()
+    anchor = "    if (requestedScene !== null && hasFixture"
+    if code.count(anchor) != 1:
+        raise ValueError("The pinned showcase navigation observation point changed")
+    # Observe existing runtime values. Upstream still handles pairing, navigation, and readiness.
+    observation = """
+    const evidence = JSON.stringify({ path: rootState ? pathnameFromState(rootState).split(/[?#]/)[0] : "",
+      requestedScene, scene, launchRequestRead, orientationSettled, themeApplied, hasFixture,
+      environments: appAtomRegistry.get(workspaceConnections.environmentsAtom).length,
+      projects: projects.length, threads: threads.length });
+    if (evidence !== duiPreviousObservation) {
+      try {
+        const name = scene === "thread" || scene === "review" ? scene : "startup";
+        const file = new DuiFile(DuiPaths.document, "dui-showcase-" + name + ".json");
+        file.create({ overwrite: true });
+        file.writeSync(evidence);
+        duiPreviousObservation = evidence;
+      } catch {}
+    }
+"""
+    imports = 'import { File as DuiFile, Paths as DuiPaths } from "expo-file-system";\n'
+    coordinator.write_text(imports + 'let duiPreviousObservation = "";\n' + code.replace(anchor, observation + anchor))
+
+
+def observe_startup(udid, temporary, device_data):
     image = temporary / "startup.png"
     capture = subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", image], capture_output=True)
     if capture.returncode == 0:
-        seen = subprocess.run([recognizer, image], capture_output=True, text=True)
-        if seen.returncode == 0:
-            print(f"Simulator startup: {seen.stdout.strip()}", flush=True)
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8199/json/list", timeout=3) as response:
-            sessions = json.load(response)
-        print(f"Metro has {len(sessions)} connected runtime target(s)", flush=True)
-    except (OSError, ValueError):
-        print("Metro runtime session list is unavailable", flush=True)
+        seen = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", "11"], capture_output=True, text=True)
+        labels = ("development servers", "add environment", "connect", "remote-first", "review changes",
+                  "uncaught error", "failed to load", "welcome", "home screen")
+        recognized = [label for label in labels if label in seen.stdout.lower()]
+        print(f"Simulator startup witnesses: {recognized}", flush=True)
+    else:
+        print(f"simctl screenshot exited with {capture.returncode}", flush=True)
+    for observation in device_data.glob("Containers/Data/Application/*/Documents/dui-showcase-*.json"):
+        try:
+            info = json.loads(observation.read_text())
+        except (FileNotFoundError, ValueError):
+            continue
+        # A diagnostic contains counts and booleans only. Successful routes are published below.
+        print("Showcase state:", {key: value for key, value in info.items() if key != "path"}, flush=True)
+    for path in Path.home().glob("Library/Logs/DiagnosticReports/T3Code*.ips"):
+        try:
+            crash = json.loads(path.read_text().split("\n", 1)[1])
+            print("App crash:", crash.get("exception", {}).get("type"), crash.get("termination", {}).get("namespace"))
+        except (ValueError, IndexError):
+            pass
 
 
-def run_capture(source, temporary, udid, device_data, recognizer):
+def run_capture(source, temporary, udid, device_data):
     pnpm_version = json.loads((source / "package.json").read_text())["packageManager"].split("@")[1]
     pnpm_dir = Path.home() / ".vite-plus/package_manager/pnpm" / pnpm_version / "pnpm/bin"
     xcconfig = temporary / "unsigned.xcconfig"
     xcconfig.write_text("CODE_SIGNING_ALLOWED = NO\nCODE_SIGNING_REQUIRED = NO\n")
     env = dict(os.environ, PATH=f"{pnpm_dir}:{os.environ['PATH']}", TMPDIR=str(temporary),
                XCODE_XCCONFIG_FILE=str(xcconfig))
-    # The simulator shares the runner's loopback. Keep the upstream app and its
-    # readiness checks intact while the temporary capture driver addresses local Metro.
+    # Build the Release simulator product so the app uses its checked-out JS bundle.
+    # Its local fixture servers, scene selection, readiness and screenshot steps stay upstream.
     original = source / "scripts/mobile-showcase.ts"
     driver = original.with_name(".dui-ios-showcase.ts")
-    harness, matches = re.subn(r"(?<=const metroHost = )[^;\n]+", '"127.0.0.1"', original.read_text())
-    if matches != 1:
-        raise ValueError("Could not locate the pinned capture driver's Metro address")
-    driver.write_text(harness)
+    harness = original.read_text()
+    if harness.count('"Debug"') != 1 or harness.count("Debug-iphonesimulator") != 1:
+        raise ValueError("The pinned driver's iOS build configuration changed")
+    driver.write_text(harness.replace('"Debug"', '"Release"').replace("Debug-iphonesimulator", "Release-iphonesimulator"))
+    install_route_observer(source)
     log = temporary / "showcase.log"
     environment = None
     observe_at = None
     with log.open("w") as stream, subprocess.Popen(
-        ["node", driver, "--platform", "ios", "--device", "iphone-6.9",
+        ["node", driver, "--skip-metro", "--platform", "ios", "--device", "iphone-6.9",
          "--appearance", "light", "--theme", "t3-code", "--scene", "thread", "--scene", "review"],
         cwd=source, env=env, stdout=stream, stderr=subprocess.STDOUT,
     ) as process:
@@ -70,7 +107,7 @@ def run_capture(source, temporary, udid, device_data, recognizer):
             if observe_at is None and any(device_data.glob("Containers/Data/Application/*/Library/Caches/T3ShowcaseScene")):
                 observe_at = time.monotonic() + 45
             if observe_at is not None and time.monotonic() >= observe_at:
-                observe_startup(udid, temporary, recognizer)
+                observe_startup(udid, temporary, device_data)
                 observe_at = time.monotonic() + 90
             if environment is None:
                 for path in temporary.glob("t3-mobile-showcase-*/environments/moonbase-terminal/userdata/environment-id"):
@@ -116,9 +153,7 @@ def main():
             checker = temporary / "check-screenshot"
             subprocess.run(["xcrun", "swiftc", Path(__file__).with_name("check-ios-screenshot.swift"),
                             "-o", checker], check=True)
-            recognizer = temporary / "startup-witness"
-            subprocess.run(["xcrun", "swiftc", Path(__file__).with_suffix(".swift"), "-o", recognizer], check=True)
-            thread_path = run_capture(source, temporary, udid, device_data, recognizer)
+            thread_path = run_capture(source, temporary, udid, device_data)
             screenshots = source / "artifacts/app-store/screenshots/apple/iphone-6.9/light/t3-code"
             summary = [f"T3 Code `{REVISION}` · {DEVICE} · iOS {runtime} · {scale:g}×",
                        "The upstream harness waited for each native scene to report its route and content ready.",
@@ -127,6 +162,10 @@ def main():
             hashes = set()
             destination.mkdir(parents=True, exist_ok=True)
             for scene, name, suffix, screen_id in SCENES:
+                observation, = device_data.glob(f"Containers/Data/Application/*/Documents/dui-showcase-{scene}.json")
+                observed = json.loads(observation.read_text())
+                if observed["path"] != thread_path + suffix or observed["scene"] != scene or not observed["hasFixture"]:
+                    raise ValueError(f"Native navigation did not confirm {name}")
                 image = screenshots / f"{scene}.png"
                 width, height = map(int, output(checker, image).split())
                 digest = hashlib.sha256(image.read_bytes()).hexdigest()
