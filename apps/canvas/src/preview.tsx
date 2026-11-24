@@ -224,7 +224,10 @@ function MapView({
         {(showAuditPill || otherRuns.length > 0 || (staticDemo && runs.length > 1)) && (
           <div className="map-top-bar">
             {staticDemo && runs.length > 1 && (
-              <section className="canvas-diff-bar glass-panel" aria-label="Showcase projects">
+              <section
+                className="canvas-diff-bar glass-panel showcase-project-bar"
+                aria-label="Showcase projects"
+              >
                 <label className="canvas-diff-select-wrap">
                   <span>Project</span>
                   <select
