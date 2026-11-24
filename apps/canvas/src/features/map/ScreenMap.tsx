@@ -421,8 +421,12 @@ export function ScreenMap({
         b = positions.get(target)!;
       const dx = Math.abs(b.x - a.x);
       const multiColumn = dx > column * 1.1;
-      const [out, into] =
-        a.x === b.x
+      const interveningSibling =
+        a.x === b.x &&
+        cardRects.some((r) => r.x === a.x && r.y > Math.min(a.y, b.y) && r.y < Math.max(a.y, b.y));
+      const [out, into] = interveningSibling
+        ? [Position.Right, Position.Right]
+        : a.x === b.x
           ? a.y < b.y
             ? [Position.Bottom, Position.Top]
             : [Position.Top, Position.Bottom]

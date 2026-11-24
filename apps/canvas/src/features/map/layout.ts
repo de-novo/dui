@@ -24,7 +24,12 @@ export function nodeMetrics(captureWidth: number): NodeMetrics {
 }
 
 export function screenFrameHeight(screen: Screen, width: number, metrics: NodeMetrics): number {
-  const cell = (screen.entries ?? screen.cells).find((c) => c.width === width);
+  const entry = (screen.entries ?? screen.cells).find((c) => c.width === width);
+  // Pages archives may store PNG dimensions only on the detailed capture.
+  const cell =
+    entry?.image && !(entry.imageWidth && entry.imageHeight)
+      ? screen.cells.find((c) => c.image === entry.image && c.imageWidth && c.imageHeight)
+      : entry;
   if (cell?.imageWidth && cell?.imageHeight && cell.imageWidth > 0 && cell.imageHeight > 0) {
     return Math.max(240, Math.round(metrics.cardWidth * (cell.imageHeight / cell.imageWidth)));
   }

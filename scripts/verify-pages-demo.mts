@@ -273,6 +273,28 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         expression: `(() => {
           const el = document.querySelector(${JSON.stringify(c.requireSelector)});
           const rect = el ? el.getBoundingClientRect() : null;
+          const cards = Array.from(document.querySelectorAll('.react-flow__node .screen-card')).map(card => ({
+            rect: card.getBoundingClientRect(), id: card.closest('.react-flow__node').dataset.id
+          }));
+          for (const [i, a] of cards.entries()) {
+            for (const b of cards.slice(i + 1)) {
+              if (a.rect.left < b.rect.right && b.rect.left < a.rect.right &&
+                  a.rect.top < b.rect.bottom && b.rect.top < a.rect.bottom) {
+                throw Error('Overlapping screen cards: ' + a.id + ' and ' + b.id);
+              }
+            }
+          }
+          for (const edge of document.querySelectorAll('.react-flow__edge-path')) {
+            const obstacles = cards.filter(card => !JSON.parse(edge.id).includes(card.id));
+            const length = edge.getTotalLength();
+            const matrix = edge.getScreenCTM();
+            for (let distance = 0; distance < length; distance += 12) {
+              const point = edge.getPointAtLength(distance).matrixTransform(matrix);
+              const crossed = obstacles.find(({rect}) => point.x > rect.left && point.x < rect.right &&
+                point.y > rect.top && point.y < rect.bottom);
+              if (crossed) throw Error('Connection ' + edge.id + ' crosses ' + crossed.id);
+            }
+          }
           const brokenImgs = Array.from(document.querySelectorAll('img')).filter(i => i.complete && i.naturalWidth === 0).length;
           return {
             innerWidth: window.innerWidth,
@@ -283,7 +305,8 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
           };
         })()`,
         returnByValue: true,
-      })) as { result?: { value?: Record<string, unknown> } };
+      })) as { result?: { value?: Record<string, unknown> }; exceptionDetails?: unknown };
+      if (evalRes.exceptionDetails) throw Error(JSON.stringify(evalRes.exceptionDetails));
       const val = evalRes.result?.value ?? {};
       if (c.name === "demo-desktop-canvas") {
         await verifyNodeHover();

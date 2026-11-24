@@ -142,6 +142,15 @@ test("layoutMap sizes tall full-page captures to their real aspect ratio without
     ],
   };
 
+  // The overview names the capture; only the detailed cell supplies its PNG dimensions.
+  for (const screen of tallArchive.screens) {
+    screen.entries = screen.cells.map(({ width, path, status, image }) => ({
+      width,
+      path,
+      status,
+      image,
+    }));
+  }
   const plan = layoutMap(tallArchive, 1280, "overview");
   const ordersNode = plan.nodes.find((n) => n.screen.id === "orders")!;
   const detailNode = plan.nodes.find((n) => n.screen.id === "detail")!;
