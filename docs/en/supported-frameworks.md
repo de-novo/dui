@@ -6,6 +6,8 @@ All 38 stacks in priorities 1–3 below are official support targets. The priori
 
 Versions were checked on 2026-11-20 (KST) against the official source linked in each row. Anything that could not be checked is marked `unconfirmed`. Version rules: [design: Supported versions](design-v0.md#supported-versions-current-latest-stable-major-only).
 
+A running local web app can be mapped through the shared Chromium pipeline with `dui map . --url http://localhost:4200/`. The framework support table concerns compiler integration. React Navigation, Expo Router and Flutter also provide source-only route discovery. See the [screen map contract](web-viewer.md).
+
 ## Rules applied
 
 1. **Official compiler only.** Types come from the compiler the project already uses (`tsc`, `rustc`, `swiftc`, `kotlinc`, `dart`).

@@ -10,6 +10,7 @@ mod host;
 mod ios;
 mod live;
 mod mcp;
+mod native_map;
 mod nextjs;
 mod recheck;
 mod reference;
@@ -350,7 +351,7 @@ const CLI_HELP: &str = "\
 dui — real UI state capture, screen map, and diff
 
 CAPTURE
-  dui map [PROJECT]                       Auto-discover routes & capture (merges optional dui.json)
+  dui map [PROJECT] [--url URL]           Discover screens from source or a running loopback web app
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
@@ -432,8 +433,19 @@ fn run() -> Reply {
     {
         return match rest {
             [] => screen_map::capture(Path::new(".")),
-            [root] => screen_map::capture(Path::new(root)),
-            _ => Err(failure(2, "expected map [PROJECT]")),
+            [root] if root != "--url" => screen_map::capture(Path::new(root)),
+            [flag, raw] | [_, flag, raw] if flag == "--url" => {
+                let project = if rest.len() == 3 {
+                    Path::new(&rest[0])
+                } else {
+                    Path::new(".")
+                };
+                let url = raw
+                    .to_str()
+                    .ok_or_else(|| failure(2, "expected a UTF-8 URL"))?;
+                screen_map::capture_target(project, Some(url))
+            }
+            _ => Err(failure(2, "expected map [PROJECT] [--url URL]")),
         };
     }
     if let [flag] = args.as_slice()

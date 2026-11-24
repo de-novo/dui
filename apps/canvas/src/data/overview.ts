@@ -105,7 +105,16 @@ export type ScreenOrigin =
   | { kind: "entry" }
   | { kind: "anchor"; from: string; selector?: string }
   | { kind: "router"; file: string };
+export type NativeSource = {
+  name: string;
+  source: string;
+  line: number;
+  dynamic?: boolean;
+  condition?: string;
+};
+
 export type Screen = {
+  nativeSource?: NativeSource;
   id: string;
   path: string;
   cells: Cell[];
@@ -131,12 +140,37 @@ export type ScreenLink = {
   replayVerified: boolean;
 };
 export type ScreenMap = {
+  screenDiscovery?: { kind: "native-source"; limitations: string[] };
   screens: Screen[];
   links: ScreenLink[];
 };
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function decodeNativeSource(raw: unknown): NativeSource | undefined {
+  if (raw === undefined) return undefined;
+  if (
+    !record(raw) ||
+    typeof raw.name !== "string" ||
+    !raw.name ||
+    typeof raw.source !== "string" ||
+    !raw.source ||
+    typeof raw.line !== "number" ||
+    !Number.isSafeInteger(raw.line) ||
+    raw.line < 1 ||
+    (raw.dynamic !== undefined && typeof raw.dynamic !== "boolean") ||
+    (raw.condition !== undefined && typeof raw.condition !== "string")
+  )
+    throw Error("Invalid native screen source");
+  return {
+    name: raw.name,
+    source: raw.source,
+    line: raw.line,
+    dynamic: raw.dynamic,
+    condition: raw.condition,
+  };
 }
 
 function decodeOrigin(raw: unknown): ScreenOrigin | undefined {
@@ -268,6 +302,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
       path: node.label,
       cells: [],
       discoveredFrom: decodeOrigin(node.discoveredFrom),
+      nativeSource: decodeNativeSource(node.nativeSource),
     };
     byPath.set(screen.path, screen);
     screens.push(screen);
@@ -378,6 +413,19 @@ export function decodeOverview(raw: unknown): ScreenMap {
     if (failedWidths && Object.keys(failedWidths).length > 0) link.failedWidths = failedWidths;
     if (action) link.action = action;
     links.push(link);
+  }
+  const discovery = raw.screenDiscovery;
+  if (record(discovery) && discovery.kind === "native-source") {
+    if (
+      !Array.isArray(discovery.limitations) ||
+      !discovery.limitations.every((v) => typeof v === "string")
+    )
+      throw Error("Invalid native discovery limitations");
+    return {
+      screens,
+      links,
+      screenDiscovery: { kind: "native-source", limitations: discovery.limitations },
+    };
   }
   return { screens, links };
 }

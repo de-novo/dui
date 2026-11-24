@@ -586,9 +586,18 @@ impl SqliteStore {
             ));
         }
 
+        let mut screens: Vec<_> = screens_by_path.into_values().collect();
+        for node in graph["nodes"].as_array().into_iter().flatten() {
+            if node["kind"] == "screen" && let Some(source) = node.get("nativeSource") {
+                let declaration = serde_json::from_value(source.clone()).map_err(db_err)?;
+                let path = node["label"].as_str().ok_or_else(|| db_err("missing native route"))?;
+                screens.push(Screen::new(path, ScreenOrigin::Native { declaration }).map_err(db_err)?);
+            }
+        }
+
         let aggregate = RunAggregate::publish(
             run,
-            screens_by_path.into_values().collect(),
+            screens,
             states_by_id.into_values().collect(),
             cells,
             edges,

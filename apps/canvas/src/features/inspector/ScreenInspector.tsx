@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
+import { NativeSourceEvidence } from "../../components/NativeSourceEvidence";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
 import { archiveFileUrl, diffOverlayUrl } from "../../data/archiveUrls";
@@ -85,7 +86,9 @@ export function ScreenInspector({
   const rawScreenCells = screen?.cells ?? [];
   const screenCells =
     locale === null ? rawScreenCells : rawScreenCells.filter((c) => c.locale === locale);
-  const title = screen ? routeName(screen.path) : t.screenUnavailable;
+  const title = screen
+    ? (screen.nativeSource?.name ?? routeName(screen.path))
+    : t.screenUnavailable;
   const showFullPath = Boolean(screen && title !== screen.path);
   const widthsOnScreen = new Set(screenCells.map((c) => c.width)).size;
   const multipleStatesPerWidth = screenCells.length > widthsOnScreen;
@@ -122,6 +125,13 @@ export function ScreenInspector({
           <X aria-hidden="true" />
         </Button>
       </div>
+
+      {screen?.nativeSource && (
+        <NativeSourceEvidence
+          source={screen.nativeSource}
+          sourceOnly={rawScreenCells.length === 0}
+        />
+      )}
 
       {screenDiff && (
         <section className="inspector-diff-section" aria-label={t.diffTitle}>
@@ -196,7 +206,7 @@ export function ScreenInspector({
         </label>
       )}
 
-      {(!screen || screenCells.length === 0) && (
+      {widths.length > 0 && (!screen || (screenCells.length === 0 && !screen.nativeSource)) && (
         <label>
           {t.width}
           <select

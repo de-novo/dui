@@ -10,6 +10,14 @@
 
 **商业分发。** 地图使用 MIT 许可的 `@xyflow/react`，保留默认署名。dui 的付费版本可以使用该库，无需订阅 Pro。上游请求隐藏界面署名的项目订阅 Pro。分发内嵌查看器的二进制时，还须附上实际使用版本的版权声明和完整 MIT 许可证。更新锁文件时检查打包依赖。使用公开 API 实现地图功能，仓库不收录 Pro 示例或模板。 [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
 
+### 共享屏幕地图
+
+使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿同源链接导航，并使用 Chromium 执行截图和布局检查。Angular 等 Web 框架共享此流程。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
+
+对 React Navigation、Expo Router 或 Flutter 应用包运行 `dui map PATH`，可以在没有设备的情况下从路由声明生成地图。React Navigation 和 Expo Router 使用项目所安装的 TypeScript。Flutter 使用 Dart SDK，dui 在首次运行时将锁定版本的分析器安装到自己的缓存中。在 monorepo 中可指定应用包路径，或在 `dui.json` 中设置 `appRoot`。
+
+使用 `dui open` 打开归档。源码卡片显示声明名称、文件和行号。按名称注册的屏幕可以使用导航键。条件路由保留条件表达式，参数路由保留路径模式。发现结果列出无法解析的声明。纯源码地图的截图尝试次数为 0。原生界面外观、跳转和运行时覆盖率需要实际截图证据。
+
 ### React Flow 验证
 
 开发预览从已完成的运行中读取入口截图和发现的链接。在仓库根目录使用 Node 26 运行下列命令，打开输出的回环地址。将最后的路径替换为捕获结果的输出目录。

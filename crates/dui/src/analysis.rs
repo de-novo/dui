@@ -1046,7 +1046,7 @@ fn execute_with_locales(
             for path in paths.iter().filter_map(Value::as_str) {
                 sources.insert(
                     path.to_owned(),
-                    json!({"kind":"anchor","from":entry_path,"selector":selector}),
+                    json!({"kind":"anchor","from":discovered_from.get(path).map_or(entry_path, String::as_str),"selector":selector}),
                 );
             }
         }

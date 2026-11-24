@@ -10,6 +10,14 @@ dui 빌드에서 클라이언트를 빌드하고 진입 페이지와 해시가 �
 
 **유료 배포.** 지도는 MIT 라이선스인 `@xyflow/react`를 사용하고 기본 출처 표시를 유지한다. dui 유료판에도 Pro 구독 없이 사용할 수 있다. 개발사는 화면 표시를 숨기는 프로젝트에 구독을 요청한다. 뷰어를 내장한 바이너리를 배포할 때에는 화면 표시와 별도로 실제 사용한 패키지 버전의 저작권 고지와 MIT 라이선스 전문을 동봉한다. 잠금 파일을 갱신할 때 번들에 포함되는 의존성도 확인한다. 지도 기능은 공개 API로 구현하고 Pro 예제와 템플릿은 저장소에서 제외한다. [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
 
+### 공통 화면 지도
+
+실행 중인 로컬 웹 앱은 `dui map . --url http://localhost:4200/`로 지도화한다. dui는 지정한 주소에서 시작해 같은 출처의 링크를 따라가고 Chromium에서 캡처와 레이아웃 검사를 수행한다. Angular를 포함한 웹 프레임워크가 이 경로를 공유한다. 라우트, 가드, 컴포넌트 입력과 상태를 소스에서 찾으려면 프로젝트의 컴파일러와 라우터에 맞는 규칙이 필요하다.
+
+React Navigation, Expo Router, Flutter 앱의 패키지에서 `dui map PATH`를 실행하면 기기 없이 라우트 선언을 지도에서 볼 수 있다. React Navigation과 Expo Router는 프로젝트에 설치된 TypeScript를 사용한다. Flutter는 Dart SDK를 사용하며 첫 실행 시 dui가 고정 버전 분석기를 자체 캐시에 준비한다. 모노레포에서는 앱 패키지 경로를 전달하거나 `dui.json`에 `appRoot`를 지정한다.
+
+`dui open`으로 결과를 연다. 소스 카드에는 선언 이름과 파일, 줄 번호가 표시된다. 이름으로 등록한 화면에는 내비게이션 키가 표시될 수 있다. 조건부 경로는 조건식을, 매개변수 경로는 패턴을 유지한다. 해석할 수 없었던 선언은 탐색 한계에 표시된다. 소스 전용 지도의 캡처 시도는 0건이다. 네이티브 외형과 전환, 런타임 검증률은 실제 캡처 근거가 필요하다.
+
 ### React Flow 검증
 
 개발용 뷰어는 저장이 끝난 실행에서 진입 화면 캡처와 발견된 링크를 읽는다. 저장소 루트에서 Node 26으로 아래 명령을 실행하고 출력된 로컬 주소를 연다. 마지막 경로는 캡처 결과의 출력 디렉터리로 바꾼다.

@@ -30,6 +30,8 @@ flowchart LR
   Adapters -->|official compilers, dev servers, browsers| World[(outside world)]
 ```
 
+Share rendering and measurement at the platform boundary. Web apps that run in Chromium use one browser host for navigation, captures and layout evidence. Add router or compiler rules where source declarations supply facts the browser cannot observe. Adapters emit the same screen graph so cards, storage and coverage keep the same meaning across frameworks.
+
 ## 2. Patterns we use
 
 ### 2.1 Functional Core + Imperative Shell

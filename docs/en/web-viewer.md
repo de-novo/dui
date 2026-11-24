@@ -10,6 +10,14 @@ Build the client during the dui build and embed the shell and hashed assets in t
 
 **Commercial distribution.** Use the MIT-licensed `@xyflow/react` package and retain the default attribution on the map. A paid dui edition can use the library without a Pro subscription. Upstream asks projects that hide the on-screen attribution to subscribe. Separately, when distributing a binary with the viewer embedded, ship the copyright notice and MIT license from the exact package version. Check bundled dependencies when updating the lockfile. Implement dui map features using the public API and keep Pro examples and templates out of the repository. [MIT](https://github.com/xyflow/xyflow/blob/main/LICENSE) · [ProOptions](https://reactflow.dev/api-reference/types/pro-options) · [React Flow Pro](https://reactflow.dev/pro/content)
 
+### Shared screen maps
+
+Run `dui map . --url http://localhost:4200/` to map a running local web app. dui starts at that address and follows same-origin links using the existing Chromium capture and layout checks. This works across web frameworks, including Angular. Source analysis of framework-specific routes, guards, component inputs and states requires rules for the project's compiler and router.
+
+Run `dui map PATH` on a React Navigation, Expo Router or Flutter app package to map its route declarations without a device. React Navigation and Expo Router use the project's TypeScript installation. Flutter uses the Dart SDK and a locked analyzer package which dui prepares in its own cache on first use. Point at the app package within a monorepo or select it with `appRoot` in `dui.json`.
+
+Open the resulting archive with `dui open`. Source cards identify the declaration and its file and line. Named registrations can have a navigation key instead of a URL. Conditional and parameterized routes keep their expressions or patterns. Unresolved declarations appear in the discovery limitations. Source-only maps have zero attempted captures. Native appearance, transitions and runtime coverage require capture evidence.
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.

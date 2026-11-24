@@ -6,6 +6,8 @@
 
 版本于 2026-11-20（KST）按每行链接的官方来源核对。无法核对的内容标为 `未确认`。版本规则：[设计：支持的版本](design-v0.md#支持的版本只支持当前最新稳定主版本)。
 
+可使用 `dui map . --url http://localhost:4200/` 通过共享 Chromium 流程为运行中的本地 Web 应用生成地图。框架支持表描述编译器集成范围。React Navigation、Expo Router 和 Flutter 还可以从源码发现路由声明。参见[屏幕地图约定](web-viewer.md)。
+
 ## 采用的原则
 
 1. **只用官方编译器。** 类型来自项目已在使用的编译器（`tsc`、`rustc`、`swiftc`、`kotlinc`、`dart`）。

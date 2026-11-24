@@ -19,6 +19,7 @@ import { routeName } from "./features/map/CaptureCard";
 import { MobileScreenDeck, type MobileViewMode } from "./features/map/MobileScreenDeck";
 
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
+import { DiscoveryLimitations } from "./components/NativeSourceEvidence";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
 import { type AuditReport, decodeAuditReport, openCommentsByPath } from "./model/audit";
@@ -526,6 +527,7 @@ function MapView({
           finalFocus={() => (showOverview ? optionsButton.current : dismiss.current)}
         >
           <DialogTitle>{t.mapOptions}</DialogTitle>
+          <DiscoveryLimitations limitations={archive.screenDiscovery?.limitations} />
           <label>
             {t.findScreen}
             <select
@@ -566,41 +568,49 @@ function MapView({
               </optgroup>
             </select>
           </label>
-          <label>
-            {t.mapCaptureWidth}
-            <select
-              data-map-capture-width=""
-              value={width}
-              onChange={(e) => update({ width: e.target.value, state: null })}
-            >
-              {widths.map((w) => (
-                <option key={w} value={w}>
-                  {w} px
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className="map-guide-options">
-            <legend>{t.allMapCards}</legend>
-            <div className="layout-tools">
-              <Button
-                size="sm"
-                variant="outline"
-                aria-pressed={mapGuides.frames}
-                onClick={() => setMapGuides((current) => ({ ...current, frames: !current.frames }))}
+          {widths.length > 0 && (
+            <label>
+              {t.mapCaptureWidth}
+              <select
+                data-map-capture-width=""
+                value={width}
+                onChange={(e) => update({ width: e.target.value, state: null })}
               >
-                {t.elementFrames}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                aria-pressed={mapGuides.guides}
-                onClick={() => setMapGuides((current) => ({ ...current, guides: !current.guides }))}
-              >
-                {t.alignmentGuides}
-              </Button>
-            </div>
-          </fieldset>
+                {widths.map((w) => (
+                  <option key={w} value={w}>
+                    {w} px
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {widths.length > 0 && (
+            <fieldset className="map-guide-options">
+              <legend>{t.allMapCards}</legend>
+              <div className="layout-tools">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-pressed={mapGuides.frames}
+                  onClick={() =>
+                    setMapGuides((current) => ({ ...current, frames: !current.frames }))
+                  }
+                >
+                  {t.elementFrames}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-pressed={mapGuides.guides}
+                  onClick={() =>
+                    setMapGuides((current) => ({ ...current, guides: !current.guides }))
+                  }
+                >
+                  {t.alignmentGuides}
+                </Button>
+              </div>
+            </fieldset>
+          )}
           {runs.length >= 2 && (
             <Button
               variant="outline"
@@ -684,6 +694,11 @@ function Viewer({
             onClose={closeDiff}
           />
         </Suspense>
+      ) : archive?.screenDiscovery && !archive.screens.length ? (
+        <section className="native-empty" aria-label={t.screenMap}>
+          <h2>{t.noDeclaredScreens}</h2>
+          <DiscoveryLimitations limitations={archive.screenDiscovery.limitations} open />
+        </section>
       ) : archive && run ? (
         <MapView archive={archive} run={run} runs={runs} onOpenDiff={() => openDiff()} />
       ) : (

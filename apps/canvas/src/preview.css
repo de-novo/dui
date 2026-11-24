@@ -291,6 +291,38 @@ h2 {
   opacity: 0.62;
   filter: saturate(0.8);
 }
+.native-empty {
+  align-self: center;
+  margin: auto;
+  padding: var(--space-4);
+  max-width: 100%;
+  min-width: 0;
+}
+.discovery-limitations {
+  padding: var(--space-2);
+  overflow-wrap: anywhere;
+}
+.discovery-limitations ul {
+  padding-inline-start: var(--space-6);
+  overflow: auto;
+  max-height: min(18rem, 40dvh);
+}
+.source-frame {
+  background: var(--muted);
+  border-radius: var(--radius-control);
+}
+.native-source-evidence {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  color: var(--muted-foreground);
+  font-size: var(--text-meta);
+  overflow-wrap: anywhere;
+}
+.native-source-evidence code {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
 .missing-frame-copy {
   display: grid;
   gap: var(--space-1);

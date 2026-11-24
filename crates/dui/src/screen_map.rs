@@ -3,16 +3,70 @@ use serde_json::{Value, json};
 use std::{fs, path::Path, process::Command};
 
 pub fn capture(project: &Path) -> Reply {
+    capture_target(project, None)
+}
+
+pub fn capture_target(project: &Path, url: Option<&str>) -> Reply {
     let project = project.canonicalize().map_err(io)?;
+    if url.is_none()
+        && let Some((app, adapter)) = crate::native_map::target(&project)?
+    {
+        let inventory = adapter.discover(&app)?;
+        return archive::publish(archive::provenance(&app)?, |out| inventory.archive(out));
+    }
     let work = tempfile::tempdir().map_err(io)?;
     let manifest = work.path().join("map.json");
-    discover(&project, &manifest)?;
+    if let Some(url) = url {
+        let profile = url_manifest(&project, url)?;
+        fs::write(&manifest, serde_json::to_vec(&profile).map_err(io)?).map_err(io)?;
+    } else {
+        discover(&project, &manifest)?;
+    }
     archive::capture(
         &project,
         &manifest,
         None,
-        archive::Capture::Run { force: false },
+        archive::Capture::Run {
+            force: url.is_some(),
+        },
     )
+}
+
+fn url_manifest(project: &Path, url: &str) -> Reply {
+    let (_, path) = crate::universal_web::parse_loopback_url(url).map_err(|e| failure(2, &e))?;
+    let mut profile = match fs::read(project.join("dui.json")) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map_err(|e| failure(2, &format!("invalid dui.json: {e}")))?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({}),
+        Err(e) => return Err(io(e)),
+    };
+    let fields = profile
+        .as_object_mut()
+        .ok_or_else(|| failure(2, "dui.json must be an object"))?;
+    fields.insert("host".into(), json!("url"));
+    fields.insert(
+        "surface".into(),
+        json!(dui_core::surface::SURFACE_UNIVERSAL_WEB),
+    );
+    fields.insert("url".into(), json!(url));
+    fields.insert("path".into(), json!(path));
+    fields.remove("rendererUrl");
+    apply_discovery_defaults(&mut profile);
+    // The generated manifest lives outside the project. Keep profile resources
+    // relative to the user's dui.json when passing them to the existing renderer.
+    for key in ["storageState", "mockPreload", "localesDir"] {
+        if let Some(rel) = profile[key].as_str() {
+            profile[key] = json!(project.join(rel));
+        }
+    }
+    if let Some(packs) = profile["rulePacks"].as_array_mut() {
+        for pack in packs {
+            if let Some(rel) = pack.as_str() {
+                *pack = json!(project.join(rel));
+            }
+        }
+    }
+    Ok(profile)
 }
 
 fn package_has_dep(pkg: &Value, name: &str) -> bool {
@@ -40,7 +94,9 @@ fn detect_non_vite_manifest(project: &Path) -> Option<Value> {
             if merged.get("widths").is_none() {
                 merged["widths"] = json!([375, 1280]);
             }
-            if merged.get("routeSelector").is_none() && matches!(host, "next" | "nextjs" | "static" | "url" | "command") {
+            if merged.get("routeSelector").is_none()
+                && matches!(host, "next" | "nextjs" | "static" | "url" | "command")
+            {
                 merged["routeSelector"] = json!("a[href]");
             }
             return Some(merged);
@@ -76,6 +132,11 @@ fn detect_non_vite_manifest(project: &Path) -> Option<Value> {
         json!({})
     };
     manifest["host"] = json!(detected_host);
+    apply_discovery_defaults(&mut manifest);
+    Some(manifest)
+}
+
+fn apply_discovery_defaults(manifest: &mut Value) {
     if manifest.get("widths").is_none() {
         manifest["widths"] = json!([375, 1280]);
     }
@@ -85,7 +146,6 @@ fn detect_non_vite_manifest(project: &Path) -> Option<Value> {
     if manifest.get("discoverOverlays").is_none() {
         manifest["discoverOverlays"] = json!(true);
     }
-    Some(manifest)
 }
 
 pub(crate) fn discover(project: &Path, manifest: &Path) -> Result<(), (u8, serde_json::Value)> {
@@ -139,8 +199,7 @@ mod tests {
             "<!doctype html><h1>Hello</h1>",
         )
         .expect("write index.html");
-        let static_manifest =
-            detect_non_vite_manifest(static_dir.path()).expect("detected static");
+        let static_manifest = detect_non_vite_manifest(static_dir.path()).expect("detected static");
         assert_eq!(static_manifest["host"], "static");
 
         let vite_dir = tempfile::tempdir().expect("tempdir");

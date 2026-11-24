@@ -5,7 +5,7 @@ use dui_core::{
     diff::{RenderDiffSummary, RenderNodeSnapshot, compute_rgba_diff, diff_render_trees},
     model::{
         CellId, Comment, CommentId, CommentStatus, CommentTarget, EdgeEndpoint, EdgeId, ProjectId,
-        RunId, Screen,
+        RunId, Screen, ScreenId, ScreenOrigin, capture::NativeSource,
     },
 };
 use gpui_kit::RenderImage;
@@ -66,8 +66,27 @@ pub struct EdgeItem {
 pub struct ScreenItem {
     pub id: String,
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub native_source: Option<NativeSource>,
     pub cells: Vec<CellItem>,
     pub outgoing: Vec<EdgeItem>,
+}
+
+impl ScreenItem {
+    /// Declared native routes have source evidence even before the first capture.
+    pub fn missing_preview(&self, compact: bool) -> String {
+        if self.cells.is_empty()
+            && let Some(origin) = &self.native_source
+        {
+            let path = if compact {
+                origin.source.rsplit('/').next().unwrap_or(&origin.source)
+            } else {
+                &origin.source
+            };
+            return format!("{path}:{}", origin.line);
+        }
+        "No image".into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -80,6 +99,8 @@ pub struct CommentItem {
     pub body: String,
     pub status: String,
     pub screen_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen_id: Option<String>,
     pub target_label: String,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
@@ -108,7 +129,7 @@ impl RunItem {
                 }
             }
         }
-        if set.is_empty() {
+        if set.is_empty() && !self.screens.iter().any(|s| s.native_source.is_some()) {
             vec![1280]
         } else {
             set.into_iter().collect()
@@ -171,12 +192,12 @@ impl DesktopWorkspace {
         order.into_iter().filter_map(|id| map.remove(&id)).collect()
     }
 
-    pub fn open_comments_by_path(&self, project_id: &str) -> BTreeMap<String, usize> {
+    pub fn open_comments_by_screen(&self, project_id: &str) -> BTreeMap<String, usize> {
         let mut counts = BTreeMap::new();
         for c in &self.comments {
             if c.project_id == project_id
                 && c.status == "open"
-                && let Some(ref p) = c.screen_path
+                && let Some(p) = c.screen_id.as_ref().or(c.screen_path.as_ref())
             {
                 *counts.entry(p.clone()).or_insert(0) += 1;
             }
@@ -586,7 +607,7 @@ fn load_run_screens(
     {
         let mut stmt = conn
             .prepare(
-                "SELECT rs.screen_id, sc.path
+                "SELECT rs.screen_id, sc.path, sc.origin_json
                  FROM run_screens rs
                  JOIN screens sc ON sc.id = rs.screen_id
                  WHERE rs.run_id = ?1
@@ -595,15 +616,25 @@ fn load_run_screens(
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map(params![run_id], |r| {
-                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
             })
             .map_err(|e| e.to_string())?;
-        for (id, path) in rows.flatten() {
+        for row in rows {
+            let (id, path, origin) = row.map_err(|e| e.to_string())?;
+            let native_source = match serde_json::from_str::<ScreenOrigin>(&origin) {
+                Ok(ScreenOrigin::Native { declaration }) => Some(declaration),
+                _ => None,
+            };
             screen_map.insert(
                 id.clone(),
                 ScreenItem {
                     id,
                     path,
+                    native_source,
                     cells: Vec::new(),
                     outgoing: Vec::new(),
                 },
@@ -674,6 +705,7 @@ fn load_run_screens(
                         .get(&screen_id)
                         .cloned()
                         .unwrap_or_else(|| screen_id.clone()),
+                    native_source: None,
                     cells: Vec::new(),
                     outgoing: Vec::new(),
                 });
@@ -774,7 +806,9 @@ fn load_comments(
     for (id, project_id, run_id, target_json, author, body, status, created_at_ms, updated_at_ms) in
         rows.flatten()
     {
-        let (screen_path, target_label) = describe_target(conn, &target_json, screen_paths);
+        let target = serde_json::from_str::<CommentTarget>(&target_json).ok();
+        let (screen_path, target_label) = describe_target(conn, target.as_ref(), screen_paths);
+        let screen_id = target.as_ref().and_then(comment_screen_id);
         out.push(CommentItem {
             id,
             project_id,
@@ -783,6 +817,7 @@ fn load_comments(
             body,
             status,
             screen_path,
+            screen_id,
             target_label,
             created_at_ms,
             updated_at_ms,
@@ -791,12 +826,20 @@ fn load_comments(
     Ok(out)
 }
 
+fn comment_screen_id(target: &CommentTarget) -> Option<String> {
+    if let CommentTarget::Screen { screen_id } = target {
+        Some(screen_id.as_str().to_owned())
+    } else {
+        None
+    }
+}
+
 fn describe_target(
     conn: &Connection,
-    target_json: &str,
+    target: Option<&CommentTarget>,
     screen_paths: &BTreeMap<String, String>,
 ) -> (Option<String>, String) {
-    let Ok(target) = serde_json::from_str::<CommentTarget>(target_json) else {
+    let Some(target) = target else {
         return (None, "target".into());
     };
     match target {
@@ -864,7 +907,10 @@ fn describe_target(
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NewCommentAnchor {
-    Screen(String),
+    Screen {
+        id: String,
+        path: String,
+    },
     Cell {
         path: String,
         cell_id: String,
@@ -890,13 +936,8 @@ pub fn add_comment(
     let rid = RunId::parse(run_id).map_err(|e| e.to_string())?;
 
     let (target, screen_path, target_label) = match anchor {
-        NewCommentAnchor::Screen(path) => {
-            let screen_id = Screen::derive_id(&path);
-            conn.execute(
-                "INSERT OR IGNORE INTO screens (id, path, origin_json) VALUES (?1, ?2, ?3)",
-                params![screen_id.as_str(), &path, r#"{"kind":"entry"}"#],
-            )
-            .map_err(|e| e.to_string())?;
+        NewCommentAnchor::Screen { id, path } => {
+            let screen_id = ScreenId::parse(&id).map_err(|e| e.to_string())?;
             (
                 CommentTarget::Screen { screen_id },
                 Some(path.clone()),
@@ -972,6 +1013,7 @@ pub fn add_comment(
         body: comment.body().to_owned(),
         status: "open".into(),
         screen_path,
+        screen_id: comment_screen_id(comment.target()),
         target_label,
         created_at_ms: comment.created_at_ms(),
         updated_at_ms: comment.updated_at_ms(),
@@ -1095,6 +1137,24 @@ mod tests {
             params![screen_id.as_str()],
         )
         .expect("insert cell");
+        let native_origin =
+            json!({"kind":"native", "name":"profile", "source":"lib/router.dart", "line":17});
+        let native_screen = Screen::new(
+            "/profile",
+            serde_json::from_value(native_origin.clone()).unwrap(),
+        )
+        .unwrap();
+        let native_id = native_screen.id().as_str();
+        conn.execute(
+            "INSERT INTO screens (id, path, origin_json) VALUES (?1, '/profile', ?2)",
+            params![native_id, native_origin.to_string()],
+        )
+        .expect("insert native screen");
+        conn.execute(
+            "INSERT INTO run_screens (run_id, screen_id) VALUES ('run-1', ?1)",
+            params![native_id],
+        )
+        .expect("link native screen");
         drop(conn);
 
         assert_eq!(
@@ -1114,7 +1174,10 @@ mod tests {
             dir.path(),
             &project_id,
             "run-1",
-            NewCommentAnchor::Screen("/order".into()),
+            NewCommentAnchor::Screen {
+                id: screen_id.as_str().to_owned(),
+                path: "/order".into(),
+            },
             "reviewer",
             "Tighten button spacing on mobile",
         )
@@ -1124,11 +1187,34 @@ mod tests {
         let ws = load_workspace(dir.path()).expect("load workspace");
         assert_eq!(ws.runs.len(), 1);
         assert_eq!(ws.project_groups().len(), 1);
-        assert_eq!(ws.runs[0].screens.len(), 1);
-        assert_eq!(ws.runs[0].screens[0].cells.len(), 1);
+        let screens = &ws.runs[0].screens;
+        assert_eq!(screens.len(), 2);
+        assert_eq!(screens[0].cells.len(), 1);
+        assert_eq!(screens[0].missing_preview(true), "No image");
+        assert!(screens[1].cells.is_empty());
+        assert_eq!(screens[1].missing_preview(true), "router.dart:17");
+        assert_eq!(screens[1].missing_preview(false), "lib/router.dart:17");
         assert_eq!(ws.comments.len(), 1);
         assert_eq!(ws.comments[0].body, "Tighten button spacing on mobile");
 
+        let native_comment = add_comment(
+            dir.path(),
+            &project_id,
+            "run-1",
+            NewCommentAnchor::Screen {
+                id: native_id.to_owned(),
+                path: "/profile".into(),
+            },
+            "reviewer",
+            "Check the declared route",
+        )
+        .expect("comment on source route");
+        assert_eq!(native_comment.screen_id.as_deref(), Some(native_id));
+        let reloaded = load_workspace(dir.path()).unwrap();
+        assert_eq!(
+            reloaded.open_comments_by_screen(&project_id).get(native_id),
+            Some(&1)
+        );
         let next = toggle_comment_status(dir.path(), &added.id).expect("resolve");
         assert_eq!(next, "resolved");
         let reopened = toggle_comment_status(dir.path(), &added.id).expect("reopen");
@@ -1177,6 +1263,7 @@ mod tests {
             screens: vec![ScreenItem {
                 id: "s1".into(),
                 path: "/".into(),
+                native_source: None,
                 cells: vec![CellItem {
                     id: "c1".into(),
                     state_id: "st0".into(),

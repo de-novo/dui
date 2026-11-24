@@ -32,6 +32,8 @@ flowchart LR
   Adapters -->|official compilers, dev servers, browsers| World[(outside world)]
 ```
 
+在平台边界共享渲染和测量流程。能够在 Chromium 中运行的 Web 应用共享浏览器导航、截图和布局测量。对于浏览器无法观测而源声明能提供的事实，添加路由器或编译器规则。适配器输出通用屏幕图，使卡片、存储与覆盖率在各框架上保持相同语义。
+
 ## 2. 采用的模式
 
 ### 2.1 函数式核心 + 命令式外壳

@@ -1,0 +1,10 @@
+name: dui_flutter_discovery
+description: Discover Flutter route declarations from the official Dart analyzer AST.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: '>=3.13.0 <4.0.0'
+dependencies:
+  analyzer: 14.7.0
+  path: ^1.9.0
+  yaml: ^3.1.3
