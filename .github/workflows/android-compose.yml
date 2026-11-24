@@ -30,6 +30,7 @@ jobs:
         env:
           ANDROID_SERIAL: emulator-5554
         run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           image="system-images;android-35;google_apis;x86_64"
           sdkmanager "$image"
           echo no | avdmanager create avd --name dui-compose --package "$image" --device pixel_2
