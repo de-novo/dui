@@ -79,3 +79,5 @@ dui는 **Web**, **Desktop App**, **Mobile App(Android · iOS)**, **TUI** 4대 �
 5. **사실 중심 코어 → 플러그인형 디자인 시스템 스펙 · 코드 기반 렌더링**: 코어는 획일적인 미적 판단을 강제하지 않으며, 팀이 원할 때 자체 `DESIGN.md`·토큰 스펙·커스텀 감사 플러그인을 연결하고(`v0.3.0`, [#167](https://github.com/de-novo/dui/issues/167)), 향후 마일스톤에서 비트맵 캡처를 넘어 실제 코드 기반 캔버스 렌더링으로 진화한다.
 
 [GitHub 마일스톤](https://github.com/de-novo/dui/milestones) · [변경 이력](changelog.md)
+
+[Compose 예제](../../fixtures/android-compose)는 같은 설정 행을 두 번 마운트합니다. [에뮬레이터 검사](../../scripts/check-compose.mts)는 720px와 1080px에서 dui가 새로 캡처한 두 행의 이름, 경계, 체크 상태를 읽습니다. 한 행을 누른 뒤 다른 행의 상태를 확인하고, 같은 행을 다시 눌러 초기 상태 복원을 검증합니다. 재현하려면 dui를 빌드하고 테스트 전용 에뮬레이터에 예제 디버그 APK를 설치한 뒤 `ANDROID_SERIAL`을 설정하고 `node scripts/check-compose.mts`를 실행합니다. 빌드와 에뮬레이터 실행 명령은 [CI 워크플로](../../.github/workflows/android-compose.yml)에 있습니다.

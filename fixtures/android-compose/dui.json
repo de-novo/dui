@@ -1,0 +1,8 @@
+{
+  "host": "android",
+  "activity": "sh.dui.fixture/.SettingsActivity",
+  "package": "sh.dui.fixture",
+  "path": "/settings",
+  "widths": [720, 1080],
+  "height": 1920
+}
