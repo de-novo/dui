@@ -43,13 +43,13 @@ jobs:
           sparse-checkout: mobile
           path: .orca
           persist-credentials: false
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          repository: pingdotgg/t3code
-          ref: 0e34fe98f2bcf76f0f611d4dc34c078728bc8b7f
-          sparse-checkout: apps/mobile
-          path: .t3code
-          persist-credentials: false
+      - name: Fetch the pinned T3 Code mobile sources
+        env:
+          T3_REVISION: 0e34fe98f2bcf76f0f611d4dc34c078728bc8b7f
+        run: |
+          # The pinned tree has unrelated gitlinks missing from .gitmodules.
+          git clone --depth=1 --filter=blob:none --sparse --revision="$T3_REVISION" https://github.com/pingdotgg/t3code.git .t3code
+          git -C .t3code sparse-checkout set apps/mobile
       - name: Check router declarations
         run: |
           npm ci
