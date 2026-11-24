@@ -1,7 +1,7 @@
 //! Pure 2D screen map layout mirroring `apps/canvas/src/features/map/layout.ts`.
 
-use crate::store::ScreenItem;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use crate::{screen_graph::ScreenGraph, store::ScreenItem};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NodeMetrics {
@@ -22,17 +22,10 @@ pub struct LayoutNode {
 }
 
 #[derive(Clone, Debug)]
-pub struct LayoutEdge {
-    pub from_idx: usize,
-    pub to_idx: usize,
-    pub source: String,
-}
-
-#[derive(Clone, Debug)]
 pub struct MapLayout {
     pub metrics: NodeMetrics,
     pub nodes: Vec<LayoutNode>,
-    pub edges: Vec<LayoutEdge>,
+    pub graph: ScreenGraph,
 }
 
 pub struct PaintedCardMetrics {
@@ -138,14 +131,6 @@ fn screen_frame_height(screen: &ScreenItem, capture_width: u32, metrics: NodeMet
 
 pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
     let metrics = node_metrics(capture_width);
-    if screens.is_empty() {
-        return MapLayout {
-            metrics,
-            nodes: Vec::new(),
-            edges: Vec::new(),
-        };
-    }
-
     let screen_frame_heights: Vec<f32> = screens
         .iter()
         .map(|sc| screen_frame_height(sc, capture_width, metrics))
@@ -155,59 +140,20 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
         .map(|fh| fh + metrics.caption_height)
         .collect();
 
-    let mut path_to_idx: BTreeMap<&str, usize> = BTreeMap::new();
-    for (i, sc) in screens.iter().enumerate() {
-        path_to_idx.insert(sc.path.as_str(), i);
-    }
-
-    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); screens.len()];
-    let mut undirected: Vec<Vec<usize>> = vec![Vec::new(); screens.len()];
-    let mut edge_source: BTreeMap<(usize, usize), String> = BTreeMap::new();
-    let mut seen_edges: BTreeSet<(usize, usize)> = BTreeSet::new();
-    for (i, sc) in screens.iter().enumerate() {
-        for edge in &sc.outgoing {
-            if let Some(&target) = path_to_idx.get(edge.to_path.as_str())
-                && target != i
-                && seen_edges.insert((i, target))
-            {
-                adj[i].push(target);
-                undirected[i].push(target);
-                undirected[target].push(i);
-                edge_source.insert((i, target), edge.source.clone());
-            }
-        }
-    }
-    let mut edges = Vec::new();
-
-    // Separate connected groups (size >= 2) from isolated screens for clean grid packing.
-    let mut visited = vec![false; screens.len()];
-    let mut groups: Vec<Vec<usize>> = Vec::new();
-    let mut isolated: Vec<usize> = Vec::new();
-
-    for start in 0..screens.len() {
-        if visited[start] {
-            continue;
-        }
-        let mut comp = Vec::new();
-        let mut queue = VecDeque::new();
-        visited[start] = true;
-        queue.push_back(start);
-        while let Some(cur) = queue.pop_front() {
-            comp.push(cur);
-            for &next in &undirected[cur] {
-                if !visited[next] {
-                    visited[next] = true;
-                    queue.push_back(next);
-                }
-            }
-        }
-        comp.sort_unstable();
-        if comp.len() == 1 {
-            isolated.push(comp[0]);
-        } else {
-            groups.push(comp);
-        }
-    }
+    let graph = ScreenGraph::new(
+        screens.iter().map(|screen| screen.path.as_str()),
+        screens
+            .iter()
+            .flat_map(|screen| &screen.outgoing)
+            .map(|edge| {
+                (
+                    edge.from_path.as_str(),
+                    edge.to_path.as_str(),
+                    edge.source.as_str(),
+                )
+            }),
+    );
+    let mut isolated = Vec::new();
 
     let step_x = metrics.card_width + metrics.col_gap;
     let mut nodes: Vec<LayoutNode> = Vec::with_capacity(screens.len());
@@ -217,36 +163,14 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
     let mut shelf_row_height: f32 = 0.0;
 
     // Place connected components side-by-side on horizontal shelves so overview maps fill landscape viewports.
-    for comp in groups {
-        let root = comp[0];
-        let mut depth_map: BTreeMap<usize, usize> = BTreeMap::new();
-        let mut q = VecDeque::new();
-        depth_map.insert(root, 0);
-        q.push_back(root);
-        while let Some(u) = q.pop_front() {
-            let d = depth_map[&u];
-            for &v in &adj[u] {
-                if let std::collections::btree_map::Entry::Vacant(e) = depth_map.entry(v) {
-                    e.insert(d + 1);
-                    q.push_back(v);
-                    // Emit clean spanning-tree forest edges matching `apps/canvas/src/features/map/layout.ts`.
-                    edges.push(LayoutEdge {
-                        from_idx: u,
-                        to_idx: v,
-                        source: edge_source
-                            .get(&(u, v))
-                            .cloned()
-                            .unwrap_or_else(|| "extracted".into()),
-                    });
-                }
-            }
-        }
-        for &idx in &comp {
-            depth_map.entry(idx).or_insert(0);
+    for component in &graph.components {
+        if let [(idx, _)] = component.as_slice() {
+            isolated.push(*idx);
+            continue;
         }
         let mut cols: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-        for (idx, col) in depth_map {
-            cols.entry(col).or_default().push(idx);
+        for &(idx, depth) in component {
+            cols.entry(depth).or_default().push(idx);
         }
         let max_rows_per_band = if capture_width <= 480 { 3 } else { 4 };
         let mut local_positions: Vec<(usize, usize, f32)> = Vec::new();
@@ -311,7 +235,7 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
     MapLayout {
         metrics,
         nodes,
-        edges,
+        graph,
     }
 }
 
@@ -346,7 +270,7 @@ mod tests {
         ];
         let layout = compute_layout(&screens, 1280);
         assert_eq!(layout.nodes.len(), 4);
-        assert_eq!(layout.edges.len(), 1);
+        assert_eq!(layout.graph.into_visible_edges(None).len(), 1);
         for i in 0..layout.nodes.len() {
             for j in (i + 1)..layout.nodes.len() {
                 let a = &layout.nodes[i];

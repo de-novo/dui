@@ -17,6 +17,10 @@ jobs:
         with:
           node-version: 26
           cache: npm
+      - name: Verify native screen-map connections
+        run: |
+          rustc --edition=2024 --test apps/desktop/src/screen_graph.rs -o "$RUNNER_TEMP/screen-graph-tests"
+          "$RUNNER_TEMP/screen-graph-tests"
       - name: Check Cargo workspace dependency inheritance
         run: |
           python3 - <<'PYTHON'

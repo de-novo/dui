@@ -27,6 +27,8 @@ For new maps, a directed link joins two captured screens when the source DOM con
 
 The preview accepts one or more run directories. With no arguments it lists saved screen maps under `~/.dui/projects`. Use **Select workspace** to choose a project, recorded branch and version. The rail always contains workspace selection, theme and collapse in that order. **Map options** contains screen lookup, link mode and capture width. Selecting a card opens its details with its states, widths, verification results, missing-image reasons, observed link evidence and **Open live session**. Returning to the overview preserves the selected screen. Cards count unverified and unrenderable cells across the available states and widths.
 
+The native desktop overview draws a spanning tree for each connected group of screens. Selecting a screen highlights all recorded incoming and outgoing connections, including links outside that tree. Arrows retain their recorded direction and evidence type. Hover previews these connections when no screen is selected.
+
 Use one display name per project ID across branches, worktrees and versions. The first successful capture records the primary project’s `package.json` name, falling back to its root folder name. `dui history` registers names for older local archives.
 
 Use **Find screen** or `Cmd+K` / `Ctrl+K` to filter captured routes. The arrow keys move through matches and Enter opens the selected screen. The desktop map controls also toggle a minimap. When a successful same-origin document at `/` changes its route during mounting, the inspector shows the requested path and the observed destination.

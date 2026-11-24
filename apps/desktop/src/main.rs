@@ -1,5 +1,6 @@
 mod i18n;
 mod layout;
+mod screen_graph;
 mod store;
 mod tokens;
 
@@ -1465,17 +1466,15 @@ impl DuiDesktopView {
         let layout = compute_layout(&run.screens, self.selected_width);
         let open_by_path = self.workspace.open_comments_by_path(&run.project_id);
         let selected_idx = self.selected_screen;
-        let mut related_indices: BTreeSet<usize> = BTreeSet::new();
-        if focus_active {
-            related_indices.insert(selected_idx);
-            for edge in &layout.edges {
-                if edge.from_idx == selected_idx {
-                    related_indices.insert(edge.to_idx);
-                }
-                if edge.to_idx == selected_idx {
-                    related_indices.insert(edge.from_idx);
-                }
-            }
+        let selection = focus_active.then_some(selected_idx);
+        let active_edge_focus = selection.or(self.hovered_screen);
+        let edges_for_paint = layout.graph.into_visible_edges(active_edge_focus);
+        let mut related_indices = BTreeSet::new();
+        if let Some(selected) = selection {
+            related_indices.insert(selected);
+            related_indices.extend(
+                edges_for_paint.iter().filter_map(|edge| edge.neighbor(selected)),
+            );
         }
 
         if self.canvas_diff_enabled {
@@ -1568,14 +1567,10 @@ impl DuiDesktopView {
             );
         }
 
-        let edges_for_paint = layout.edges.clone();
         let node_rects_for_paint = node_rects.clone();
         let col_gap_px = layout.metrics.col_gap * zoom;
         let row_gap_px = layout.metrics.row_gap * zoom;
         let step_x_px = (layout.metrics.card_width + layout.metrics.col_gap) * zoom;
-        let active_edge_focus = self
-            .hovered_screen
-            .or_else(|| focus_active.then_some(selected_idx));
         let grid_color = p.map_grid;
         let link_color = p.map_link;
         let fg_color = p.foreground;
@@ -1625,8 +1620,8 @@ impl DuiDesktopView {
                     ) else {
                         continue;
                     };
-                    let connected_to_focus = active_edge_focus
-                        .is_some_and(|id| edge.from_idx == id || edge.to_idx == id);
+                    let connected_to_focus =
+                        active_edge_focus.and_then(|id| edge.neighbor(id)).is_some();
                     let dimmed_edge = active_edge_focus.is_some() && !connected_to_focus;
                     let stroke_w = if connected_to_focus {
                         base_stroke_w * 1.6
