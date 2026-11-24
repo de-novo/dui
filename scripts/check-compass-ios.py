@@ -4,9 +4,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import plistlib
+import re
 import shutil
 import subprocess
 import tempfile
+import time
 from ios_simulator import fresh_iphone
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +20,38 @@ FLUTTER = "ae9b586f34a8443573f82ef57c3bf914a908cbf7"
 
 def read(*args):
     return subprocess.check_output(args, text=True).strip()
+
+
+def capture_on_simulator(app_bundle, phone):
+    with (app_bundle / "Info.plist").open("rb") as source:
+        bundle_id = plistlib.load(source)["CFBundleIdentifier"]
+    simctl = ["xcrun", "simctl"]
+    print(f"Installing {bundle_id} on {phone.name}", flush=True)
+    subprocess.run([*simctl, "install", phone.udid, app_bundle], check=True, timeout=180)
+    container = subprocess.check_output(
+        [*simctl, "get_app_container", phone.udid, bundle_id, "data"], text=True, timeout=30
+    ).strip()
+    capture = Path(container) / "Documents/dui-capture"
+    if not container or capture.exists():
+        raise RuntimeError("Expected a fresh Compass app data container")
+    print(f"Launching {bundle_id} and waiting for the integration test", flush=True)
+    subprocess.run([*simctl, "launch", phone.udid, bundle_id], check=True, timeout=90,
+                   env={**os.environ, "SIMCTL_CHILD_COMPASS_CAPTURE_OUTPUT": str(capture)})
+    result = capture / "result.json"
+    deadline = time.monotonic() + 300
+    reported = set()
+    while not result.is_file():
+        frames = {p.name for p in capture.glob("*.png")}
+        if new_frames := frames - reported:
+            print(f"Captured {', '.join(sorted(new_frames))}", flush=True)
+            reported.update(new_frames)
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"Compass did not finish. Captured frames: {sorted(reported)}")
+        time.sleep(1)
+    report = json.loads(result.read_text())
+    if report["passed"] is not True:
+        raise RuntimeError(f"Compass integration test failed: {report['failures']}")
+    return capture, report["screens"]
 
 
 def main():
@@ -44,25 +79,28 @@ def main():
             subprocess.run(["git", "-C", checkout, "checkout", "--quiet", "--detach", SAMPLES], check=True)
             app = checkout / "compass_app/app"
             target = "integration_test/dui_capture_test.dart"
-            driver = "test_driver/dui_capture_driver.dart"
-            (app / driver).parent.mkdir(exist_ok=True)
             shutil.copyfile(FIXTURE / "capture_test.dart", app / target)
-            shutil.copyfile(FIXTURE / "capture_driver.dart", app / driver)
-            subprocess.run(["flutter", "drive", "--debug", "-d", phone.udid,
-                            "--target", target, "--driver", driver], cwd=app, check=True,
-                           env={**os.environ, "COMPASS_CAPTURE_OUTPUT": str(output)})
+            subprocess.run(["flutter", "build", "ios", "--debug", "--simulator", "--target", target],
+                           cwd=app, check=True)
+            bundles = list((app / "build/ios/iphonesimulator").glob("*.app"))
+            if len(bundles) != 1:
+                raise RuntimeError(f"Expected one simulator app, found {bundles}")
+            capture, rows = capture_on_simulator(bundles[0], phone)
             checker = Path(temp) / "check-image"
             subprocess.run(["xcrun", "swiftc", ROOT / "scripts/check-ios-screenshot.swift", "-o", checker], check=True)
-            rows = json.loads((output / "screens.json").read_text())
             expected = {"/", "/search", "/results", "/activities", "/booking", "/booking/:id", "/login"}
             if len(rows) != len(expected) or {row["route"] for row in rows} != expected:
                 raise ValueError("Expected all seven source routes")
+            names = {row["name"] for row in rows}
+            if len(names) != len(rows) or not all(re.fullmatch(r"[a-z-]+", name) for name in names):
+                raise ValueError("Expected unique screenshot names")
             summary = [f"Native Compass capture on {phone.name} ({phone.runtime.split('.')[-1]}).",
                        f"flutter/samples `{SAMPLES}`, Flutter `{sdk['frameworkVersion']}`, source `lib/routing/router.dart`.",
                        "", "| Declaration | Observed route | PNG | Viewport (pt) | Image (px) | SHA-256 |",
                        "|---|---|---|---|---|---|"]
             for row in rows:
                 image = output / (row["name"] + ".png")
+                shutil.copyfile(capture / image.name, image)
                 witness = [row["witness"]] if row["route"] == "/" else []
                 w, h = map(int, read(checker, image, *witness).split())
                 ratio = row["devicePixelRatio"]

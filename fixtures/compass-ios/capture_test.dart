@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:compass_app/data/repositories/itinerary_config/itinerary_config_repository.dart';
@@ -12,9 +14,27 @@ import 'package:provider/provider.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final output = Directory(Platform.environment['COMPASS_CAPTURE_OUTPUT']!)
+    ..createSync(recursive: true);
+  final screens = <Map<String, Object>>[];
+  unawaited(
+    binding.allTestsPassed.future.then((passed) {
+      final result = File('${output.path}/result.tmp');
+      result.writeAsStringSync(
+        jsonEncode({
+          'passed': passed,
+          'screens': screens,
+          'failures': binding.failureMethodsDetails
+              .map((f) => f.details)
+              .toList(),
+        }),
+        flush: true,
+      );
+      result.renameSync('${output.path}/result.json');
+    }),
+  );
   testWidgets('Compass renders its seven screens on iOS', (tester) async {
     expect(Platform.isIOS, isTrue);
-    final screens = <Map<String, Object>>[];
     Future<BuildContext> capture(
       String slug,
       String path,
@@ -43,6 +63,7 @@ void main() {
       expect((Offset.zero & size).overlaps(tester.getRect(target)), isTrue);
       final bytes = await binding.takeScreenshot(slug);
       expect(bytes.length, greaterThan(1000));
+      await File('${output.path}/$slug.png').writeAsBytes(bytes, flush: true);
       screens.add({
         'name': slug,
         'route': declaration ?? path,
@@ -90,6 +111,5 @@ void main() {
     await capture('activities', '/activities', 'Scenic Boat Tour');
     router.go('/booking');
     await capture('new-booking', '/booking', 'Amalfi Coast');
-    binding.reportData!['compassScreens'] = screens;
   });
 }
