@@ -27,7 +27,6 @@ import {
 } from "./model/canvasDiff";
 import { type CaptureDiff, decodeCaptureDiff } from "./model/diff";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
-import "./preview.css";
 
 const CaptureDiffView = lazy(() =>
   import("./features/diff/CaptureDiffView").then((m) => ({ default: m.CaptureDiffView })),

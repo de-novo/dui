@@ -45,6 +45,8 @@ GitHub의 **Compare base and head captures** 검사는 PR이 열리거나 갱신
 
 웹 뷰어는 Tailwind CSS 4.3.5와 shadcn/ui의 Base UI 프리셋(`base-nova`)을 쓴다. 공통 버튼과 대화상자는 shadcn CLI 4.23.0으로 생성하고 `@base-ui/react` 1.9.0으로 동작한다. Tailwind와 화면 지도는 같은 테마 토큰을 쓴다.
 
+뷰어는 첫 화면을 그리기 전에 저장된 테마를 적용한다. 시스템 설정을 선택하면 아카이브를 불러오는 동안에도 기기의 테마 변경을 반영한다.
+
 [tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
 
 - **색과 재질** — 두 테마 모두 캔버스 배경은 흑백 단색으로 한다. 오렌지 `--primary`(#EF803F)는 dui 마크와 주요 동작에 쓴다. 레일과 상태·상세 패널은 지도 위에 띄운 반투명 글래스 표면(라이트 모드는 반투명 흰색, 다크 모드는 반투명 차콜)으로 두고, 캡처 카드와 함께 `--blur`(16 px)를 적용한다.
