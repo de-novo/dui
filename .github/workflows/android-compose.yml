@@ -1,0 +1,44 @@
+name: Android Compose component
+on:
+  pull_request:
+    paths:
+      - "fixtures/android-compose/**"
+      - "scripts/check-compose.mts"
+      - "crates/dui-core/src/android.rs"
+      - "crates/dui/src/android.rs"
+      - ".github/workflows/android-compose.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  component:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - name: Build dui and the fixture APK
+        run: |
+          npm ci
+          npm ci --prefix apps/canvas
+          cargo build --locked
+          JAVA_HOME="$JAVA_HOME_21_X64" gradle --no-daemon -p fixtures/android-compose assembleDebug
+      - name: Check two independent switches on Android
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          image="system-images;android-35;google_apis;x86_64"
+          sdkmanager "$image"
+          echo no | avdmanager create avd --name dui-compose --package "$image" --device pixel_2
+          sudo chmod a+rw /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -avd dui-compose -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          timeout 300 bash -c 'until [ "$(adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = 1 ]; do sleep 2; done' || { tail -100 "$RUNNER_TEMP/emulator.log"; exit 1; }
+          adb -s "$ANDROID_SERIAL" shell input keyevent KEYCODE_WAKEUP
+          adb -s "$ANDROID_SERIAL" shell wm dismiss-keyguard
+          adb -s "$ANDROID_SERIAL" install fixtures/android-compose/build/outputs/apk/debug/*.apk
+          node scripts/check-compose.mts

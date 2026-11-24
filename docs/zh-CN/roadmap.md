@@ -70,3 +70,5 @@ dui 面向四大界面形态——**Web**、**Desktop App**、**Mobile App（And
 5. **客观事实核心 → 插件化设计系统规范与代码级画布渲染**：核心不强加硬编码审美规则，团队可按需接入自有 `DESIGN.md`、Token 规范或自定义审计插件检测设计偏离（`v0.3.0`，[#167](https://github.com/de-novo/dui/issues/167)），后续里程碑将从位图截图演进到直接基于代码的画布渲染。
 
 [GitHub 里程碑](https://github.com/de-novo/dui/milestones) · [变更日志](changelog.md)
+
+[Compose 示例](../../fixtures/android-compose) 挂载同一设置行的两个独立实例。[模拟器检查](../../scripts/check-compose.mts) 在 720 和 1080 px 两种宽度下，从 dui 新采集的数据读取两个控件的名称、边界和选中状态。点击其中一行后检查另一行，再次点击以验证状态恢复。要复现，请构建 dui，在专用模拟器中安装示例的调试 APK，设置 `ANDROID_SERIAL`，然后运行 `node scripts/check-compose.mts`。[CI 工作流](../../.github/workflows/android-compose.yml) 包含构建和启动模拟器的命令。

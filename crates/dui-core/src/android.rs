@@ -200,7 +200,9 @@ pub fn parse_uiautomator_xml(xml: &str) -> Vec<RenderNodeSnapshot> {
             .filter(|s| !s.is_empty())
             .cloned();
         let clickable = raw_attrs.get("clickable").map(String::as_str) == Some("true");
-        let meaningful = !text.is_empty() || resource_id.is_some() || clickable || tag != "view";
+        let checkable = raw_attrs.get("checkable").map(String::as_str) == Some("true");
+        let meaningful =
+            !text.is_empty() || resource_id.is_some() || clickable || checkable || tag != "view";
 
         let emitted_id = if meaningful && rect.width > 0 && rect.height > 0 {
             let key_base = resource_id
@@ -228,6 +230,7 @@ pub fn parse_uiautomator_xml(xml: &str) -> Vec<RenderNodeSnapshot> {
                 ("content-desc", "contentDesc"),
                 ("clickable", "clickable"),
                 ("enabled", "enabled"),
+                ("checkable", "checkable"),
                 ("checked", "checked"),
                 ("focused", "focused"),
                 ("selected", "selected"),
@@ -264,6 +267,18 @@ pub fn parse_uiautomator_xml(xml: &str) -> Vec<RenderNodeSnapshot> {
 mod tests {
     use super::*;
     use crate::diff::diff_render_trees;
+
+    #[test]
+    fn keeps_checked_state_for_an_unnamed_checkable_view() {
+        let xml = r#"<hierarchy>
+          <node class="android.view.View" checkable="true" checked="false" bounds="[8,16][48,56]" />
+          <node class="android.view.View" checkable="false" checked="false" bounds="[8,64][48,104]" />
+        </hierarchy>"#;
+        let nodes = parse_uiautomator_xml(xml);
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].attributes["checkable"], "true");
+        assert_eq!(nodes[0].attributes["checked"], "false");
+    }
 
     #[test]
     fn parses_adb_devices_and_selects_online_device() {

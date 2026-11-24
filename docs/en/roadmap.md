@@ -70,3 +70,5 @@ dui targets four surfaces—**Web**, **Desktop App**, **Mobile App (Android & iO
 5. **Fact-only core → Pluggable design-system specs & code-based rendering**: `dui-core` never imposes hardcoded aesthetic opinions; teams opt into conformance checks against their own `DESIGN.md`, token definitions, or custom audit plugins (`v0.3.0`, [#167](https://github.com/de-novo/dui/issues/167)), while future canvas milestones move from bitmap screenshots to direct code-based rendering.
 
 [GitHub milestones](https://github.com/de-novo/dui/milestones) · [Changelog](../../CHANGELOG.md)
+
+The [Compose fixture](../../fixtures/android-compose) mounts two independent instances of the same settings row. The [emulator check](../../scripts/check-compose.mts) reads their names, bounds and checked states from fresh dui captures at 720 and 1080 px. It taps one row, checks its sibling, then taps again to verify reset. To reproduce, build dui, install the fixture debug APK on a disposable emulator, set `ANDROID_SERIAL`, and run `node scripts/check-compose.mts`. The [CI workflow](../../.github/workflows/android-compose.yml) includes the build and emulator commands.
