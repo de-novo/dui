@@ -115,6 +115,7 @@ dependencies = [
  "dui-storage",
  "png",
  "rusqlite",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",

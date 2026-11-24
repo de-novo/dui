@@ -238,7 +238,7 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
         serde_json::from_slice(&fs::read(manifest).map_err(|_| failure(2, "missing spec"))?)
             .map_err(|_| failure(2, "invalid spec"))?;
     let path = spec["path"].as_str().unwrap_or("/").to_owned();
-    let widths: Vec<u32> = spec["widths"]
+    let mut widths: Vec<u32> = spec["widths"]
         .as_array()
         .into_iter()
         .flatten()
@@ -273,6 +273,12 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
     let mut render_path = String::new();
     let mut element_tree_available = false;
 
+    let selected = crate::recheck::targets(out)?;
+    if let Some(targets) = &selected {
+        widths = targets.iter().map(|t| t.width).collect();
+        widths.sort_unstable();
+        widths.dedup();
+    }
     for (index, state_def) in states.iter().enumerate() {
         let name = state_def["name"]
             .as_str()
@@ -285,6 +291,13 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
         cell_spec["expect"] = state_def["expect"].clone();
 
         for &width in &widths {
+            if selected.as_ref().is_some_and(|targets| {
+                !targets
+                    .iter()
+                    .any(|t| t.width == width && t.state == state_id && t.path == path)
+            }) {
+                continue;
+            }
             let staged =
                 tempfile::NamedTempFile::new_in(out).map_err(|e| failure(3, &e.to_string()))?;
             let mut obs = renderer

@@ -33,6 +33,8 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 新的 Chromium 捕获在 CLI 和 MCP 的 `inspect` 以及网页和桌面检查器中提供 `screenEvidence`。捕获状态记录捕获检查的结果。页面验证还要求文档响应成功、到达请求的路由（或允许的入口重定向）、页面稳定，并存在匹配项目 `readySelector` 的可见元素。使用默认就绪条件时，页面身份保持未验证。若页面有唯一的同源 canonical 链接，检查器自动比较声明的地址与实际到达的路由。检查器显示观测到的标题。旧归档保留原有证据。
 
+在项目目录运行 `dui recheck RUN`，可复验捕获结果为未验证、不可渲染或已有页面验证未通过的单元格。复验使用当前项目，按归档中的路径、状态输入、宽度和语言区域重新渲染。使用自定义清单时，运行 `dui recheck RUN PROJECT MANIFEST`。MCP 工具 `recheck` 接受 `run`、`project` 和可选的 `manifest`。新归档仅含选中的单元格，`recheck.source` 指向原归档，`selected`、`skipped`、`resolved` 和 `remaining` 分别记录选中、跳过、已解决和待解决的数量。仍有项目缺少证据时，CLI 退出码为 `5`。原归档中的单元格全部通过时，退出码为 `0`，无需启动渲染器或创建归档。
+
 地图先根据捕获数据估算画框尺寸。渲染后，使用包含标题的卡片实测高度计算行位置和连线间距。图片加载或卡片尺寸变化时，地图会重新布局。
 
 ### 查看器设计系统

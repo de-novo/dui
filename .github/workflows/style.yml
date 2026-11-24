@@ -64,6 +64,7 @@ jobs:
           npm run check:m1
           npm run check:i18n
           npm run check:cache
+          npm run check:recheck
           npm run check:diff
           npm run check:viewer
           npm run check:transitions

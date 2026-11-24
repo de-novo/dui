@@ -11,6 +11,7 @@ use dui_core::{
     locale::{flatten_message_keys, is_rtl_locale, missing_translation_keys, summarize_by_locale},
     model::{CacheOutcome, CellStatus},
 };
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -260,7 +261,7 @@ fn resolve_locales(
 }
 
 #[cfg(test)]
-fn execute_with(
+pub(crate) fn execute_with(
     renderer: Option<&mut dyn Renderer>,
     analysis: &Value,
     spec: &Value,
@@ -353,25 +354,55 @@ fn execute_with_locales(
             }
         }
     }
-    while let Some((scenario, mut spec)) = scenarios.pop_front() {
+    let selected = crate::recheck::targets(out)?;
+    let retry_cases = if selected.is_some() {
+        cache = None;
+        std::mem::take(&mut scenarios)
+    } else {
+        Default::default()
+    };
+    let mut retries = selected.into_iter().flatten().filter_map(|target| {
+        let case = crate::recheck::current_spec(spec, &retry_cases, &target)?;
+        Some((target.scenario.clone(), case, Some(target)))
+    });
+    let mut retry_rounds = BTreeMap::new();
+    let mut previous_scenario = None;
+    let mut baselines = BTreeMap::new();
+    let mut proven_visual_slots = BTreeSet::new();
+    while let Some((scenario, mut spec, target)) = retries
+        .next()
+        .or_else(|| scenarios.pop_front().map(|(name, case)| (name, case, None)))
+    {
         apply_generated(&mut spec, &analysis["autoMocks"]);
         let max_stagnant = spec["maxNoImprovementRounds"].as_u64().map(|n| n as usize);
         let mut active = BTreeSet::new();
         let mut done = BTreeSet::new();
-        let mut pending = vec![BTreeMap::new()];
-        type BaselineSnapshot = (String, BTreeMap<String, Value>);
-        let mut baselines: BTreeMap<(Option<String>, u32), BaselineSnapshot> = BTreeMap::new();
-        let mut proven_visual_slots: BTreeSet<String> = BTreeSet::new();
+        let selected_widths = target.as_ref().map(|t| BTreeSet::from([t.width]));
+        let widths = selected_widths.as_ref().unwrap_or(widths);
+        let row = target
+            .as_ref()
+            .map(|t| BTreeMap::deserialize(&t.input))
+            .transpose()
+            .map_err(crate::replay::io)?
+            .unwrap_or_default();
+        let mut pending = vec![row];
+        if previous_scenario.as_ref() != Some(&scenario) {
+            baselines.clear();
+            proven_visual_slots.clear();
+        }
+        previous_scenario = Some(scenario.clone());
         let mut observed_slot_values: BTreeMap<String, Vec<Value>> = BTreeMap::new();
         let mut stagnant_rounds = 0usize;
         let mut termination = FillTermination::Exhausted;
         while let Some(row) = pending.first().cloned() {
-            let index = done.len();
+            let index = target.as_ref().map_or(done.len(), |t| t.plan_index);
             let prev_hits = hits.len();
             let prev_active = active.len();
             done.insert(serde_json::to_string(&row).map_err(|e| failure(3, &e.to_string()))?);
             let checks = assertions(facts, &row, &spec);
-            let locale_slots: Vec<Option<&str>> = if locales.is_empty() {
+            let locale_slots: Vec<Option<&str>> = if let Some(t) = &target {
+                vec![t.locale.as_deref()]
+            } else if locales.is_empty() {
                 vec![None]
             } else {
                 locales.iter().map(|l| Some(l.as_str())).collect()
@@ -748,6 +779,10 @@ fn execute_with_locales(
                     cells.push(cell);
                 }
             }
+            if target.is_some() {
+                pending.clear();
+                break;
+            }
             pending = candidates_with_observed(facts, &active, &observed_slot_values)
                 .into_iter()
                 .filter(|r| !done.contains(&json!(r).to_string()))
@@ -858,8 +893,18 @@ fn execute_with_locales(
             }
         }
         seen_slots.extend(active);
-        rounds.push(json!({"scenario":scenario,"name":spec["name"],"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
+        if let Some(target) = target {
+            let (_, indices) = retry_rounds
+                .entry(scenario)
+                .or_insert_with(|| (spec["name"].clone(), BTreeSet::new()));
+            indices.insert(target.plan_index);
+        } else {
+            rounds.push(json!({"scenario":scenario,"name":spec["name"],"plannedStates":done.len(),"remainingStates":pending.len(),"termination":termination}));
+        }
         remaining += pending.len();
+    }
+    for (scenario, (name, indices)) in retry_rounds {
+        rounds.push(json!({"scenario":scenario,"name":name,"plannedStates":indices.len(),"remainingStates":0,"termination":FillTermination::Exhausted}));
     }
     // Promote runtime-discovered WAI-ARIA/HTML modals, dialogs, and drawers into verified
     // child screen nodes (`<parentPath>#overlay:<slug>`), deduplicating global header overlays
