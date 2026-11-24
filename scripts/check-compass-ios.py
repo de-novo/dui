@@ -28,7 +28,9 @@ def main():
     if read("git", "-C", samples, "rev-parse", "HEAD") != SAMPLES:
         raise ValueError(f"Expected flutter/samples at {SAMPLES}")
     subprocess.run(["git", "-C", samples, "diff", "--exit-code", "HEAD"], check=True)
-    sdk = json.loads(read("flutter", "--version", "--machine"))
+    # Flutter can print first-run bootstrap progress before its machine-readable response.
+    subprocess.run(["flutter", "--no-version-check", "precache", "--ios"], check=True)
+    sdk = json.loads(read("flutter", "--no-version-check", "--version", "--machine"))
     if sdk["frameworkRevision"] != FLUTTER:
         raise ValueError(f"Expected Flutter 3.50.1 at {FLUTTER}")
     output = args.output.resolve()
