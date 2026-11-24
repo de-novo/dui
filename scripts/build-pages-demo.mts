@@ -454,12 +454,18 @@ async function main() {
       runs.push(...results);
     }
 
-    // Also include dui.sh itself (dogfooded!)
+    // Also include dui.sh itself (self-dogfooded) PLUS a baseline run + precomputed
+    // Render-Tree & Pixel Diff so visitors can test 2D Canvas Inline Diff right on GitHub Pages.
     if (!filterSet || filterSet.has("dui-site")) {
-      console.log("[pages-demo] capturing dui.sh official site (self-dogfood)...");
+      console.log("[pages-demo] capturing dui.sh official site (current + baseline diff)...");
+      const currentSiteDir = path.join(tmpHome, "site-current");
+      fs.cpSync(path.join(root, "site"), currentSiteDir, {
+        recursive: true,
+        filter: (src) => !src.endsWith(path.join("site", "demo")),
+      });
       const siteHome = path.join(tmpHome, "home-dui-site");
       fs.mkdirSync(siteHome, { recursive: true });
-      const res = await runCommandAsync(binary, ["map", path.join(root, "site")], {
+      const res = await runCommandAsync(binary, ["map", currentSiteDir], {
         env: { ...process.env, HOME: siteHome },
         timeoutMs: 120_000,
       });
@@ -467,8 +473,9 @@ async function main() {
       if (!parsed.output) {
         throw new Error(`Failed capturing dui.sh site: ${res.stderr || res.stdout}`);
       }
+      const currentRunDir = parsed.output;
       const stats = exportRunToArchive(
-        parsed.output,
+        currentRunDir,
         path.join(archiveDir, "dui-site"),
         siteHome,
         root,
@@ -476,14 +483,98 @@ async function main() {
       console.log(
         `[pages-demo] exported dui-site: ${stats.cells} cells (${stats.verified} verified)`,
       );
-      runs.push({
-        key: "dui-site",
-        projectId: "oss-dui-site",
-        project: "de-novo/dui (dui.sh)",
-        branch: "Apache-2.0 · Zero-dep HTML",
-        version: "Self-dogfooded · 2 modals",
-        liveAvailable: false,
+
+      // Build a baseline variant of site/ (pre-showcase hero + without the 6-OSS grid)
+      // so visitors can interactively toggle Before / After / Render / Pixel Overlay diff.
+      const baselineSiteDir = path.join(tmpHome, "site-baseline");
+      fs.cpSync(path.join(root, "site"), baselineSiteDir, {
+        recursive: true,
+        filter: (src) => !src.endsWith(path.join("site", "demo")),
       });
+      const baseIndexPath = path.join(baselineSiteDir, "index.html");
+      let baseHtml = fs.readFileSync(baseIndexPath, "utf8");
+      baseHtml = baseHtml.replace(
+        /<section class="section" id="live-oss-showcase">[\s\S]*?<\/section>/,
+        "",
+      );
+      baseHtml = baseHtml.replace(
+        "Render every screen, state, modal, and width from real code.",
+        "Deterministic UI review from your real compiler.",
+      );
+      fs.writeFileSync(baseIndexPath, baseHtml);
+
+      const baseHome = path.join(tmpHome, "home-dui-site-baseline");
+      fs.mkdirSync(baseHome, { recursive: true });
+      const baseRes = await runCommandAsync(binary, ["map", baselineSiteDir], {
+        env: { ...process.env, HOME: baseHome },
+        timeoutMs: 120_000,
+      });
+      const baseParsed = JSON.parse(baseRes.stdout) as { output?: string };
+      if (baseParsed.output) {
+        const baseStats = exportRunToArchive(
+          baseParsed.output,
+          path.join(archiveDir, "dui-site-baseline"),
+          baseHome,
+          root,
+        );
+        console.log(
+          `[pages-demo] exported dui-site-baseline: ${baseStats.cells} cells (${baseStats.verified} verified)`,
+        );
+
+        const diffsDir = path.join(archiveDir, "diffs");
+        fs.mkdirSync(diffsDir, { recursive: true });
+        const diffRes = await runCommandAsync(
+          binary,
+          ["diff", baseParsed.output, currentRunDir, "--overlay-dir", diffsDir],
+          { env: { ...process.env, HOME: siteHome }, timeoutMs: 60_000 },
+        );
+        if (diffRes.stdout.trim()) {
+          const diffJson = JSON.parse(diffRes.stdout) as Record<string, unknown>;
+          const normalizeOverlay = (entry: unknown) => {
+            if (!entry || typeof entry !== "object") return;
+            const obj = entry as Record<string, unknown>;
+            const pd = obj.pixelDiff as Record<string, unknown> | undefined;
+            if (pd && typeof pd.overlayImage === "string") {
+              pd.overlayImage = path.basename(pd.overlayImage);
+            }
+          };
+          for (const key of ["changed", "added", "removed", "unchanged"]) {
+            const arr = diffJson[key];
+            if (Array.isArray(arr)) arr.forEach(normalizeOverlay);
+          }
+          fs.writeFileSync(
+            path.join(diffsDir, "dui-site-baseline__dui-site.json"),
+            JSON.stringify(diffJson),
+          );
+          console.log("[pages-demo] exported static diff: dui-site-baseline__dui-site.json");
+        }
+
+        runs.push({
+          key: "dui-site",
+          projectId: "oss-dui-site",
+          project: "de-novo/dui (dui.sh)",
+          branch: "Apache-2.0 · Zero-dep HTML",
+          version: "v0.2.0-current (Compare diff!)",
+          liveAvailable: false,
+        });
+        runs.push({
+          key: "dui-site-baseline",
+          projectId: "oss-dui-site",
+          project: "de-novo/dui (dui.sh)",
+          branch: "Apache-2.0 · Zero-dep HTML",
+          version: "v0.2.0-baseline",
+          liveAvailable: false,
+        });
+      } else {
+        runs.push({
+          key: "dui-site",
+          projectId: "oss-dui-site",
+          project: "de-novo/dui (dui.sh)",
+          branch: "Apache-2.0 · Zero-dep HTML",
+          version: "Self-dogfooded · 2 modals",
+          liveAvailable: false,
+        });
+      }
     }
 
     fs.writeFileSync(path.join(archiveDir, "runs.json"), JSON.stringify(runs, null, 2));
