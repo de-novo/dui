@@ -263,7 +263,7 @@ impl<S: AppStore> CellCache<S> {
             .ok()
             .filter(|s| !s.trim().is_empty());
         let renderer_env_digest = ContentHash::from_canonical(
-            "dui:renderer-env:v1",
+            "dui:renderer-env:v2",
             &json!({
                 "os": std::env::consts::OS,
                 "arch": std::env::consts::ARCH,
@@ -546,6 +546,9 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
         })
         .unwrap_or_default();
     let mut assertions = obs["assertions"].as_array().cloned().unwrap_or_default();
+    if let Some(path) = obs["redirectedTo"].as_str() {
+        assertions.push(json!({"__duiRedirectedTo": path}));
+    }
     if let Some(audit) = obs.get("localeAudit").filter(|v| v.is_object()) {
         assertions.push(json!({"__duiLocaleAudit": audit}));
     }
@@ -575,11 +578,14 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
     let mut locale_audit = None;
     let mut render_tree = None;
     let mut overlays = None;
+    let mut redirected_to = None;
     for item in ev.assertions() {
         if let Some(audit) = item.get("__duiLocaleAudit") {
             locale_audit = Some(audit.clone());
         } else if let Some(tree) = item.get("__duiRenderTree") {
             render_tree = Some(tree.clone());
+        } else if let Some(path) = item.get("__duiRedirectedTo") {
+            redirected_to = Some(path.clone());
         } else if let Some(ov) = item.get("__duiOverlays") {
             overlays = Some(ov.clone());
         } else {
@@ -603,6 +609,9 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
         "responseChecks": response_checks,
         "assertions": assertions,
     });
+    if let Some(path) = redirected_to {
+        obs["redirectedTo"] = path;
+    }
     if let Some(audit) = locale_audit {
         obs["localeAudit"] = audit;
     }

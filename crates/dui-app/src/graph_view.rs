@@ -15,6 +15,28 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         .filter_map(|n| n["id"].as_str().map(str::to_owned))
         .collect();
     let screen_paths: BTreeSet<_> = cells.iter().filter_map(|c| c["path"].as_str()).collect();
+    let entry_aliases: BTreeSet<_> = cells
+        .iter()
+        .filter(|c| c["path"] == "/" && c["status"] == "verified")
+        .filter_map(|c| {
+            Some((
+                c["observation"]["redirectedTo"].as_str()?,
+                c["width"].as_u64()?,
+            ))
+        })
+        .collect();
+    let resolve_route = |target: &str, width| {
+        if let Some(path) = screen_paths.get(target) {
+            Some(*path)
+        } else if entry_aliases.contains(&(target, width)) {
+            Some("/")
+        } else {
+            target
+                .split('?')
+                .next()
+                .and_then(|base| screen_paths.get(base).copied())
+        }
+    };
     let mut navigation = BTreeMap::<(&str, &str), BTreeSet<u64>>::new();
     let mut overlay_edges = BTreeMap::<(&str, &str), (BTreeSet<u64>, Option<String>)>::new();
     // Large sweeps share many identical branch traces. Keep the full membership once.
@@ -51,30 +73,14 @@ pub fn with_cells(mut graph: Value, report: &Value) -> Reply {
         if let Some(obs_path) = cell["observation"]["path"].as_str()
             && let Some(width) = cell["width"].as_u64()
             && let Some(anchors) = cell["observation"]["links"].as_array()
+            && let Some(from) = resolve_route(obs_path, width)
         {
-            let from = if screen_paths.contains(obs_path) {
-                Some(obs_path)
-            } else {
-                obs_path
-                    .split('?')
-                    .next()
-                    .filter(|base| screen_paths.contains(*base))
-            };
-            if let Some(from) = from {
-                for raw_target in anchors.iter().filter_map(Value::as_str) {
-                    let target = if screen_paths.contains(raw_target) {
-                        Some(raw_target)
-                    } else {
-                        raw_target
-                            .split('?')
-                            .next()
-                            .filter(|base| screen_paths.contains(*base))
-                    };
-                    if let Some(target) = target
-                        && from != target
-                    {
-                        navigation.entry((from, target)).or_default().insert(width);
-                    }
+            for raw_target in anchors.iter().filter_map(Value::as_str) {
+                let target = resolve_route(raw_target, width);
+                if let Some(target) = target
+                    && from != target
+                {
+                    navigation.entry((from, target)).or_default().insert(width);
                 }
             }
         }

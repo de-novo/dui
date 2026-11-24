@@ -29,6 +29,8 @@ The preview accepts one or more run directories. With no arguments it lists save
 
 Use one display name per project ID across branches, worktrees and versions. The first successful capture records the primary project’s `package.json` name, falling back to its root folder name. `dui history` registers names for older local archives.
 
+Use **Find screen** or `Cmd+K` / `Ctrl+K` to filter captured routes. The arrow keys move through matches and Enter opens the selected screen. The desktop map controls also toggle a minimap. When a successful same-origin document at `/` changes its route during mounting, the inspector shows the requested path and the observed destination.
+
 ### Viewer design system
 
 The preview uses Tailwind CSS 4.3.5 and the shadcn/ui Base UI preset (`base-nova`). The shared button and dialog were generated with shadcn CLI 4.23.0 and run on `@base-ui/react` 1.9.0. Tailwind reads the same theme tokens as the map.

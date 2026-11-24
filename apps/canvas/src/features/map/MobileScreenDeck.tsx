@@ -1,4 +1,5 @@
-import { ArrowRight, Layers, Map as MapIcon } from "lucide-react";
+import { ArrowRight, Search, Layers, Map as MapIcon } from "lucide-react";
+import { Button } from "../../components/ui/button";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import {
@@ -30,6 +31,7 @@ export function MobileScreenDeck({
   afterRunKey,
   imageUrl,
   mobileView,
+  openSearch,
   onSelectMobileView,
   onSelectWidth,
   onSelectScreen,
@@ -45,6 +47,7 @@ export function MobileScreenDeck({
   afterRunKey: string;
   imageUrl: (name: string) => string;
   mobileView: MobileViewMode;
+  openSearch: () => void;
   onSelectMobileView: (next: MobileViewMode) => void;
   onSelectWidth: (nextWidth: number) => void;
   onSelectScreen: (id: string) => void;
@@ -78,6 +81,9 @@ export function MobileScreenDeck({
           </button>
         </div>
 
+        <Button variant="ghost" size="icon" aria-label={t.findScreen} onClick={openSearch}>
+          <Search aria-hidden="true" />
+        </Button>
         {widths.length > 0 && (
           <div className="mobile-width-pills" aria-label={t.width}>
             {widths.map((w) => (

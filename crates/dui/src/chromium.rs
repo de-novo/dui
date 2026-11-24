@@ -861,6 +861,7 @@ impl Browser {
         let mut settled = false;
         // Wait between samples in the page so the CDP loop keeps serving intercepted requests.
         let delayed = format!("globalThis.__duiRuntime?.observe({selector},true)");
+        let mut empty_since = None;
         for poll in 0..100 {
             let next = self.call(
                 s,
@@ -874,6 +875,14 @@ impl Browser {
                 stable = 0;
             }
             v = next;
+            if v["emptyMount"] == true {
+                let start = empty_since.get_or_insert_with(std::time::Instant::now);
+                if start.elapsed() >= Duration::from_secs(2) {
+                    break;
+                }
+                continue;
+            }
+            empty_since = None;
             if stable >= 4
                 && spec["requiredRequests"]
                     .as_array()
@@ -889,6 +898,14 @@ impl Browser {
             {
                 settled = true;
                 break;
+            }
+        }
+        if let Some(fields) = v.as_object_mut() {
+            let document_origin = fields.remove("documentOrigin");
+            if spec["path"] != "/"
+                || document_origin.as_ref().and_then(Value::as_str) != Some(&origin)
+            {
+                fields.remove("redirectedTo");
             }
         }
         // Always collect same-origin navigation anchors so the 2D screen map renders
@@ -1052,7 +1069,10 @@ impl Browser {
                     continue;
                 };
                 let res = &opened["result"]["value"];
-                if res["opened"] == true
+                if res["opened"] != true {
+                    continue;
+                }
+                if res["imagePreview"] != true
                     && let Some(slug) = res["slug"].as_str()
                     && seen_slugs.insert(slug.to_owned())
                     && let Ok(shot) =
@@ -1081,38 +1101,38 @@ impl Browser {
                             "renderTree": res["renderTree"],
                         }));
                     }
-                    let _ = self.call(
-                        s,
-                        "Input.dispatchKeyEvent",
-                        json!({
-                            "type": "keyDown",
-                            "key": "Escape",
-                            "code": "Escape",
-                            "windowsVirtualKeyCode": 27,
-                            "nativeVirtualKeyCode": 27
-                        }),
-                    );
-                    let _ = self.call(
-                        s,
-                        "Input.dispatchKeyEvent",
-                        json!({
-                            "type": "keyUp",
-                            "key": "Escape",
-                            "code": "Escape",
-                            "windowsVirtualKeyCode": 27,
-                            "nativeVirtualKeyCode": 27
-                        }),
-                    );
-                    let _ = self.call(
-                        s,
-                        "Runtime.evaluate",
-                        json!({
-                            "expression": "globalThis.__duiRuntime.closeOverlay()",
-                            "awaitPromise": true,
-                            "returnByValue": true
-                        }),
-                    );
                 }
+                let _ = self.call(
+                    s,
+                    "Input.dispatchKeyEvent",
+                    json!({
+                        "type": "keyDown",
+                        "key": "Escape",
+                        "code": "Escape",
+                        "windowsVirtualKeyCode": 27,
+                        "nativeVirtualKeyCode": 27
+                    }),
+                );
+                let _ = self.call(
+                    s,
+                    "Input.dispatchKeyEvent",
+                    json!({
+                        "type": "keyUp",
+                        "key": "Escape",
+                        "code": "Escape",
+                        "windowsVirtualKeyCode": 27,
+                        "nativeVirtualKeyCode": 27
+                    }),
+                );
+                let _ = self.call(
+                    s,
+                    "Runtime.evaluate",
+                    json!({
+                        "expression": "globalThis.__duiRuntime.closeOverlay()",
+                        "awaitPromise": true,
+                        "returnByValue": true
+                    }),
+                );
             }
             if !overlays.is_empty() {
                 v["overlays"] = json!(overlays);

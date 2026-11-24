@@ -29,6 +29,8 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 同一项目 ID 在所有分支、工作树和版本中共用一个显示名称。首次保存截图时记录主项目的 `package.json` 名称，缺失时使用根目录名。`dui history` 为已有本地归档登记名称。
 
+使用**查找屏幕**或 `Cmd+K` / `Ctrl+K` 筛选已捕获的路由。使用方向键在结果间移动，按 Enter 打开所选屏幕。桌面地图控件还可切换缩略地图。如果 `/` 成功返回的文档在挂载期间转到同源路由，详情面板会显示请求路径和观测到的目标路径。
+
 ### 查看器设计系统
 
 预览使用 Tailwind CSS 4.3.5 和 shadcn/ui 的 Base UI 预设（`base-nova`）。通用按钮与对话框由 shadcn CLI 4.23.0 生成，运行时使用 `@base-ui/react` 1.9.0。Tailwind 与屏幕地图共用主题变量。

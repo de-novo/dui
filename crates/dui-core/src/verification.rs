@@ -140,9 +140,17 @@ impl Intent<'_> {
         let probe_ran = observed["hits"]
             .as_array()
             .is_some_and(|hits| hits.iter().any(Value::is_string));
-        let path_matches = observed["path"]
-            .as_str()
-            .is_some_and(|obs_path| analyze_url_match(self.path, obs_path).matched);
+        let path_matches = observed["path"].as_str().is_some_and(|obs_path| {
+            analyze_url_match(self.path, obs_path).matched
+                || (self.path == "/"
+                    && observed["redirectedTo"].as_str() == Some(obs_path)
+                    && obs_path.starts_with('/')
+                    && !obs_path.starts_with("//")
+                    && observed["responses"]["/"] == 200
+                    && observed["renderTree"]
+                        .as_array()
+                        .is_some_and(|tree| !tree.is_empty()))
+        });
         let matches = self.analyzed
             && values_match
             && targets_match
@@ -209,6 +217,39 @@ mod tests {
             broken[key] = value;
             assert_eq!(intent.failure(&broken), Some(Failure::AssertFailed));
         }
+    }
+
+    #[test]
+    fn entry_redirect_requires_document_and_render_evidence() {
+        let intent = Intent {
+            path: "/",
+            width: 375,
+            inputs: &BTreeMap::new(),
+            assertions: &[],
+            required_requests: &[],
+            analyzed: true,
+            expects_probe: false,
+        };
+        let sample = json!({"ready": true, "width": 375, "path": "/dashboard", "redirectedTo": "/dashboard",
+            "responses": {"/": 200}, "renderTree": [{"tag":"main"}], "responseChecks": {}, "assertions": []});
+        assert_eq!(intent.failure(&sample), None);
+        for (key, value) in [
+            ("redirectedTo", Value::Null),
+            ("renderTree", json!([])),
+            ("responses", json!({})),
+        ] {
+            let mut broken = sample.clone();
+            broken[key] = value;
+            assert!(intent.failure(&broken).is_some());
+        }
+        assert!(
+            Intent {
+                path: "/admin",
+                ..intent
+            }
+            .failure(&sample)
+            .is_some()
+        );
     }
 
     #[test]

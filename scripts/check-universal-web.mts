@@ -18,6 +18,7 @@ interface ReportCell {
   status: string;
   image?: string;
   observation?: {
+    redirectedTo?: string;
     renderTree?: Array<{ id: string; tag: string; text: string }>;
   };
 }
@@ -32,8 +33,8 @@ interface RunReport {
 
 interface GraphEdge {
   kind: string;
-  from: string;
-  to: string;
+  source: string;
+  target: string;
 }
 
 interface GraphView {
@@ -77,6 +78,7 @@ try {
   <body style="font-family:sans-serif;padding:24px">
     <h1>Universal Home</h1>
     <nav>
+      <a href="/public.JSON?v=2#raw">Manifest</a>
       <a href="/pricing.html">Pricing</a>
       <a href="/about.html">About</a>
       <button id="more-toggle" type="button" aria-expanded="false">More</button>
@@ -84,6 +86,8 @@ try {
     </nav>
     <main>
       <p>Plain HTML rendered with zero bundler.</p>
+      <button type="button" aria-haspopup="dialog" onclick="document.querySelector('#lightbox').showModal()">View image</button>
+      <dialog id="lightbox"><img alt="Preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='160'/%3E"><button type="button" aria-label="Close image preview">×</button></dialog>
       <button id="open-modal-btn" type="button" aria-haspopup="dialog">Create Item</button>
       <dialog id="create-dialog" aria-label="Create Item">
         <h2>Create Item</h2>
@@ -224,7 +228,12 @@ try {
       res.end("<html><body><h1>Live Docs</h1><a href='/'>Home</a></body></html>");
       return;
     }
-    res.end("<html><body><h1>Live Server</h1><a href='/docs'>Docs</a></body></html>");
+    res.end(`<html><body><div id="app"></div><script>
+      setTimeout(() => {
+        history.replaceState(null, "", "/dashboard");
+        document.querySelector("#app").innerHTML = "<h1>Live Server</h1><a href='/docs'>Docs</a><a href='/dashboard'>Current screen</a>";
+      }, 900);
+    </script></body></html>`);
   });
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", () => resolve());
@@ -248,6 +257,25 @@ try {
     const urlReport = JSON.parse(
       fs.readFileSync(path.join(urlOut, "report.json"), "utf8"),
     ) as RunReport;
+    assert.equal(
+      urlReport.cells.find((cell) => cell.path === "/")?.observation?.redirectedTo,
+      "/dashboard",
+    );
+    const urlGraph = JSON.parse(
+      fs.readFileSync(path.join(urlOut, "graph.json"), "utf8"),
+    ) as GraphView;
+    assert.ok(
+      urlGraph.edges?.some(
+        (edge) =>
+          edge.kind === "linksTo" && edge.source === "route:/" && edge.target === "route:/docs",
+      ),
+      "entry alias retains outbound edges",
+    );
+    assert.equal(
+      urlReport.cells.length,
+      2,
+      "the discovered landing route already has entry evidence",
+    );
     assert.equal(
       urlReport.coverage.verified,
       2,

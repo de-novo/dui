@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
@@ -11,11 +11,11 @@ import {
 } from "./data/archiveUrls";
 import { decodeOverview, type ScreenMap as Archive } from "./data/overview";
 import type { Run } from "./data/run";
-import { CaptureDiffView } from "./features/diff/CaptureDiffView";
+import { ScreenSearch } from "./features/map/ScreenSearch";
 import { ScreenInspector } from "./features/inspector/ScreenInspector";
 import { routeName } from "./features/map/CaptureCard";
 import { MobileScreenDeck, type MobileViewMode } from "./features/map/MobileScreenDeck";
-import { ScreenMap } from "./features/map/ScreenMap";
+
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
@@ -28,6 +28,13 @@ import {
 import { type CaptureDiff, decodeCaptureDiff } from "./model/diff";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import "./preview.css";
+
+const CaptureDiffView = lazy(() =>
+  import("./features/diff/CaptureDiffView").then((m) => ({ default: m.CaptureDiffView })),
+);
+const ScreenMap = lazy(() =>
+  import("./features/map/ScreenMap").then((m) => ({ default: m.ScreenMap })),
+);
 
 function archiveUrl(name: string, run: Run) {
   return archiveFileUrl(name, run.key);
@@ -47,18 +54,6 @@ function MapView({
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
   const [railInset, setRailInset] = useState<number>();
-  useLayoutEffect(() => {
-    const area = mapArea.current;
-    const layer = overviewLayer.current;
-    if (!area || !layer) return;
-    const measure = () => setRailInset(layer.clientWidth - area.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(area);
-    observer.observe(layer);
-    return () => observer.disconnect();
-  }, []);
-
   const { t } = useI18n();
   const [search, setSearch] = useState(location.search);
   const selection = parseSelection(search, archive);
@@ -206,6 +201,42 @@ function MapView({
   const showOverview = !showDetails;
   const showMobileDeck = isMobile && mobileView === "deck";
 
+  useLayoutEffect(() => {
+    const area = mapArea.current;
+    const layer = overviewLayer.current;
+    if (!area || !layer) return;
+    const measure = () => setRailInset(layer.clientWidth - area.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    observer.observe(layer);
+    return () => observer.disconnect();
+  }, [showMobileDeck]);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchOrigin = useRef<HTMLElement | null>(null);
+  const openSearch = () => {
+    searchOrigin.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSearchOpen(true);
+  };
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k" &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !document.querySelector('[role="dialog"]')
+      ) {
+        event.preventDefault();
+        openSearch();
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, []);
+
   return (
     <section
       className={"workspace" + (showMobileDeck ? " mobile-deck-active" : "")}
@@ -225,6 +256,7 @@ function MapView({
             afterRunKey={run.key}
             imageUrl={(name) => archiveUrl(name, run)}
             mobileView={mobileView}
+            openSearch={openSearch}
             onSelectMobileView={setMobileView}
             onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}
             onSelectScreen={(id) => select(id)}
@@ -232,23 +264,27 @@ function MapView({
         ) : (
           <div ref={overviewLayer} className="overview-layer">
             {railInset !== undefined && (
-              <ScreenMap
-                railInset={railInset}
-                archive={visibleArchive}
-                width={width}
-                mode={mode}
-                selectedId={selectedId}
-                focusActive={showDetails}
-                openCommentsByPath={openCommentsByPath(audit)}
-                diffsByPath={diffsByPath}
-                diffActive={diffActive}
-                diffVisualMode={diffVisualMode}
-                beforeRunKey={compareBeforeKey || undefined}
-                afterRunKey={run.key}
-                imageUrl={(name) => archiveUrl(name, run)}
-                select={select}
-                onClearSelection={returnToOverview}
-              />
+              <Suspense fallback={<output>{t.loadingMap}</output>}>
+                <ScreenMap
+                  desktop={!isMobile}
+                  openSearch={openSearch}
+                  railInset={railInset}
+                  archive={visibleArchive}
+                  width={width}
+                  mode={mode}
+                  selectedId={selectedId}
+                  focusActive={showDetails}
+                  openCommentsByPath={openCommentsByPath(audit)}
+                  diffsByPath={diffsByPath}
+                  diffActive={diffActive}
+                  diffVisualMode={diffVisualMode}
+                  beforeRunKey={compareBeforeKey || undefined}
+                  afterRunKey={run.key}
+                  imageUrl={(name) => archiveUrl(name, run)}
+                  select={select}
+                  onClearSelection={returnToOverview}
+                />
+              </Suspense>
             )}
           </div>
         )}
@@ -455,6 +491,19 @@ function MapView({
         />
       )}
 
+      {searchOpen && (
+        <ScreenSearch
+          screens={visibleArchive.screens}
+          close={() => setSearchOpen(false)}
+          restoreFocus={() => searchOrigin.current}
+          select={(id) => {
+            const trigger = searchOrigin.current;
+            setSearchOpen(false);
+            select(id, trigger);
+            requestAnimationFrame(() => dismiss.current?.focus());
+          }}
+        />
+      )}
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
         <DialogContent finalFocus={() => (showOverview ? optionsButton.current : dismiss.current)}>
           <DialogTitle>{t.mapOptions}</DialogTitle>
@@ -582,13 +631,15 @@ function Viewer({
     <main className="viewer">
       <WorkspaceRail run={run} open={() => setPickerOpen(true)} />
       {isDiffView && diffBefore && diffAfter ? (
-        <CaptureDiffView
-          runs={runs}
-          beforeKey={diffBefore}
-          afterKey={diffAfter}
-          onSelectPair={(nextBefore, nextAfter) => openDiff(nextBefore, nextAfter)}
-          onClose={closeDiff}
-        />
+        <Suspense fallback={<output>{t.loadingMap}</output>}>
+          <CaptureDiffView
+            runs={runs}
+            beforeKey={diffBefore}
+            afterKey={diffAfter}
+            onSelectPair={(nextBefore, nextAfter) => openDiff(nextBefore, nextAfter)}
+            onClose={closeDiff}
+          />
+        </Suspense>
       ) : archive && run ? (
         <MapView archive={archive} run={run} runs={runs} onOpenDiff={() => openDiff()} />
       ) : (

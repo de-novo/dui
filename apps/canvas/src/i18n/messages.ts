@@ -37,6 +37,10 @@ export type Messages = {
   expandRail: string;
   collapseRail: string;
   screenMap: string;
+  findScreen: string;
+  noMatchingScreens: string;
+  miniMap: string;
+  loadingMap: string;
   mapOptions: string;
   screenDetails: string;
   screenUnavailable: string;
@@ -161,6 +165,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     expandRail: "Expand rail",
     collapseRail: "Collapse rail",
     screenMap: "Screen map",
+    findScreen: "Find screen",
+    noMatchingScreens: "No matching screens",
+    miniMap: "Minimap",
+    loadingMap: "Loading…",
     mapOptions: "Map options",
     screenDetails: "Screen details",
     screenUnavailable: "Screen unavailable",
@@ -284,6 +292,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     expandRail: "展开侧栏",
     collapseRail: "收起侧栏",
     screenMap: "界面地图",
+    findScreen: "查找屏幕",
+    noMatchingScreens: "没有匹配的屏幕",
+    miniMap: "缩略地图",
+    loadingMap: "加载中…",
     mapOptions: "地图选项",
     screenDetails: "界面详情",
     screenUnavailable: "界面不可用",
@@ -407,6 +419,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     expandRail: "사이드바 펼치기",
     collapseRail: "사이드바 접기",
     screenMap: "화면 지도",
+    findScreen: "화면 찾기",
+    noMatchingScreens: "일치하는 화면이 없습니다",
+    miniMap: "미니맵",
+    loadingMap: "불러오는 중…",
     mapOptions: "지도 옵션",
     screenDetails: "화면 상세",
     screenUnavailable: "화면 없음",

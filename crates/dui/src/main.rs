@@ -332,7 +332,7 @@ fn is_supported_ts(version: &str) -> bool {
 }
 
 const CLI_HELP: &str = "\
-dui — real UI state capture, screen map, diff, and design audit
+dui — real UI state capture, screen map, and diff
 
 CAPTURE
   dui map [PROJECT]                       Auto-discover routes & capture (merges optional dui.json)

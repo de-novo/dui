@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
+import { Search, Map as MapIcon } from "lucide-react";
+import { useI18n } from "../../i18n/LocaleContext";
 import { CaptureCard } from "./CaptureCard";
 import { layoutMap } from "./layout";
 import {
@@ -10,6 +12,7 @@ import {
   EdgeLabelRenderer,
   Handle,
   MarkerType,
+  MiniMap,
   PanOnScrollMode,
   Position,
   ReactFlow,
@@ -269,6 +272,8 @@ const nodeTypes = { screen: Card };
 const edgeTypes = { gutter: GutterEdge };
 
 export function ScreenMap({
+  desktop,
+  openSearch,
   railInset,
   archive,
   width,
@@ -285,6 +290,8 @@ export function ScreenMap({
   select,
   onClearSelection,
 }: {
+  desktop: boolean;
+  openSearch: () => void;
   railInset: number;
   archive: Archive;
   width: number;
@@ -301,6 +308,8 @@ export function ScreenMap({
   select: (id: string, active?: Element | null) => void;
   onClearSelection?: () => void;
 }) {
+  const { t } = useI18n();
+  const [miniMap, setMiniMap] = useState(false);
   const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { cardWidth, frameHeight, column, row } = layout.metrics;
@@ -520,7 +529,36 @@ export function ScreenMap({
       }}
     >
       <Background color="var(--map-grid)" gap={20} size={1} />
+      {desktop && miniMap && (
+        <MiniMap
+          position="top-right"
+          pannable
+          zoomable
+          ariaLabel={t.miniMap}
+          bgColor="var(--card)"
+          nodeColor="var(--muted-foreground)"
+          maskColor="var(--glass-surface)"
+        />
+      )}
       <Controls showInteractive={false}>
+        <ControlButton
+          onClick={openSearch}
+          aria-label={t.findScreen}
+          title={t.findScreen + " (⌘/Ctrl K)"}
+          aria-keyshortcuts="Meta+K Control+K"
+        >
+          <Search aria-hidden="true" />
+        </ControlButton>
+        {desktop && (
+          <ControlButton
+            onClick={() => setMiniMap((open) => !open)}
+            aria-label={t.miniMap}
+            aria-pressed={miniMap}
+            title={t.miniMap}
+          >
+            <MapIcon aria-hidden="true" />
+          </ControlButton>
+        )}
         <ZoomOneToOneButton
           target={layout.nodes.find((n) => n.screen.id === selectedId) ?? layout.nodes[0]}
           cardWidth={cardWidth}

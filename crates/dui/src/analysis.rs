@@ -331,6 +331,7 @@ fn execute_with_locales(
         .iter()
         .map(|p| dui_core::discovery::route_pattern(p))
         .collect();
+    let mut entry_destination = None;
     let mut discovered_from: BTreeMap<String, String> = BTreeMap::new();
     if spec.get("screenDiscovery").is_none()
         && let Some(base_path) = spec["path"].as_str().filter(|p| !p.is_empty())
@@ -780,6 +781,23 @@ fn execute_with_locales(
         }
         if spec["routeSelector"].is_string() {
             let from_path = spec["path"].as_str().unwrap_or("/").to_owned();
+            // A direct destination remains independently capturable when a manifest requests it.
+            // For link discovery, the entry already covers it if every baseline agrees.
+            if scenario == "default" && from_path == "/" {
+                let mut baseline = cells
+                    .iter()
+                    .filter(|cell| cell["scenario"] == scenario && cell["planIndex"] == 0);
+                if let Some(first) = baseline.next()
+                    && let Some(destination) = first["observation"]["redirectedTo"].as_str()
+                    && first["status"] == "verified"
+                    && baseline.all(|cell| {
+                        cell["status"] == "verified"
+                            && cell["observation"]["redirectedTo"] == destination
+                    })
+                {
+                    entry_destination = Some(destination.to_owned());
+                }
+            }
             let paths: BTreeSet<String> = cells
                 .iter()
                 .filter(|cell| {
@@ -798,6 +816,9 @@ fn execute_with_locales(
                 .collect();
             let max_routes = spec["maxRoutes"].as_u64().map(|n| n as usize);
             for path in paths {
+                if entry_destination.as_ref() == Some(&path) {
+                    continue;
+                }
                 if max_routes.is_some_and(|limit| configured_paths.len() >= limit) {
                     break;
                 }
