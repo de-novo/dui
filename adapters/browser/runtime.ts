@@ -583,6 +583,57 @@ declare var __duiProbe: {
     }
     return nodes;
   }
+  function collectScreenLinks(paths: Set<string>, selector: string) {
+    const asset =
+      /\.(?:json|xml|rss|atom|pdf|zip|svg|png|jpe?g|webp|gif|csv|txt|ico|woff2?|avif|mp[34]|css|m?js)$/i;
+    for (const link of document.querySelectorAll(selector)) {
+      if (
+        !(link instanceof HTMLAnchorElement) ||
+        !link.hasAttribute("href") ||
+        link.hasAttribute("download")
+      )
+        continue;
+      const url = URL.parse(link.href);
+      if (
+        url &&
+        url.protocol === location.protocol &&
+        url.origin === location.origin &&
+        !url.pathname.startsWith("//") &&
+        !asset.test(url.pathname)
+      ) {
+        paths.add(url.pathname + url.search + url.hash);
+      }
+    }
+  }
+
+  function isImagePreview(dialog: HTMLElement) {
+    if (
+      !dialog.querySelector("img") ||
+      dialog.querySelector("form, input, select, textarea, a[href], [contenteditable=true]")
+    )
+      return false;
+    const copy = dialog.cloneNode(true) as HTMLElement;
+    for (const control of copy.querySelectorAll("button, [role], [tabindex]")) {
+      if (control.matches('button, [role="button"]')) {
+        const name =
+          control.getAttribute("aria-label") ||
+          control.getAttribute("title") ||
+          control.textContent ||
+          "";
+        if (
+          !/^(?:close|dismiss|next|prev(?:ious)?)(?: (?:image(?: preview)?|preview|dialog))?$|^[×✕x]$/i.test(
+            name.trim(),
+          )
+        )
+          return false;
+        control.remove();
+      } else if (!control.matches('img, [role="img"], [role="presentation"], [role="none"]'))
+        return false;
+    }
+    for (const decoration of copy.querySelectorAll("svg, script, style")) decoration.remove();
+    return !copy.textContent?.trim();
+  }
+
   async function observe(selector: string, delayed: boolean) {
     const p = globalThis.__duiProbe;
     if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 100)));
@@ -597,13 +648,29 @@ declare var __duiProbe: {
       }))
       .filter((entry) => entry.values.length > 1);
     const renderTree = collectRenderTree();
+    const root = document.querySelector("#root, #app, #__next");
+    const navigation = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    const path = location.pathname + location.search + location.hash;
+    const entryRedirect =
+      navigation?.name === location.origin + "/" &&
+      navigation.responseStatus === 200 &&
+      location.pathname !== "/";
     return {
       ready: !!document.querySelector(selector),
+      ...(root &&
+      !root.firstElementChild &&
+      !root.textContent?.trim() &&
+      !document.body?.innerText.trim()
+        ? { emptyMount: true }
+        : {}),
+      ...(entryRedirect ? { redirectedTo: path, documentOrigin: location.origin } : {}),
       slots: p.slots,
       instances: p.instances,
       hits: [...p.hits].sort(),
       text: document.body?.innerText?.slice(0, 4000),
-      path: location.pathname + location.search + location.hash,
+      path,
       width: innerWidth,
       ...(selectOptions.length > 0 ? { selectOptions } : {}),
       ...(renderTree.length > 0 ? { renderTree } : {}),
@@ -684,48 +751,13 @@ declare var __duiProbe: {
       reference,
       links(selector: string) {
         const paths = new Set<string>();
-        for (const link of document.querySelectorAll(selector)) {
-          if (
-            !(link instanceof HTMLAnchorElement) ||
-            !link.hasAttribute("href") ||
-            link.hasAttribute("download")
-          )
-            continue;
-          const url = URL.parse(link.href);
-          if (
-            url &&
-            url.protocol === location.protocol &&
-            url.origin === location.origin &&
-            !url.pathname.startsWith("//")
-          ) {
-            paths.add(url.pathname + url.search + url.hash);
-          }
-        }
+        collectScreenLinks(paths, selector);
         return [...paths].sort();
       },
       async discoverLinks(selector: string) {
-        const collectInto = (target: Set<string>, sel: string) => {
-          for (const link of document.querySelectorAll(sel)) {
-            if (
-              !(link instanceof HTMLAnchorElement) ||
-              !link.hasAttribute("href") ||
-              link.hasAttribute("download")
-            )
-              continue;
-            const url = URL.parse(link.href);
-            if (
-              url &&
-              url.protocol === location.protocol &&
-              url.origin === location.origin &&
-              !url.pathname.startsWith("//")
-            ) {
-              target.add(url.pathname + url.search + url.hash);
-            }
-          }
-        };
         const paths = new Set<string>();
-        collectInto(paths, selector);
-        collectInto(paths, "a[href]");
+        collectScreenLinks(paths, selector);
+        collectScreenLinks(paths, "a[href]");
 
         // Framework-agnostic WAI-ARIA navigation disclosure expansion:
         // safely expand collapsed nav accordions/trees (aria-expanded="false") after capture
@@ -779,8 +811,8 @@ declare var __duiProbe: {
           await new Promise((resolve) =>
             requestAnimationFrame(() => requestAnimationFrame(resolve)),
           );
-          collectInto(paths, selector);
-          collectInto(paths, "a[href]");
+          collectScreenLinks(paths, selector);
+          collectScreenLinks(paths, "a[href]");
           for (const trigger of opened.reverse()) {
             if (trigger.isConnected && trigger.getAttribute("aria-expanded") === "true") {
               try {
@@ -914,6 +946,7 @@ declare var __duiProbe: {
 
         const dialog = newlyOpened[newlyOpened.length - 1]!;
         (globalThis as Record<string, unknown>).__duiActiveOverlay = dialog;
+        if (isImagePreview(dialog)) return { opened: true, imagePreview: true };
         // Wait for CSS slide-in / fade-in animations on the dialog (e.g. Tailwind duration-500
         // drawers) to finish before measuring renderTree or taking the screenshot.
         try {

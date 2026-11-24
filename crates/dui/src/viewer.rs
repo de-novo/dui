@@ -260,6 +260,9 @@ fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
         if let Some(audit) = item.get("localeAudit").filter(|v| v.is_object()) {
             cell["localeAudit"] = audit.clone();
         }
+        if let Some(path) = item["observation"]["redirectedTo"].as_str() {
+            cell["redirectedTo"] = json!(path);
+        }
         if let Some(tree) = item["observation"]
             .get("renderTree")
             .filter(|v| v.is_array())

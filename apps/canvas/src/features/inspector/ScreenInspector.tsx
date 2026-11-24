@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
-import type { KeyboardEvent, RefObject } from "react";
+import { lazy, Suspense, type KeyboardEvent, type RefObject } from "react";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
 import { archiveFileUrl, diffOverlayUrl } from "../../data/archiveUrls";
@@ -10,7 +10,9 @@ import type { ScreenCanvasDiff } from "../../model/canvasDiff";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
 import { CommentPanel } from "./CommentPanel";
-import { ElementInspector } from "./ElementInspector";
+const ElementInspector = lazy(() =>
+  import("./ElementInspector").then((m) => ({ default: m.ElementInspector })),
+);
 
 function cellLabel(
   cell: Cell,
@@ -91,6 +93,11 @@ export function ScreenInspector({
         <div className="panel-heading">
           <h2>{title}</h2>
           {showFullPath && screen && <code className="route-path">{screen.path}</code>}
+          {cell?.redirectedTo && (
+            <code className="route-path">
+              {screen?.path} → {cell.redirectedTo}
+            </code>
+          )}
           <p className="origin-meta">{t.archive}</p>
         </div>
         <Button
@@ -232,11 +239,13 @@ export function ScreenInspector({
       )}
 
       {cell?.image && cell.renderTree && cell.renderTree.length > 0 && (
-        <ElementInspector
-          key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
-          cell={cell}
-          imageUrl={archiveFileUrl(cell.image, run.key)}
-        />
+        <Suspense fallback={<output>{t.loadingMap}</output>}>
+          <ElementInspector
+            key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
+            cell={cell}
+            imageUrl={archiveFileUrl(cell.image, run.key)}
+          />
+        </Suspense>
       )}
 
       {hasLocaleIssues && audit && (

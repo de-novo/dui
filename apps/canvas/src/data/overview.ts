@@ -55,6 +55,7 @@ export type Cell = {
   scenario?: string;
   locale?: string;
   localeAudit?: LocaleAudit;
+  redirectedTo?: string;
   renderTree?: RenderNode[];
 };
 export type ScreenOrigin =
@@ -260,6 +261,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
         reason: typeof cell.reason === "string" ? cell.reason : undefined,
         locale: typeof cell.locale === "string" ? cell.locale : undefined,
         localeAudit: decodeLocaleAudit(cell.localeAudit),
+        ...(typeof cell.redirectedTo === "string" ? { redirectedTo: cell.redirectedTo } : {}),
         renderTree: decodeRenderTree(cell.renderTree),
       });
     }
