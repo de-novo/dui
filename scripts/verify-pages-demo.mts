@@ -223,6 +223,42 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
       },
     ];
 
+    async function verifyNodeHover() {
+      const evaluate = async (expression: string) => {
+        const response = await call("Runtime.evaluate", { expression, returnByValue: true });
+        if (response.exceptionDetails) throw new Error(JSON.stringify(response.exceptionDetails));
+        return (response.result as { value: unknown }).value;
+      };
+      const point = (await evaluate(`(() => {
+        const nodes = Array.from(document.querySelectorAll(".react-flow__node"));
+        const point = nodes.map(node => {
+          const rect = node.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          return node.contains(document.elementFromPoint(x, y)) ? { x, y } : null;
+        }).find(Boolean);
+        if (!point) throw Error("No screen node available for hover");
+        const edges = Array.from(document.querySelectorAll(".react-flow__edge-path"));
+        let hidden = false;
+        const observer = new MutationObserver(records => {
+          if (records.some(r => r.oldValue?.includes("visibility: hidden") || r.target.style.visibility === "hidden")) hidden = true;
+        });
+        for (const node of nodes) observer.observe(node, { attributes: true, attributeFilter: ["style"], attributeOldValue: true });
+        window.checkHover = () => {
+          observer.disconnect();
+          return !hidden && [...nodes, ...edges].every(el => el.isConnected);
+        };
+        return point;
+      })()`)) as { x: number; y: number };
+      for (const position of [point, { x: 1, y: 1 }]) {
+        await call("Input.dispatchMouseEvent", { type: "mouseMoved", ...position });
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!(await evaluate("window.checkHover()"))) {
+        throw new Error("Hovering the map hid measured screen nodes or replaced connected edges");
+      }
+    }
+
     const results: Array<Record<string, unknown>> = [];
     for (const c of checks) {
       await call("Emulation.setDeviceMetricsOverride", {
@@ -249,6 +285,10 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         returnByValue: true,
       })) as { result?: { value?: Record<string, unknown> } };
       const val = evalRes.result?.value ?? {};
+      if (c.name === "demo-desktop-canvas") {
+        await verifyNodeHover();
+        val.stableNodeHover = true;
+      }
       results.push({ name: c.name, ...val });
       if (!val.found) {
         throw new Error(`Self-dogfood gate failed (${c.name}): missing ${c.requireSelector}`);
