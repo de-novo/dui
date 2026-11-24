@@ -12,7 +12,7 @@ use gpui_kit::{
     base::StyledExt,
     canvas,
     component::{
-        Theme, ThemeMode, TitleBar,
+        Theme, ThemeMode, TitleBar, TITLE_BAR_HEIGHT,
         button::{Button, ButtonVariants as _},
         input::{Input, InputState},
         label::Label,
@@ -23,7 +23,7 @@ use gpui_kit::{
     test::{TestQueryExt, TestWindowExt},
 };
 use i18n::UiLang;
-use layout::{MapLayout, compute_layout};
+use layout::{MapLayout, PaintedCardMetrics, compute_layout};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -106,6 +106,7 @@ struct DuiDesktopView {
     pan_x: f32,
     pan_y: f32,
     zoom: f32,
+    auto_fit: bool,
     dragging: bool,
     drag_moved: bool,
     drag_last: Point<Pixels>,
@@ -235,11 +236,12 @@ impl DuiDesktopView {
             pan_x: 32.0,
             pan_y: 32.0,
             zoom: 0.12,
+            auto_fit: true,
             dragging: false,
             drag_moved: false,
             drag_last: point(px(0.0), px(0.0)),
-            viewport_w: opts.viewport_width.max(400) as f32,
-            viewport_h: opts.viewport_height.max(400) as f32,
+            viewport_w: 0.0,
+            viewport_h: 0.0,
             focus_handle,
             comment_input,
             comment_target: CommentTargetChoice::Screen,
@@ -255,7 +257,6 @@ impl DuiDesktopView {
         };
         this.ensure_render_trees();
         this.sync_cell_to_width();
-        this.fit_map();
         if this.view_mode == ViewMode::Diff || this.canvas_diff_enabled {
             this.ensure_diff_loaded();
         }
@@ -348,19 +349,17 @@ impl DuiDesktopView {
         let right_inset = self.inspector_width() + 28.0;
         let top_inset = 24.0;
         let bottom_inset = 28.0;
-        if layout.nodes.is_empty() || layout.content_width <= 0.0 || layout.content_height <= 0.0 {
+        self.auto_fit = true;
+        if layout.nodes.is_empty() {
             self.zoom = 0.2;
             self.pan_x = left_inset;
             self.pan_y = top_inset;
             return;
         }
-        let avail_w = (self.viewport_w - left_inset - right_inset).max(240.0);
-        let avail_h = (self.viewport_h - top_inset - bottom_inset).max(240.0);
-        let zx = avail_w / layout.content_width;
-        let zy = avail_h / layout.content_height;
-        self.zoom = zx.min(zy).clamp(0.02, 1.0);
-        let scaled_w = layout.content_width * self.zoom;
-        let scaled_h = layout.content_height * self.zoom;
+        let avail_w = (self.viewport_w - left_inset - right_inset).max(1.0);
+        let avail_h = (self.viewport_h - top_inset - bottom_inset).max(1.0);
+        let (zoom, scaled_w, scaled_h) = layout.fit(avail_w, avail_h);
+        self.zoom = zoom;
         self.pan_x = left_inset + (avail_w - scaled_w) * 0.5;
         self.pan_y = top_inset + (avail_h - scaled_h) * 0.5;
     }
@@ -370,6 +369,7 @@ impl DuiDesktopView {
         let left_inset = self.rail_width();
         let right_inset = self.inspector_width();
         let center_x = left_inset + ((self.viewport_w - left_inset - right_inset).max(240.0) * 0.5);
+        self.auto_fit = false;
         self.zoom = 1.0;
         if let Some(node) = layout
             .nodes
@@ -385,7 +385,8 @@ impl DuiDesktopView {
     }
 
     fn adjust_zoom_at(&mut self, factor: f32, anchor_x: f32, anchor_y: f32) {
-        let next = (self.zoom * factor).clamp(0.02, 3.0);
+        self.auto_fit = false;
+        let next = (self.zoom * factor).clamp(self.zoom.min(0.02), 3.0);
         let ratio = next / self.zoom;
         self.pan_x = anchor_x - (anchor_x - self.pan_x) * ratio;
         self.pan_y = anchor_y - (anchor_y - self.pan_y) * ratio;
@@ -1552,15 +1553,15 @@ impl DuiDesktopView {
         let pan_y = self.pan_y;
         let zoom = self.zoom;
         let metrics = layout.metrics;
-        let card_w = (metrics.card_width * zoom).max(16.0);
-        let pad_px = (card_w * 0.04).clamp(4.0, 12.0);
+        let card = PaintedCardMetrics::new(metrics, zoom);
+        let card_w = card.width;
+        let pad_px = card.padding;
         let inner_w = (card_w - pad_px * 2.0).max(8.0);
-        let caption_h = (metrics.caption_height * zoom).max(18.0);
+        let caption_h = card.caption_height;
 
         let mut node_rects: BTreeMap<usize, (f32, f32, f32, f32)> = BTreeMap::new();
         for node in &layout.nodes {
-            let n_frame_h = (node.frame_height * zoom).max(10.0);
-            let n_card_h = n_frame_h + caption_h + pad_px * 2.0;
+            let (n_frame_h, n_card_h) = card.heights(node);
             node_rects.insert(
                 node.screen_idx,
                 (pan_x + node.x * zoom, pan_y + node.y * zoom, n_frame_h, n_card_h),
@@ -2103,6 +2104,7 @@ impl DuiDesktopView {
                         f32::from(event.position.y),
                     );
                 } else {
+                    this.auto_fit = false;
                     this.pan_x += delta.0;
                     this.pan_y += delta.1;
                 }
@@ -2122,6 +2124,9 @@ impl DuiDesktopView {
                     let dy = f32::from(event.position.y) - f32::from(this.drag_last.y);
                     if dx.abs() > 2.0 || dy.abs() > 2.0 {
                         this.drag_moved = true;
+                    }
+                    if dx != 0.0 || dy != 0.0 {
+                        this.auto_fit = false;
                     }
                     this.pan_x += dx;
                     this.pan_y += dy;
@@ -3873,8 +3878,15 @@ impl Render for DuiDesktopView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = self.pal();
         let win_bounds = window.viewport_size();
-        self.viewport_w = f32::from(win_bounds.width).max(320.0);
-        self.viewport_h = (f32::from(win_bounds.height) - 34.0).max(320.0);
+        let width = f32::from(win_bounds.width);
+        let height = f32::from(win_bounds.height - TITLE_BAR_HEIGHT);
+        if (width, height) != (self.viewport_w, self.viewport_h) {
+            self.viewport_w = width;
+            self.viewport_h = height;
+            if self.auto_fit {
+                self.fit_map();
+            }
+        }
 
         let title_bar = self.render_title_bar(cx);
         let rail = self.render_workspace_rail(cx);

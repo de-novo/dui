@@ -33,8 +33,65 @@ pub struct MapLayout {
     pub metrics: NodeMetrics,
     pub nodes: Vec<LayoutNode>,
     pub edges: Vec<LayoutEdge>,
-    pub content_width: f32,
-    pub content_height: f32,
+}
+
+pub struct PaintedCardMetrics {
+    pub width: f32,
+    pub padding: f32,
+    pub caption_height: f32,
+    zoom: f32,
+}
+
+impl PaintedCardMetrics {
+    pub fn new(metrics: NodeMetrics, zoom: f32) -> Self {
+        let width = (metrics.card_width * zoom).max(16.0);
+        Self {
+            width,
+            padding: (width * 0.04).clamp(4.0, 12.0),
+            caption_height: (metrics.caption_height * zoom).max(18.0),
+            zoom,
+        }
+    }
+
+    pub fn heights(&self, node: &LayoutNode) -> (f32, f32) {
+        let frame = (node.frame_height * self.zoom).max(10.0);
+        (frame, frame + self.caption_height + self.padding * 2.0)
+    }
+}
+
+impl MapLayout {
+    fn painted_size(&self, zoom: f32) -> (f32, f32) {
+        let card = PaintedCardMetrics::new(self.metrics, zoom);
+        self.nodes.iter().fold((0.0, 0.0), |(w, h), node| {
+            (
+                w.max(node.x * zoom + card.width),
+                h.max(node.y * zoom + card.heights(node).1),
+            )
+        })
+    }
+
+    pub fn fit(&self, width: f32, height: f32) -> (f32, f32, f32) {
+        // Fixed pixel minima for captions and padding make the painted size
+        // monotonic in zoom, but not proportional to it.
+        let mut zoom = 1.0;
+        let (w, h) = self.painted_size(zoom);
+        if w > width || h > height {
+            let mut lo = 0.0;
+            let mut hi = zoom;
+            for _ in 0..24 {
+                let mid = (lo + hi) * 0.5;
+                let (w, h) = self.painted_size(mid);
+                if w <= width && h <= height {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            zoom = lo.max(f32::EPSILON);
+        }
+        let (w, h) = self.painted_size(zoom);
+        (zoom, w, h)
+    }
 }
 
 pub fn node_metrics(capture_width: u32) -> NodeMetrics {
@@ -58,7 +115,9 @@ fn screen_frame_height(screen: &ScreenItem, capture_width: u32, metrics: NodeMet
     let cell = screen
         .cells
         .iter()
-        .find(|c| c.width_px == capture_width && c.image_width.is_some() && c.image_height.is_some())
+        .find(|c| {
+            c.width_px == capture_width && c.image_width.is_some() && c.image_height.is_some()
+        })
         .or_else(|| {
             screen
                 .cells
@@ -84,8 +143,6 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
             metrics,
             nodes: Vec::new(),
             edges: Vec::new(),
-            content_width: 0.0,
-            content_height: 0.0,
         };
     }
 
@@ -251,19 +308,10 @@ pub fn compute_layout(screens: &[ScreenItem], capture_width: u32) -> MapLayout {
 
     nodes.sort_by_key(|n| n.screen_idx);
 
-    let mut max_x: f32 = 0.0;
-    let mut max_y: f32 = 0.0;
-    for n in &nodes {
-        max_x = max_x.max(n.x + metrics.card_width);
-        max_y = max_y.max(n.y + n.card_height);
-    }
-
     MapLayout {
         metrics,
         nodes,
         edges,
-        content_width: max_x,
-        content_height: max_y,
     }
 }
 
@@ -306,6 +354,23 @@ mod tests {
                 let overlap_x = (a.x - b.x).abs() < layout.metrics.card_width;
                 let overlap_y = a.y < b.y + b.card_height && b.y < a.y + a.card_height;
                 assert!(!(overlap_x && overlap_y), "nodes {i} and {j} overlap");
+            }
+        }
+    }
+
+    #[test]
+    fn fit_includes_padding_and_minimum_caption_height_on_the_last_row() {
+        let screens: Vec<_> = (0..8)
+            .map(|i| dummy_screen(&format!("/{i}"), None))
+            .collect();
+        let layout = compute_layout(&screens, 1280);
+        for height in [180.0, 480.0, 800.0] {
+            let (zoom, width, painted_height) = layout.fit(5000.0, height);
+            let card = PaintedCardMetrics::new(layout.metrics, zoom);
+            assert!(width <= 5000.0 && painted_height <= height);
+            assert!((height - painted_height).abs() < 0.01);
+            for node in &layout.nodes {
+                assert!(node.y * zoom + card.heights(node).1 <= height);
             }
         }
     }
