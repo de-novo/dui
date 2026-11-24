@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 import uuid
 
 
@@ -26,22 +27,51 @@ def output(*command):
     return subprocess.check_output(command, text=True).strip()
 
 
-def run_capture(source, temporary):
+def observe_startup(udid, temporary, recognizer):
+    image = temporary / "startup.png"
+    capture = subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", image], capture_output=True)
+    if capture.returncode == 0:
+        seen = subprocess.run([recognizer, image], capture_output=True, text=True)
+        if seen.returncode == 0:
+            print(f"Simulator startup: {seen.stdout.strip()}", flush=True)
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8199/json/list", timeout=3) as response:
+            sessions = json.load(response)
+        print(f"Metro has {len(sessions)} connected runtime target(s)", flush=True)
+    except (OSError, ValueError):
+        print("Metro runtime session list is unavailable", flush=True)
+
+
+def run_capture(source, temporary, udid, device_data, recognizer):
     pnpm_version = json.loads((source / "package.json").read_text())["packageManager"].split("@")[1]
     pnpm_dir = Path.home() / ".vite-plus/package_manager/pnpm" / pnpm_version / "pnpm/bin"
     xcconfig = temporary / "unsigned.xcconfig"
     xcconfig.write_text("CODE_SIGNING_ALLOWED = NO\nCODE_SIGNING_REQUIRED = NO\n")
     env = dict(os.environ, PATH=f"{pnpm_dir}:{os.environ['PATH']}", TMPDIR=str(temporary),
                XCODE_XCCONFIG_FILE=str(xcconfig))
+    # The simulator shares the runner's loopback. Keep the upstream app and its
+    # readiness checks intact while the temporary capture driver addresses local Metro.
+    original = source / "scripts/mobile-showcase.ts"
+    driver = original.with_name(".dui-ios-showcase.ts")
+    harness, matches = re.subn(r"(?<=const metroHost = )[^;\n]+", '"127.0.0.1"', original.read_text())
+    if matches != 1:
+        raise ValueError("Could not locate the pinned capture driver's Metro address")
+    driver.write_text(harness)
     log = temporary / "showcase.log"
     environment = None
+    observe_at = None
     with log.open("w") as stream, subprocess.Popen(
-        ["pnpm", "screenshots:mobile", "--platform", "ios", "--device", "iphone-6.9",
+        ["node", driver, "--platform", "ios", "--device", "iphone-6.9",
          "--appearance", "light", "--theme", "t3-code", "--scene", "thread", "--scene", "review"],
         cwd=source, env=env, stdout=stream, stderr=subprocess.STDOUT,
     ) as process:
         # The app and fixture share this ID. Its server removes the file on successful cleanup.
         while process.poll() is None:
+            if observe_at is None and any(device_data.glob("Containers/Data/Application/*/Library/Caches/T3ShowcaseScene")):
+                observe_at = time.monotonic() + 45
+            if observe_at is not None and time.monotonic() >= observe_at:
+                observe_startup(udid, temporary, recognizer)
+                observe_at = time.monotonic() + 90
             if environment is None:
                 for path in temporary.glob("t3-mobile-showcase-*/environments/moonbase-terminal/userdata/environment-id"):
                     try:
@@ -52,8 +82,8 @@ def run_capture(source, temporary):
     if process.returncode:
         # Only emit diagnostics. The full harness log can contain ephemeral pairing URLs.
         lines = [line[:750] for line in log.read_text(errors="replace").splitlines()
-                 if re.search(r"error|failed|timed out|ENOSPC|not found|\[!\]", line, re.I)
-                 and not re.search(r"token|pairing|credential|://|authorization|password", line, re.I)]
+                 if re.search(r"\berror:|failed|timed out|ENOSPC|not found|\[!\]", line, re.I)
+                 and not re.search(r"warning:|NSError|token|pairing|credential|://|authorization|password", line, re.I)]
         print("\n".join(lines[-30:]), file=sys.stderr)
         raise RuntimeError(f"T3 Code showcase exited with {process.returncode}")
     if environment is None:
@@ -76,6 +106,8 @@ def main():
         subprocess.run([*simctl, "bootstatus", udid, "-b"], check=True)
         runtime = output(*simctl, "getenv", udid, "SIMULATOR_RUNTIME_VERSION")
         scale = float(output(*simctl, "getenv", udid, "SIMULATOR_MAINSCREEN_SCALE"))
+        inventory = json.loads(output(*simctl, "list", "devices", "-j"))["devices"]
+        device_data = next(Path(d["dataPath"]) for group in inventory.values() for d in group if d["udid"] == udid)
         if not runtime or scale <= 0:
             raise ValueError("CoreSimulator did not report the runtime and display scale")
         subprocess.run([*simctl, "shutdown", udid], check=True)
@@ -84,7 +116,9 @@ def main():
             checker = temporary / "check-screenshot"
             subprocess.run(["xcrun", "swiftc", Path(__file__).with_name("check-ios-screenshot.swift"),
                             "-o", checker], check=True)
-            thread_path = run_capture(source, temporary)
+            recognizer = temporary / "startup-witness"
+            subprocess.run(["xcrun", "swiftc", Path(__file__).with_suffix(".swift"), "-o", recognizer], check=True)
+            thread_path = run_capture(source, temporary, udid, device_data, recognizer)
             screenshots = source / "artifacts/app-store/screenshots/apple/iphone-6.9/light/t3-code"
             summary = [f"T3 Code `{REVISION}` · {DEVICE} · iOS {runtime} · {scale:g}×",
                        "The upstream harness waited for each native scene to report its route and content ready.",

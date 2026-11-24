@@ -4,6 +4,7 @@ on:
     paths:
       - .github/workflows/ios-t3-showcase.yml
       - scripts/check-ios-t3-showcase.py
+      - scripts/check-ios-t3-showcase.swift
       - scripts/check-ios-screenshot.swift
   workflow_dispatch:
     inputs:
@@ -24,6 +25,11 @@ jobs:
       EXPO_NO_TELEMETRY: '1'
       COCOAPODS_DISABLE_STATS: 'true'
       T3CODE_TELEMETRY_ENABLED: 'false'
+      T3CODE_MOBILE_UPDATES_ENABLED: '0'
+      EXPO_PUBLIC_SHOWCASE: '1'
+      REACT_NATIVE_PACKAGER_HOSTNAME: '127.0.0.1'
+      # expo-dev-launcher gives an embedded bundle precedence over the requested local Metro URL.
+      SKIP_BUNDLING: '1'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
