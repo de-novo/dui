@@ -1,4 +1,5 @@
 import { ArrowRight, Search, Layers, Map as MapIcon } from "lucide-react";
+import { DiscoveryLimitations, NativeSourceEvidence } from "../../components/NativeSourceEvidence";
 import { Button } from "../../components/ui/button";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -102,6 +103,7 @@ export function MobileScreenDeck({
       </div>
 
       <div className="mobile-deck-list">
+        <DiscoveryLimitations limitations={archive.screenDiscovery?.limitations} />
         {archive.screens.map((screen) => {
           const cell = preferredCellForWidth(screen, width);
           const isOverlay = screen.path.includes("#overlay:");
@@ -126,6 +128,7 @@ export function MobileScreenDeck({
           return (
             <article
               key={screen.id}
+              data-screen-id={screen.id}
               className={
                 "mobile-deck-card" +
                 (selectedId === screen.id ? " selected" : "") +
@@ -140,7 +143,7 @@ export function MobileScreenDeck({
                 <div className="mobile-deck-card-head">
                   <span className="mobile-deck-route">
                     {isOverlay && <span className="mobile-modal-tag">MODAL</span>}
-                    <strong>{routeName(screen.path)}</strong>
+                    <strong>{screen.nativeSource?.name ?? routeName(screen.path)}</strong>
                   </span>
                   <span className="mobile-deck-meta">
                     {screenDiff && (
@@ -148,10 +151,17 @@ export function MobileScreenDeck({
                         {screenDiff.kind}
                       </span>
                     )}
-                    {cell?.width ? `${cell.width}px` : `${screen.cells.length}`}
+                    {cell?.width
+                      ? `${cell.width}px`
+                      : screen.nativeSource
+                        ? null
+                        : screen.cells.length}
                   </span>
                 </div>
 
+                {screen.nativeSource && !cell && !src && (
+                  <NativeSourceEvidence source={screen.nativeSource} sourceOnly />
+                )}
                 {src && (
                   <div className="mobile-deck-frame">
                     <img src={src} alt={routeName(screen.path)} loading="lazy" />

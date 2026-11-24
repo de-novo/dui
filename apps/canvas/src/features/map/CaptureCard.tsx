@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NativeSourceEvidence } from "../../components/NativeSourceEvidence";
 import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -63,6 +64,7 @@ export function CaptureCard({
     afterRunKey,
     fallbackSrc,
   );
+  const sourceCard = !resolvedSrc && screen.cells.length === 0 ? screen.nativeSource : undefined;
   const displayedImage =
     resolvedSrc === fallbackSrc
       ? cell?.image
@@ -109,13 +111,15 @@ export function CaptureCard({
       title={screen.path}
     >
       <div
-        className="capture-frame"
+        className={sourceCard ? "source-frame" : "capture-frame"}
         style={
-          naturalW && naturalH
-            ? { aspectRatio: `${naturalW} / ${naturalH}` }
-            : cardWidth && frameHeight
-              ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
-              : undefined
+          sourceCard
+            ? undefined
+            : naturalW && naturalH
+              ? { aspectRatio: `${naturalW} / ${naturalH}` }
+              : cardWidth && frameHeight
+                ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
+                : undefined
         }
       >
         {resolvedSrc ? (
@@ -134,6 +138,8 @@ export function CaptureCard({
               }
             }}
           />
+        ) : sourceCard ? (
+          <NativeSourceEvidence source={sourceCard} sourceOnly />
         ) : (
           <div className="missing-frame-copy">
             <span>{cell ? "Missing image" : "No capture at this width"}</span>
@@ -187,7 +193,7 @@ export function CaptureCard({
         )}
       </div>
       <div className="card-caption">
-        <strong>{routeName(screen.path)}</strong>
+        <strong>{screen.nativeSource?.name ?? routeName(screen.path)}</strong>
         {openComments > 0 && (
           <small className="card-comment-badge" title={openComments + " unresolved comments"}>
             {t.comments} {openComments}

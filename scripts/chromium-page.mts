@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createInterface } from "node:readline";
 
 export function findChrome(): string {
   const candidates = [
@@ -28,39 +29,64 @@ export async function withChromiumPage<T>(verify: (page: ChromiumPage) => Promis
   const chrome = spawn(
     chromeBin,
     [
-      "--headless=new",
+      "--headless",
       "--disable-gpu",
       "--no-sandbox",
+      "--no-first-run",
+      "--no-startup-window",
+      "--disable-dev-shm-usage",
       "--remote-debugging-port=0",
       `--user-data-dir=${userDataDir}`,
     ],
-    { stdio: "ignore" },
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
 
   try {
-    let wsUrl: string | undefined;
-    for (let i = 0; i < 40; i++) {
-      try {
-        const [debugPort] = fs
-          .readFileSync(path.join(userDataDir, "DevToolsActivePort"), "utf8")
-          .split("\n");
-        const targets = (await (
-          await fetch(`http://127.0.0.1:${debugPort}/json`)
-        ).json()) as Array<{
-          type: string;
-          webSocketDebuggerUrl?: string;
-        }>;
-        wsUrl = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
-        if (wsUrl) break;
-      } catch {
-        // Chrome still booting.
+    const endpoint = await new Promise<URL>((resolve, reject) => {
+      let stderr = "";
+      const timer = setTimeout(() => fail("timed out starting DevTools"), 30_000);
+      function fail(reason: string) {
+        clearTimeout(timer);
+        reject(new Error(`${chromeBin}: ${reason}\n${stderr.trim()}`));
       }
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    if (!wsUrl) throw new Error("Failed to attach to headless Chrome CDP");
+      chrome.once("error", (error) => fail(error.message));
+      chrome.once("close", (code, signal) => fail(`Chrome exited (${signal ?? code})`));
+      createInterface({ input: chrome.stderr }).on("line", (line) => {
+        stderr = (stderr + line + "\n").slice(-4096);
+        const match = line.match(/^DevTools listening on (ws:\/\/\S+)/);
+        if (match) {
+          clearTimeout(timer);
+          resolve(new URL(match[1]));
+        }
+      });
+    });
+    const response = await fetch(`http://${endpoint.host}/json/new?about:blank`, {
+      method: "PUT",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`Could not create Chrome page: ${response.status}`);
+    const { webSocketDebuggerUrl } = (await response.json()) as { webSocketDebuggerUrl: string };
 
-    const ws = new WebSocket(wsUrl);
-    await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+    const ws = new WebSocket(webSocketDebuggerUrl);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Chrome page WebSocket timed out")), 10_000);
+      ws.addEventListener(
+        "open",
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
+      ws.addEventListener(
+        "error",
+        () => {
+          clearTimeout(timer);
+          reject(new Error("Chrome page WebSocket failed"));
+        },
+        { once: true },
+      );
+    });
     let msgId = 1;
     const call = (method: string, params: Record<string, unknown> = {}) =>
       new Promise<Record<string, unknown>>((resolve, reject) => {

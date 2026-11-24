@@ -178,10 +178,12 @@ impl DuiDesktopView {
                 .runs
                 .iter()
                 .position(|r| {
-                    r.screens
-                        .iter()
-                        .flat_map(|s| s.cells.iter())
-                        .any(|c| c.status_kind == "verified" && c.blob_path.is_some())
+                    r.screens.iter().any(|screen| {
+                        screen.native_source.is_some()
+                            || screen.cells.iter().any(|cell| {
+                                cell.status_kind == "verified" && cell.blob_path.is_some()
+                            })
+                    })
                 })
                 .unwrap_or(0)
         };
@@ -500,8 +502,12 @@ impl DuiDesktopView {
         let project_id = run.project_id.clone();
         let run_id = run.id.clone();
         let screen_path = screen.path.clone();
+        let screen_anchor = || NewCommentAnchor::Screen {
+            id: screen.id.clone(),
+            path: screen.path.clone(),
+        };
         let anchor = match &self.comment_target {
-            CommentTargetChoice::Screen => NewCommentAnchor::Screen(screen_path),
+            CommentTargetChoice::Screen => screen_anchor(),
             CommentTargetChoice::Cell => {
                 if let Some(cell) = self.active_cell() {
                     NewCommentAnchor::Cell {
@@ -510,7 +516,7 @@ impl DuiDesktopView {
                         width_px: cell.width_px,
                     }
                 } else {
-                    NewCommentAnchor::Screen(screen_path)
+                    screen_anchor()
                 }
             }
             CommentTargetChoice::Transition(to_path) => NewCommentAnchor::Transition {
@@ -1489,7 +1495,7 @@ impl DuiDesktopView {
         };
 
         let layout = compute_layout(&run.screens, self.selected_width);
-        let open_by_path = self.workspace.open_comments_by_path(&run.project_id);
+        let open_by_screen = self.workspace.open_comments_by_screen(&run.project_id);
         let selected_idx = self.selected_screen;
         let selection = focus_active.then_some(selected_idx);
         let active_edge_focus = selection.or(self.hovered_screen);
@@ -1783,7 +1789,8 @@ impl DuiDesktopView {
             let is_related = focus_active && !is_selected && related_indices.contains(&idx);
             let is_dimmed = (focus_active && !related_indices.contains(&idx))
                 || (canvas_diff_active && screen_diff.is_none());
-            let open_comments = open_by_path.get(&screen.path).copied().unwrap_or(0);
+            let open_comments = open_by_screen.get(&screen.id).copied().unwrap_or(0)
+                + open_by_screen.get(&screen.path).copied().unwrap_or(0);
             let unverified = screen
                 .cells
                 .iter()
@@ -1931,7 +1938,7 @@ impl DuiDesktopView {
                     .justify_center()
                     .bg(p.background)
                     .child(
-                        Label::new("No image")
+                        Label::new(screen.missing_preview(true))
                             .text_xs()
                             .text_color(p.muted_foreground),
                     )
@@ -2335,7 +2342,7 @@ impl DuiDesktopView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child(Label::new("No image").text_color(p.muted_foreground))
+                    .child(Label::new(screen.missing_preview(false)).text_color(p.muted_foreground))
             };
             div().absolute().inset_0().child(full_preview)
         } else {
@@ -2378,7 +2385,7 @@ impl DuiDesktopView {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(Label::new("No image").text_color(p.muted_foreground))
+                        .child(Label::new(screen.missing_preview(false)).text_color(p.muted_foreground))
                 })
                 .child(
                     Label::new(route_short_name(&screen.path))
@@ -2433,7 +2440,7 @@ impl DuiDesktopView {
                                 .items_center()
                                 .justify_center()
                                 .child(
-                                    Label::new("No image")
+                                    Label::new(run.screens[p_idx].missing_preview(false))
                                         .text_xs()
                                         .text_color(p.muted_foreground),
                                 )
@@ -2691,10 +2698,7 @@ impl DuiDesktopView {
         }
 
         // Comment target pills
-        let active_w = self
-            .active_cell()
-            .map(|c| c.width_px)
-            .unwrap_or(self.selected_width);
+        let active_w = self.active_cell().map(|cell| cell.width_px);
         let mut target_bar = div()
             .flex()
             .flex_wrap()
@@ -2713,20 +2717,22 @@ impl DuiDesktopView {
                         cx.notify();
                     })),
             )
-            .child(
-                Button::new("cmt-target-cell")
-                    .label(format!("{} {active_w}px", tr.target_width))
-                    .when(self.comment_target == CommentTargetChoice::Cell, |b| {
-                        b.primary()
-                    })
-                    .when(self.comment_target != CommentTargetChoice::Cell, |b| {
-                        b.outline()
-                    })
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.comment_target = CommentTargetChoice::Cell;
-                        cx.notify();
-                    })),
-            );
+            .when_some(active_w, |bar, active_w| {
+                bar.child(
+                    Button::new("cmt-target-cell")
+                        .label(format!("{} {active_w}px", tr.target_width))
+                        .when(self.comment_target == CommentTargetChoice::Cell, |b| {
+                            b.primary()
+                        })
+                        .when(self.comment_target != CommentTargetChoice::Cell, |b| {
+                            b.outline()
+                        })
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.comment_target = CommentTargetChoice::Cell;
+                            cx.notify();
+                        })),
+                )
+            });
         if let Some(first_edge) = screen.outgoing.first() {
             let to = first_edge.to_path.clone();
             let active = self.comment_target == CommentTargetChoice::Transition(to.clone());
@@ -2752,8 +2758,10 @@ impl DuiDesktopView {
             .iter()
             .filter(|c| {
                 c.project_id == run.project_id
-                    && (c.screen_path.as_deref() == Some(screen.path.as_str())
-                        || c.screen_path.is_none())
+                    && c.screen_id.as_ref().map_or_else(
+                        || c.screen_path.as_ref().is_none_or(|path| path == &screen.path),
+                        |id| id == &screen.id,
+                    )
             })
             .cloned()
             .collect();
@@ -3371,6 +3379,13 @@ impl DuiDesktopView {
                                             .text_xs()
                                             .text_color(p.muted_foreground),
                                     )
+                                    .when_some(screen.native_source.as_ref(), |header, origin| {
+                                        header.child(
+                                            Label::new(format!("{}:{}", origin.source, origin.line))
+                                                .text_xs()
+                                                .text_color(p.muted_foreground),
+                                        )
+                                    })
                                     .child(
                                         Label::new(tr.archive)
                                             .text_xs()
@@ -3400,31 +3415,33 @@ impl DuiDesktopView {
                                     ),
                             ),
                     )
-                    // `1:1` inspect toggle
-                    .child(
-                        Button::new("inspector-1x-toggle")
-                            .label(if self.full_1x_detail {
-                                tr.back_to_overview
-                            } else {
-                                tr.inspect_1x
-                            })
-                            .outline()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.full_1x_detail = !this.full_1x_detail;
-                                cx.notify();
-                            })),
-                    )
-                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
-                    .child(
-                        Label::new(if multiple_states {
-                            tr.states_and_widths
-                        } else {
-                            tr.widths
-                        })
-                        .text_xs()
-                        .text_color(p.muted_foreground),
-                    )
-                    .child(cells_col)
+                    .when(!screen.cells.is_empty(), |panel| {
+                        panel
+                            .child(
+                                Button::new("inspector-1x-toggle")
+                                    .label(if self.full_1x_detail {
+                                        tr.back_to_overview
+                                    } else {
+                                        tr.inspect_1x
+                                    })
+                                    .outline()
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.full_1x_detail = !this.full_1x_detail;
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                            .child(
+                                Label::new(if multiple_states {
+                                    tr.states_and_widths
+                                } else {
+                                    tr.widths
+                                })
+                                .text_xs()
+                                .text_color(p.muted_foreground),
+                            )
+                            .child(cells_col)
+                    })
                     .when_some(inspector_diff_box, |el, diff_box| el.child(diff_box))
                     .when_some(diagnostic_box, |el, diag| el.child(diag))
                     .when_some(element_inspector_box, |el, el_box| el.child(el_box))
@@ -3869,6 +3886,7 @@ impl DuiDesktopView {
             .map(RunItem::widths)
             .unwrap_or_else(|| vec![1280]);
 
+        let has_widths = !widths.is_empty();
         let mut width_row = div().flex().flex_wrap().gap_2();
         for w in widths {
             let active = w == self.selected_width;
@@ -3934,13 +3952,16 @@ impl DuiDesktopView {
                                 }),
                             )),
                     )
-                    .child(
-                        Label::new(tr.widths)
-                            .text_xs()
-                            .text_color(p.muted_foreground),
-                    )
-                    .child(width_row)
-                    .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                    .when(has_widths, |panel| {
+                        panel
+                            .child(
+                                Label::new(tr.widths)
+                                    .text_xs()
+                                    .text_color(p.muted_foreground),
+                            )
+                            .child(width_row)
+                            .child(div().h(px(1.0)).w_full().bg(p.glass_line))
+                    })
                     .child(
                         div()
                             .flex()
@@ -4065,7 +4086,10 @@ fn collect_elements(window: &Window) -> Vec<Value> {
         .elements()
         .into_iter()
         .filter_map(|el| {
-            let label = el.label()?;
+            let label = match el.role() {
+                Some(gpui_kit::Role::Label) => el.label().or_else(|| el.value()),
+                _ => el.label(),
+            }?;
             let trimmed = label.trim();
             if trimmed.is_empty() {
                 return None;

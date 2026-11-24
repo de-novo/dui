@@ -99,6 +99,11 @@ export type Messages = {
   noCaptureAtWidth: string;
   verified: string;
   unverified: string;
+  sourceDeclaration: string;
+  dynamicRoute: string;
+  discoveryLimitations: string;
+  noDeclaredScreens: string;
+  routeCondition: string;
   unrenderable: string;
   links: string;
   discovered: string;
@@ -252,6 +257,11 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "No capture at this width",
     verified: "Verified",
     unverified: "Unverified",
+    sourceDeclaration: "Source declaration",
+    dynamicRoute: "Dynamic route",
+    discoveryLimitations: "Discovery limitations",
+    noDeclaredScreens: "No screen declarations found",
+    routeCondition: "Condition",
     unrenderable: "Unrenderable",
     links: "Links",
     discovered: "Discovered",
@@ -413,6 +423,11 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "此宽度暂无截图",
     verified: "已验证",
     unverified: "未验证",
+    sourceDeclaration: "源码声明",
+    dynamicRoute: "动态路由",
+    discoveryLimitations: "识别限制",
+    noDeclaredScreens: "未发现屏幕声明",
+    routeCondition: "条件",
     unrenderable: "无法渲染",
     links: "链接",
     discovered: "已发现",
@@ -572,6 +587,11 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "이 폭의 캡처가 없습니다",
     verified: "검증됨",
     unverified: "미검증",
+    sourceDeclaration: "소스 선언",
+    dynamicRoute: "동적 경로",
+    discoveryLimitations: "화면 탐색의 제약",
+    noDeclaredScreens: "화면 선언을 찾지 못했습니다",
+    routeCondition: "조건",
     unrenderable: "렌더 불가",
     links: "링크",
     discovered: "발견됨",

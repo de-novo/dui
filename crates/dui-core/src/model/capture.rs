@@ -183,10 +183,26 @@ impl Run {
     }
 }
 
+/// Location of a screen declaration, independent of any capture or runtime state.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct NativeSource {
+    pub name: String,
+    pub source: String,
+    pub line: std::num::NonZeroU32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dynamic: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum ScreenOrigin {
     Entry,
+    Native {
+        #[serde(flatten)]
+        declaration: NativeSource,
+    },
     Router {
         file: String,
     },
@@ -208,7 +224,12 @@ pub struct Screen {
 impl Screen {
     pub fn new(path: impl Into<String>, origin: ScreenOrigin) -> Result<Self, DomainError> {
         let path = NonEmptyText::parse("screen_path", path)?;
-        let id = ScreenId::derive(&json!(path.as_str()));
+        let id = match &origin {
+            ScreenOrigin::Native { .. } => ScreenId::derive(&json!([path.as_str(), &origin])),
+            ScreenOrigin::Entry | ScreenOrigin::Router { .. } | ScreenOrigin::Anchor { .. } => {
+                Self::derive_id(path.as_str())
+            }
+        };
         Ok(Self { id, path, origin })
     }
 

@@ -248,6 +248,7 @@ mod tests {
         ScreenItem {
             id: path.into(),
             path: path.into(),
+            native_source: None,
             cells: Vec::new(),
             outgoing: to
                 .map(|t| EdgeItem {
@@ -306,6 +307,7 @@ mod tests {
         let make_tall = |path: &str, h: u32| ScreenItem {
             id: path.into(),
             path: path.into(),
+            native_source: None,
             cells: vec![CellItem {
                 id: format!("c-{path}"),
                 state_id: "s0".into(),

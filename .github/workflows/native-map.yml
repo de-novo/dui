@@ -1,0 +1,73 @@
+name: Cross-platform screen map
+on:
+  pull_request:
+    paths:
+      - "adapters/native-map/**"
+      - "crates/dui/src/main.rs"
+      - "crates/dui/src/analysis.rs"
+      - "crates/dui/src/native_map.rs"
+      - "crates/dui/src/screen_map.rs"
+      - "crates/dui/src/universal_web.rs"
+      - "crates/dui-core/src/model/capture.rs"
+      - "crates/dui-storage/src/lib.rs"
+      - "apps/canvas/src/**"
+      - "scripts/check-native-map*.mts"
+      - "scripts/check-map-url.mts"
+      - "scripts/chromium-page.mts"
+      - ".github/workflows/native-map.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1
+        with:
+          sdk: 3.14.1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: flutter/samples
+          ref: a5bccd247163b1017d2eb9320cf3b94a95ccfb5e
+          sparse-checkout: compass_app/app
+          path: .samples
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: stablyai/orca
+          ref: 55049f5745a7a6c1755e6d9c6641bb02f158fcc5
+          sparse-checkout: mobile
+          path: .orca
+          persist-credentials: false
+      - name: Fetch the pinned T3 Code mobile sources
+        env:
+          T3_REVISION: 0e34fe98f2bcf76f0f611d4dc34c078728bc8b7f
+        run: |
+          # The pinned tree has unrelated gitlinks missing from .gitmodules.
+          git clone --depth=1 --filter=blob:none --sparse --revision="$T3_REVISION" https://github.com/pingdotgg/t3code.git .t3code
+          git -C .t3code sparse-checkout set apps/mobile
+      - name: Check router declarations
+        run: |
+          npm ci
+          node --test adapters/native-map/js.test.mjs
+          cd adapters/native-map/flutter
+          dart pub get --enforce-lockfile
+          dart analyze
+          dart run test/discover_test.dart ../../../.samples/compass_app/app
+      - name: Build and check the archives on desktop and mobile
+        run: |
+          npm ci --prefix apps/canvas
+          cargo build --locked
+          npm install --prefix "$RUNNER_TEMP/t3-syntax" --no-audit --no-fund --ignore-scripts typescript@6.0.3
+          ln -s "$RUNNER_TEMP/t3-syntax/node_modules" .t3code/apps/mobile/node_modules
+          ln -s "$GITHUB_WORKSPACE/node_modules" .orca/mobile/node_modules
+          DUI_CHROMIUM="$(command -v google-chrome)"
+          export DUI_CHROMIUM
+          "$DUI_CHROMIUM" --version
+          node scripts/check-native-map.mts .t3code/apps/mobile .orca/mobile .samples/compass_app/app
+          node scripts/check-map-url.mts
