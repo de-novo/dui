@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #0b0b0e;
   --surface: #131318;
   --surface-2: #1a1a22;
@@ -17,6 +18,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #fafafa;
   --surface: #ffffff;
   --surface-2: #f4f4f5;
@@ -372,6 +374,23 @@ h1 {
   margin-bottom: 10px;
 }
 
+.card:has(> pre.code-block) {
+  display: flex;
+  flex-direction: column;
+}
+
+.card:has(> pre.code-block) > .step-num {
+  align-self: flex-start;
+}
+
+.card > pre.code-block:last-child {
+  margin-top: auto;
+}
+
+.card:has(> pre.code-block) > p {
+  margin-bottom: 12px;
+}
+
 pre.code-block {
   margin: 12px 0 0;
   padding: 14px 16px;
@@ -586,24 +605,16 @@ dialog::backdrop {
   .site-nav {
     order: 3;
     flex: 1 1 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
     gap: 4px;
     padding-top: 6px;
     border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .site-nav::-webkit-scrollbar {
-    display: none;
   }
 
   .site-nav a {
-    flex: none;
-    white-space: nowrap;
-    padding: 5px 10px;
+    flex: 1 0 auto;
+    padding: 5px 4px;
     font-size: 13px;
+    text-align: center;
   }
 
   main {
@@ -689,5 +700,12 @@ dialog::backdrop {
   .grid-2,
   .grid-3 {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 22.5rem) {
+  .site-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
