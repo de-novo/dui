@@ -83,6 +83,7 @@ dui audit <run-dir>
 | 分组 | 命令 | 用途 |
 | --- | --- | --- |
 | 捕获 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 自动发现/捕获界面与模态框，或在不启动浏览器的情况下输出编译器事实与自动模拟 |
+| 复验失败项 | `dui recheck RUN [PROJECT [MANIFEST]]` | 仅重新渲染上次捕获未通过的单元格，并报告已恢复的项目 |
 | 认证 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 保存 Playwright 兼容的 `storageState.json`（`0600` 权限） |
 | 查看 | `dui open [RUN_DIR]` · `dui desktop` | 内置 2D Web 画布或原生 GPUI 桌面查看器 |
 | 对比与质量 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 元素级与像素级 Diff、99% 覆盖率审计、评审评论 |

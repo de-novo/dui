@@ -13,6 +13,7 @@
     "check:m1": "tsc --project scripts && cargo build --locked && node scripts/check-m1-gates.mts",
     "check:i18n": "tsc --project scripts && cargo build --locked && node scripts/check-i18n.mts",
     "check:cache": "tsc --project scripts && cargo build --locked && node scripts/check-cache.mts",
+    "check:recheck": "tsc --project scripts && cargo test --locked -p dui recheck && cargo build --locked && node scripts/check-recheck.mts",
     "check:diff": "tsc --project scripts && cargo build --locked && node scripts/check-diff.mts",
     "check:viewer": "tsc --project scripts && cargo build --locked && node scripts/check-viewer.mts",
     "check:transitions": "tsc --project scripts && cargo build --locked && node scripts/check-transitions.mts",

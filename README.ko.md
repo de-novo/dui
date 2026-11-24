@@ -85,6 +85,7 @@ dui audit <run-dir>
 | 분류 | 명령어 | 역할 |
 | --- | --- | --- |
 | 캡처 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 화면·모달 자동 발견·캡처 또는 브라우저 없이 컴파일러 사실/목 출력 |
+| 실패 항목 재검증 | `dui recheck RUN [PROJECT [MANIFEST]]` | 이전 캡처에서 검증에 실패한 항목만 다시 렌더링하고 해결 여부를 확인 |
 | 인증 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 인증된 화면 캡처용 `storageState.json` 저장(`0600`) |
 | 뷰어 | `dui open [RUN_DIR]` · `dui desktop` | 내장 2D 웹 캔버스 또는 네이티브 GPUI 데스크톱 뷰어 |
 | 비교 · 품질 | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 요소/픽셀 Diff, 99% 커버리지 감사, 리뷰 코멘트 |

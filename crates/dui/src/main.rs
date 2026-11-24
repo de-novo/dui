@@ -10,6 +10,7 @@ mod ios;
 mod live;
 mod mcp;
 mod nextjs;
+mod recheck;
 mod reference;
 mod replay;
 mod retry;
@@ -339,6 +340,7 @@ CAPTURE
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
+  dui recheck RUN [PROJECT [MANIFEST]]    Re-render unsuccessful cells with current project conditions
   dui scan [PROJECT] [MANIFEST]           Print compiler facts, controls, and auto-mocks (no browser)
   dui transitions PROJECT MANIFEST [RUN]  Replay actions and verify screen transitions
 
@@ -780,6 +782,21 @@ fn run() -> Reply {
             _ => return Err(failure(2, "expected prune [--max-bytes BYTES]")),
         };
         return archive::prune(max_bytes);
+    }
+    if let [cmd, rest @ ..] = args.as_slice()
+        && cmd == "recheck"
+    {
+        let [run, options @ ..] = rest else {
+            return Err(failure(2, "expected recheck RUN [PROJECT [MANIFEST]]"));
+        };
+        if options.len() > 2 {
+            return Err(failure(2, "expected recheck RUN [PROJECT [MANIFEST]]"));
+        }
+        return recheck::run(
+            Path::new(run),
+            options.first().map(Path::new).unwrap_or(Path::new(".")),
+            options.get(1).map(Path::new),
+        );
     }
     if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "run"

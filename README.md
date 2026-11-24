@@ -85,6 +85,7 @@ dui audit <run-dir>
 | Group | Command | Purpose |
 | --- | --- | --- |
 | Capture | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | Discover/capture screens & modals or print compiler facts without launching a browser |
+| Retry failed cells | `dui recheck RUN [PROJECT [MANIFEST]]` | Re-render only unsuccessful cells from a capture and report which ones recovered |
 | Auth | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | Save Playwright-compatible `storageState.json` (`0600`) for authenticated routes |
 | View | `dui open [RUN_DIR]` · `dui desktop` | Embedded 2D web canvas or native GPUI desktop viewer |
 | Diff & Quality | `dui diff --base BRANCH [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage audit, review comments |

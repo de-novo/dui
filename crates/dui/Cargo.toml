@@ -6,6 +6,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+serde.workspace = true
 serde_json.workspace = true
 dui-core.workspace = true
 dui-ports.workspace = true

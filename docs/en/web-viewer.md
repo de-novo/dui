@@ -33,6 +33,8 @@ Use **Find screen** or `Cmd+K` / `Ctrl+K` to filter captured routes. The arrow k
 
 New Chromium captures include `screenEvidence` in CLI and MCP `inspect` and in both inspectors. Capture status records the capture checks. Screen verification additionally requires a successful document response, the requested route (or an accepted entry redirect), a settled page, and a visible element matching the project’s `readySelector`. A default readiness selector leaves screen identity unverified. A unique same-origin canonical link is automatically compared with the observed route. The observed heading is evidence the reviewer can read. Older archives retain their recorded evidence.
 
+From the project directory, run `dui recheck RUN` to retry cells whose capture was unverified or unrenderable, or whose recorded screen verification failed. Each retry uses the archived path, state inputs, width and locale with the current project and fresh rendering. Pass `dui recheck RUN PROJECT MANIFEST` for a custom manifest. The MCP tool `recheck` takes `run`, `project` and an optional `manifest`. A new archive contains only the selected cells, links back to the source in `recheck.source`, and reports `selected`, `skipped`, `resolved` and `remaining`. The CLI exits with `5` if a target still lacks evidence. When all source cells passed, it exits with `0` without launching a renderer or creating an archive.
+
 The map initially estimates each frame from the capture. Once rendered, measured card heights, including captions, determine row placement and link clearance. Image loads and subsequent size changes update those measurements.
 
 ### Viewer design system
