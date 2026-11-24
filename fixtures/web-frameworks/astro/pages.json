@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/",
+    "heading": "Fossil atlas",
+    "body": "Explore specimens from the coastal shelf.",
+    "next": "/collection"
+  },
+  {
+    "path": "/collection",
+    "heading": "Specimen collection",
+    "body": "Browse the catalog of identified specimens.",
+    "next": "/collection/ammonite"
+  },
+  {
+    "path": "/collection/ammonite",
+    "heading": "Ammonite specimen",
+    "body": "A spiral shell from the Jurassic period.",
+    "next": "/"
+  }
+]

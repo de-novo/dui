@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/",
+    "heading": "Trail journal",
+    "body": "Field notes from the reserve.",
+    "next": "/walks"
+  },
+  {
+    "path": "/walks",
+    "heading": "Recorded walks",
+    "body": "Browse the hikes recorded this season.",
+    "next": "/walks/fern-loop"
+  },
+  {
+    "path": "/walks/fern-loop",
+    "heading": "Fern loop",
+    "body": "The stream crossing is clear near the north trailhead.",
+    "next": "/"
+  }
+]

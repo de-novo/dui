@@ -8,6 +8,8 @@
 
 可使用 `dui map . --url http://localhost:4200/` 通过共享 Chromium 流程为运行中的本地 Web 应用生成地图。框架支持表描述编译器集成范围。React Navigation、Expo Router 和 Flutter 还可以从源码发现路由声明。参见[屏幕地图约定](web-viewer.md)。
 
+构建目录测试使用 `dui map . --build-dir dist` 运行已构建的 Vue Router、SvelteKit、Astro 和 Preact 应用，在两种宽度下验证链接页面。
+
 ## 采用的原则
 
 1. **只用官方编译器。** 类型来自项目已在使用的编译器（`tsc`、`rustc`、`swiftc`、`kotlinc`、`dart`）。

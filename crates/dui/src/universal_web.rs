@@ -141,7 +141,11 @@ fn percent_decode(input: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-fn resolve_static_file(root: &Path, raw_target: &str, spa_fallback: bool) -> Option<PathBuf> {
+pub(crate) fn resolve_static_file(
+    root: &Path,
+    raw_target: &str,
+    spa_fallback: bool,
+) -> Option<PathBuf> {
     let path_only = raw_target.split(['?', '#']).next().unwrap_or("/");
     let decoded = percent_decode(path_only);
     let trimmed = decoded.trim_start_matches('/');
@@ -428,7 +432,10 @@ pub(crate) fn collect_static_source_files(project: &Path, root_rel: &str) -> Vec
         children.sort();
         for path in children {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name.starts_with('.') || matches!(name, "node_modules" | "target" | "dist") {
+            if path.is_symlink()
+                || name.starts_with('.')
+                || matches!(name, "node_modules" | "target" | "dist")
+            {
                 continue;
             }
             if path.is_dir() {

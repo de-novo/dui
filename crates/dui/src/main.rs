@@ -352,8 +352,8 @@ const CLI_HELP: &str = "\
 dui — real UI state capture, screen map, and diff
 
 CAPTURE
+  dui map [PROJECT] [--url URL | --build-dir DIR]   Map source, a running app or built web pages
   dui map attach SOURCE_RUN RECORDINGS_JSON  Attach identified runtime PNGs to native source cards
-  dui map [PROJECT] [--url URL]           Discover screens from source or a running loopback web app
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
@@ -441,19 +441,29 @@ fn run() -> Reply {
                 Err(failure(2, "expected map attach SOURCE_RUN RECORDINGS_JSON"))
             }
             [] => screen_map::capture(Path::new(".")),
-            [root] if root != "--url" => screen_map::capture(Path::new(root)),
-            [flag, raw] | [_, flag, raw] if flag == "--url" => {
+            [root] if root != "--url" && root != "--build-dir" => {
+                screen_map::capture(Path::new(root))
+            }
+            [flag, raw] | [_, flag, raw] if flag == "--url" || flag == "--build-dir" => {
                 let project = if rest.len() == 3 {
                     Path::new(&rest[0])
                 } else {
                     Path::new(".")
                 };
-                let url = raw
-                    .to_str()
-                    .ok_or_else(|| failure(2, "expected a UTF-8 URL"))?;
-                screen_map::capture_target(project, Some(url))
+                let target = if flag == "--build-dir" {
+                    screen_map::WebTarget::BuildDir(Path::new(raw))
+                } else {
+                    screen_map::WebTarget::Url(
+                        raw.to_str()
+                            .ok_or_else(|| failure(2, "expected a UTF-8 URL"))?,
+                    )
+                };
+                screen_map::capture_target(project, Some(target))
             }
-            _ => Err(failure(2, "expected map [PROJECT] [--url URL]")),
+            _ => Err(failure(
+                2,
+                "expected map [PROJECT] [--url URL | --build-dir DIR]",
+            )),
         };
     }
     if let [flag] = args.as_slice()

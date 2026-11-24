@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/",
+    "heading": "Observation log",
+    "body": "Review recent observations from the ridge station.",
+    "next": "/nights"
+  },
+  {
+    "path": "/nights",
+    "heading": "Clear nights",
+    "body": "Two clear nights were recorded this week.",
+    "next": "/nights/perseid"
+  },
+  {
+    "path": "/nights/perseid",
+    "heading": "Perseid watch",
+    "body": "Eighteen meteors crossed the northeast sky.",
+    "next": "/"
+  }
+]
