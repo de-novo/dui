@@ -37,6 +37,8 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 评审 PR 时先捕获两个分支，再运行 `dui diff --base main --regressions-only --markdown`。比较使用各分支上该应用的最新捕获，跳过选择性复验和实时编辑记录。要指定确切的运行目录，使用 `dui diff BEFORE AFTER --regressions-only`。工具按路由、场景、状态、宽度和语言区域匹配单元格，分别比较捕获验证与页面验证。只有基准分支已通过、变更分支有明确未通过记录的检查才计为回归。JSON 在 `verification.regressions` 中列出受影响的单元格，同时报告已比较的检查数和未匹配的单元格数。缺少证据的检查保持未知。比较完成时，确认有回归的 CLI 退出码为 `5`，无回归为 `0`。没有任何可比较的检查时，判定为 `inconclusive`，仅回归模式的 CLI 退出码为 `2`。向 MCP `diff` 传入 `regressionsOnly: true` 可获得相同的判定数据。
 
+GitHub 的 **Compare base and head captures** 检查在 PR 打开或更新时运行。它检出事件中的两个提交 SHA，使用基准提交构建的同一 dui 二进制文件，为双方共有的每个网页项目分别生成新归档。工具通过 Git 跟踪的 `index.html` 或与 `package.json` 同目录的 `dui.json` 发现项目。嵌套静态页面归入上层项目，npm 应用按锁文件安装依赖。路由、状态输入、宽度、语言区域和就绪条件来自各提交的项目配置和 dui 自动发现。作业摘要显示两个 SHA、未匹配的项目或单元格以及每项新增失败的观测证据。确认回归或无法判定时检查失败，推送修复提交后会重新捕获。
+
 地图先根据捕获数据估算画框尺寸。渲染后，使用包含标题的卡片实测高度计算行位置和连线间距。图片加载或卡片尺寸变化时，地图会重新布局。
 
 ### 查看器设计系统

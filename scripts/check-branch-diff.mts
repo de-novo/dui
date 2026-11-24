@@ -5,7 +5,7 @@
 // 4. Verify CLI `dui diff --base main --project <REPO>` and MCP `diff { baseBranch: "main", project }`
 //    return identical JSON with `beforeBranch: "main"`, `afterBranch: "feat/ui-update"`, and changed cells.
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   cpSync,
   mkdirSync,
@@ -276,6 +276,47 @@ try {
   assert.ok(md.stdout.includes("verified → unverified") && md.stdout.includes("375px"));
   assert.ok(!md.stdout.includes("existing.html"));
   assert.ok(md.stdout.includes("#wide") && md.stdout.includes("visible false"));
+  // Execute the PR check itself on separate exact Git checkouts. A repair commit
+  // must clear the check even though the unrelated route still lacks evidence.
+  const checkout = join(stage, "pinned-base");
+  git(stage, ["clone", "--quiet", "--branch", "main", "--single-branch", site, checkout]);
+  const sha = (dir: string) =>
+    execFileSync("git", ["-C", dir, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const baseSha = sha(checkout);
+  const check = (headSha: string, expected: number) => {
+    const summary = join(stage, "job-summary.md");
+    writeFileSync(summary, "");
+    const run = spawnSync(
+      process.execPath,
+      [join(root, "scripts/pr-captures.mts"), binary, checkout, site, baseSha, headSha],
+      {
+        env: { ...process.env, GITHUB_STEP_SUMMARY: summary },
+        encoding: "utf8",
+      },
+    );
+    assert.equal(run.status, expected, run.stdout + run.stderr);
+    return readFileSync(summary, "utf8");
+  };
+  const brokenSha = sha(site);
+  const brokenSummary = check(brokenSha, 5);
+  assert.ok(brokenSummary.startsWith("# New verification regressions"));
+  assert.ok(brokenSummary.includes(baseSha) && brokenSummary.includes(brokenSha));
+  assert.ok(
+    brokenSummary.includes("375px | ko | screen") && !brokenSummary.includes("existing.html"),
+  );
+  writeFileSync(join(site, "index.html"), html.replace("display:none", "display:block"));
+  const addedApp = join(site, "new-web-app");
+  mkdirSync(addedApp);
+  writeFileSync(join(addedApp, "index.html"), html);
+  writeFileSync(join(addedApp, "dui.json"), JSON.stringify(spec));
+  git(site, ["add", "."]);
+  git(site, ["commit", "-m", "repair mobile Korean screen and add a web app"]);
+  const repaired = check(sha(site), 0);
+  assert.ok(repaired.startsWith("# No new verification regressions"));
+  assert.ok(repaired.includes("16 compared checks"));
+  assert.ok(repaired.includes("new-web-app</code> — present only on the head commit"));
+  const mismatch = check(brokenSha, 2);
+  assert.ok(mismatch.startsWith("# Inconclusive") && mismatch.includes("does not match"));
   console.log(
     JSON.stringify({
       regressedCells: verdict.regressedCells,

@@ -1,0 +1,59 @@
+name: PR verification
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dui-pr-verification-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Compare base and head captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Check out base
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+      - name: Check out head
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+          package-manager-cache: false
+      - name: Build one verifier from the base commit
+        working-directory: base
+        run: |
+          npm ci
+          npm ci --prefix apps/canvas
+          cargo build --locked
+      - name: Capture and compare the PR commits
+        id: compare
+        run: |
+          if ! DUI_CHROMIUM="$(command -v google-chrome)" || ! "$DUI_CHROMIUM" --version; then
+            echo '# Inconclusive — Chrome could not start' >> "$GITHUB_STEP_SUMMARY"
+            exit 2
+          fi
+          export DUI_CHROMIUM
+          node head/scripts/pr-captures.mts base/target/debug/dui base head "$BASE_SHA" "$HEAD_SHA"
+      - name: Report setup failure
+        if: failure() && steps.compare.outcome == 'skipped'
+        run: |
+          echo '# Inconclusive — capture setup failed' >> "$GITHUB_STEP_SUMMARY"
+          echo "Base \`$BASE_SHA\` · Head \`$HEAD_SHA\`" >> "$GITHUB_STEP_SUMMARY"
