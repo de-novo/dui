@@ -14,7 +14,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 
-import { withChromiumPage } from "./chromium-page.mts";
+import { withChromiumPage, type ChromiumPage } from "./chromium-page.mts";
 import { verifyViewerThemes, viewerViewports } from "./verify-viewer-themes.mts";
 
 const root = process.cwd();
@@ -122,13 +122,16 @@ function checkContentPage() {
       language.dispatchEvent(new Event("change", { bubbles: true }));
       const content = rect("main > :first-child");
       const header = rect(".site-header");
+      const brand = rect(".brand");
+      const actions = rect(".header-actions");
       const viewport = document.documentElement.clientWidth;
       const main = document.querySelector("main")!;
       const rightEdge =
         main.getBoundingClientRect().right - parseFloat(getComputedStyle(main).paddingRight);
       if (
-        Math.abs(rect(".brand").left - content.left) > 1 ||
-        Math.abs(rect(".header-actions").right - rightEdge) > 1 ||
+        Math.abs(brand.left - content.left) > 1 ||
+        Math.abs(actions.right - rightEdge) > 1 ||
+        Math.abs(brand.top + brand.height / 2 - (actions.top + actions.height / 2)) > 1 ||
         content.top <= header.bottom ||
         document.documentElement.scrollWidth > viewport + 1
       ) {
@@ -189,9 +192,42 @@ function checkContentPage() {
   }
 }
 
+// All public content pages use the same stylesheet. Chromium resolves its media
+// lengths (including rem) in CSS pixels, so the probes follow stylesheet edits.
+async function contentWidths(page: ChromiumPage, url: string) {
+  await page.call("DOM.enable");
+  await page.call("CSS.enable");
+  await page.call("Page.navigate", { url });
+  await page.call("Runtime.evaluate", {
+    expression:
+      'document.readyState === "complete" || new Promise(resolve => addEventListener("load", () => resolve(true), { once: true }))',
+    awaitPromise: true,
+  });
+  const { medias } = (await page.call("CSS.getMediaQueries")) as {
+    medias: Array<{
+      mediaList?: Array<{ expressions: Array<{ feature: string; computedLength?: number }> }>;
+    }>;
+  };
+  await page.call("CSS.disable");
+  await page.call("DOM.disable");
+  const widths = new Set([320, 390, 768, 1440]);
+  for (const media of medias.flatMap((rule) => rule.mediaList ?? [])) {
+    for (const { feature, computedLength } of media.expressions) {
+      if (computedLength === undefined || !["width", "min-width", "max-width"].includes(feature))
+        continue;
+      const boundary = Math.floor(computedLength);
+      for (const width of [boundary - 1, boundary, boundary + 1]) {
+        if (width >= 320 && width <= 1440) widths.add(width);
+      }
+    }
+  }
+  return [...widths].sort((a, b) => a - b);
+}
+
 async function verifyRenderedPages(port: number, firstRunKey?: string) {
   return withChromiumPage(async (page) => {
     const { call } = page;
+    const widths = await contentWidths(page, `http://127.0.0.1:${port}/index.html`);
     const checks: Array<{
       name: string;
       url: string;
@@ -205,11 +241,11 @@ async function verifyRenderedPages(port: number, firstRunKey?: string) {
         .readdirSync(siteDir)
         .filter((file) => file.endsWith(".html"))
         .flatMap((file) =>
-          [320, 390, 768, 1440].map((width) => ({
+          widths.map((width) => ({
             name: file + "-" + width,
             width,
             height: width < 768 ? 844 : 920,
-            mobile: width < 768,
+            mobile: width <= 390,
             url: `http://127.0.0.1:${port}/${file}`,
             requireSelector:
               file === "index.html" ? (width < 768 ? "[data-copy]" : ".oss-card") : ".hero h1",
