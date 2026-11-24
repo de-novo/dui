@@ -184,7 +184,7 @@ h2 {
   font: var(--text-meta)/1.5 var(--font-mono);
   color: var(--sidebar-muted);
 }
-.rail-theme {
+.workspace-switch + .rail-theme {
   margin-top: auto;
 }
 .rail-theme select {
