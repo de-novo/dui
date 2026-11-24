@@ -63,7 +63,7 @@ pre {
 .wrap {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding-inline: 20px;
 }
 
 .site-header {
@@ -82,7 +82,7 @@ pre {
   gap: 16px;
   min-height: 60px;
   flex-wrap: wrap;
-  padding: 8px 0;
+  padding-block: 8px;
 }
 
 .brand {
@@ -155,7 +155,7 @@ pre {
 }
 
 main {
-  padding: 48px 0 80px;
+  padding-block: 48px 80px;
 }
 
 .hero {
@@ -553,15 +553,15 @@ dialog::backdrop {
   color: var(--fg);
 }
 
-/* Mobile-first polish (<= 680px): 2-row compact header, pinned Copy button, balanced CTA grid */
+/* Mobile-first polish (<= 680px): two-row header, pinned Copy button and wrapping actions */
 @media (max-width: 680px) {
   .wrap {
-    padding: 0 16px;
+    padding-inline: 16px;
   }
 
   .header-inner {
     gap: 8px 10px;
-    padding: 10px 0 8px;
+    padding-block: 10px 8px;
     min-height: 0;
   }
 
@@ -607,7 +607,7 @@ dialog::backdrop {
   }
 
   main {
-    padding: 24px 0 56px;
+    padding-block: 24px 56px;
   }
 
   .hero {
@@ -638,25 +638,26 @@ dialog::backdrop {
     font-size: 12px;
   }
 
-  .hero .cta-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+  .hero .cta-row,
+  .section-head .cta-row {
     width: 100%;
+    gap: 8px;
   }
 
-  .hero .cta-row .btn {
-    width: 100%;
-    padding: 0 8px;
+  .hero .cta-row .btn,
+  .section-head .cta-row .btn {
+    flex: 1 1 max-content;
+    min-width: 0;
+    min-height: 38px;
+    height: auto;
+    padding: 6px 10px;
     font-size: 12.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    text-align: center;
   }
 
   .hero .cta-row .btn-primary {
-    grid-column: 1 / -1;
-    height: 44px;
+    flex-basis: 100%;
+    min-height: 44px;
     font-size: 14.5px;
   }
 
@@ -684,23 +685,9 @@ dialog::backdrop {
     gap: 12px;
   }
 
-  .section-head .cta-row {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .section-head .cta-row .btn {
-    width: 100%;
-    padding: 0 10px;
-    font-size: 12.5px;
-    white-space: nowrap;
-  }
-
   .oss-grid,
   .grid-2,
   .grid-3 {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
