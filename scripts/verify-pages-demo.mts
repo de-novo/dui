@@ -10,30 +10,17 @@
  *   at both mobile (390px) and desktop (1440px)
  * - Mobile `site/demo/` renders the MobileScreenDeck cards (`.mobile-deck-card`)
  */
-import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
-import os from "node:os";
 import path from "node:path";
+
+import { withChromiumPage } from "./chromium-page.mts";
+import { verifyViewerThemes, viewerViewports } from "./verify-viewer-themes.mts";
 
 const root = process.cwd();
 const siteDir = path.join(root, "site");
 const demoDir = path.join(siteDir, "demo");
 const archiveDir = path.join(demoDir, "archive");
-
-function findChrome(): string {
-  const candidates = [
-    process.env.DUI_CHROMIUM,
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ].filter((c): c is string => Boolean(c));
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  throw new Error("Chrome/Chromium binary not found; set DUI_CHROMIUM");
-}
 
 function verifyArchives(): Array<{ key: string; cells: number; populated: number }> {
   const runsPath = path.join(archiveDir, "runs.json");
@@ -124,63 +111,8 @@ function startStaticServer(): Promise<{ server: http.Server; port: number }> {
 }
 
 async function verifyRenderedPages(port: number, firstRunKey: string) {
-  const chromeBin = findChrome();
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dui-pages-verify-"));
-  const debugPort = 9240 + Math.floor(Math.random() * 500);
-  const chrome = spawn(
-    chromeBin,
-    [
-      "--headless=new",
-      "--disable-gpu",
-      "--no-sandbox",
-      `--remote-debugging-port=${debugPort}`,
-      `--user-data-dir=${userDataDir}`,
-    ],
-    { stdio: "ignore" },
-  );
-
-  try {
-    let wsUrl: string | undefined;
-    for (let i = 0; i < 40; i++) {
-      try {
-        const targets = (await (
-          await fetch(`http://127.0.0.1:${debugPort}/json`)
-        ).json()) as Array<{
-          type: string;
-          webSocketDebuggerUrl?: string;
-        }>;
-        wsUrl = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
-        if (wsUrl) break;
-      } catch {
-        // Chrome still booting.
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    if (!wsUrl) throw new Error("Failed to attach to headless Chrome CDP");
-
-    const ws = new WebSocket(wsUrl);
-    await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-    let msgId = 1;
-    const call = (method: string, params: Record<string, unknown> = {}) =>
-      new Promise<Record<string, unknown>>((resolve, reject) => {
-        const cur = msgId++;
-        const onMsg = (ev: MessageEvent) => {
-          const msg = JSON.parse(String(ev.data)) as {
-            id?: number;
-            result?: Record<string, unknown>;
-            error?: { message?: string };
-          };
-          if (msg.id !== cur) return;
-          ws.removeEventListener("message", onMsg);
-          if (msg.error) reject(new Error(msg.error.message || method));
-          else resolve(msg.result ?? {});
-        };
-        ws.addEventListener("message", onMsg);
-        ws.send(JSON.stringify({ id: cur, method, params }));
-      });
-
-    await call("Page.enable");
-
+  return withChromiumPage(async (page) => {
+    const { call } = page;
     const checks: Array<{
       name: string;
       url: string;
@@ -188,6 +120,7 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
       height: number;
       mobile: boolean;
       requireSelector: string;
+      verifyThemes?: boolean;
     }> = [
       {
         name: "landing-mobile",
@@ -205,22 +138,12 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         mobile: false,
         requireSelector: ".oss-card",
       },
-      {
-        name: "demo-mobile-deck",
+      ...viewerViewports.map((viewport) => ({
+        ...viewport,
+        verifyThemes: true,
+        name: viewport.mobile ? "demo-mobile-deck" : "demo-desktop-canvas",
         url: `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(firstRunKey)}`,
-        width: 390,
-        height: 844,
-        mobile: true,
-        requireSelector: ".mobile-deck-card img",
-      },
-      {
-        name: "demo-desktop-canvas",
-        url: `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(firstRunKey)}`,
-        width: 1440,
-        height: 920,
-        mobile: false,
-        requireSelector: ".screen-card img",
-      },
+      })),
     ];
 
     async function verifyNodeHover() {
@@ -310,6 +233,9 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         deviceScaleFactor: c.mobile ? 2 : 1,
         mobile: c.mobile,
       });
+      const themes = c.verifyThemes
+        ? await verifyViewerThemes(page, c.url, c.requireSelector)
+        : undefined;
       await call("Page.navigate", { url: c.url });
       await new Promise((r) => setTimeout(r, 1500));
       const evalRes = (await call("Runtime.evaluate", {
@@ -335,7 +261,7 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         await verifyMapClearance();
         val.clearanceAfterResize = true;
       }
-      results.push({ name: c.name, ...val });
+      results.push({ name: c.name, ...val, themes });
       if (!val.found) {
         throw new Error(`Self-dogfood gate failed (${c.name}): missing ${c.requireSelector}`);
       }
@@ -353,17 +279,8 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         throw new Error(`Self-dogfood gate failed (${c.name}): ${val.brokenImgs} broken images`);
       }
     }
-    ws.close();
     return results;
-  } finally {
-    chrome.kill("SIGTERM");
-    await new Promise((r) => setTimeout(r, 250));
-    try {
-      fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 3 });
-    } catch {
-      // Ignore temp profile cleanup race on exit.
-    }
-  }
+  });
 }
 
 async function main() {

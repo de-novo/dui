@@ -45,6 +45,8 @@ The map initially estimates each frame from the capture. Once rendered, measured
 
 The preview uses Tailwind CSS 4.3.5 and the shadcn/ui Base UI preset (`base-nova`). The shared button and dialog were generated with shadcn CLI 4.23.0 and run on `@base-ui/react` 1.9.0. Tailwind reads the same theme tokens as the map.
 
+Apply the saved theme before the first viewer paint. With the system setting, follow device appearance changes even while the archive is loading.
+
 [tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
 
 - **Color and material** — Use solid monochrome canvas surfaces in both themes. Use orange `--primary` (#EF803F) for the dui mark and the primary action. Float the rail and inspector panels over the map with translucent frosted surfaces (light white glass in light mode, smoked charcoal glass in dark mode) using `--blur` (16 px), alongside frosted capture cards.

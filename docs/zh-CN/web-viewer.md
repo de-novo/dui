@@ -45,6 +45,8 @@ GitHub 的 **Compare base and head captures** 检查在 PR 打开或更新时运
 
 预览使用 Tailwind CSS 4.3.5 和 shadcn/ui 的 Base UI 预设（`base-nova`）。通用按钮与对话框由 shadcn CLI 4.23.0 生成，运行时使用 `@base-ui/react` 1.9.0。Tailwind 与屏幕地图共用主题变量。
 
+查看器在首次绘制前应用已保存的主题。选择系统主题时，即使归档仍在加载，也会跟随设备的外观变化。
+
 [tokens.css](../../apps/canvas/src/styles/tokens.css) · [Button](../../apps/canvas/src/components/ui/button.tsx) · [Dialog](../../apps/canvas/src/components/ui/dialog.tsx) · [CaptureCard](../../apps/canvas/src/features/map/CaptureCard.tsx)
 
 - **色彩与材质** — 两种主题的画布底色均使用不透明黑白表面。橙色 `--primary` (#EF803F) 用于 dui 标记和主要操作。侧栏与状态/详情面板均悬浮在地图上方，使用更通透的磨砂玻璃表面（浅色主题为半透明白，深色主题为半透明炭灰），与截图卡片共用 `--blur` (16 px)。

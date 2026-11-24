@@ -6,24 +6,13 @@ import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } f
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
+import { findChrome, withChromiumPage } from "./chromium-page.mts";
+import { verifyViewerThemes, viewerViewports } from "./verify-viewer-themes.mts";
+
 const root = resolve(import.meta.dirname, "..");
 const fixture = join(root, "fixtures/toggle");
 const binary = resolve(process.argv[2] ?? join(root, "target/debug/dui"));
 const stage = mkdtempSync(join(tmpdir(), "dui-viewer-check-"));
-
-function chromeExecutable(): string {
-  const candidates = [
-    process.env.DUI_CHROMIUM,
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/usr/bin/chromium",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-  ];
-  for (const path of candidates) {
-    if (path && existsSync(path)) return path;
-  }
-  throw new Error("Chrome/Chromium executable not found");
-}
 
 function runDui(args: string[], envExtra: Record<string, string>) {
   const res = spawnSync(binary, args, {
@@ -200,7 +189,7 @@ try {
     assert.equal(diff.summary.totalChanged, 0);
 
     // Render the embedded viewer in headless Chrome to verify the React + React Flow bundle mounts.
-    const chrome = chromeExecutable();
+    const chrome = findChrome();
     const dom = execFileSync(
       chrome,
       [
@@ -215,6 +204,20 @@ try {
     );
     assert(dom.includes("Archive"), "expected embedded viewer React UI to mount in Chrome");
 
+    const themes = await withChromiumPage(async (page) => {
+      const results = [];
+      for (const { width, height, mobile, requireSelector } of viewerViewports) {
+        await page.call("Emulation.setDeviceMetricsOverride", {
+          width,
+          height,
+          mobile,
+          deviceScaleFactor: mobile ? 2 : 1,
+        });
+        results.push({ width, themes: await verifyViewerThemes(page, url, requireSelector) });
+      }
+      return results;
+    });
+
     console.log(
       JSON.stringify({
         version: verBody,
@@ -225,6 +228,7 @@ try {
         cellsServed: graph.cells.length,
         legacyHtmlRemoved: true,
         chromeRenderedEmbeddedViewer: true,
+        themes,
       }),
     );
   } finally {

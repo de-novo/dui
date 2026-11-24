@@ -9,12 +9,18 @@ import {
   PanelLeftOpen,
   Sun,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 import { UI_LOCALE_OPTIONS, type UiLocale } from "../../i18n/messages";
 
 type Theme = "system" | "light" | "dark";
+declare global {
+  interface Window {
+    duiTheme: { preference: Theme };
+  }
+}
+
 export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
   const { locale, setLocale, t } = useI18n();
   const [collapsed, setCollapsed] = useState(
@@ -22,21 +28,7 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
       localStorage.getItem("dui.rail") === "collapsed" ||
       (localStorage.getItem("dui.rail") === null && matchMedia("(max-width: 600px)").matches),
   );
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem("dui.theme");
-    return saved === "dark" || saved === "light" ? saved : "system";
-  });
-  useEffect(() => {
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => {
-      document.documentElement.dataset.theme =
-        theme === "system" ? (media.matches ? "dark" : "light") : theme;
-    };
-    apply();
-    media.addEventListener("change", apply);
-    localStorage.setItem("dui.theme", theme);
-    return () => media.removeEventListener("change", apply);
-  }, [theme]);
+  const [theme, setTheme] = useState(() => window.duiTheme.preference);
   function toggle() {
     localStorage.setItem("dui.rail", collapsed ? "expanded" : "collapsed");
     setCollapsed(!collapsed);
@@ -91,7 +83,10 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
         <select
           aria-label={t.theme}
           value={theme}
-          onChange={(e) => setTheme(e.target.value as Theme)}
+          onChange={(e) => {
+            window.duiTheme.preference = e.target.value as Theme;
+            setTheme(window.duiTheme.preference);
+          }}
         >
           <option value="system">{t.themeSystem}</option>
           <option value="light">{t.themeLight}</option>
