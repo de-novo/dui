@@ -2079,21 +2079,32 @@ h2 {
   }
 
   .map .react-flow__controls {
-    min-width: 0;
-    border-radius: 10px;
-    overflow: hidden;
+    gap: var(--space-2);
+    background: transparent;
+    box-shadow: none;
   }
 
   .map .react-flow__controls-button {
-    width: var(--control-height);
-    height: 100%;
-    min-height: var(--control-height);
+    box-sizing: border-box;
+    width: var(--touch-target);
+    min-height: var(--touch-target);
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    touch-action: manipulation;
   }
 
   .map-options {
-    padding-inline: var(--space-3);
+    min-height: var(--touch-target);
     height: auto;
-    border-radius: 10px;
+    min-width: var(--touch-target);
+    padding-inline: var(--space-2);
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .map-options svg {
+    display: none;
   }
 
   .workspace .inspector {
@@ -2177,10 +2188,18 @@ h2 {
   }
 
   .mobile-map-return {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     align-self: flex-start;
     padding: 4px;
     border-radius: 10px;
     pointer-events: auto;
+  }
+
+  .mobile-map-return > button {
+    width: var(--touch-target);
+    height: var(--touch-target);
   }
 
   .mobile-view-switch {

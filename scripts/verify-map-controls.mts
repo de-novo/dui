@@ -75,6 +75,25 @@ async function checkMapControls(mobile: boolean) {
       credit,
       ...document.querySelectorAll(".mobile-map-return button"),
     ]);
+    if (mobile) {
+      const boxes = [...buttons, options]
+        .map((button) => button.getBoundingClientRect())
+        .sort((a, b) => a.left - b.left);
+      for (const [i, box] of boxes.entries()) {
+        if (box.width < 44 || box.height < 44)
+          issues.push(locale + " map touch target " + box.width + "×" + box.height);
+        if (i && box.left - boxes[i - 1].right < 8)
+          issues.push(locale + " adjacent map actions have less than 8px clearance");
+      }
+      const searchTrigger = '.mobile-map-return button[aria-haspopup="dialog"]';
+      const search = await waitFor(searchTrigger);
+      search.focus();
+      search.click();
+      await waitFor(".screen-search-input");
+      const dismissSearch = await waitFor('[role="dialog"] [data-slot="dialog-close"]');
+      dismissSearch.click();
+      await waitFor(searchTrigger + ":focus");
+    }
     const row = options.getBoundingClientRect();
     const nav = controls.getBoundingClientRect();
     if (Math.abs(nav.bottom - row.bottom) > 0.5 || (mobile && Math.abs(nav.top - row.top) > 0.5)) {

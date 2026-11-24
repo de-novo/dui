@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Search } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "./components/ui/dialog";
 import {
@@ -338,6 +339,17 @@ function MapView({
                     <span>{t.mobileViewMap}</span>
                   </button>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t.findScreen}
+                  title={t.findScreen}
+                  aria-haspopup="dialog"
+                  aria-keyshortcuts="Meta+K Control+K"
+                  onClick={openSearch}
+                >
+                  <Search aria-hidden="true" />
+                </Button>
               </div>
             )}
             {staticDemo && runs.length > 1 && (

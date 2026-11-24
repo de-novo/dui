@@ -638,23 +638,25 @@ export function ScreenMap({
           showInteractive={false}
           orientation={desktop ? "vertical" : "horizontal"}
         >
-          <ControlButton
-            onClick={openSearch}
-            aria-label={t.findScreen}
-            title={t.findScreen + " (⌘/Ctrl K)"}
-            aria-keyshortcuts="Meta+K Control+K"
-          >
-            <Search aria-hidden="true" />
-          </ControlButton>
           {desktop && (
-            <ControlButton
-              onClick={() => setMiniMap((open) => !open)}
-              aria-label={t.miniMap}
-              aria-pressed={miniMap}
-              title={t.miniMap}
-            >
-              <MapIcon aria-hidden="true" />
-            </ControlButton>
+            <>
+              <ControlButton
+                onClick={openSearch}
+                aria-label={t.findScreen}
+                title={t.findScreen + " (⌘/Ctrl K)"}
+                aria-keyshortcuts="Meta+K Control+K"
+              >
+                <Search aria-hidden="true" />
+              </ControlButton>
+              <ControlButton
+                onClick={() => setMiniMap((open) => !open)}
+                aria-label={t.miniMap}
+                aria-pressed={miniMap}
+                title={t.miniMap}
+              >
+                <MapIcon aria-hidden="true" />
+              </ControlButton>
+            </>
           )}
           <ZoomOneToOneButton
             fitOptions={fitOptions}

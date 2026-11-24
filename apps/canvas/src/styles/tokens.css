@@ -44,6 +44,7 @@
   --radius-control: 6px;
   --radius-panel: 12px;
   --control-height: 2.25rem;
+  --touch-target: 2.75rem;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
