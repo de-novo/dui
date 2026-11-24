@@ -2,6 +2,22 @@
 
 English · [한국어](../ko/roadmap.md) · [简体中文](../zh-CN/roadmap.md)
 
+## Goal
+
+Today, the sources of truth for making a product are split across planning documents, Figma designs, and code. dui unifies development and UI work around one source: the code itself. The screen map and design view are generated from that code, and UI edits go back into the same code, so a separate design file cannot drift.
+
+**What this means**
+
+- Review and edit the UI against what the code actually renders.
+- Changes made in the map land in the same codebase that ships.
+
+**What this is not**
+
+- A standalone design tool with its own file format.
+- Supporting every platform first. React Native, Flutter, iOS, Android, and mapping an arbitrary local app from a URL ([#236](https://github.com/de-novo/dui/issues/236), [#237](https://github.com/de-novo/dui/issues/237)) come later, unless they directly serve this goal.
+
+**Current focus.** Close the loop: generate the map from code, and write UI edits back into that code (the code-based canvas work planned for v0.3.0). Broader platform coverage and packaging can wait.
+
 dui maps the screens an app actually renders so a reviewer can follow a task from start to finish. Screens are the landmarks. Each screen opens into its states and viewport widths. A connection records the action that leads to another screen or state.
 
 **A review should answer a concrete question.** After cancelling an order on a phone, where does the user land? The reviewer follows the path from order details through confirmation, opens the result at mobile width and records what feels unclear. An agent fixes the code. The reviewer returns to the same point on the map and compares the two worktrees.
@@ -46,6 +62,8 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 **Render only what changed.** Reuse cells whose inputs are unchanged and store each image once ([cache](https://github.com/de-novo/dui/issues/8)). Compare two captures by listing only the changed cells ([diff](https://github.com/de-novo/dui/issues/11)).
 
 ## Later milestones
+
+New surfaces and packaging stay later unless they serve the goal above. That includes React Native, Flutter, iOS, Android, mapping a local app from a URL ([#236](https://github.com/de-novo/dui/issues/236), [#237](https://github.com/de-novo/dui/issues/237)), and follow-ups such as [#239](https://github.com/de-novo/dui/issues/239) and [#240](https://github.com/de-novo/dui/issues/240). Prebuilt binaries and Homebrew ([#176](https://github.com/de-novo/dui/issues/176)) wait until the product is stable. The next step that does serve the goal is writing UI edits back into the code (v0.3.0).
 
 | Version | Outcome |
 | --- | --- |

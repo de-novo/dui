@@ -4,6 +4,8 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 dui captures a running web or GPUI app across UI states and viewport widths. It reads the app’s official compiler types, generates mock responses, and checks what was actually rendered. Browse the screen map, live sessions, and diffs in the embedded web viewer (`dui open`) or consume the same results as JSON through the CLI or MCP.
 
+**Goal.** Today planning documents, Figma designs, and code are separate sources of truth. dui makes the code itself the single source of truth for development and UI work: the screen map is generated from the code, and UI edits go back into the same code.
+
 [Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md) · [Full stack matrix](docs/en/supported-frameworks.md)
 
 ## What dui analyzes
