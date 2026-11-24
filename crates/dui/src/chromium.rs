@@ -980,6 +980,13 @@ impl Browser {
                 }),
             );
         }
+        if target_h > vp_h {
+            self.call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": "globalThis.__duiRuntime.setCaptureGutter(true)"}),
+            )?;
+        }
         if (expanded_shell || target_h > vp_h)
             && let Ok(refreshed) = self.call(
                 s,
@@ -1008,7 +1015,14 @@ impl Browser {
         } else {
             json!({"format": "png"})
         };
-        let data = self.call(s, "Page.captureScreenshot", shot_params)?;
+        let screenshot = self.call(s, "Page.captureScreenshot", shot_params);
+        if target_h > vp_h {
+            self.call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": "globalThis.__duiRuntime.setCaptureGutter(false)"}),
+            )?;
+        }
         if expanded_shell {
             let _ = self.call(
                 s,
@@ -1016,6 +1030,7 @@ impl Browser {
                 json!({"width": width, "height": 800, "deviceScaleFactor": 1, "mobile": false}),
             );
         }
+        let data = screenshot?;
         fs::write(
             png,
             STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?,

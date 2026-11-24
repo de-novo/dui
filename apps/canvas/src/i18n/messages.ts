@@ -142,6 +142,14 @@ export type Messages = {
   noComments: string;
   commentFailed: string;
   auditOpenCommentsLabel: (count: number) => string;
+  elementFrames: string;
+  alignmentGuides: string;
+  showGuide: string;
+  selectedBounds: string;
+  alignmentChanges: (count: number) => string;
+  alignmentSummary: (count: number, narrower: number, wider: number) => string;
+  alignmentUnverified: string;
+  guideEdges: Record<"middle" | "bottom" | "top" | "center" | "left" | "right", string>;
   elementInspectorTitle: string;
   boxModelLabel: string;
   elementAttributesLabel: string;
@@ -281,6 +289,23 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "No review comments on this screen yet.",
     commentFailed: "Could not save review comments.",
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
+    elementFrames: "Element frames",
+    alignmentGuides: "Alignment guides",
+    showGuide: "Show guide",
+    selectedBounds: "Selected element edges",
+    alignmentChanges: (n) => `${n} alignment changes`,
+    alignmentSummary: (n, a, b) =>
+      `${n} alignment ${n === 1 ? "change" : "changes"} · Compared with ${a} and ${b} px`,
+    alignmentUnverified:
+      "Automatic comparison needs matching, aligned controls at a narrower and a wider capture width.",
+    guideEdges: {
+      middle: "Row center",
+      top: "Top",
+      bottom: "Bottom",
+      center: "Column center",
+      left: "Left",
+      right: "Right",
+    },
     elementInspectorTitle: "Element inspector",
     boxModelLabel: "Box model",
     elementAttributesLabel: "Attributes",
@@ -419,6 +444,21 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "此界面暂无评审评论。",
     commentFailed: "无法保存评审评论。",
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
+    elementFrames: "元素边框",
+    alignmentGuides: "对齐参考线",
+    showGuide: "显示参考线",
+    selectedBounds: "所选元素边界",
+    alignmentChanges: (n) => `${n} 处对齐变化`,
+    alignmentSummary: (n, a, b) => `与 ${a} 和 ${b} px 的截图相比，有 ${n} 处对齐变化`,
+    alignmentUnverified: "自动比较需要在更窄和更宽的截图中找到彼此对齐的相同控件。",
+    guideEdges: {
+      middle: "行中心",
+      top: "顶部",
+      bottom: "底部",
+      center: "列中心",
+      left: "左侧",
+      right: "右侧",
+    },
     elementInspectorTitle: "元素检查器",
     boxModelLabel: "盒模型",
     elementAttributesLabel: "元素属性",
@@ -557,6 +597,22 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "이 화면에 등록된 코멘트가 없습니다.",
     commentFailed: "코멘트를 불러오거나 저장할 수 없습니다.",
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
+    elementFrames: "요소 프레임",
+    alignmentGuides: "정렬 가이드",
+    showGuide: "표시할 가이드",
+    selectedBounds: "선택한 요소의 경계",
+    alignmentChanges: (n) => `정렬 변화 ${n}건`,
+    alignmentSummary: (n, a, b) => `${a}px·${b}px와 비교한 정렬 변화 ${n}건`,
+    alignmentUnverified:
+      "자동 비교에는 더 좁은 캡처와 더 넓은 캡처에서 같은 선에 놓인 조작 요소가 필요합니다.",
+    guideEdges: {
+      middle: "행 중심",
+      top: "상단",
+      bottom: "하단",
+      center: "열 중심",
+      left: "왼쪽",
+      right: "오른쪽",
+    },
     elementInspectorTitle: "요소 인스펙터",
     boxModelLabel: "박스 모델",
     elementAttributesLabel: "요소 속성",

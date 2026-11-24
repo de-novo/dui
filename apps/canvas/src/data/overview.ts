@@ -165,8 +165,17 @@ function decodeRenderTree(raw: unknown): RenderNode[] | undefined {
   for (const item of raw) {
     if (!record(item) || typeof item.id !== "string" || typeof item.tag !== "string") continue;
     if (!record(item.rect)) continue;
-    const r = item.rect;
-    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+    const { x, y, width, height } = item.rect;
+    if (
+      typeof x !== "number" ||
+      typeof y !== "number" ||
+      typeof width !== "number" ||
+      typeof height !== "number" ||
+      ![x, y, width, height].every(Number.isFinite) ||
+      width < 0 ||
+      height < 0
+    )
+      continue;
     const style: Record<string, string> = {};
     if (record(item.style)) {
       for (const [k, v] of Object.entries(item.style)) {
@@ -197,7 +206,7 @@ function decodeRenderTree(raw: unknown): RenderNode[] | undefined {
       tag: item.tag,
       role: typeof item.role === "string" ? item.role : undefined,
       text: typeof item.text === "string" ? item.text : "",
-      rect: { x: num(r.x), y: num(r.y), width: num(r.width), height: num(r.height) },
+      rect: { x, y, width, height },
       style,
       parentId: typeof item.parentId === "string" ? item.parentId : undefined,
       boxModel,
