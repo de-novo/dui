@@ -181,6 +181,42 @@ def confirm_fixture_route(udid, scene):
     raise RuntimeError(f"The app did not observe the seeded {scene} route and native content")
 
 
+def visible_fixture(image, scene):
+    witnesses = (("remotefirstcommandcenter", "keepagentworkinsync", "terminalstatefollowsyou", "612testspassed",
+                  "everymachinelikeitisrighthere", "agentworkremainsperfectlyinsync") if scene == "thread" else
+                 ("changesvsmain", "reviewchanges", "remotehandoffcard"))
+    for mode in ("11", "6"):
+        read = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", mode],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True)
+        words = re.sub("[^a-z0-9]", "", read.stdout.decode("utf-8", "replace").lower())
+        if any(witness in words for witness in witnesses):
+            return True
+    return False
+
+
+def capture_visible_content(udid, scene, image):
+    # The upstream Thread marker can fire while the transcript still says "Loading messages…".
+    if visible_fixture(image, scene):
+        return
+    normalizer = """
+        import fs from 'node:fs';
+        import { normalizeStorePng } from './scripts/mobile-showcase.ts';
+        fs.writeFileSync(process.argv[2], normalizeStorePng(fs.readFileSync(process.argv[1])));
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        raw, normalized = Path(tmp) / "frame.png", Path(tmp) / "normalized.png"
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline:
+            time.sleep(3)
+            raw.unlink(missing_ok=True)
+            subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", "--type=png", raw], check=True)
+            subprocess.run(["node", "--input-type=module", "-e", normalizer, raw, normalized], check=True)
+            if visible_fixture(normalized, scene):
+                shutil.copyfile(normalized, image)
+                return
+    raise RuntimeError(f"The iOS {scene} route did not show its fixture text before timeout")
+
+
 def run_capture(source, temporary, udid, device_data):
     pnpm_version = json.loads((source / "package.json").read_text())["packageManager"].split("@")[1]
     pnpm_dir = Path.home() / ".vite-plus/package_manager/pnpm" / pnpm_version / "pnpm/bin"
@@ -207,6 +243,13 @@ def run_capture(source, temporary, udid, device_data):
     harness = harness.replace(credentials, credentials + "\n        " + record_origin)
     fallback = f'  await runCommand("python3", [{helper}, "--confirm-fixture-route", udid, scene]);'
     harness = re.sub(r"^  throw new Error\(`iOS showcase scene[^\n]+$", lambda _: fallback, harness, flags=re.M)
+    ios_start, ios_end = harness.index("async function captureIos("), harness.index("function androidSdkTool(")
+    ios_capture = harness[ios_start:ios_end]
+    finished = "await finalizeCapture(destination, capture.device);"
+    if ios_capture.count(finished) != 1:
+        raise ValueError("The pinned iOS screenshot step changed")
+    witness = f'await runCommand("python3", [{helper}, "--capture-visible-content", simulator.udid, scene, destination]);'
+    harness = harness[:ios_start] + ios_capture.replace(finished, finished + "\n    " + witness) + harness[ios_end:]
     driver.write_text(harness.replace('"Debug"', '"Release"').replace("Debug-iphonesimulator", "Release-iphonesimulator"))
     install_route_observer(source)
     log = temporary / "showcase.log"
@@ -291,16 +334,8 @@ def main():
                     raise ValueError(f"Native navigation did not confirm {name}")
                 image = screenshots / f"{scene}.png"
                 width, height = map(int, output(checker, image).split())
-                if scene in direct:
-                    witnesses = ("remotecodingfeellocal", "remotefirstcommandcenter") if scene == "thread" else ("reviewchanges", "changesvsmain", "selectdiff")
-                    for mode in ("11", "6"):
-                        read = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", mode],
-                                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True)
-                        words = re.sub("[^a-z0-9]", "", read.stdout.decode("utf-8", "replace").lower())
-                        if any(witness in words for witness in witnesses):
-                            break
-                    else:
-                        raise ValueError(f"PNG text did not confirm the seeded {name} screen")
+                if not visible_fixture(image, scene):
+                    raise ValueError(f"PNG text did not confirm the seeded {name} content")
                 digest = hashlib.sha256(image.read_bytes()).hexdigest()
                 if digest in hashes:
                     raise ValueError("Both routes produced identical pixels")
@@ -322,5 +357,7 @@ if __name__ == "__main__":
         prepare_simulator_keychain(Path(sys.argv[2]).resolve())
     elif len(sys.argv) == 4 and sys.argv[1] == "--confirm-fixture-route":
         confirm_fixture_route(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 5 and sys.argv[1] == "--capture-visible-content":
+        capture_visible_content(sys.argv[2], sys.argv[3], Path(sys.argv[4]))
     else:
         main()
