@@ -71,6 +71,7 @@ jobs:
           npm run check:recheck
           npm run check:diff
           npm run check:viewer
+          npm run check:example
           npm run check:transitions
           npm run check:comments
           npm run check:audit

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dispatch · Market Street</title>
+    <link rel="stylesheet" href="board.css" />
+  </head>
+  <body>
+    <header><strong>Dispatch</strong><a href="/">Pickup board</a></header>
+    <main>
+      <h1>Market Street</h1>
+      <section aria-labelledby="handoff">
+        <h2 id="handoff">Collection details</h2>
+        <dl>
+          <div>
+            <dt>Pickup time</dt>
+            <dd>09:30</dd>
+          </div>
+          <div>
+            <dt>Load</dt>
+            <dd>12 cartons</dd>
+          </div>
+          <div>
+            <dt>Bay</dt>
+            <dd>02</dd>
+          </div>
+        </dl>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="instructions"
+          onclick="document.getElementById('instructions').showModal()"
+        >
+          Pickup instructions
+        </button>
+      </section>
+      <dialog id="instructions" aria-labelledby="note">
+        <h2 id="note">Driver handoff</h2>
+        <p>Use the south entrance and present the collection slip at bay 2.</p>
+        <form method="dialog"><button>Close</button></form>
+      </dialog>
+    </main>
+  </body>
+</html>

@@ -15,6 +15,7 @@
     "check:cache": "tsc --project scripts && cargo build --locked && node scripts/check-cache.mts",
     "check:recheck": "tsc --project scripts && cargo test --locked -p dui recheck && cargo build --locked && node scripts/check-recheck.mts",
     "check:diff": "tsc --project scripts && cargo build --locked && node scripts/check-diff.mts",
+    "check:example": "tsc --project scripts && cargo build --locked && node scripts/check-dispatch.mts",
     "check:viewer": "tsc --project scripts && cargo build --locked && node scripts/check-viewer.mts",
     "check:transitions": "tsc --project scripts && cargo build --locked && node scripts/check-transitions.mts",
     "check:comments": "tsc --project scripts && cargo build --locked && node scripts/check-comments.mts",
