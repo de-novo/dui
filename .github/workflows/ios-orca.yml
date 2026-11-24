@@ -1,0 +1,75 @@
+name: Orca iOS Simulator captures
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ios-orca.yml"
+      - "scripts/check-ios-orca.py"
+      - "scripts/check-ios-screenshot.swift"
+      - "scripts/ios_simulator.py"
+  workflow_dispatch:
+    inputs:
+      export_pngs:
+        description: Export the two clean fixture PNGs for one day
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: xcode-27
+    timeout-minutes: 100
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      COCOAPODS_DISABLE_STATS: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: stablyai/orca
+          ref: 55049f5745a7a6c1755e6d9c6641bb02f158fcc5
+          path: .orca
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install and prebuild the pinned mobile project
+        working-directory: .orca/mobile
+        run: |
+          npm install --prefix "$RUNNER_TEMP/orca-pnpm" --no-audit --no-fund pnpm@12.18.0
+          export PATH="$RUNNER_TEMP/orca-pnpm/node_modules/.bin:$PATH"
+          pnpm install --frozen-lockfile
+          python3 "$GITHUB_WORKSPACE/scripts/check-ios-orca.py" instrument .
+          pnpm exec expo prebuild --platform ios --no-install
+          cd ios
+          pod install
+      - name: Build the native Release app with its JavaScript bundle
+        working-directory: .orca/mobile/ios
+        run: |
+          xcodebuild -quiet -workspace Orca.xcworkspace -scheme Orca -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/orca-build" ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
+      - name: Capture the unpaired home and About screens
+        run: |
+          xcrun swiftc scripts/check-ios-screenshot.swift -o "$RUNNER_TEMP/check-ios-screenshot"
+          python3 scripts/ios_simulator.py orca -- python3 scripts/check-ios-orca.py capture \
+            "$RUNNER_TEMP/orca-build/Build/Products/Release-iphonesimulator/Orca.app" \
+            "$RUNNER_TEMP/check-ios-screenshot" "$RUNNER_TEMP/orca-images"
+      - name: Export approved fixture PNGs
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.export_pngs) ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.body, '<!-- export-ios-fixture-pngs -->'))
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: orca-ios-simulator
+          path: |
+            ${{ runner.temp }}/orca-images/orca-home.png
+            ${{ runner.temp }}/orca-images/orca-about.png
+          retention-days: 1
+          if-no-files-found: error
