@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
-import { lazy, Suspense, type KeyboardEvent, type RefObject } from "react";
+import { lazy, Suspense, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
 import { archiveFileUrl, diffOverlayUrl } from "../../data/archiveUrls";
@@ -9,6 +9,7 @@ import { useI18n } from "../../i18n/LocaleContext";
 import type { ScreenCanvasDiff } from "../../model/canvasDiff";
 import { screenConnections, stateKeyFor } from "../../model/selection";
 import { routeName } from "../map/CaptureCard";
+import { inspectAlignmentSeries } from "../../model/layoutGuides";
 import { CommentPanel } from "./CommentPanel";
 const ElementInspector = lazy(() =>
   import("./ElementInspector").then((m) => ({ default: m.ElementInspector })),
@@ -74,6 +75,12 @@ export function ScreenInspector({
   beforeRunKey?: string;
 }) {
   const { t } = useI18n();
+  const [frames, setFrames] = useState(false);
+  const [guides, setGuides] = useState(false);
+  const reports = useMemo(
+    () => (guides && screen ? inspectAlignmentSeries(screen.cells) : null),
+    [guides, screen],
+  );
   const connections = screen ? screenConnections(archive, screen.id) : [];
   const rawScreenCells = screen?.cells ?? [];
   const screenCells =
@@ -215,6 +222,7 @@ export function ScreenInspector({
               const localIndex = widthCells.indexOf(entry);
               const entryKey = stateKeyFor(widthCells, localIndex);
               const active = entry === cell;
+              const changeCount = reports?.get(entry)?.changes.length ?? 0;
               const subtitle = cellLabel(entry, widthCells.length > 1, localIndex, t.stateLabel);
               return (
                 <li key={`${entry.width}-${entry.locale ?? ""}-${entry.state ?? index}`}>
@@ -227,6 +235,7 @@ export function ScreenInspector({
                   >
                     <span className="cell-row-title">
                       <strong>{entry.width} px</strong>
+                      {changeCount > 0 && <span>{t.alignmentChanges(changeCount)}</span>}
                       {subtitle && <span>{subtitle}</span>}
                     </span>
                     <span className="cell-row-status">
@@ -288,8 +297,22 @@ export function ScreenInspector({
       {cell?.image && cell.renderTree && cell.renderTree.length > 0 && (
         <Suspense fallback={<output>{t.loadingMap}</output>}>
           <ElementInspector
-            key={`${run.key}:${cell.path}:${cell.width}:${cell.state ?? ""}`}
+            key={JSON.stringify([
+              run.key,
+              cell.path,
+              cell.width,
+              cell.scenario,
+              cell.state,
+              cell.locale,
+              cell.image,
+              stateParam,
+            ])}
             cell={cell}
+            frames={frames}
+            guides={guides}
+            toggleFrames={() => setFrames((value) => !value)}
+            toggleGuides={() => setGuides((value) => !value)}
+            report={reports?.get(cell)}
             imageUrl={archiveFileUrl(cell.image, run.key)}
           />
         </Suspense>

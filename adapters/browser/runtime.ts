@@ -702,8 +702,26 @@ declare var __duiProbe: {
       ? node.innerText.trim()
       : null;
   }
+  // Full-page screenshots can hide a classic scrollbar and reflow the page after
+  // its rectangles have been measured. Reserve the existing gutter while painting.
+  let restoreGutter: (() => void) | undefined;
+  function setCaptureGutter(enabled: boolean) {
+    if (!enabled) {
+      restoreGutter?.();
+      restoreGutter = undefined;
+      return;
+    }
+    const root = document.documentElement;
+    if (root.clientWidth >= innerWidth || getComputedStyle(root).scrollbarGutter !== "auto") return;
+    const property = "scrollbar-gutter";
+    const value = root.style.getPropertyValue(property);
+    const priority = root.style.getPropertyPriority(property);
+    root.style.setProperty(property, "stable", "important");
+    restoreGutter = () => root.style.setProperty(property, value, priority);
+  }
   Object.assign(globalThis, {
     __duiRuntime: {
+      setCaptureGutter,
       install,
       visibleText,
       async liveEdit(

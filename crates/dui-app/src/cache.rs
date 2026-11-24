@@ -262,7 +262,7 @@ impl<S: AppStore> CellCache<S> {
             .ok()
             .filter(|s| !s.trim().is_empty());
         let renderer_env_digest = ContentHash::from_canonical(
-            "dui:renderer-env:v3",
+            "dui:renderer-env:v4",
             &json!({
                 "os": std::env::consts::OS,
                 "arch": std::env::consts::ARCH,

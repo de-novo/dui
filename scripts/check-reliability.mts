@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { withChromiumPage } from "./chromium-page.mts";
 
 const repoRoot = process.cwd();
 const duiBin = path.join(repoRoot, "target", "debug", "dui");
@@ -111,6 +112,62 @@ http.createServer((req, res) => {
   const auditRes = runDuiRaw(["audit", okOut], duiHome);
   assert.equal(auditRes.status, 0);
 
+  // On a tall page a classic scrollbar can wrap a row that would fit with hidden scrollbars.
+  // Sample the actual PNG at recorded control centers, including one below the viewport.
+  const tall = path.join(tmp, "tall");
+  fs.mkdirSync(tall);
+  fs.writeFileSync(
+    path.join(tall, "index.html"),
+    `<!doctype html>
+    <style>
+      body { margin: 0 } header { display: flex; flex-wrap: wrap }
+      button { flex: none; width: 50vw; height: 48px; border: 0; background: #cc3344 }
+      button + button { background: #44aa55 } main { height: 180vh } footer button { background: #3355cc }
+    </style>
+    <header><button aria-label="First"></button><button aria-label="Second"></button></header>
+    <main></main><footer><button aria-label="Last"></button></footer>`,
+  );
+  const manifest = path.join(tall, "dui.json");
+  fs.writeFileSync(
+    manifest,
+    JSON.stringify({ host: "static", path: "/", widths: [600], readySelector: "button" }),
+  );
+  const output = path.join(tmp, "out-tall");
+  assert.equal(runDuiRaw(["run", tall, manifest, output], duiHome).status, 0);
+  const [capture] = JSON.parse(fs.readFileSync(path.join(output, "report.json"), "utf8")).cells;
+  const png = fs.readFileSync(path.join(output, capture.image)).toString("base64");
+  type SampleNode = {
+    tag: string;
+    rect: { x: number; y: number; width: number; height: number };
+    style: { backgroundColor: string };
+  };
+  const samples = (capture.observation.renderTree as SampleNode[])
+    .filter((node) => node.tag === "button")
+    .map(({ rect, style }) => ({
+      x: Math.floor(rect.x + rect.width / 2),
+      y: Math.floor(rect.y + rect.height / 2),
+      color: style.backgroundColor,
+    }));
+  assert.equal(samples.length, 3);
+  await withChromiumPage(async (page) => {
+    const result = await page.call("Runtime.evaluate", {
+      awaitPromise: true,
+      returnByValue: true,
+      expression: `(async () => {
+      const img = new Image(); img.src = "data:image/png;base64,${png}"; await img.decode();
+      const canvas = document.createElement("canvas"); canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0);
+      return ${JSON.stringify(samples)}.map(({x, y}) => {
+        const [r, g, b] = ctx.getImageData(x, y, 1, 1).data; return "rgb(" + [r, g, b].join(", ") + ")";
+      });
+    })()`,
+    });
+    assert.deepEqual(
+      (result.result as { value: string[] }).value,
+      samples.map((s) => s.color),
+      "Full-page PNG paint must match recorded geometry",
+    );
+  });
   console.log(
     JSON.stringify({
       status: "ok",
