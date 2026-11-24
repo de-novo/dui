@@ -14,6 +14,7 @@ import type { Run } from "./data/run";
 import { CaptureDiffView } from "./features/diff/CaptureDiffView";
 import { ScreenInspector } from "./features/inspector/ScreenInspector";
 import { routeName } from "./features/map/CaptureCard";
+import { MobileScreenDeck, type MobileViewMode } from "./features/map/MobileScreenDeck";
 import { ScreenMap } from "./features/map/ScreenMap";
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { WorkPicker } from "./features/workspace/WorkPicker";
@@ -75,6 +76,14 @@ function MapView({
   const { cells, cell } = resolveCell(screen, width, state, locale);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => matchMedia("(max-width: 768px)").matches);
+  const [mobileView, setMobileView] = useState<MobileViewMode>("deck");
+  useEffect(() => {
+    const mq = matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   const [audit, setAudit] = useState<AuditReport | null>(null);
   const openCommentCount = audit?.summary.openComments ?? 0;
   const showAuditPill = openCommentCount > 0;
@@ -195,34 +204,84 @@ function MapView({
 
   const showDetails = view === "details" && selectedId !== null;
   const showOverview = !showDetails;
+  const showMobileDeck = isMobile && mobileView === "deck";
 
   return (
-    <section className="workspace" aria-label={t.screenMap}>
+    <section
+      className={"workspace" + (showMobileDeck ? " mobile-deck-active" : "")}
+      aria-label={t.screenMap}
+    >
       <div className="map" ref={mapArea}>
-        <div ref={overviewLayer} className="overview-layer">
-          {railInset !== undefined && (
-            <ScreenMap
-              railInset={railInset}
-              archive={visibleArchive}
-              width={width}
-              mode={mode}
-              selectedId={selectedId}
-              focusActive={showDetails}
-              openCommentsByPath={openCommentsByPath(audit)}
-              diffsByPath={diffsByPath}
-              diffActive={diffActive}
-              diffVisualMode={diffVisualMode}
-              beforeRunKey={compareBeforeKey || undefined}
-              afterRunKey={run.key}
-              imageUrl={(name) => archiveUrl(name, run)}
-              select={select}
-              onClearSelection={returnToOverview}
-            />
-          )}
-        </div>
+        {showMobileDeck ? (
+          <MobileScreenDeck
+            archive={visibleArchive}
+            width={width}
+            widths={widths}
+            selectedId={selectedId}
+            diffsByPath={diffsByPath}
+            diffActive={diffActive}
+            diffVisualMode={diffVisualMode}
+            beforeRunKey={compareBeforeKey || undefined}
+            afterRunKey={run.key}
+            imageUrl={(name) => archiveUrl(name, run)}
+            mobileView={mobileView}
+            onSelectMobileView={setMobileView}
+            onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}
+            onSelectScreen={(id) => select(id)}
+          />
+        ) : (
+          <div ref={overviewLayer} className="overview-layer">
+            {railInset !== undefined && (
+              <ScreenMap
+                railInset={railInset}
+                archive={visibleArchive}
+                width={width}
+                mode={mode}
+                selectedId={selectedId}
+                focusActive={showDetails}
+                openCommentsByPath={openCommentsByPath(audit)}
+                diffsByPath={diffsByPath}
+                diffActive={diffActive}
+                diffVisualMode={diffVisualMode}
+                beforeRunKey={compareBeforeKey || undefined}
+                afterRunKey={run.key}
+                imageUrl={(name) => archiveUrl(name, run)}
+                select={select}
+                onClearSelection={returnToOverview}
+              />
+            )}
+          </div>
+        )}
 
-        {(showAuditPill || otherRuns.length > 0 || (staticDemo && runs.length > 1)) && (
+        {(showAuditPill ||
+          otherRuns.length > 0 ||
+          (staticDemo && runs.length > 1) ||
+          (isMobile && mobileView === "map")) && (
           <div className="map-top-bar">
+            {isMobile && mobileView === "map" && (
+              <div className="mobile-map-return glass-panel">
+                <div className="mobile-view-switch" role="tablist" aria-label="Mobile view mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={false}
+                    className="mobile-view-tab"
+                    onClick={() => setMobileView("deck")}
+                  >
+                    <span>{t.mobileViewCards}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={true}
+                    className="mobile-view-tab active"
+                    onClick={() => setMobileView("map")}
+                  >
+                    <span>{t.mobileViewMap}</span>
+                  </button>
+                </div>
+              </div>
+            )}
             {staticDemo && runs.length > 1 && (
               <section
                 className="canvas-diff-bar glass-panel showcase-project-bar"

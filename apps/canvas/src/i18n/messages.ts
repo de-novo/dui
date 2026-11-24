@@ -142,6 +142,8 @@ export type Messages = {
   canvasDiffVisualOnly: string;
   canvasDiffSummary: (changed: number, added: number, removed: number) => string;
   canvasDiffNoChanges: string;
+  mobileViewCards: string;
+  mobileViewMap: string;
 };
 
 export const MESSAGES: Record<UiLocale, Messages> = {
@@ -265,6 +267,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     canvasDiffSummary: (changed, added, removed) =>
       `${changed} changed · ${added} added · ${removed} removed`,
     canvasDiffNoChanges: "No UI changes",
+    mobileViewCards: "Cards",
+    mobileViewMap: "2D Map",
   },
   "zh-CN": {
     workspace: "工作区",
@@ -386,6 +390,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     canvasDiffSummary: (changed, added, removed) =>
       `变更 ${changed} · 新增 ${added} · 删除 ${removed}`,
     canvasDiffNoChanges: "无界面变更",
+    mobileViewCards: "卡片",
+    mobileViewMap: "2D 地图",
   },
   ko: {
     workspace: "워크스페이스",
@@ -507,5 +513,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     canvasDiffSummary: (changed, added, removed) =>
       `변경 ${changed} · 추가 ${added} · 삭제 ${removed}`,
     canvasDiffNoChanges: "UI 변경 없음",
+    mobileViewCards: "카드",
+    mobileViewMap: "2D 맵",
   },
 };
