@@ -71,6 +71,7 @@ function enrichGraph(runDir: string): Record<string, unknown> {
       entry.imageWidth = dims.width;
       entry.imageHeight = dims.height;
     }
+    if (obs.screenEvidence) entry.screenEvidence = obs.screenEvidence;
     if (typeof obs.redirectedTo === "string") entry.redirectedTo = obs.redirectedTo;
     if (Array.isArray(obs.renderTree)) entry.renderTree = obs.renderTree;
     if (obs.localeAudit && typeof obs.localeAudit === "object") {

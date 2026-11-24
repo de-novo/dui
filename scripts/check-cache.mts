@@ -23,6 +23,7 @@ import { basename, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
 type CacheCell = {
+  observation?: { screenEvidence?: unknown };
   scenario: string;
   path: string;
   state: string;
@@ -83,6 +84,7 @@ function normalizeCells(cells: CacheCell[]) {
     status: c.status,
     reason: c.reason ?? null,
     image: c.image ?? null,
+    screenEvidence: c.observation?.screenEvidence,
   }));
 }
 

@@ -93,7 +93,6 @@ impl<S: AppStore> CellCache<S> {
         browser_version: Option<&Value>,
         force: bool,
     ) -> Self {
-
         let mut source_files = BTreeMap::new();
         let mut locale_files = BTreeMap::new();
         if let Some(root) = project_dir {
@@ -263,7 +262,7 @@ impl<S: AppStore> CellCache<S> {
             .ok()
             .filter(|s| !s.trim().is_empty());
         let renderer_env_digest = ContentHash::from_canonical(
-            "dui:renderer-env:v2",
+            "dui:renderer-env:v3",
             &json!({
                 "os": std::env::consts::OS,
                 "arch": std::env::consts::ARCH,
@@ -571,6 +570,7 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
         assertions,
         vec![],
     )
+    .with_screen_evidence(obs.get("screenEvidence"))
 }
 
 fn evidence_to_observation(ev: &Evidence) -> Value {
@@ -609,6 +609,9 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
         "responseChecks": response_checks,
         "assertions": assertions,
     });
+    if let Some(value) = ev.screen_evidence() {
+        obs["screenEvidence"] = value.clone();
+    }
     if let Some(path) = redirected_to {
         obs["redirectedTo"] = path;
     }

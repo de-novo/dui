@@ -523,7 +523,8 @@ impl SqliteStore {
                     responses,
                     raw["checks"].as_array().cloned().unwrap_or_default(),
                     live_edits,
-                );
+                )
+                .with_screen_evidence(obs.get("screenEvidence"));
                 let id = ev.id().clone();
                 evidence_list.push(ev);
                 id

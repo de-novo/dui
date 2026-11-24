@@ -438,6 +438,8 @@ impl Cell {
 #[serde(rename_all = "camelCase")]
 pub struct Evidence {
     id: EvidenceId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    screen_evidence: Option<Value>,
     observed_path: Option<String>,
     observed_width: Option<u32>,
     ready: Option<bool>,
@@ -484,6 +486,7 @@ impl Evidence {
         }));
         Self {
             id,
+            screen_evidence: None,
             observed_path,
             observed_width,
             ready,
@@ -496,6 +499,22 @@ impl Evidence {
             assertions,
             live_edits,
         }
+    }
+
+    pub fn with_screen_evidence(mut self, evidence: Option<&Value>) -> Self {
+        if let Some(value) = evidence.filter(|value| value.is_object()) {
+            self.screen_evidence = Some(value.clone());
+            let mut payload = json!(&self);
+            if let Value::Object(fields) = &mut payload {
+                fields.remove("id");
+            }
+            self.id = EvidenceId::derive(&payload);
+        }
+        self
+    }
+
+    pub fn screen_evidence(&self) -> Option<&Value> {
+        self.screen_evidence.as_ref()
     }
 
     pub fn id(&self) -> &EvidenceId {

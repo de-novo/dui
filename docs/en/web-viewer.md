@@ -31,6 +31,8 @@ Use one display name per project ID across branches, worktrees and versions. The
 
 Use **Find screen** or `Cmd+K` / `Ctrl+K` to filter captured routes. The arrow keys move through matches and Enter opens the selected screen. The desktop map controls also toggle a minimap. When a successful same-origin document at `/` changes its route during mounting, the inspector shows the requested path and the observed destination.
 
+New Chromium captures include `screenEvidence` in CLI and MCP `inspect` and in both inspectors. Capture status records the capture checks. Screen verification additionally requires a successful document response, the requested route (or an accepted entry redirect), a settled page, and a visible element matching the project’s `readySelector`. A default readiness selector leaves screen identity unverified. A unique same-origin canonical link is automatically compared with the observed route. The observed heading is evidence the reviewer can read. Older archives retain their recorded evidence.
+
 The map initially estimates each frame from the capture. Once rendered, measured card heights, including captions, determine row placement and link clearance. Image loads and subsequent size changes update those measurements.
 
 ### Viewer design system

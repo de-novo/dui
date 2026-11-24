@@ -389,6 +389,7 @@ mod tests {
                 locale: None,
                 status_kind: "verified".into(),
                 reason: None,
+                screen_evidence: None,
                 observed_path: Some(path.into()),
                 http_errors: Vec::new(),
                 blob_id: None,

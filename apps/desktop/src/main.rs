@@ -2579,7 +2579,11 @@ impl DuiDesktopView {
         for (c_idx, entry) in screen.cells.iter().enumerate() {
             let active = c_idx == self.selected_cell;
             let entry_w = entry.width_px;
-            let st_text = status_label(&entry.status_kind);
+            let st_text = if entry.status_kind == "verified" && entry.screen_evidence.is_some() {
+                tr.capture_verified
+            } else {
+                status_label(&entry.status_kind)
+            };
             cells_col = cells_col.child(
                 div()
                     .id(format!("insp-cell-{c_idx}"))
@@ -3186,7 +3190,11 @@ impl DuiDesktopView {
                 .observed_path
                 .as_deref()
                 .filter(|obs| !obs.is_empty() && *obs != screen.path);
-            if !show_reason && c.http_errors.is_empty() && path_diff.is_none() {
+            if !show_reason
+                && c.http_errors.is_empty()
+                && path_diff.is_none()
+                && c.screen_evidence.is_none()
+            {
                 return None;
             }
             let mut box_el = div()
@@ -3207,6 +3215,71 @@ impl DuiDesktopView {
                         .font_semibold()
                         .text_color(p.primary),
                 );
+            }
+            if let Some(ev) = &c.screen_evidence {
+                let unknown = tr.not_observed;
+                let matched = |value: &Value| match value.as_bool() {
+                    Some(true) => tr.matched,
+                    Some(false) => tr.unmatched,
+                    None => unknown,
+                };
+                let source = if ev["selectorSource"] == "project" {
+                    tr.project_condition
+                } else {
+                    tr.default_readiness
+                };
+                for line in [
+                    format!(
+                        "{} · {}",
+                        tr.screen_evidence,
+                        status_label(ev["screenStatus"].as_str().unwrap_or("unverified"))
+                    ),
+                    format!(
+                        "{} → {} · {}",
+                        screen.path,
+                        ev["observedPath"].as_str().unwrap_or(unknown),
+                        matched(&ev["routeMatches"])
+                    ),
+                    format!(
+                        "HTTP {}",
+                        ev["documentStatus"]
+                            .as_u64()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| unknown.into())
+                    ),
+                    format!(
+                        "{source} · {} · {}",
+                        ev["selector"].as_str().unwrap_or(unknown),
+                        matched(&ev["selectorMatched"])
+                    ),
+                ] {
+                    box_el = box_el.child(Label::new(line).text_xs().text_color(p.foreground));
+                }
+                if let Some(canonical) = ev["canonicalPath"].as_str() {
+                    box_el = box_el.child(
+                        Label::new(format!("rel=canonical · {canonical} · {}", matched(&ev["canonicalMatches"]))).text_xs(),
+                    );
+                }
+                if ev["selectorSource"] == "project" {
+                    box_el = box_el.child(
+                        Label::new(format!(
+                            "{} · {}",
+                            tr.visible_match,
+                            matched(&ev["selectorVisible"])
+                        ))
+                        .text_xs(),
+                    );
+                }
+                if ev["settled"] == false {
+                    box_el = box_el.child(Label::new(tr.did_not_settle).text_xs());
+                }
+                if let Some(heading) = ev["heading"].as_str() {
+                    box_el = box_el.child(
+                        Label::new(format!("{} · {heading}", tr.observed_heading))
+                            .text_xs()
+                            .text_color(p.foreground),
+                    );
+                }
             }
             for err_line in &c.http_errors {
                 box_el = box_el.child(
@@ -3329,8 +3402,8 @@ impl DuiDesktopView {
                     )
                     .child(cells_col)
                     .when_some(inspector_diff_box, |el, diff_box| el.child(diff_box))
-                    .when_some(element_inspector_box, |el, el_box| el.child(el_box))
                     .when_some(diagnostic_box, |el, diag| el.child(diag))
+                    .when_some(element_inspector_box, |el, el_box| el.child(el_box))
                     .child(div().h(px(1.0)).w_full().bg(p.glass_line))
                     .child(
                         Label::new(tr.links)

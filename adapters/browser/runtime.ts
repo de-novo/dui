@@ -657,8 +657,26 @@ declare var __duiProbe: {
       navigation?.name === location.origin + "/" &&
       navigation.responseStatus === 200 &&
       location.pathname !== "/";
+    const canonicalLinks = document.head?.querySelectorAll<HTMLLinkElement>(
+      'link[rel~="canonical" i]',
+    );
+    const declared =
+      canonicalLinks?.length === 1 ? canonicalLinks[0].getAttribute("href")?.trim() : undefined;
+    const canonical = declared ? URL.parse(declared, document.baseURI) : null;
+    const canonicalPath =
+      canonical?.origin === location.origin
+        ? canonical.pathname + canonical.search + canonical.hash
+        : null;
+    const matches = document.querySelectorAll(selector);
     return {
-      ready: !!document.querySelector(selector),
+      ready: matches.length > 0,
+      selectorVisible: Array.from(matches).some(
+        (node) =>
+          node.checkVisibility({ visibilityProperty: true, opacityProperty: true }) &&
+          Array.from(node.getClientRects()).some((rect) => rect.width > 0 && rect.height > 0),
+      ),
+      documentStatus: navigation?.responseStatus || null,
+      canonicalPath,
       ...(root &&
       !root.firstElementChild &&
       !root.textContent?.trim() &&

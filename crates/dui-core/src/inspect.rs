@@ -77,6 +77,17 @@ pub fn inspect(facts: &[Value], cells: &[Value], query: &Selection) -> Result<Va
     if matches.next().is_some() {
         return Err("ambiguous-cell");
     }
+    let mut reply = json!({
+        "state": query.state, "width": query.width, "observation": "archive", "controls": [],
+        "status": cell["status"], "reason": cell["reason"], "captured": cell["image"].is_string()
+    });
+    if let Some(evidence) = cell["observation"].get("screenEvidence") {
+        reply["screenEvidence"] = evidence.clone();
+    }
+    if query.slot.is_none() && !cell["observation"]["instances"].is_object() {
+        reply["controlsAvailable"] = Value::Bool(false);
+        return Ok(reply);
+    }
     let instances = cell["observation"]["instances"]
         .as_object()
         .ok_or("instance-evidence-unavailable")?;
@@ -137,7 +148,8 @@ pub fn inspect(facts: &[Value], cells: &[Value], query: &Selection) -> Result<Va
     if query.slot.is_some() && controls.is_empty() {
         return Err("slot-or-instance-not-found");
     }
-    Ok(json!({"state":query.state,"width":query.width,"observation":"archive","controls":controls}))
+    reply["controls"] = json!(controls);
+    Ok(reply)
 }
 
 #[cfg(test)]

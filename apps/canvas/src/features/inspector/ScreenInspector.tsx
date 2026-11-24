@@ -82,6 +82,9 @@ export function ScreenInspector({
   const showFullPath = Boolean(screen && title !== screen.path);
   const widthsOnScreen = new Set(screenCells.map((c) => c.width)).size;
   const multipleStatesPerWidth = screenCells.length > widthsOnScreen;
+  const evidence = cell?.screenEvidence;
+  const matchLabel = (value?: boolean) =>
+    value === undefined ? t.notObserved : value ? t.matched : t.unmatched;
   const audit = cell?.localeAudit;
   const hasLocaleIssues = Boolean(
     audit && (audit.missingKeys.length > 0 || audit.overflows.length > 0 || audit.rtlMismatch),
@@ -236,6 +239,50 @@ export function ScreenInspector({
             })}
           </ul>
         </section>
+      )}
+
+      {evidence && (
+        <details className="readonly-disclosure link-details-disclosure" open>
+          <summary>
+            {t.screenEvidence} · {evidence.screenStatus === "verified" ? t.verified : t.unverified}
+          </summary>
+          <ul className="readonly-list">
+            <li className="link-evidence-item">
+              <code className="selector-evidence">
+                {evidence.requestedPath} → {evidence.observedPath ?? t.notObserved}
+              </code>
+              <span>
+                {matchLabel(evidence.routeMatches)} · HTTP{" "}
+                {evidence.documentStatus ?? t.notObserved}
+              </span>
+            </li>
+            {evidence.canonicalPath && (
+              <li className="link-evidence-item">
+                <span>rel="canonical" · {matchLabel(evidence.canonicalMatches)}</span>
+                <code className="selector-evidence">{evidence.canonicalPath}</code>
+              </li>
+            )}
+            {evidence.heading && (
+              <li className="link-evidence-item">
+                {t.observedHeading} · {evidence.heading}
+              </li>
+            )}
+            <li className="link-evidence-item">
+              <span>
+                {evidence.selectorSource === "project" ? t.projectReady : t.documentReady} ·{" "}
+                {matchLabel(evidence.selectorMatched)}
+              </span>
+              <code className="selector-evidence">{evidence.selector}</code>
+              {evidence.selectorSource === "project" && (
+                <span>
+                  {t.visibility} · {matchLabel(evidence.selectorVisible)}
+                </span>
+              )}
+              {evidence.settled === false && <span>{t.didNotSettle}</span>}
+              {evidence.selectorSource === "default" && <span>{t.noScreenCondition}</span>}
+            </li>
+          </ul>
+        </details>
       )}
 
       {cell?.image && cell.renderTree && cell.renderTree.length > 0 && (

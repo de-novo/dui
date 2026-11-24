@@ -43,7 +43,50 @@ export type RenderNode = {
   attributes?: Record<string, string>;
 };
 
+export type ScreenEvidence = {
+  screenStatus: "verified" | "unverified";
+  requestedPath: string;
+  observedPath?: string;
+  canonicalPath?: string;
+  canonicalMatches?: boolean;
+  routeMatches?: boolean;
+  documentStatus?: number;
+  heading?: string;
+  selector: string;
+  selectorSource: "default" | "project";
+  selectorMatched?: boolean;
+  selectorVisible?: boolean;
+  settled?: boolean;
+};
+
+function decodeScreenEvidence(raw: unknown): ScreenEvidence | undefined {
+  if (
+    !record(raw) ||
+    (raw.screenStatus !== "verified" && raw.screenStatus !== "unverified") ||
+    typeof raw.requestedPath !== "string" ||
+    typeof raw.selector !== "string" ||
+    (raw.selectorSource !== "default" && raw.selectorSource !== "project")
+  )
+    return undefined;
+  return {
+    screenStatus: raw.screenStatus,
+    requestedPath: raw.requestedPath,
+    observedPath: typeof raw.observedPath === "string" ? raw.observedPath : undefined,
+    canonicalPath: typeof raw.canonicalPath === "string" ? raw.canonicalPath : undefined,
+    canonicalMatches: typeof raw.canonicalMatches === "boolean" ? raw.canonicalMatches : undefined,
+    routeMatches: typeof raw.routeMatches === "boolean" ? raw.routeMatches : undefined,
+    documentStatus: typeof raw.documentStatus === "number" ? raw.documentStatus : undefined,
+    heading: typeof raw.heading === "string" ? raw.heading : undefined,
+    selector: raw.selector,
+    selectorSource: raw.selectorSource,
+    selectorVisible: typeof raw.selectorVisible === "boolean" ? raw.selectorVisible : undefined,
+    settled: typeof raw.settled === "boolean" ? raw.settled : undefined,
+    selectorMatched: typeof raw.selectorMatched === "boolean" ? raw.selectorMatched : undefined,
+  };
+}
+
 export type Cell = {
+  screenEvidence?: ScreenEvidence;
   path: string;
   width: number;
   status: "verified" | "unverified" | "unrenderable";
@@ -262,6 +305,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
         locale: typeof cell.locale === "string" ? cell.locale : undefined,
         localeAudit: decodeLocaleAudit(cell.localeAudit),
         ...(typeof cell.redirectedTo === "string" ? { redirectedTo: cell.redirectedTo } : {}),
+        screenEvidence: decodeScreenEvidence(cell.screenEvidence),
         renderTree: decodeRenderTree(cell.renderTree),
       });
     }
