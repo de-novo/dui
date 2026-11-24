@@ -35,6 +35,8 @@ npm --prefix apps/canvas run preview:archive -- /path/to/run
 
 在项目目录运行 `dui recheck RUN`，可复验捕获结果为未验证、不可渲染或已有页面验证未通过的单元格。复验使用当前项目，按归档中的路径、状态输入、宽度和语言区域重新渲染。使用自定义清单时，运行 `dui recheck RUN PROJECT MANIFEST`。MCP 工具 `recheck` 接受 `run`、`project` 和可选的 `manifest`。新归档仅含选中的单元格，`recheck.source` 指向原归档，`selected`、`skipped`、`resolved` 和 `remaining` 分别记录选中、跳过、已解决和待解决的数量。仍有项目缺少证据时，CLI 退出码为 `5`。原归档中的单元格全部通过时，退出码为 `0`，无需启动渲染器或创建归档。
 
+评审 PR 时先捕获两个分支，再运行 `dui diff --base main --regressions-only --markdown`。比较使用各分支上该应用的最新捕获，跳过选择性复验和实时编辑记录。要指定确切的运行目录，使用 `dui diff BEFORE AFTER --regressions-only`。工具按路由、场景、状态、宽度和语言区域匹配单元格，分别比较捕获验证与页面验证。只有基准分支已通过、变更分支有明确未通过记录的检查才计为回归。JSON 在 `verification.regressions` 中列出受影响的单元格，同时报告已比较的检查数和未匹配的单元格数。缺少证据的检查保持未知。比较完成时，确认有回归的 CLI 退出码为 `5`，无回归为 `0`。没有任何可比较的检查时，判定为 `inconclusive`，仅回归模式的 CLI 退出码为 `2`。向 MCP `diff` 传入 `regressionsOnly: true` 可获得相同的判定数据。
+
 地图先根据捕获数据估算画框尺寸。渲染后，使用包含标题的卡片实测高度计算行位置和连线间距。图片加载或卡片尺寸变化时，地图会重新布局。
 
 ### 查看器设计系统

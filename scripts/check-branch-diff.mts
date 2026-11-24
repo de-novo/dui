@@ -6,7 +6,15 @@
 //    return identical JSON with `beforeBranch: "main"`, `afterBranch: "feat/ui-update"`, and changed cells.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -185,6 +193,99 @@ try {
     `expected valid element bounding box: ${JSON.stringify(h1Change)}`,
   );
 
+  const visualOnly = runDui(
+    ["diff", "--base", "main", "--project", appDir, "--regressions-only"],
+    env,
+  );
+  assert.equal(visualOnly.status, 0);
+  assert.equal(visualOnly.body.verification.regressedCells, 0);
+
+  // Two commits render identical documents. Changing the screen assertion fails only on
+  // the Korean narrow viewport. Another route has been unverified since the base commit.
+  const site = join(stage, "screen-app");
+  mkdirSync(site);
+  const html = `<!doctype html><meta charset="utf-8"><title>Inbox</title>
+    <style>@media(max-width:500px){html.ko #wide{display:none}}</style>
+    <h1 id="ready">Inbox</h1><p id="wide">Wide</p><div id="never" hidden>Hidden</div>
+    <script>document.documentElement.className = navigator.language</script>`;
+  writeFileSync(join(site, "index.html"), html);
+  writeFileSync(join(site, "existing.html"), html);
+  const spec = {
+    host: "static",
+    path: "/",
+    widths: [375, 1280],
+    locales: ["en", "ko"],
+    readySelector: "#ready",
+    scenarios: [{ path: "/existing.html", readySelector: "#never" }],
+  };
+  const config = join(site, "dui.json");
+  writeFileSync(config, JSON.stringify(spec));
+  git(site, ["init", "-b", "main"]);
+  git(site, ["add", "."]);
+  git(site, ["commit", "-m", "baseline screen assertions"]);
+  const baseCapture = runDui(["run", site, config], env);
+  assert.equal(baseCapture.status, 0);
+  git(site, ["checkout", "-b", "feat/screen-regression"]);
+  writeFileSync(config, JSON.stringify({ ...spec, readySelector: "#wide" }));
+  git(site, ["commit", "-am", "change screen assertion"]);
+  const headCapture = runDui(["run", site, config, "--force"], env);
+  assert.equal(headCapture.status, 0);
+  const partial = runDui(["recheck", headCapture.body.output, site, config], env);
+  assert.equal(partial.status, 5);
+
+  const args = ["diff", "--base", "main", "--project", site, "--regressions-only"];
+  const gate = runDui(args, env);
+  assert.equal(gate.status, 5);
+  assert.equal(gate.body.after.path, headCapture.body.output);
+  assert.equal(gate.body.before.path, baseCapture.body.output);
+  assert.equal(gate.body.screens, undefined);
+  const verdict = gate.body.verification;
+  assert.equal(verdict.matchedCells, 8);
+  assert.equal(verdict.comparedChecks, 16);
+  assert.equal(verdict.regressedCells, 1);
+  assert.equal(verdict.regressions.length, 1);
+  const [row] = verdict.regressions;
+  assert.deepEqual(
+    [row.path, row.width, row.locale, row.checks.length, row.checks[0].check],
+    ["/", 375, "ko", 1, "screen"],
+  );
+  assert.equal(row.checks[0].evidence.selectorVisible, false);
+  const select = (cells: { state: string; width: number; image: string }[]) =>
+    cells.find((c) => c.state === row.state && c.width === row.width)?.image;
+  assert.ok(select(baseCapture.body.cells));
+  assert.equal(select(baseCapture.body.cells), select(headCapture.body.cells));
+  const fullBranch = runDui(["diff", "--base", "main", "--project", site], env);
+  assert.equal(fullBranch.status, 0);
+  assert.deepEqual(fullBranch.body.verification, verdict);
+  assert.equal(fullBranch.body.summary.changed, 1);
+  assert.equal(fullBranch.body.screens[0].cells[0].after.screenStatus, "unverified");
+  const empty = join(stage, "empty-capture");
+  mkdirSync(empty);
+  writeFileSync(join(empty, "report.json"), JSON.stringify({ cells: [] }));
+  const incomparable = runDui(["diff", baseCapture.body.output, empty, "--regressions-only"], env);
+  assert.equal(incomparable.status, 2);
+  assert.equal(incomparable.body.verification.verdict, "inconclusive");
+  assert.equal(incomparable.body.verification.unmatchedBaseCells, 8);
+  const viaMcp = callMcp("diff", { baseBranch: "main", project: site, regressionsOnly: true }, env);
+  assert.deepEqual(viaMcp, gate.body);
+  const md = spawnSync(binary, [...args, "--markdown"], {
+    env: { ...process.env, ...env },
+    encoding: "utf8",
+  });
+  assert.equal(md.status, 5);
+  assert.ok(md.stdout.includes("verified → unverified") && md.stdout.includes("375px"));
+  assert.ok(!md.stdout.includes("existing.html"));
+  assert.ok(md.stdout.includes("#wide") && md.stdout.includes("visible false"));
+  console.log(
+    JSON.stringify({
+      regressedCells: verdict.regressedCells,
+      matchedCells: verdict.matchedCells,
+      comparedChecks: verdict.comparedChecks,
+      identicalImages: true,
+      cliMcpParity: true,
+      gateExit: gate.status,
+    }),
+  );
   console.log(
     JSON.stringify({
       ok: true,
