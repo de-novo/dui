@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { layoutMap, nodeMetrics } from "../src/features/map/layout.ts";
+import { clearLane, layoutMap, nodeMetrics } from "../src/features/map/layout.ts";
 import type { ScreenMap } from "../src/data/overview.ts";
 
 const archive: ScreenMap = {
@@ -142,6 +142,15 @@ test("layoutMap sizes tall full-page captures to their real aspect ratio without
     ],
   };
 
+  // The overview names the capture; only the detailed cell supplies its PNG dimensions.
+  for (const screen of tallArchive.screens) {
+    screen.entries = screen.cells.map(({ width, path, status, image }) => ({
+      width,
+      path,
+      status,
+      image,
+    }));
+  }
   const plan = layoutMap(tallArchive, 1280, "overview");
   const ordersNode = plan.nodes.find((n) => n.screen.id === "orders")!;
   const detailNode = plan.nodes.find((n) => n.screen.id === "detail")!;
@@ -156,4 +165,40 @@ test("layoutMap sizes tall full-page captures to their real aspect ratio without
     bottom.position.y >= top.position.y + top.frameHeight + 120,
     `expected bottom node (${bottom.position.y}) below top node (${top.position.y} + ${top.frameHeight})`,
   );
+});
+
+test("measured card boxes reserve space at every width in overview, all links and focus", () => {
+  const screens = Array.from({ length: 20 }, (_, i) => ({
+    id: String(i),
+    path: "/page/" + i,
+    cells: [],
+  }));
+  const map = { screens, links: screens.slice(1).map((s) => ({ source: "0", target: s.id })) };
+  for (const width of [401, 937, 1493]) {
+    const heights = new Map(screens.map((s, i) => [s.id, 179 + ((i * 1307 + width) % 4901)]));
+    for (const mode of ["overview", "all", "focus:0"]) {
+      const { nodes, metrics } = layoutMap(map, width, mode, heights);
+      for (const [i, a] of nodes.entries()) {
+        for (const b of nodes.slice(i + 1)) {
+          if (Math.abs(a.position.x - b.position.x) >= metrics.cardWidth) continue;
+          const [upper, lower] = a.position.y <= b.position.y ? [a, b] : [b, a];
+          assert.ok(lower.position.y > upper.position.y + heights.get(upper.screen.id)!);
+        }
+      }
+    }
+  }
+});
+
+test("the nearest clear lane accounts for nested and overlapping obstacle intervals", () => {
+  const obstacles = [
+    { top: 80, bottom: 140 },
+    { top: 10, bottom: 90 },
+    { top: 40, bottom: 50 },
+    { top: 180, bottom: 215 },
+  ];
+  assert.equal(clearLane(60, obstacles), 10);
+  assert.equal(clearLane(100, obstacles), 140);
+  assert.equal(clearLane(160, obstacles), 160);
+  assert.equal(clearLane(-40, obstacles), -40);
+  assert.equal(clearLane(205, obstacles), 215);
 });

@@ -63,12 +63,8 @@ export function CaptureCard({
     fallbackSrc,
   );
   const activeLoaded = resolvedSrc && loadedSize?.src === resolvedSrc ? loadedSize : null;
-  const naturalW = cell?.imageWidth ?? activeLoaded?.w;
-  const naturalH = cell?.imageHeight ?? activeLoaded?.h;
-  const effectiveFrameHeight =
-    cardWidth && naturalW && naturalH
-      ? Math.max(240, Math.round(cardWidth * (naturalH / naturalW)))
-      : frameHeight;
+  const naturalW = activeLoaded?.w ?? cell?.imageWidth;
+  const naturalH = activeLoaded?.h ?? cell?.imageHeight;
   const diffClass = screenDiff ? ` diff-${screenDiff.kind}` : "";
   const renderChangeCount = screenDiff?.renderDiff?.changes.length ?? 0;
   const diffBadgeText = screenDiff
@@ -85,7 +81,7 @@ export function CaptureCard({
   const showRenderBoxes =
     diffVisualMode === "render" && Boolean(screenDiff && renderChangeCount > 0);
   const capW = Math.max(1, screenDiff?.captureWidth ?? naturalW ?? cell?.width ?? 1280);
-  const capH = Math.max(1, screenDiff?.captureHeight ?? naturalH ?? effectiveFrameHeight ?? 800);
+  const capH = Math.max(1, screenDiff?.captureHeight ?? naturalH ?? frameHeight ?? 800);
   return (
     <article
       className={
@@ -108,10 +104,10 @@ export function CaptureCard({
       <div
         className="capture-frame"
         style={
-          cardWidth && effectiveFrameHeight
-            ? { aspectRatio: `${cardWidth} / ${effectiveFrameHeight}` }
-            : naturalW && naturalH
-              ? { aspectRatio: `${naturalW} / ${naturalH}` }
+          naturalW && naturalH
+            ? { aspectRatio: `${naturalW} / ${naturalH}` }
+            : cardWidth && frameHeight
+              ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
               : undefined
         }
       >
