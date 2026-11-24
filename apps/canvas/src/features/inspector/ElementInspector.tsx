@@ -1,5 +1,8 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import type { Cell } from "../../data/overview";
+import { Button } from "../../components/ui/button";
+import { LayoutOverlay } from "./LayoutOverlay";
+import type { AlignmentReport } from "../../model/layoutGuides";
 import { useI18n } from "../../i18n/LocaleContext";
 import {
   boxModelOverlayRects,
@@ -10,11 +13,21 @@ import {
 export function ElementInspector({
   cell,
   imageUrl,
+  frames,
+  guides: showGuides,
+  toggleFrames,
+  toggleGuides,
+  report,
   externalSelectedId,
   onHighlightNode,
 }: {
   cell: Cell;
   imageUrl: string;
+  frames: boolean;
+  guides: boolean;
+  toggleFrames: () => void;
+  toggleGuides: () => void;
+  report?: AlignmentReport;
   externalSelectedId?: string | null;
   onHighlightNode?: (nodeId: string | null) => void;
 }) {
@@ -22,11 +35,10 @@ export function ElementInspector({
   const nodes = useMemo(() => cell.renderTree ?? [], [cell.renderTree]);
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(() => nodes[0]?.id ?? null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number }>({
-    w: Math.max(1, cell.width),
-    h: Math.max(1, Math.round(cell.width * 0.75)),
-  });
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
+  const [changeIndex, setChangeIndex] = useState(0);
+  const change = report?.changes[changeIndex];
   const activeSelectedId = externalSelectedId ?? localSelectedId;
   const selected = useMemo(
     () => nodes.find((n) => n.id === activeSelectedId) ?? nodes[0] ?? null,
@@ -40,7 +52,7 @@ export function ElementInspector({
   if (nodes.length === 0) return null;
 
   const stageW = Math.max(1, cell.width);
-  const stageH = Math.max(1, Math.round((naturalSize.h / Math.max(1, naturalSize.w)) * stageW));
+  const stageH = naturalSize ? (naturalSize.h / naturalSize.w) * stageW : stageW;
 
   function pointToCapture(event: MouseEvent<HTMLDivElement>): { x: number; y: number } {
     const box = event.currentTarget.getBoundingClientRect();
@@ -61,6 +73,7 @@ export function ElementInspector({
     const pt = pointToCapture(event);
     const hit = pickNodeAtPoint(nodes, pt.x, pt.y);
     if (hit) {
+      setChangeIndex(-1);
       setLocalSelectedId(hit.id);
       onHighlightNode?.(hit.id);
     }
@@ -80,6 +93,45 @@ export function ElementInspector({
         <span className="element-count-pill">{nodes.length}</span>
       </div>
 
+      <div className="layout-tools">
+        <Button size="sm" variant="outline" aria-pressed={frames} onClick={toggleFrames}>
+          {t.elementFrames}
+        </Button>
+        <Button size="sm" variant="outline" aria-pressed={showGuides} onClick={toggleGuides}>
+          {t.alignmentGuides}
+        </Button>
+      </div>
+      {showGuides && (
+        <div className="layout-measurements">
+          <p>
+            {report?.compared
+              ? t.alignmentSummary(report.changes.length, report.widths[0], report.widths[1])
+              : t.alignmentUnverified}
+          </p>
+          {report && report.changes.length > 0 && (
+            <label>
+              {t.showGuide}
+              <select
+                value={change ? changeIndex : -1}
+                onChange={(e) => setChangeIndex(Number(e.target.value))}
+              >
+                <option value={-1}>{t.selectedBounds}</option>
+                {report.changes.map(({ first, second }, i) => (
+                  <option key={i} value={i}>
+                    {first.attributes?.["aria-label"] || first.text || first.id} ·{" "}
+                    {second.attributes?.["aria-label"] || second.text || second.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {change && (
+            <output>
+              {t.guideEdges[change.edge]} · {change.offset} px
+            </output>
+          )}
+        </div>
+      )}
       <div
         className="element-stage"
         onMouseMove={handleMove}
@@ -93,6 +145,7 @@ export function ElementInspector({
         <img
           src={imageUrl}
           alt={cell.path}
+          onError={() => setNaturalSize(null)}
           onLoad={(e) => {
             const img = e.currentTarget;
             if (img.naturalWidth > 0 && img.naturalHeight > 0) {
@@ -100,7 +153,7 @@ export function ElementInspector({
             }
           }}
         />
-        {boxes && selected && (
+        {naturalSize && boxes && selected && !(frames || showGuides) && (
           <div className="element-overlay-layer" aria-hidden="true">
             <span
               className="box-overlay-margin"
@@ -140,7 +193,7 @@ export function ElementInspector({
             </span>
           </div>
         )}
-        {hovered && hovered.id !== selected?.id && (
+        {naturalSize && hovered && hovered.id !== selected?.id && !(frames || showGuides) && (
           <div className="element-overlay-layer" aria-hidden="true">
             <span
               className="box-overlay-hover"
@@ -172,6 +225,17 @@ export function ElementInspector({
               );
             })}
           </div>
+        )}
+        {naturalSize && (frames || showGuides) && (
+          <LayoutOverlay
+            width={stageW}
+            height={stageH}
+            nodes={nodes}
+            frames={frames}
+            guides={showGuides}
+            selected={selected}
+            change={change}
+          />
         )}
       </div>
 
@@ -263,7 +327,7 @@ export function ElementInspector({
           {t.elementTreeLabel} ({nodes.length})
         </summary>
         <ul className="element-node-list">
-          {nodes.slice(0, 60).map((node) => (
+          {nodes.map((node) => (
             <li key={node.id}>
               <button
                 type="button"
@@ -277,6 +341,7 @@ export function ElementInspector({
                   onHighlightNode?.(selected?.id ?? null);
                 }}
                 onClick={() => {
+                  setChangeIndex(-1);
                   setLocalSelectedId(node.id);
                   onHighlightNode?.(node.id);
                 }}

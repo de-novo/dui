@@ -176,6 +176,47 @@ async function verifyCapture(page: ChromiumPage, origin: string, archive: string
   }
 }
 
+async function verifyLayoutToggles(page: ChromiumPage, cell: Cell) {
+  const buttons = 'document.querySelectorAll(".layout-tools button")';
+  const pressed = () =>
+    evaluate<string[]>(page, `Array.from(${buttons}, b => b.getAttribute("aria-pressed"))`);
+  const click = (index: number) => evaluate(page, `${buttons}[${index}].click()`);
+  const lines = 'document.querySelectorAll(".layout-guide-lines line").length';
+  const frames = 'document.querySelectorAll(".layout-frames rect").length';
+  const image = 'document.querySelector(".element-stage img").currentSrc';
+  const source = await evaluate<string>(page, image);
+  assert.deepEqual(await pressed(), ["false", "false"]);
+  await evaluate(page, `${buttons}[0].focus()`);
+  for (const type of ["keyDown", "keyUp"]) {
+    await page.call("Input.dispatchKeyEvent", {
+      type,
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      ...(type === "keyDown" ? { text: "\r" } : {}),
+    });
+  }
+  await waitFor(page, `${frames} > 0`);
+  assert.equal(await evaluate(page, frames), cell.observation.renderTree.length);
+  assert.deepEqual(await pressed(), ["true", "false"]);
+  await click(1);
+  await waitFor(page, `${lines} > 0`);
+  assert.deepEqual(await pressed(), ["true", "true"]);
+  assert.equal(
+    await evaluate(
+      page,
+      'getComputedStyle(document.querySelector(".layout-overlay")).pointerEvents',
+    ),
+    "none",
+  );
+  await click(0);
+  await waitFor(page, `${frames} === 0 && ${lines} > 0`);
+  await click(1);
+  await waitFor(page, '!document.querySelector(".layout-overlay")');
+  assert.deepEqual(await pressed(), ["false", "false"]);
+  assert.equal(await evaluate(page, image), source);
+}
+
 async function verifyViewer(
   page: ChromiumPage,
   before: { output: string; snapshot: { id: string } },
@@ -212,7 +253,11 @@ async function verifyViewer(
       width: String(cell.width),
     });
     await loaded(page, () => page.call("Page.navigate", { url: url + "/?" + select }));
-    await waitFor(page, 'document.querySelector(".element-node-btn")');
+    await waitFor(
+      page,
+      'document.querySelector(".element-node-btn") && document.querySelector(".element-stage img")?.naturalWidth > 0',
+    );
+    await verifyLayoutToggles(page, cell);
     await evaluate(
       page,
       `(()=>{const b=Array.from(document.querySelectorAll(".element-node-btn")).find(b=>b.querySelector("code").textContent===${JSON.stringify(heading.id)});b.closest("details").open=true;b.click()})()`,
