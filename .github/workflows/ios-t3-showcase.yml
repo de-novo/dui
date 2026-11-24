@@ -1,0 +1,62 @@
+name: T3 Code iOS showcase
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ios-t3-showcase.yml
+      - scripts/check-ios-t3-showcase.py
+      - scripts/check-ios-screenshot.swift
+  workflow_dispatch:
+    inputs:
+      export_fixture_pngs:
+        description: Capture and share the two iOS showcase PNGs for one day
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: ios-t3-showcase-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  showcase:
+    runs-on: xcode-27
+    timeout-minutes: 120
+    env:
+      EXPO_NO_TELEMETRY: '1'
+      COCOAPODS_DISABLE_STATS: 'true'
+      T3CODE_TELEMETRY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Fetch the public showcase source
+        shell: bash
+        run: |
+          git init -q "$RUNNER_TEMP/t3code"
+          git -C "$RUNNER_TEMP/t3code" fetch --quiet --depth 1 https://github.com/pingdotgg/t3code.git f274d47150dfe0df5ed96bb27cb490a023e75500
+          git -C "$RUNNER_TEMP/t3code" checkout --quiet --detach FETCH_HEAD
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
+        with:
+          working-directory: ${{ runner.temp }}/t3code
+          node-version-file: package.json
+          cache: false
+          run-install: |
+            args:
+              - --frozen-lockfile
+              - --filter=@t3tools/mobile...
+              - --filter=@t3tools/scripts...
+              - --filter=t3...
+      - name: Capture the thread and review on an iPhone simulator
+        run: python3 scripts/check-ios-t3-showcase.py "$RUNNER_TEMP/t3code" "$RUNNER_TEMP/t3-ios-pngs"
+      - name: Share the approved fixture screenshots for one day
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.export_fixture_pngs) ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+           contains(github.event.pull_request.body, '<!-- export-ios-fixture-pngs -->'))
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: t3-ios-f274d471
+          path: |
+            ${{ runner.temp }}/t3-ios-pngs/thread.png
+            ${{ runner.temp }}/t3-ios-pngs/review.png
+          if-no-files-found: error
+          retention-days: 1
