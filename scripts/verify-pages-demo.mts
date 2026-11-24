@@ -110,7 +110,54 @@ function startStaticServer(): Promise<{ server: http.Server; port: number }> {
   });
 }
 
-async function verifyRenderedPages(port: number, firstRunKey: string) {
+// Runs in Chromium after navigation. Compare the rendered boxes so the test
+// follows the current gutter, font, language and action count.
+function checkContentPage() {
+  const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+  const language = document.querySelector<HTMLSelectElement>("[data-lang-select]")!;
+  const original = language.value;
+  try {
+    for (const option of language.options) {
+      language.value = option.value;
+      language.dispatchEvent(new Event("change", { bubbles: true }));
+      const content = rect("main > :first-child");
+      const header = rect(".site-header");
+      const viewport = document.documentElement.clientWidth;
+      const main = document.querySelector("main")!;
+      const rightEdge =
+        main.getBoundingClientRect().right - parseFloat(getComputedStyle(main).paddingRight);
+      if (
+        Math.abs(rect(".brand").left - content.left) > 1 ||
+        Math.abs(rect(".header-actions").right - rightEdge) > 1 ||
+        content.top <= header.bottom ||
+        document.documentElement.scrollWidth > viewport + 1
+      ) {
+        throw Error(
+          `Misaligned or overflowing layout: ${location.pathname}, ${option.value}, ${viewport}px`,
+        );
+      }
+      for (const button of document.querySelectorAll("main .cta-row .btn")) {
+        const range = document.createRange();
+        range.selectNodeContents(button);
+        const text = range.getBoundingClientRect();
+        const box = button.getBoundingClientRect();
+        if (
+          text.left < box.left - 1 ||
+          text.right > box.right + 1 ||
+          text.top < box.top - 1 ||
+          text.bottom > box.bottom + 1
+        ) {
+          throw Error(`Clipped action: ${button.textContent?.trim()} at ${viewport}px`);
+        }
+      }
+    }
+  } finally {
+    language.value = original;
+    language.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+async function verifyRenderedPages(port: number, firstRunKey?: string) {
   return withChromiumPage(async (page) => {
     const { call } = page;
     const checks: Array<{
@@ -122,28 +169,28 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
       requireSelector: string;
       verifyThemes?: boolean;
     }> = [
-      {
-        name: "landing-mobile",
-        url: `http://127.0.0.1:${port}/`,
-        width: 390,
-        height: 844,
-        mobile: true,
-        requireSelector: "[data-copy]",
-      },
-      {
-        name: "landing-desktop",
-        url: `http://127.0.0.1:${port}/`,
-        width: 1440,
-        height: 920,
-        mobile: false,
-        requireSelector: ".oss-card",
-      },
-      ...viewerViewports.map((viewport) => ({
-        ...viewport,
-        verifyThemes: true,
-        name: viewport.mobile ? "demo-mobile-deck" : "demo-desktop-canvas",
-        url: `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(firstRunKey)}`,
-      })),
+      ...fs
+        .readdirSync(siteDir)
+        .filter((file) => file.endsWith(".html"))
+        .flatMap((file) =>
+          [320, 390, 768, 1440].map((width) => ({
+            name: file + "-" + width,
+            width,
+            height: width < 768 ? 844 : 920,
+            mobile: width < 768,
+            url: `http://127.0.0.1:${port}/${file}`,
+            requireSelector:
+              file === "index.html" ? (width < 768 ? "[data-copy]" : ".oss-card") : ".hero h1",
+          })),
+        ),
+      ...(firstRunKey
+        ? viewerViewports.map((viewport) => ({
+            ...viewport,
+            verifyThemes: true,
+            name: viewport.mobile ? "demo-mobile-deck" : "demo-desktop-canvas",
+            url: `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(firstRunKey)}`,
+          }))
+        : []),
     ];
 
     async function verifyNodeHover() {
@@ -238,6 +285,12 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
         : undefined;
       await call("Page.navigate", { url: c.url });
       await new Promise((r) => setTimeout(r, 1500));
+      if (!c.verifyThemes) {
+        const layout = await call("Runtime.evaluate", {
+          expression: `(${checkContentPage.toString()})()`,
+        });
+        if (layout.exceptionDetails) throw Error(JSON.stringify(layout.exceptionDetails));
+      }
       const evalRes = (await call("Runtime.evaluate", {
         expression: `(() => {
           const el = document.querySelector(${JSON.stringify(c.requireSelector)});
@@ -284,9 +337,13 @@ async function verifyRenderedPages(port: number, firstRunKey: string) {
 }
 
 async function main() {
-  const archiveSummary = verifyArchives();
   const { server, port } = await startStaticServer();
   try {
+    if (process.argv.includes("--layout-only")) {
+      console.log(JSON.stringify(await verifyRenderedPages(port)));
+      return;
+    }
+    const archiveSummary = verifyArchives();
     const installer = await fetch(`http://127.0.0.1:${port}/install`);
     if (
       installer.status !== 200 ||
