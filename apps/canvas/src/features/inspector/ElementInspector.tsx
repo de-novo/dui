@@ -1,7 +1,7 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import type { Cell } from "../../data/overview";
 import { Button } from "../../components/ui/button";
-import { LayoutOverlay } from "./LayoutOverlay";
+import { LayoutOverlay } from "../../components/LayoutOverlay";
 import type { AlignmentReport } from "../../model/layoutGuides";
 import { useI18n } from "../../i18n/LocaleContext";
 import {

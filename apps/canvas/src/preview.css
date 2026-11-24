@@ -381,6 +381,7 @@ h2 {
   z-index: 12;
 }
 .map .react-flow {
+  --map-guide-unit: 1px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto auto;
@@ -1647,6 +1648,41 @@ h2 {
   background: var(--muted);
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
+}
+.map-guide-delta {
+  position: absolute;
+  inset-inline-start: var(--space-1);
+  inset-block-end: var(--space-1);
+  background: var(--card);
+  color: var(--foreground);
+  padding-inline: var(--space-1);
+  font-size: var(--text-meta);
+  pointer-events: none;
+}
+.screen-card .layout-frames {
+  stroke-width: calc(0.55 * var(--map-guide-unit));
+  opacity: 0.65;
+}
+.screen-card .layout-guide-lines,
+.screen-card .layout-focus-frames {
+  stroke-width: var(--map-guide-unit);
+}
+.screen-card .layout-guide-lines {
+  stroke-dasharray: calc(3 * var(--map-guide-unit)) calc(2 * var(--map-guide-unit));
+}
+.map-options-dialog {
+  gap: var(--space-2);
+  max-height: calc(100dvh - var(--space-4));
+  overflow-y: auto;
+}
+.map-options-dialog[data-slot="dialog-content"] label {
+  margin: 0;
+}
+.map-guide-options legend {
+  margin-bottom: var(--space-1);
+}
+.map-guide-options .layout-tools {
+  gap: var(--space-2);
 }
 .layout-tools {
   display: flex;

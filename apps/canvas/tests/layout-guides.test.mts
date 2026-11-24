@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { decodeOverview, type Cell, type RenderNode } from "../src/data/overview.ts";
-import { inspectAlignmentSeries } from "../src/model/layoutGuides.ts";
+import {
+  inspectAlignmentSeries,
+  mapEvidenceCell,
+  sharedControlGuides,
+} from "../src/model/layoutGuides.ts";
 
 function button(text: string, x: number, y: number): RenderNode {
   return {
@@ -127,4 +131,43 @@ test("archive decoding ignores missing coordinates and retains recorded zero-siz
     result.screens[0].cells[0].renderTree?.map((node) => node.id),
     [save.id, close.id],
   );
+});
+
+test("map frames use the displayed image at its recorded width and state", () => {
+  const a = { ...small, image: "a.png", state: "a" };
+  const b = { ...small, image: "b.png", state: "b" };
+  const entry = { ...small, image: a.image, renderTree: undefined };
+  const screen = { id: "map", path: a.path, cells: [b, a], entries: [entry] };
+  assert.equal(mapEvidenceCell(screen, entry, a.image), a);
+  assert.equal(mapEvidenceCell(screen, entry, b.image), b);
+  assert.equal(mapEvidenceCell(screen, entry, "older.png"), undefined);
+  assert.equal(
+    mapEvidenceCell({ ...screen, cells: [{ ...a, width: a.width + 1 }] }, entry, a.image),
+    undefined,
+  );
+  const sharedImage = { ...b, image: a.image };
+  assert.equal(mapEvidenceCell({ ...screen, cells: [a, sharedImage] }, entry, a.image), undefined);
+  assert.equal(
+    mapEvidenceCell({ ...screen, cells: [a, sharedImage] }, { ...entry, state: "a" }, a.image),
+    a,
+  );
+  assert.equal(
+    mapEvidenceCell({ ...screen, cells: [a, sharedImage] }, sharedImage, a.image),
+    sharedImage,
+  );
+  assert.equal(
+    mapEvidenceCell({ ...screen, cells: [{ ...a, status: "unrenderable" }] }, entry, a.image),
+    undefined,
+  );
+});
+
+test("map guides choose the strongest shared axes from the displayed control rectangles", () => {
+  const row = [button("A", 10, 20), button("B", 70, 20), button("C", 130, 20)];
+  const column = [button("D", 10, 80), button("E", 10, 140)];
+  assert.deepEqual(sharedControlGuides([...column, ...row]), [
+    { vertical: false, position: 36 },
+    { vertical: true, position: 10 },
+  ]);
+  assert.deepEqual(sharedControlGuides([row[0], row[0], { ...row[1], parentId: "other" }]), []);
+  assert.deepEqual(sharedControlGuides([row[0], { ...row[1], tag: "span" }]), []);
 });

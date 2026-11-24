@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import {
@@ -62,6 +63,12 @@ export function CaptureCard({
     afterRunKey,
     fallbackSrc,
   );
+  const displayedImage =
+    resolvedSrc === fallbackSrc
+      ? cell?.image
+      : screenDiff?.afterImage && resolvedSrc === imageUrl(screenDiff.afterImage)
+        ? screenDiff.afterImage
+        : undefined;
   const activeLoaded = resolvedSrc && loadedSize?.src === resolvedSrc ? loadedSize : null;
   const naturalW = activeLoaded?.w ?? cell?.imageWidth;
   const naturalH = activeLoaded?.h ?? cell?.imageHeight;
@@ -115,6 +122,7 @@ export function CaptureCard({
           <img
             alt=""
             src={resolvedSrc}
+            onError={() => setLoadedSize(null)}
             onLoad={(event) => {
               const img = event.currentTarget;
               if (img.naturalWidth > 0 && img.naturalHeight > 0) {
@@ -131,6 +139,14 @@ export function CaptureCard({
             <span>{cell ? "Missing image" : "No capture at this width"}</span>
             {cell?.reason && <small>{cell.reason}</small>}
           </div>
+        )}
+        {cell && displayedImage && activeLoaded && (
+          <MapCardGuides
+            screen={screen}
+            entry={cell}
+            image={displayedImage}
+            aspectRatio={activeLoaded.w / activeLoaded.h}
+          />
         )}
         {isOverlayPath(screen.path) && <span className="card-overlay-pill">MODAL</span>}
         {showRenderBoxes && screenDiff?.renderDiff && (

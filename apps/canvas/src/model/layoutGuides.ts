@@ -1,4 +1,4 @@
-import type { Cell, RenderNode } from "../data/overview";
+import type { Cell, RenderNode, Screen } from "../data/overview";
 
 export type AlignmentEdge = "middle" | "top" | "bottom" | "center" | "left" | "right";
 export type AlignmentChange = {
@@ -38,15 +38,18 @@ const controlRoles = new Set([
   "textbox",
 ]);
 
+export function isMeasuredControl(node: RenderNode) {
+  return (
+    node.rect.width > 0 &&
+    node.rect.height > 0 &&
+    (controlTags.has(node.tag) || controlRoles.has(node.role ?? ""))
+  );
+}
+
 function indexedControls(cell: Cell) {
   const controls = new Map<string, RenderNode | null>();
   for (const node of cell.renderTree ?? []) {
-    if (
-      node.rect.width <= 0 ||
-      node.rect.height <= 0 ||
-      (!controlTags.has(node.tag) && !controlRoles.has(node.role ?? ""))
-    )
-      continue;
+    if (!isMeasuredControl(node)) continue;
     const a = node.attributes;
     const testId = a?.["data-testid"];
     const id = a?.id || (node.id.startsWith("#") ? node.id.slice(1) : undefined);
@@ -150,4 +153,72 @@ export function inspectAlignmentSeries(cells: readonly Cell[]) {
     }
   }
   return reports;
+}
+
+// Overview entries may only carry the image and width. Match the image being painted
+// to a detailed cell before using its geometry or comparing neighboring widths.
+export function mapEvidenceCell(screen: Screen, entry: Cell, image: string) {
+  const original = image === entry.image;
+  if (original && screen.cells.includes(entry))
+    return entry.status !== "unrenderable" && entry.renderTree?.length ? entry : undefined;
+  const matches = screen.cells.filter(
+    (cell) =>
+      cell.path === entry.path &&
+      cell.width === entry.width &&
+      cell.image === image &&
+      (!original ||
+        (["state", "scenario", "locale"] as const).every(
+          (field) => entry[field] === undefined || entry[field] === cell[field],
+        )),
+  );
+  const fallback = original ? entry : undefined;
+  const [match] = matches;
+  const cell = matches.length === 1 && match.renderTree?.length ? match : fallback;
+  return cell?.renderTree?.length && cell.status !== "unrenderable" ? cell : undefined;
+}
+
+export type GuideLine = { vertical: boolean; position: number };
+
+// Pick the most widely shared row and column of non-overlapping sibling controls.
+// Rectangles come from one capture, so only exactly coincident edges count here.
+export function sharedControlGuides(nodes: readonly RenderNode[]): GuideLine[] {
+  const controls = nodes.filter(isMeasuredControl);
+  const lines: GuideLine[] = [];
+  for (const vertical of [false, true]) {
+    const edges: AlignmentEdge[] = vertical
+      ? ["left", "center", "right"]
+      : ["middle", "top", "bottom"];
+    const groups = new Map<string, { position: number; spans: { start: number; end: number }[] }>();
+    for (const node of controls) {
+      const parent = node.attributes?.["data-dui-dom-parent"] ?? node.parentId;
+      if (!parent) continue;
+      const start = vertical ? node.rect.y : node.rect.x;
+      const end = start + (vertical ? node.rect.height : node.rect.width);
+      for (const edge of edges) {
+        const position = edgePosition(node, edge);
+        const key = JSON.stringify([parent, edge, position]);
+        const group = groups.get(key) ?? { position, spans: [] };
+        group.spans.push({ start, end });
+        groups.set(key, group);
+      }
+    }
+    let most = 1;
+    let winner: GuideLine | undefined;
+    for (const { position, spans } of groups.values()) {
+      if (spans.length <= most) continue;
+      let count = 0;
+      let lastEnd = -Infinity;
+      for (const span of spans.sort((a, b) => a.end - b.end)) {
+        if (span.start < lastEnd) continue;
+        lastEnd = span.end;
+        count++;
+      }
+      if (count > most) {
+        most = count;
+        winner = { vertical, position };
+      }
+    }
+    if (winner) lines.push(winner);
+  }
+  return lines;
 }

@@ -142,6 +142,12 @@ export type Messages = {
   noComments: string;
   commentFailed: string;
   auditOpenCommentsLabel: (count: number) => string;
+  selectMapScreen: string;
+  mapConnections: string;
+  allMapLinks: string;
+  screenMapLinks: string;
+  mapCaptureWidth: string;
+  allMapCards: string;
   elementFrames: string;
   alignmentGuides: string;
   showGuide: string;
@@ -289,6 +295,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "No review comments on this screen yet.",
     commentFailed: "Could not save review comments.",
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
+    selectMapScreen: "Select a screen",
+    mapConnections: "Connections",
+    allMapLinks: "All links",
+    screenMapLinks: "Links to and from a screen",
+    mapCaptureWidth: "Capture width",
+    allMapCards: "All map cards",
     elementFrames: "Element frames",
     alignmentGuides: "Alignment guides",
     showGuide: "Show guide",
@@ -444,6 +456,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "此界面暂无评审评论。",
     commentFailed: "无法保存评审评论。",
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
+    selectMapScreen: "选择屏幕",
+    mapConnections: "连接",
+    allMapLinks: "所有连接",
+    screenMapLinks: "与屏幕关联的连接",
+    mapCaptureWidth: "捕获宽度",
+    allMapCards: "全部地图卡片",
     elementFrames: "元素边框",
     alignmentGuides: "对齐参考线",
     showGuide: "显示参考线",
@@ -597,6 +615,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noComments: "이 화면에 등록된 코멘트가 없습니다.",
     commentFailed: "코멘트를 불러오거나 저장할 수 없습니다.",
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
+    selectMapScreen: "화면 선택",
+    mapConnections: "연결선",
+    allMapLinks: "모든 연결선",
+    screenMapLinks: "화면에 연결된 경로",
+    mapCaptureWidth: "캡처 폭",
+    allMapCards: "지도 전체 카드",
     elementFrames: "요소 프레임",
     alignmentGuides: "정렬 가이드",
     showGuide: "표시할 가이드",
