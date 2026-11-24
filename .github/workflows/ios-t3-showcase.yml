@@ -5,6 +5,7 @@ on:
       - .github/workflows/ios-t3-showcase.yml
       - scripts/check-ios-t3-showcase.py
       - scripts/check-ios-screenshot.swift
+      - scripts/check-t3-showcase-ocr.py
   workflow_dispatch:
     inputs:
       export_fixture_pngs:
@@ -30,6 +31,10 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Check OCR on temporary PNGs
+        run: |
+          if ! command -v tesseract >/dev/null; then HOMEBREW_NO_AUTO_UPDATE=1 brew install tesseract; fi
+          python3 scripts/check-t3-showcase-ocr.py
       - name: Fetch the public showcase source
         shell: bash
         run: |
@@ -48,9 +53,7 @@ jobs:
               - --filter=@t3tools/scripts...
               - --filter=t3...
       - name: Capture the thread and review on an iPhone simulator
-        run: |
-          if ! command -v tesseract >/dev/null; then HOMEBREW_NO_AUTO_UPDATE=1 brew install tesseract; fi
-          python3 scripts/check-ios-t3-showcase.py "$RUNNER_TEMP/t3code" "$RUNNER_TEMP/t3-ios-pngs"
+        run: python3 scripts/check-ios-t3-showcase.py "$RUNNER_TEMP/t3code" "$RUNNER_TEMP/t3-ios-pngs"
       - name: Share the approved fixture screenshots for one day
         if: >-
           (github.event_name == 'workflow_dispatch' && inputs.export_fixture_pngs) ||
