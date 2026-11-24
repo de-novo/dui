@@ -18,6 +18,23 @@ React Navigation, Expo Router, Flutter 앱의 패키지에서 `dui map PATH`를 
 
 `dui open`으로 결과를 연다. 소스 카드에는 선언 이름과 파일, 줄 번호가 표시된다. 이름으로 등록한 화면에는 내비게이션 키가 표시될 수 있다. 조건부 경로는 조건식을, 매개변수 경로는 패턴을 유지한다. 해석할 수 없었던 선언은 탐색 한계에 표시된다. 소스 전용 지도의 캡처 시도는 0건이다. 네이티브 외형과 전환, 런타임 검증률은 실제 캡처 근거가 필요하다.
 
+레코더가 네이티브 라우트를 열면 PNG와 아래 형식의 JSON을 같은 디렉터리에 저장한다. 녹화한 빌드에 해당하는 소스 지도의 스냅샷 ID와 해당 선언 ID를 사용한다. 레코더는 실제로 열린 경로와 논리적 화면 폭을 기록한다. `runtime` 값은 `android`, `ios`, `web`, `desktop` 중 하나다.
+
+```json
+{
+  "sourceSnapshot": "<snapshot.id>",
+  "captures": [{
+    "screenId": "<graph.nodes[].id>",
+    "runtime": "android",
+    "observedPath": "/settings",
+    "width": 393,
+    "image": "settings.png"
+  }]
+}
+```
+
+로컬에 저장된 원본 소스 지도로 `dui map attach SOURCE_RUN recordings.json`을 실행한 뒤 새 결과를 `dui open`으로 연다. 이미지가 연결된 카드는 소스 위치와 함께 캡처를 보여 준다. 아카이브에는 PNG 크기, 실행 환경, 실제 경로가 남는다. 화면과 이미지의 관계는 레코더가 관찰했으므로 가져온 이미지는 `unverified`로 표시한다. 자동 검증 집계는 0으로 유지한다. 한 파일에서 선언·실행 환경·화면 폭이 같은 조합에는 캡처 하나를 사용한다.
+
 ### React Flow 검증
 
 개발용 뷰어는 저장이 끝난 실행에서 진입 화면 캡처와 발견된 링크를 읽는다. 저장소 루트에서 Node 26으로 아래 명령을 실행하고 출력된 로컬 주소를 연다. 마지막 경로는 캡처 결과의 출력 디렉터리로 바꾼다.

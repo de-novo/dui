@@ -18,6 +18,23 @@
 
 使用 `dui open` 打开归档。源码卡片显示声明名称、文件和行号。按名称注册的屏幕可以使用导航键。条件路由保留条件表达式，参数路由保留路径模式。发现结果列出无法解析的声明。纯源码地图的截图尝试次数为 0。原生界面外观、跳转和运行时覆盖率需要实际截图证据。
 
+录制工具打开原生路由后，将 PNG 和下列格式的 JSON 保存在同一目录。从与录制版本对应的源码地图复制快照 ID 和声明 ID。录制工具提供实际到达的路径和逻辑视口宽度。`runtime` 接受 `android`、`ios`、`web` 和 `desktop`。
+
+```json
+{
+  "sourceSnapshot": "<snapshot.id>",
+  "captures": [{
+    "screenId": "<graph.nodes[].id>",
+    "runtime": "android",
+    "observedPath": "/settings",
+    "width": 393,
+    "image": "settings.png"
+  }]
+}
+```
+
+对本地原始源码归档运行 `dui map attach SOURCE_RUN recordings.json`，再用 `dui open` 打开新结果。已关联的卡片显示录制图像并保留源码位置。归档记录 PNG 尺寸、运行环境和实际到达的路由。由于对应关系由录制工具提供，导入的图像标为 `unverified`。自动验证覆盖计数保持为零。每组声明、运行环境和宽度在一个记录文件中对应一张截图。
+
 ### React Flow 验证
 
 开发预览从已完成的运行中读取入口截图和发现的链接。在仓库根目录使用 Node 26 运行下列命令，打开输出的回环地址。将最后的路径替换为捕获结果的输出目录。
