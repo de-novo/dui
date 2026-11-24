@@ -62,6 +62,8 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/orca-build" ARCHS=arm64 build-for-testing
       - name: Capture the unpaired home and About screens
         run: |
+          if ! command -v tesseract >/dev/null; then HOMEBREW_NO_AUTO_UPDATE=1 brew install tesseract; fi
+          tesseract --version
           xcrun swiftc scripts/check-ios-screenshot.swift -o "$RUNNER_TEMP/check-ios-screenshot"
           python3 scripts/ios_simulator.py orca -- python3 scripts/check-ios-orca.py capture \
             "$RUNNER_TEMP/orca-build/Build/Products" \

@@ -39,6 +39,10 @@ import { Dimensions, useWindowDimensions } from 'react-native'
     layout.write_text(imports + source.replace(anchor, anchor + observation))
 
 
+def normalized_text(text):
+    return "".join(character for character in text.casefold() if character.isalnum())
+
+
 def capture(products, checker, output):
     udid = os.environ["DUI_IOS_UDID"]
     xctestrun, = products.glob("*.xctestrun")
@@ -70,7 +74,19 @@ def capture(products, checker, output):
             match, = [item for test in manifest for item in test["attachments"]
                       if item["suggestedHumanReadableName"].startswith(f"orca-{name}")]
             frame = attachments / match["exportedFileName"]
-            geometry = subprocess.check_output([checker, frame, witness], text=True)
+            # The virtual Xcode 27 host lacks the Vision recognition service.
+            # ImageIO still validates the PNG; CPU OCR checks its visible content.
+            geometry = subprocess.check_output([checker, frame], text=True)
+            lines = []
+            for page_segmentation in ["11", "6"]:
+                text = subprocess.check_output([
+                    "tesseract", frame, "stdout", "-l", "eng", "--psm", page_segmentation
+                ], text=True)
+                lines.append(text)
+                if normalized_text(witness) in normalized_text(text):
+                    break
+            else:
+                raise ValueError(f"Missing {witness!r} in {filename}. OCR read {lines!r}")
             width, height = map(int, geometry.split())
             screen = state["screen"]
             if (width, height) != (round(screen["width"] * screen["scale"]), round(screen["height"] * screen["scale"])):
