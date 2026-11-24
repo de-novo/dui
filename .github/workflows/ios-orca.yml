@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/workflows/ios-orca.yml"
       - "scripts/check-ios-orca.py"
+      - "fixtures/ios-orca/**"
       - "scripts/check-ios-screenshot.swift"
       - "scripts/ios_simulator.py"
   workflow_dispatch:
@@ -51,18 +52,19 @@ jobs:
           python3 "$GITHUB_WORKSPACE/scripts/check-ios-orca.py" instrument .
           pnpm exec expo prebuild --platform ios --no-install
           cd ios
+          echo 'require File.join(ENV.fetch("GITHUB_WORKSPACE"), "fixtures/ios-orca/configure")' >> Podfile
           pod install
-      - name: Build the native Release app with its JavaScript bundle
+      - name: Build Orca and its native UI test for the simulator
         working-directory: .orca/mobile/ios
         run: |
-          xcodebuild -quiet -workspace Orca.xcworkspace -scheme Orca -configuration Release \
+          xcodebuild -quiet -workspace Orca.xcworkspace -scheme OrcaCapture -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/orca-build" ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
+            -derivedDataPath "$RUNNER_TEMP/orca-build" ARCHS=arm64 build-for-testing
       - name: Capture the unpaired home and About screens
         run: |
           xcrun swiftc scripts/check-ios-screenshot.swift -o "$RUNNER_TEMP/check-ios-screenshot"
           python3 scripts/ios_simulator.py orca -- python3 scripts/check-ios-orca.py capture \
-            "$RUNNER_TEMP/orca-build/Build/Products/Release-iphonesimulator/Orca.app" \
+            "$RUNNER_TEMP/orca-build/Build/Products" \
             "$RUNNER_TEMP/check-ios-screenshot" "$RUNNER_TEMP/orca-images"
       - name: Export approved fixture PNGs
         if: >-

@@ -6,7 +6,6 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import time
 
 
 REVISION = "55049f5745a7a6c1755e6d9c6641bb02f158fcc5"
@@ -30,7 +29,9 @@ import { Dimensions, useWindowDimensions } from 'react-native'
     observation = """
   const { width, height, scale } = useWindowDimensions()
   useEffect(() => {
-    const file = new CaptureFile(CapturePaths.document, 'dui-observation.json')
+    if (pathname !== '/' && pathname !== '/about') return
+    const name = pathname === '/' ? 'home' : 'about'
+    const file = new CaptureFile(CapturePaths.document, `dui-observation-${name}.json`)
     file.create({ overwrite: true })
     file.writeSync(JSON.stringify({ pathname, width, height, scale, screen: Dimensions.get('screen') }))
   }, [pathname, width, height, scale])
@@ -38,54 +39,50 @@ import { Dimensions, useWindowDimensions } from 'react-native'
     layout.write_text(imports + source.replace(anchor, anchor + observation))
 
 
-def capture(app, checker, output):
+def capture(products, checker, output):
     udid = os.environ["DUI_IOS_UDID"]
-    simctl = ["xcrun", "simctl"]
-    subprocess.run([*simctl, "install", udid, app], check=True)
-    subprocess.run([*simctl, "launch", udid, BUNDLE, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"], check=True)
-    container = subprocess.check_output([*simctl, "get_app_container", udid, BUNDLE, "data"], text=True)
-    state_file = Path(container.strip()) / "Documents/dui-observation.json"
+    xctestrun, = products.glob("*.xctestrun")
     output.mkdir(parents=True, exist_ok=False)
     recordings = []
     with tempfile.TemporaryDirectory() as work:
-        frame = Path(work) / "candidate.png"
-        for route, witness, filename in [
-            ("/", "Connect your desktop", "orca-home.png"),
-            ("/about", "Open-source agent IDE", "orca-about.png"),
+        result = Path(work) / "Capture.xcresult"
+        attachments = Path(work) / "attachments"
+        subprocess.run([
+            "xcodebuild", "test-without-building", "-xctestrun", xctestrun,
+            "-destination", f"platform=iOS Simulator,id={udid}",
+            "-parallel-testing-enabled", "NO", "-resultBundlePath", result,
+        ], check=True)
+        subprocess.run(["xcrun", "xcresulttool", "export", "attachments",
+                        "--path", result, "--output-path", attachments], check=True)
+        manifest = json.loads((attachments / "manifest.json").read_text())
+        container = subprocess.check_output(
+            ["xcrun", "simctl", "get_app_container", udid, BUNDLE, "data"], text=True
+        )
+        for route, name, witness in [
+            ("/", "home", "Connect your desktop"),
+            ("/about", "about", "Open-source agent IDE"),
         ]:
-            if route != "/":
-                subprocess.run([*simctl, "openurl", udid, "orca://" + route.lstrip("/")], check=True)
-            deadline = time.monotonic() + 120
-            state = None
-            while time.monotonic() < deadline:
-                time.sleep(1)
-                try:
-                    state = json.loads(state_file.read_text())
-                except (FileNotFoundError, json.JSONDecodeError):
-                    continue
-                if state["pathname"] != route or state["width"] <= 0 or state["height"] <= 0:
-                    continue
-                subprocess.run([*simctl, "io", udid, "screenshot", "--type=png", frame], check=True)
-                check = subprocess.run([checker, frame, witness], capture_output=True, text=True)
-                if check.returncode != 0:
-                    continue
-                width, height = map(int, check.stdout.split())
-                screen = state["screen"]
-                if (width, height) != (round(screen["width"] * screen["scale"]), round(screen["height"] * screen["scale"])):
-                    raise ValueError(f"PNG {width}×{height} disagrees with iOS screen {screen}")
-                if json.loads(state_file.read_text()) != state:
-                    continue
-                pixels = frame.read_bytes()
-                (output / filename).write_bytes(pixels)
-                recordings.append({
-                    "runtime": "ios", "observedPath": route, "width": state["width"],
-                    "height": state["height"], "scale": state["scale"], "image": filename,
-                    "imageWidth": width, "imageHeight": height, "visibleText": witness,
-                    "sha256": hashlib.sha256(pixels).hexdigest(),
-                })
-                break
-            else:
-                raise RuntimeError(f"Timed out waiting for {route} to display {witness!r}; last observation: {state}")
+            state_file = Path(container.strip()) / f"Documents/dui-observation-{name}.json"
+            state = json.loads(state_file.read_text())
+            if state["pathname"] != route or state["width"] <= 0 or state["height"] <= 0:
+                raise ValueError(f"Invalid route observation {state}")
+            filename = f"orca-{name}.png"
+            match, = [item for test in manifest for item in test["attachments"]
+                      if item["suggestedHumanReadableName"].startswith(f"orca-{name}")]
+            frame = attachments / match["exportedFileName"]
+            geometry = subprocess.check_output([checker, frame, witness], text=True)
+            width, height = map(int, geometry.split())
+            screen = state["screen"]
+            if (width, height) != (round(screen["width"] * screen["scale"]), round(screen["height"] * screen["scale"])):
+                raise ValueError(f"PNG {width}×{height} disagrees with iOS screen {screen}")
+            pixels = frame.read_bytes()
+            (output / filename).write_bytes(pixels)
+            recordings.append({
+                "runtime": "ios", "observedPath": route, "width": state["width"],
+                "height": state["height"], "scale": state["scale"], "image": filename,
+                "imageWidth": width, "imageHeight": height, "visibleText": witness,
+                "sha256": hashlib.sha256(pixels).hexdigest(),
+            })
     evidence = {"revision": REVISION, "device": os.environ["DUI_IOS_DEVICE"],
                 "simulatorRuntime": os.environ["DUI_IOS_RUNTIME"], "captures": recordings}
     print(json.dumps(evidence, indent=2))
@@ -98,4 +95,4 @@ if __name__ == "__main__":
     elif len(sys.argv) == 5 and sys.argv[1] == "capture":
         capture(*(Path(arg).resolve() for arg in sys.argv[2:]))
     else:
-        sys.exit("Use instrument ORCA_MOBILE or capture APP_BUNDLE SCREENSHOT_CHECKER OUTPUT_DIRECTORY")
+        sys.exit("Use instrument ORCA_MOBILE or capture BUILD_PRODUCTS SCREENSHOT_CHECKER OUTPUT_DIRECTORY")
