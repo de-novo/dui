@@ -115,6 +115,28 @@ export async function verifyViewerThemes(page: ChromiumPage, url: string, card: 
       2,
       "Expected distinct theme backgrounds",
     );
+    await evaluate(`(async () => {
+      const rail = document.querySelector(".rail");
+      const [language, theme] = [...rail.querySelectorAll("select")].map(el => el.closest("label"));
+      const toggle = rail.querySelector(".rail-collapse-btn");
+      const frame = () => new Promise(requestAnimationFrame);
+      const box = el => el.getBoundingClientRect();
+      if (getComputedStyle(rail).flexDirection === "row") {
+        const a = box(language), b = box(theme);
+        if (!a.width || !b.width || a.right > b.left || b.right > innerWidth || a.top !== b.top)
+          throw Error("Language and theme must share the mobile header");
+      } else {
+        for (let i = 0; i < 2; i++) {
+          const a = box(language), b = box(theme), c = box(toggle);
+          const gap = parseFloat(getComputedStyle(rail).rowGap);
+          if (![b.top - a.bottom, c.top - b.bottom].every(space => Math.abs(space - gap) < 1))
+            throw Error("Language, theme and collapse must form an adjacent group");
+          toggle.click();
+          await frame();
+          await frame();
+        }
+      }
+    })()`);
     return results;
   } finally {
     await call("Page.removeScriptToEvaluateOnNewDocument", { identifier });
