@@ -105,15 +105,22 @@ def install_route_observer(source):
     coordinator.write_text(imports + 'let duiPreviousObservation = "";\n' + code.replace(anchor, observation + anchor))
 
 
+def frame_text(png, mode):
+    # Leptonica refuses some macOS /tmp paths. Decode the actual PNG on stdin.
+    read = subprocess.run(["tesseract", "stdin", "stdout", "-l", "eng", "--psm", mode],
+                          input=png, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                          check=True, timeout=25)
+    return read.stdout.decode("utf-8", "replace").lower()
+
+
 def observe_startup(udid, temporary, device_data):
     image = temporary / "startup.png"
     capture = subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", image], capture_output=True)
     if capture.returncode == 0:
-        seen = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", "11"],
-                              capture_output=True, text=True, errors="replace", timeout=20)
+        seen = frame_text(image.read_bytes(), "11")
         labels = ("development servers", "add environment", "connect", "remote-first", "review changes",
                   "uncaught error", "failed to load", "welcome", "home screen")
-        recognized = [label for label in labels if label in seen.stdout.lower()]
+        recognized = [label for label in labels if label in seen]
         print(f"Simulator startup witnesses: {recognized}", flush=True)
     else:
         print(f"simctl screenshot exited with {capture.returncode}", flush=True)
@@ -182,39 +189,48 @@ def confirm_fixture_route(udid, scene):
 
 
 def visible_fixture(image, scene):
-    witnesses = (("remotefirstcommandcenter", "keepagentworkinsync", "terminalstatefollowsyou", "612testspassed",
-                  "everymachinelikeitisrighthere", "agentworkremainsperfectlyinsync") if scene == "thread" else
-                 ("changesvsmain", "reviewchanges", "remotehandoffcard"))
+    png = image.read_bytes()
     for mode in ("11", "6"):
-        read = subprocess.run(["tesseract", image, "stdout", "-l", "eng", "--psm", mode],
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True)
-        words = re.sub("[^a-z0-9]", "", read.stdout.decode("utf-8", "replace").lower())
-        if any(witness in words for witness in witnesses):
+        words = re.sub("[^a-z0-9]", "", frame_text(png, mode))
+        if scene == "thread" and any(body in words for body in (
+            "remotefirstcommandcenter", "keepagentworkinsync", "terminalstatefollowsyou", "612testspassed",
+            "everymachinelikeitisrighthere", "agentworkremainsperfectlyinsync",
+        )):
             return True
+        if scene == "review" and ("changesvsmain" in words or "reviewchanges" in words):
+            if any(line in words for line in ("remotehandoffca", "exportfunctionenvironmentlabel", "pulseframe")):
+                return True
     return False
 
 
 def capture_visible_content(udid, scene, image):
     # The upstream Thread marker can fire while the transcript still says "Loading messages…".
-    if visible_fixture(image, scene):
-        return
     normalizer = """
         import fs from 'node:fs';
         import { normalizeStorePng } from './scripts/mobile-showcase.ts';
         fs.writeFileSync(process.argv[2], normalizeStorePng(fs.readFileSync(process.argv[1])));
     """
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=image.parent) as tmp:
         raw, normalized = Path(tmp) / "frame.png", Path(tmp) / "normalized.png"
+        candidate = image
+        readable = 0
         deadline = time.monotonic() + 180
         while time.monotonic() < deadline:
+            try:
+                found = visible_fixture(candidate, scene)
+                readable += 1
+                if found:
+                    if candidate != image:
+                        shutil.copyfile(candidate, image)
+                    return
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                pass  # Retry with a fresh screenshot of the running app.
             time.sleep(3)
             raw.unlink(missing_ok=True)
             subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", "--type=png", raw], check=True)
             subprocess.run(["node", "--input-type=module", "-e", normalizer, raw, normalized], check=True)
-            if visible_fixture(normalized, scene):
-                shutil.copyfile(normalized, image)
-                return
-    raise RuntimeError(f"The iOS {scene} route did not show its fixture text before timeout")
+            candidate = normalized
+    raise RuntimeError(f"The iOS {scene} fixture text check failed after {readable} OCR-readable frames")
 
 
 def run_capture(source, temporary, udid, device_data):
