@@ -916,55 +916,36 @@ impl Browser {
             v["localeAudit"] = audit["result"]["value"].clone();
         }
         const MAX_FULL_PAGE_HEIGHT: u32 = 12_000;
-        let metrics_expr = r#"(() => {
-            const vpH = Math.max(1, Math.round(window.innerHeight || 800));
-            const docH = Math.ceil(Math.max(
-                vpH,
-                document.documentElement ? document.documentElement.scrollHeight : 0,
-                document.body ? document.body.scrollHeight : 0
-            ));
-            let shellH = 0;
-            if (docH <= vpH + 8) {
-                const vpW = Math.max(1, Math.round(window.innerWidth || 0));
-                const candidates = document.querySelectorAll('main, [role="main"], [data-dui-scroll-root], div, section, ul, ol, article');
-                for (const el of candidates) {
-                    if (!(el instanceof HTMLElement)) continue;
-                    const cs = getComputedStyle(el);
-                    if (cs.overflowY !== 'auto' && cs.overflowY !== 'scroll') continue;
-                    if (
-                        el.clientHeight >= vpH * 0.35 &&
-                        el.clientWidth >= vpW * 0.4 &&
-                        el.scrollHeight > el.clientHeight + 40
-                    ) {
-                        const needed = Math.ceil(vpH + (el.scrollHeight - el.clientHeight));
-                        if (needed > shellH) shellH = needed;
-                    }
-                }
-            }
-            return { vpH, docH, shellH };
-        })()"#;
-        let (vp_h, doc_h, shell_h) = self
+        let reveal_info = self
             .call(
                 s,
                 "Runtime.evaluate",
-                json!({"expression": metrics_expr, "returnByValue": true}),
+                json!({
+                    "expression": format!("globalThis.__duiRuntime.revealForFullPageCapture({MAX_FULL_PAGE_HEIGHT})"),
+                    "awaitPromise": true,
+                    "returnByValue": true
+                }),
             )
             .ok()
-            .and_then(|res| {
-                let val = &res["result"]["value"];
-                let vp = val["vpH"].as_u64()? as u32;
-                let doc = val["docH"].as_u64()? as u32;
-                let shell = val["shellH"].as_u64().unwrap_or(0) as u32;
-                Some((vp.max(1), doc.max(vp), shell))
-            })
-            .unwrap_or((800, 800, 0));
+            .map(|res| res["result"]["value"].clone())
+            .unwrap_or_else(|| json!({}));
 
-        let expanded_shell = shell_h > doc_h;
-        let target_h = if expanded_shell {
-            shell_h.clamp(vp_h, MAX_FULL_PAGE_HEIGHT)
-        } else {
-            doc_h.clamp(vp_h, MAX_FULL_PAGE_HEIGHT)
-        };
+        let vp_h = reveal_info["vpH"].as_u64().unwrap_or(800).max(1) as u32;
+        let target_h = reveal_info["captureH"]
+            .as_u64()
+            .unwrap_or(vp_h as u64)
+            .clamp(vp_h as u64, MAX_FULL_PAGE_HEIGHT as u64) as u32;
+        let expanded_shell = reveal_info["expandedShell"].as_bool().unwrap_or(false);
+        let infinite_scroll = reveal_info["infiniteScrollDetected"]
+            .as_bool()
+            .unwrap_or(false);
+        let truncated = reveal_info["truncated"].as_bool().unwrap_or(false);
+        if infinite_scroll {
+            v["infiniteScrollDetected"] = json!(true);
+        }
+        if truncated {
+            v["truncatedHeight"] = json!(true);
+        }
 
         if expanded_shell {
             let _ = self.call(
@@ -981,16 +962,18 @@ impl Browser {
                     "returnByValue": true
                 }),
             );
-            if let Ok(refreshed) = self.call(
+        }
+        if (expanded_shell || target_h > vp_h)
+            && let Ok(refreshed) = self.call(
                 s,
                 "Runtime.evaluate",
                 json!({"expression": &expr, "awaitPromise": true, "returnByValue": true}),
-            ) && let Some(tree) = refreshed["result"]["value"]
+            )
+            && let Some(tree) = refreshed["result"]["value"]
                 .get("renderTree")
                 .filter(|t| t.is_array())
-            {
-                v["renderTree"] = tree.clone();
-            }
+        {
+            v["renderTree"] = tree.clone();
         }
 
         let shot_params = if target_h > vp_h {

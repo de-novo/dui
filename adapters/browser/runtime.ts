@@ -815,6 +815,8 @@ declare var __duiProbe: {
           if (el.closest('nav, aside, [role="navigation"]')) return;
           const role = (el.getAttribute("role") || "").toLowerCase();
           if (skipRoles.has(role)) return;
+          const popup = (el.getAttribute("aria-haspopup") || "").toLowerCase();
+          if (!explicit && (popup === "menu" || popup === "listbox")) return;
           if (el instanceof HTMLButtonElement && (el.type || "").toLowerCase() === "submit") return;
           const rect = el.getBoundingClientRect();
           if (rect.width < 16 || rect.height < 16) return;
@@ -870,7 +872,21 @@ declare var __duiProbe: {
             const cs = getComputedStyle(el);
             if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
             const r = el.getBoundingClientRect();
-            if (r.width >= 120 && r.height >= 80) found.push(el);
+            const isExplicitModal = el.matches(
+              'dialog[open], [role="alertdialog"], [aria-modal="true"]',
+            );
+            if (isExplicitModal) {
+              if (r.width >= 120 && r.height >= 80) found.push(el);
+              continue;
+            }
+            // Non-modal dialogs/popovers: skip tiny filter dropdowns/listboxes without headings or forms.
+            if (r.width < 260 || r.height < 160) continue;
+            const hasListboxOrMenu = Boolean(el.querySelector('[role="listbox"], [role="menu"]'));
+            const hasHeadingOrForm = Boolean(
+              el.querySelector('h1, h2, h3, h4, [role="heading"], form'),
+            );
+            if (hasListboxOrMenu && !hasHeadingOrForm) continue;
+            found.push(el);
           }
           return found;
         };
@@ -1053,6 +1069,159 @@ declare var __duiProbe: {
           htmlLang: document.documentElement.lang || null,
           overflows,
           runtimeMissingKeys: [...runtimeMissingKeys].sort(),
+        };
+      },
+      async revealForFullPageCapture(maxHeight: number) {
+        const limit = Math.max(800, Math.round(maxHeight || 12_000));
+        const vpH = Math.max(1, Math.round(window.innerHeight || 800));
+        const measureDocH = () =>
+          Math.ceil(
+            Math.max(
+              vpH,
+              document.documentElement ? document.documentElement.scrollHeight : 0,
+              document.body ? document.body.scrollHeight : 0,
+            ),
+          );
+        const measureShellH = (docH: number) => {
+          let shellH = 0;
+          if (docH <= vpH + 8) {
+            const vpW = Math.max(1, Math.round(window.innerWidth || 0));
+            const candidates = document.querySelectorAll(
+              'main, [role="main"], [data-dui-scroll-root], div, section, ul, ol, article',
+            );
+            for (const el of candidates) {
+              if (!(el instanceof HTMLElement)) continue;
+              const cs = getComputedStyle(el);
+              if (cs.overflowY !== "auto" && cs.overflowY !== "scroll") continue;
+              if (
+                el.clientHeight >= vpH * 0.35 &&
+                el.clientWidth >= vpW * 0.4 &&
+                el.scrollHeight > el.clientHeight + 40
+              ) {
+                const needed = Math.ceil(vpH + (el.scrollHeight - el.clientHeight));
+                if (needed > shellH) shellH = needed;
+              }
+            }
+          }
+          return shellH;
+        };
+
+        const initialDocH = measureDocH();
+        const sweepCeiling = Math.min(initialDocH, limit);
+
+        // Promote lazy images inside the initial document height so full-page captures do not show empty boxes.
+        for (const img of document.querySelectorAll('img[loading="lazy"]')) {
+          if (img instanceof HTMLImageElement) {
+            img.loading = "eager";
+          }
+        }
+
+        let infiniteScrollDetected = false;
+        let growthEvents = 0;
+        let prevDocH = initialDocH;
+        const startScrollY = window.scrollY;
+        const growthThreshold = Math.max(400, Math.round(vpH * 0.6));
+        const burstThreshold = Math.max(1600, vpH * 2);
+
+        if (sweepCeiling > vpH + 8) {
+          const maxScrollY = Math.max(0, sweepCeiling - vpH);
+          const step = Math.max(Math.round(vpH * 0.85), Math.ceil(maxScrollY / 12));
+          for (let stepIdx = 1, y = step; stepIdx <= 12; stepIdx++, y += step) {
+            const targetY = Math.min(y, maxScrollY);
+            window.scrollTo(0, targetY);
+            await new Promise((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(resolve)),
+            );
+            await new Promise((resolve) => setTimeout(resolve, 45));
+
+            const curDocH = measureDocH();
+            if (
+              curDocH > prevDocH + Math.max(200, Math.round(vpH * 0.4)) &&
+              curDocH > initialDocH + growthThreshold
+            ) {
+              growthEvents += 1;
+              prevDocH = curDocH;
+            }
+            if (
+              growthEvents >= 2 ||
+              curDocH > initialDocH + burstThreshold ||
+              (initialDocH <= limit && curDocH > limit)
+            ) {
+              infiniteScrollDetected = true;
+              break;
+            }
+            if (targetY >= maxScrollY) break;
+          }
+          window.scrollTo(0, startScrollY);
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+        }
+
+        // Wait briefly for eager/lazy images and scroll-reveal animations to settle (strictly bounded).
+        try {
+          const pendingImgs: Promise<unknown>[] = [];
+          for (const img of document.querySelectorAll("img")) {
+            if (!(img instanceof HTMLImageElement) || !img.currentSrc) continue;
+            if (!img.complete) {
+              pendingImgs.push(
+                new Promise((resolve) => {
+                  img.addEventListener("load", resolve, { once: true });
+                  img.addEventListener("error", resolve, { once: true });
+                }),
+              );
+            } else if (typeof img.decode === "function") {
+              pendingImgs.push(img.decode().catch(() => {}));
+            }
+          }
+          if (pendingImgs.length > 0) {
+            await Promise.race([
+              Promise.allSettled(pendingImgs),
+              new Promise((resolve) => setTimeout(resolve, 1200)),
+            ]);
+          }
+        } catch {
+          // Ignore image decode errors.
+        }
+
+        try {
+          const anims =
+            typeof document.getAnimations === "function"
+              ? document
+                  .getAnimations()
+                  .filter(
+                    (a) =>
+                      a.playState === "running" &&
+                      (a.effect?.getComputedTiming().iterations ?? 1) === 1,
+                  )
+              : [];
+          if (anims.length > 0) {
+            await Promise.race([
+              Promise.allSettled(anims.map((a) => a.finished)),
+              new Promise((resolve) => setTimeout(resolve, 650)),
+            ]);
+          }
+        } catch {
+          // Ignore Web Animations API errors.
+        }
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        const finalDocH = measureDocH();
+        const shellH = measureShellH(finalDocH);
+        const effectiveDocH = infiniteScrollDetected ? initialDocH : finalDocH;
+        const expandedShell = !infiniteScrollDetected && shellH > effectiveDocH;
+        const captureH = Math.max(vpH, Math.min(expandedShell ? shellH : effectiveDocH, limit));
+        const truncated =
+          infiniteScrollDetected || effectiveDocH > limit || (expandedShell && shellH > limit);
+        return {
+          vpH,
+          docH: effectiveDocH,
+          initialDocH,
+          shellH,
+          captureH,
+          expandedShell,
+          infiniteScrollDetected,
+          truncated,
         };
       },
       assertions: (checks: Check[]) => checks.map(check),

@@ -147,10 +147,21 @@
   }
 
   for (const demoLink of document.querySelectorAll("[data-demo-link]")) {
-    demoLink.setAttribute("href", "./demo/");
+    demoLink.addEventListener("click", (event) => {
+      event.preventDefault();
+      location.href = "./demo/";
+    });
   }
   for (const runLink of document.querySelectorAll("[data-demo-run]")) {
     const key = runLink.getAttribute("data-demo-run");
-    if (key) runLink.setAttribute("href", `./demo/?run=${encodeURIComponent(key)}`);
+    const compare = runLink.getAttribute("data-demo-compare");
+    if (key) {
+      runLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        const qs = new URLSearchParams({ run: key });
+        if (compare) qs.set("compare", compare);
+        location.href = `./demo/?${qs.toString()}`;
+      });
+    }
   }
 })();
