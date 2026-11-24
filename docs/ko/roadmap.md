@@ -59,6 +59,15 @@ M0 검수 화면의 다섯 상태를 375·768·1280px에서 검증해 서로 다
 | v0.2.0 | **프레임워크 비종속 라우팅 트리, 풀페이지 실제 비율 노드, 모달 자동 캡처 및 사실 중심 코어.** 중첩 스크롤 셸을 포함한 화면 전체 높이를 캡처해 실제 비율대로 배치하고([#147](https://github.com/de-novo/dui/issues/147)), WAI-ARIA 메뉴 펼침 + 공식 컴파일러 라우트 레지스트리 기반 프레임워크 비종속 라우팅 트리·zero-config `dui scan` 및 멀티 호스트 `dui map`([#149](https://github.com/de-novo/dui/issues/149), [#153](https://github.com/de-novo/dui/issues/153)), macOS 통합 `TitleBar`·장애물 회피 거터 연결선([#155](https://github.com/de-novo/dui/issues/155), [#159](https://github.com/de-novo/dui/issues/159)), WAI-ARIA 기반 모달/다이얼로그/드로어 자동 캡처 및 자식 오버레이 노드 표현을 제공한다([#157](https://github.com/de-novo/dui/issues/157)). 또한 하드코딩 전역 디자인 결함 휴리스틱과 임시 iframe 라이브 마운트를 제거해 순수 객관적 렌더 증거만 보고한다([#163](https://github.com/de-novo/dui/issues/163), [#169](https://github.com/de-novo/dui/issues/169)). |
 | v0.3.0 | **플러그인 기반 디자인 시스템 정합성 검증 (`DESIGN.md` / 플러그인) 및 코드 기반 캔버스 렌더링.** `dui-core`는 순수 사실 중심으로 유지하고 `dui.json`에 프로젝트별 `DESIGN.md` · W3C Design Tokens · 커스텀 감사 플러그인을 연결해 디자인 시스템 불일치를 추출하며([#167](https://github.com/de-novo/dui/issues/167)), 캔버스 렌더링을 비트맵 캡처에서 직접 코드 기반 컴포넌트 렌더링으로 발전시킨다. |
 
+**소스 미리보기(실험 단계).** Node 26과 Swift 6 또는 Kotlin 2/JDK가 있는 체크아웃에서 신뢰할 수 있는 로컬 소스에 아래 명령 중 하나를 실행합니다. 내보내기는 선택한 컴포넌트를 레이아웃·텍스트·불리언 스위치용 미리보기 구현과 함께 컴파일하고 실행합니다. 독립 HTML은 관측된 전이를 오프라인에서 재생하고 결과를 소스 미리보기로 표시합니다. 네이티브 외관, 플랫폼 서비스와 실행 검증은 별도의 네이티브 실행이 필요합니다.
+
+입력은 자체 완결된 파일 하나와 인수가 없는 진입점입니다. 상태는 결정적인 불리언 값이어야 하고 선언 순서가 일정해야 합니다. 도달 가능한 상태는 최대 32개, 상태당 스위치는 최대 16개까지 탐색합니다. 지원하지 않는 API 또는 한도 초과 시 내보내기가 실패합니다. 현재 결과는 지도와 별도로 브라우저에서 엽니다.
+
+```sh
+node scripts/source-preview.mts fixtures/source-preview/Settings.swift Settings swift.html
+node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Settings compose.html
+```
+
 ## 멀티 서피스 아키텍처와 진화 방향
 
 dui는 **Web**, **Desktop App**, **Mobile App(Android · iOS)**, **TUI** 4대 영역을 하나의 공통 아키텍처로 지원하며, **객관적 렌더 증거**와 **플러그인 기반 디자인 시스템 검증**으로 사람과 AI 모두가 빠르게 리뷰할 수 있도록 설계한다:

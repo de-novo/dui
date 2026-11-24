@@ -1,0 +1,26 @@
+name: Portable component preview
+on:
+  pull_request:
+    paths:
+      - "adapters/source-preview/**"
+      - "fixtures/source-preview/**"
+      - "scripts/source-preview.mts"
+      - "scripts/check-source-preview.mts"
+      - "scripts/chromium-page.mts"
+      - ".github/workflows/source-preview.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - name: Compile source and exercise offline browser previews
+        run: |
+          unset ANDROID_HOME ANDROID_SDK_ROOT
+          node scripts/check-source-preview.mts

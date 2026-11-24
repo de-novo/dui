@@ -59,6 +59,15 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 | v0.2.0 | **框架无关路由树、全页真实比例节点、模态框自动捕获与客观事实核心。** 按页面完整高度（含嵌套滚动容器）捕获并按真实宽高比排列画布与桌面节点（[#147](https://github.com/de-novo/dui/issues/147)），通过 WAI-ARIA 导航展开与官方编译器路由注册表实现框架无关路由树发现、零配置 `dui scan` 与多宿主 `dui map`（[#149](https://github.com/de-novo/dui/issues/149)、[#153](https://github.com/de-novo/dui/issues/153)），对齐 GPUI 桌面原生 macOS `TitleBar` 与避障走廊连线（[#155](https://github.com/de-novo/dui/issues/155)、[#159](https://github.com/de-novo/dui/issues/159)），基于 WAI-ARIA 自动捕获模态框/抽屉并以子叠加层节点展示（[#157](https://github.com/de-novo/dui/issues/157)），并移除硬编码的全局设计缺陷启发式规则与过早的 iframe 实时挂载，使 `dui` 严格报告客观渲染证据（[#163](https://github.com/de-novo/dui/issues/163)、[#169](https://github.com/de-novo/dui/issues/169)）。 |
 | v0.3.0 | **插件化设计系统一致性校验（`DESIGN.md` / 插件）与基于代码的画布渲染。** 保持 `dui-core` 严格输出客观事实，在 `dui.json` 中提供可选插件架构接入自有 `DESIGN.md`、W3C Design Tokens 或自定义审计插件（[#167](https://github.com/de-novo/dui/issues/167)），并推动画布渲染从位图截图演进为直接基于代码的组件渲染。 |
 
+**源码预览（实验性）。** 在装有 Node 26 和 Swift 6 或 Kotlin 2/JDK 的检出目录中，对受信任的本地源码运行以下任一命令。导出器将所选组件与布局、文本和布尔开关的可移植预览实现一起编译并运行。独立 HTML 可离线回放实际观察到的状态转换，并标识为源码预览。原生外观、平台服务和运行验证需要单独运行原生应用。
+
+原型接受一个独立文件和一个无参入口。状态必须是确定性的布尔值，声明顺序须稳定。最多探索 32 个可达状态，每个状态最多 16 个开关。遇到不支持的 API 或超过上限时导出失败。当前产物独立于地图，在浏览器中打开。
+
+```sh
+node scripts/source-preview.mts fixtures/source-preview/Settings.swift Settings swift.html
+node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Settings compose.html
+```
+
 ## 多平台架构与演进路线
 
 dui 面向四大界面形态——**Web**、**Desktop App**、**Mobile App（Android 与 iOS）**、**TUI**——以**客观渲染证据**与**插件化设计系统校验**为核心，兼顾**人类与 AI 双方的高可读性**：

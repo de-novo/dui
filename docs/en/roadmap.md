@@ -59,6 +59,15 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 | v0.2.0 | **Universal Routing Tree, Full-Page True-Aspect Nodes, Modal Auto-Capture & Fact-Only Core.** Capture full-page screen heights (including nested app-shell scroll containers) and size canvas/desktop nodes to each screen's real aspect ratio without cropping or overlap ([#147](https://github.com/de-novo/dui/issues/147)), discover framework-agnostic navigation trees via WAI-ARIA disclosure expansion + official compiler route registries with zero-config `dui scan` & multi-host `dui map` ([#149](https://github.com/de-novo/dui/issues/149), [#153](https://github.com/de-novo/dui/issues/153)), align GPUI desktop UX with native macOS `TitleBar` and obstacle-free gutter edge routing ([#155](https://github.com/de-novo/dui/issues/155), [#159](https://github.com/de-novo/dui/issues/159)), auto-discover and capture modals/dialogs/drawers via WAI-ARIA as child overlay nodes ([#157](https://github.com/de-novo/dui/issues/157)), and remove hardcoded global design-defect heuristics and premature iframe live-mount so `dui` reports strictly objective rendering evidence ([#163](https://github.com/de-novo/dui/issues/163), [#169](https://github.com/de-novo/dui/issues/169)). |
 | v0.3.0 | **Pluggable Design-System Conformance (`DESIGN.md` / Plugins) & Code-Based Canvas Rendering.** Keep `dui-core` strictly fact-only while adding an opt-in plugin architecture in `dui.json` so projects can attach their own `DESIGN.md`, W3C Design Tokens, or custom checker plugins ([#167](https://github.com/de-novo/dui/issues/167)), and evolve canvas rendering from bitmap captures toward direct code-based component rendering. |
 
+**Portable source preview (experimental).** From a checkout with Node 26 and Swift 6 or Kotlin 2/JDK, run one of the commands below on trusted local source. The exporter compiles and runs the selected entry against portable layout, text and Boolean-switch primitives. The standalone HTML replays the observed transitions offline. It labels the result as a source preview. Native appearance, platform services and runtime verification require a separate native run.
+
+The prototype takes one self-contained file and a parameterless entry. State must be deterministic, Boolean and declared in a stable order. It explores up to 32 reachable states and 16 switches per state. Unsupported APIs or exceeded limits fail the export. The current output opens in a browser independently of the map.
+
+```sh
+node scripts/source-preview.mts fixtures/source-preview/Settings.swift Settings swift.html
+node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Settings compose.html
+```
+
 ## Multi-surface architecture & evolution
 
 dui targets four surfaces—**Web**, **Desktop App**, **Mobile App (Android & iOS)**, and **TUI**—using one shared architecture designed to be equally effortless for **both humans and AI agents**, built on **objective rendering evidence** with pluggable design-system conformance:
