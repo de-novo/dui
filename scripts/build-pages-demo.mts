@@ -133,7 +133,11 @@ const showcaseProjects: OssShowcaseSpec[] = [
     license: "MIT",
     kind: "url-server",
     installCmd: ["pnpm", ["install", "--frozen-lockfile", "--ignore-scripts"]],
-    serverCmd: (port) => ["pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", String(port)]],
+    buildCmd: ["pnpm", ["exec", "vite", "build"]],
+    serverCmd: (port) => [
+      "pnpm",
+      ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    ],
     maxRoutes: 12,
   },
   {
@@ -193,7 +197,7 @@ const showcaseProjects: OssShowcaseSpec[] = [
     kind: "url-server",
     installCmd: ["pnpm", ["install", "--frozen-lockfile", "--ignore-scripts"]],
     serverCmd: (port) => ["pnpm", ["exec", "next", "dev", "-H", "127.0.0.1", "-p", String(port)]],
-    startPath: "/dashboard",
+    startPath: "/",
     maxRoutes: 10,
   },
   {
@@ -207,7 +211,11 @@ const showcaseProjects: OssShowcaseSpec[] = [
     license: "MIT",
     kind: "url-server",
     installCmd: ["pnpm", ["install", "--frozen-lockfile", "--ignore-scripts"]],
-    serverCmd: (port) => ["pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", String(port)]],
+    buildCmd: ["pnpm", ["exec", "vite", "build"]],
+    serverCmd: (port) => [
+      "pnpm",
+      ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    ],
     maxRoutes: 10,
   },
 ];
@@ -269,6 +277,18 @@ function exportRunToArchive(
   const verified = cells.filter(
     (c) => c && typeof c === "object" && (c as Record<string, unknown>).status === "verified",
   ).length;
+  const populated = cells.filter(
+    (c) =>
+      c &&
+      typeof c === "object" &&
+      Array.isArray((c as Record<string, unknown>).renderTree) &&
+      ((c as Record<string, unknown>).renderTree as unknown[]).length >= 10,
+  ).length;
+  if (populated < 2) {
+    throw new Error(
+      `Refusing blank capture for ${path.basename(dest)}: only ${populated}/${cells.length} cells had >=10 rendered DOM nodes`,
+    );
+  }
   return { cells: cells.length, verified };
 }
 
@@ -340,6 +360,9 @@ async function captureOssProject(
 
   if (!spec.serverCmd) {
     throw new Error(`Missing serverCmd for ${spec.key}`);
+  }
+  if (spec.buildCmd && !fs.existsSync(path.join(repoDir, spec.staticSubdir || "dist"))) {
+    execFileSync(spec.buildCmd[0], spec.buildCmd[1], { cwd: repoDir, stdio: "inherit" });
   }
   const [cmd, cmdArgs] = spec.serverCmd(port);
   const child = spawn(cmd, cmdArgs, {

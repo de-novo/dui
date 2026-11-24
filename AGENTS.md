@@ -51,6 +51,7 @@ For viewer UI changes, choose the skill for the stage of work:
 - **Design** with [Uizze anti-ui-slop](.agents/skills/anti-ui-slop/SKILL.md). Use real dui captures to decide layout, hierarchy and empty states.
 - **Implement** with [shadcn/ui](.agents/skills/shadcn/SKILL.md). Reuse viewer tokens and shared controls.
 - **Review** with [Vercel Web Interface Guidelines](.agents/skills/web-design-guidelines/SKILL.md). Check keyboard access, focus, navigation, responsive layout and themes.
+- **Self-dogfood before shipping**: verify every `apps/canvas` or `site/` change across both mobile (`390x844`) and desktop (`1440x920`) viewports (zero horizontal overflow, zero clipped primary controls, zero broken images, and non-blank `renderTree` captures via `npm run verify:pages-demo` for Pages deploys).
 
 The [viewer contract](docs/en/web-viewer.md) defines archive evidence, capture status and map behavior.
 
