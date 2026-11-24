@@ -42,6 +42,7 @@ function neighborhood(
   focus: Screen,
   width: number,
   metrics: NodeMetrics,
+  measured: ReadonlyMap<string, number>,
 ): Layout {
   const { column } = metrics;
   const rowGap = metrics.row - metrics.frameHeight;
@@ -61,10 +62,10 @@ function neighborhood(
   ] as const) {
     const boxes = group.map((s) => {
       const fh = heightOf(s);
-      return { screen: s, frameHeight: fh, boxHeight: fh + rowGap };
+      return { screen: s, frameHeight: fh, boxHeight: (measured.get(s.id) ?? fh) + rowGap };
     });
     const totalH = boxes.reduce((sum, b) => sum + b.boxHeight, 0);
-    let cursorY = (focusH + rowGap - totalH) / 2;
+    let cursorY = ((measured.get(focus.id) ?? focusH) + rowGap - totalH) / 2;
     for (const item of boxes) {
       nodes.push({
         screen: item.screen,
@@ -81,6 +82,7 @@ export function layoutMap(
   archive: ScreenMap,
   width: number,
   mode: string,
+  measured: ReadonlyMap<string, number> = new Map(),
 ): Layout & { total: number; metrics: NodeMetrics } {
   const metrics = nodeMetrics(width);
   const { column, row } = metrics;
@@ -89,10 +91,16 @@ export function layoutMap(
   const links = archive.links.filter((e) => !e.observedWidths || e.observedWidths.includes(width));
   const focus = screens.find((s) => mode === "focus:" + s.id);
   if (focus)
-    return { ...neighborhood(screens, links, focus, width, metrics), total: links.length, metrics };
+    return {
+      ...neighborhood(screens, links, focus, width, metrics, measured),
+      total: links.length,
+      metrics,
+    };
 
   const frameHeights = new Map(screens.map((s) => [s.id, screenFrameHeight(s, width, metrics)]));
-  const boxHeights = new Map(screens.map((s) => [s.id, frameHeights.get(s.id)! + rowGap]));
+  const boxHeights = new Map(
+    screens.map((s) => [s.id, (measured.get(s.id) ?? frameHeights.get(s.id)!) + rowGap]),
+  );
   const neighbors = new Map(screens.map((s) => [s.id, new Map<string, Link>()]));
   // Prefer the observed forward edge when either direction can join the same pair.
   for (const e of links) neighbors.get(e.source)!.set(e.target, e);
@@ -201,4 +209,20 @@ export function layoutMap(
     shelfHeight = Math.max(shelfHeight, block.height);
   }
   return { nodes, links: mode === "all" ? links : forest, total: links.length, metrics };
+}
+
+// Find the nearest horizontal lane outside the union of the intervening card bounds.
+export function clearLane(preferred: number, intervals: { top: number; bottom: number }[]) {
+  const sorted = intervals.toSorted((a, b) => a.top - b.top);
+  let bottom = -Infinity;
+  let top = -Infinity;
+  for (const interval of sorted) {
+    if (interval.top > bottom) {
+      if (preferred < interval.top) break;
+      top = interval.top;
+    }
+    bottom = Math.max(bottom, interval.bottom);
+  }
+  if (preferred <= top || preferred >= bottom) return preferred;
+  return preferred - top <= bottom - preferred ? top : bottom;
 }

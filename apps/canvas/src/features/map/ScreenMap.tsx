@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 
 import { Search, Map as MapIcon } from "lucide-react";
 import { useI18n } from "../../i18n/LocaleContext";
 import { CaptureCard } from "./CaptureCard";
-import { layoutMap } from "./layout";
+import { clearLane, layoutMap } from "./layout";
 import {
   Background,
   BaseEdge,
@@ -22,6 +22,7 @@ import {
   type EdgeProps,
   type Node,
   type NodeProps,
+  type OnNodesChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
@@ -310,7 +311,25 @@ export function ScreenMap({
 }) {
   const { t } = useI18n();
   const [miniMap, setMiniMap] = useState(false);
-  const layout = useMemo(() => layoutMap(archive, width, mode), [archive, width, mode]);
+  const [heights, setHeights] = useState<ReadonlyMap<string, number>>(() => new Map());
+  const measureNodes = useCallback<OnNodesChange<CardNode>>((changes) => {
+    const sizes = changes.toArray().filter((change) => change.type === "dimensions");
+    if (!sizes.length) return;
+    setHeights((previous) => {
+      let updated: Map<string, number> | undefined;
+      for (const { id, dimensions } of sizes) {
+        const height = dimensions?.height;
+        if (height && previous.get(id) !== height) {
+          (updated ??= new Map(previous)).set(id, height);
+        }
+      }
+      return updated ?? previous;
+    });
+  }, []);
+  const layout = useMemo(
+    () => layoutMap(archive, width, mode, heights),
+    [archive, width, mode, heights],
+  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { cardWidth, frameHeight, column, row } = layout.metrics;
   const colGap = column - cardWidth;
@@ -393,27 +412,18 @@ export function ScreenMap({
     x: n.position.x,
     y: n.position.y,
     w: cardWidth,
-    h: n.frameHeight + 96,
+    h: heights.get(n.screen.id) ?? n.frameHeight,
   }));
-  const findClearGutterY = (
-    x1: number,
-    x2: number,
-    preferredY: number,
-    trackIndex: number,
-  ): number => {
-    const loX = Math.min(x1, x2) + 8;
-    const hiX = Math.max(x1, x2) - 8;
-    const blocking = cardRects.filter((r) => r.x + r.w > loX && r.x < hiX);
-    if (blocking.length === 0) return preferredY;
-    const pad = 28;
-    const isClear = (y: number) => blocking.every((r) => y < r.y - pad || y > r.y + r.h + pad);
-    if (isClear(preferredY)) return preferredY;
-    const minTop = Math.min(...blocking.map((r) => r.y));
-    const maxBottom = Math.max(...blocking.map((r) => r.y + r.h));
-    const trackStep = 28;
-    const topBus = minTop - 72 - (trackIndex % 4) * trackStep;
-    const bottomBus = maxBottom + 72 + (trackIndex % 4) * trackStep;
-    return Math.abs(preferredY - topBus) <= Math.abs(preferredY - bottomBus) ? topBus : bottomBus;
+  const findClearGutterY = (x1: number, x2: number, preferredY: number): number => {
+    const left = Math.min(x1, x2);
+    const right = Math.max(x1, x2);
+    // Leave room for the curve at either end of the horizontal segment.
+    const radius = 28;
+    const obstacles = cardRects.filter((r) => r.x + r.w > left && r.x < right);
+    return clearLane(
+      preferredY,
+      obstacles.map((r) => ({ top: r.y - radius, bottom: r.y + r.h + radius })),
+    );
   };
   const edges: MapEdge[] = layout.links.map(
     ({ source, target, origin, provenance, replayVerified, action }, edgeIdx) => {
@@ -468,7 +478,6 @@ export function ScreenMap({
             a.x + (b.x >= a.x ? cardWidth : 0),
             b.x + (b.x >= a.x ? 0 : cardWidth),
             preferredGutterY,
-            edgeIdx,
           )
         : preferredGutterY;
       const baseOpacity = isOverlayEdge ? 0.72 : 0.28;
@@ -517,6 +526,7 @@ export function ScreenMap({
     <ReactFlow
       key={JSON.stringify([mode, width])}
       nodes={nodes}
+      onNodesChange={measureNodes}
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}

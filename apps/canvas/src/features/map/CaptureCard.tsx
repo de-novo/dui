@@ -63,8 +63,8 @@ export function CaptureCard({
     fallbackSrc,
   );
   const activeLoaded = resolvedSrc && loadedSize?.src === resolvedSrc ? loadedSize : null;
-  const naturalW = cell?.imageWidth ?? activeLoaded?.w;
-  const naturalH = cell?.imageHeight ?? activeLoaded?.h;
+  const naturalW = activeLoaded?.w ?? cell?.imageWidth;
+  const naturalH = activeLoaded?.h ?? cell?.imageHeight;
   const diffClass = screenDiff ? ` diff-${screenDiff.kind}` : "";
   const renderChangeCount = screenDiff?.renderDiff?.changes.length ?? 0;
   const diffBadgeText = screenDiff
@@ -104,10 +104,10 @@ export function CaptureCard({
       <div
         className="capture-frame"
         style={
-          cardWidth && frameHeight
-            ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
-            : naturalW && naturalH
-              ? { aspectRatio: `${naturalW} / ${naturalH}` }
+          naturalW && naturalH
+            ? { aspectRatio: `${naturalW} / ${naturalH}` }
+            : cardWidth && frameHeight
+              ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
               : undefined
         }
       >
