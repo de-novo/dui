@@ -1,6 +1,7 @@
 mod i18n;
 mod layout;
 mod screen_graph;
+mod screen_search;
 mod store;
 mod tokens;
 
@@ -115,6 +116,7 @@ struct DuiDesktopView {
     viewport_h: f32,
     // Comment composer
     focus_handle: FocusHandle,
+    search_trigger: FocusHandle,
     comment_input: Entity<InputState>,
     comment_target: CommentTargetChoice,
     error_message: Option<String>,
@@ -214,6 +216,7 @@ impl DuiDesktopView {
 
         let placeholder = i18n::strings(opts.lang).comment_placeholder;
         let focus_handle = cx.focus_handle();
+        focus_handle.focus(window, cx);
         let comment_input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
 
         let mut this = Self {
@@ -244,6 +247,7 @@ impl DuiDesktopView {
             viewport_w: 0.0,
             viewport_h: 0.0,
             focus_handle,
+            search_trigger: cx.focus_handle().tab_stop(true),
             comment_input,
             comment_target: CommentTargetChoice::Screen,
             error_message: None,
@@ -545,6 +549,16 @@ impl DuiDesktopView {
         }
     }
 
+    fn open_map_screen(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.selected_screen = index;
+        self.sync_cell_to_width();
+        self.neighbor_page = 0;
+        self.full_1x_detail = false;
+        self.comment_target = CommentTargetChoice::Screen;
+        self.view_mode = ViewMode::Detail;
+        cx.notify();
+    }
+
     fn handle_key_down(
         &mut self,
         event: &KeyDownEvent,
@@ -561,6 +575,17 @@ impl DuiDesktopView {
         }
         let key = event.keystroke.key.as_str();
         match key {
+            "k" if (event.keystroke.modifiers.platform || event.keystroke.modifiers.control)
+                && !event.keystroke.modifiers.alt
+                && !event.keystroke.modifiers.shift
+                && !self.options_open
+                && !self.picker_open
+                && self.view_mode != ViewMode::Diff
+                && !self.full_1x_detail =>
+            {
+                self.open_screen_search(window, cx);
+                cx.stop_propagation();
+            }
             "escape" => {
                 if self.picker_open || self.options_open {
                     self.picker_open = false;
@@ -1972,13 +1997,7 @@ impl DuiDesktopView {
                     MouseButton::Left,
                     cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
-                        this.selected_screen = idx;
-                        this.sync_cell_to_width();
-                        this.neighbor_page = 0;
-                        this.full_1x_detail = false;
-                        this.comment_target = CommentTargetChoice::Screen;
-                        this.view_mode = ViewMode::Detail;
-                        cx.notify();
+                        this.open_map_screen(idx, cx);
                     }),
                 )
                 .child(media_el)
@@ -2072,6 +2091,16 @@ impl DuiDesktopView {
                     cx.notify();
                 }),
             ))
+            .child(
+                Button::new("find-screen")
+                    .icon(gpui_kit::component::IconName::Search)
+                    .accessibility_label(tr.find_screen)
+                    .tooltip(tr.find_screen)
+                    .track_focus(&self.search_trigger)
+                    .w(px(28.0))
+                    .h(px(28.0))
+                    .on_click(cx.listener(|this, _, window, cx| this.open_screen_search(window, cx))),
+            )
             .child(ctrl_btn("zoom-1x", "1:1").on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
