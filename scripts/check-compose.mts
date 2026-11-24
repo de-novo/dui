@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 type Control = {
+  id: string;
+  parentId?: string;
   text: string;
   rect: { x: number; y: number; width: number; height: number };
   attributes: Record<string, string>;
@@ -62,8 +64,22 @@ function capture(width: number, phase: string) {
   );
   assert.equal(controls.length, 2, JSON.stringify(nodes));
   const byLabel = new Map<string, Control>();
+  // Compose may expose the name as a separate virtual accessibility child.
+  function namesWithin(node: Control): string[] {
+    const own = (node.attributes.contentDesc || node.text).trim();
+    if (own) return [own];
+    return nodes
+      .filter((child) => child.parentId === node.id && child.attributes.clickable !== "true")
+      .flatMap(namesWithin);
+  }
   for (const control of controls) {
-    const label = control.attributes.contentDesc || control.text;
+    const names = new Set(namesWithin(control));
+    assert.equal(
+      names.size,
+      1,
+      "Expected one name in the switch subtree: " + JSON.stringify(nodes),
+    );
+    const [label] = names;
     const { x, y, width: w, height: h } = control.rect;
     assert.ok(
       label && !byLabel.has(label),
