@@ -10,16 +10,23 @@ const temp = mkdtempSync(join(tmpdir(), "dui-recheck-"));
 const project = join(temp, "site");
 mkdirSync(project);
 
-async function dui(args: string[], code = 0, input = "") {
-  const child = spawn(bin, args, { cwd: project, env: { ...process.env, HOME: temp } });
+async function dui(args: string[], code = 0, input?: string) {
+  const child = spawn(bin, args, {
+    cwd: project,
+    env: { ...process.env, HOME: temp },
+    stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+  });
   let stdout = "";
   let stderr = "";
-  child.stdout.on("data", (chunk) => (stdout += chunk));
-  child.stderr.on("data", (chunk) => (stderr += chunk));
-  child.stdin.end(input);
+  child.stdout!.on("data", (chunk) => (stdout += chunk));
+  child.stderr!.on("data", (chunk) => (stderr += chunk));
   const exit = await new Promise<number | null>((done, reject) => {
     child.on("error", reject);
     child.on("close", done);
+    if (input !== undefined) {
+      child.stdin?.on("error", reject);
+      child.stdin?.end(input);
+    }
   });
   assert.equal(exit, code, stderr + stdout.slice(0, 1000));
   return JSON.parse(stdout);
