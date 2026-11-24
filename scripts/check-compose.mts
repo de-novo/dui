@@ -65,7 +65,10 @@ function capture(width: number, phase: string) {
   for (const control of controls) {
     const label = control.attributes.contentDesc || control.text;
     const { x, y, width: w, height: h } = control.rect;
-    assert.ok(label && !byLabel.has(label), "Each switch needs a distinct accessible name.");
+    assert.ok(
+      label && !byLabel.has(label),
+      "Expected distinct switch names: " + JSON.stringify(controls),
+    );
     assert.ok(w > 0 && h > 0 && x >= 0 && y >= 0 && x + w <= width && y + h <= spec.height);
     assert.match(control.attributes.checked, /^(true|false)$/);
     byLabel.set(label, control);
