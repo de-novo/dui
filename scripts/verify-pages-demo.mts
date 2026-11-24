@@ -136,6 +136,24 @@ function checkContentPage() {
           `Misaligned or overflowing layout: ${location.pathname}, ${option.value}, ${viewport}px`,
         );
       }
+      const nav = rect(".site-nav");
+      for (const link of document.querySelectorAll(".site-nav a")) {
+        const bounds = link.getBoundingClientRect();
+        if (bounds.left < nav.left - 1 || bounds.right > nav.right + 1) {
+          throw Error(`Navigation link requires scrolling: ${link.textContent} at ${viewport}px`);
+        }
+      }
+      for (const command of document.querySelectorAll(".card > pre.code-block:last-child")) {
+        const card = command.parentElement!;
+        const style = getComputedStyle(card);
+        const bottom =
+          card.getBoundingClientRect().bottom -
+          parseFloat(style.paddingBottom) -
+          parseFloat(style.borderBottomWidth);
+        if (Math.abs(command.getBoundingClientRect().bottom - bottom) > 1) {
+          throw Error(`Command panel above its card footer at ${viewport}px`);
+        }
+      }
       for (const button of document.querySelectorAll("main .cta-row .btn")) {
         const range = document.createRange();
         range.selectNodeContents(button);
@@ -150,6 +168,20 @@ function checkContentPage() {
           throw Error(`Clipped action: ${button.textContent?.trim()} at ${viewport}px`);
         }
       }
+    }
+    const theme = document.querySelector<HTMLButtonElement>("[data-theme-toggle]")!;
+    const checkScheme = () => {
+      const expected = document.documentElement.dataset.theme ?? "dark";
+      if (getComputedStyle(document.documentElement).colorScheme !== expected) {
+        throw Error(`Native controls do not match the ${expected} theme`);
+      }
+    };
+    checkScheme();
+    theme.click();
+    try {
+      checkScheme();
+    } finally {
+      theme.click();
     }
   } finally {
     language.value = original;
