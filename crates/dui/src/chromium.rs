@@ -1220,6 +1220,7 @@ impl Browser {
             v["blockedMutations"] = json!(self.blocked_mutations.iter().collect::<Vec<_>>());
             v["apiProvenance"] = json!(self.api_provenance);
         }
+        v["screenEvidence"] = dui_core::verification::screen_evidence(spec, &v);
         Ok(v)
     }
     pub fn version(&mut self) -> Result<Value> {

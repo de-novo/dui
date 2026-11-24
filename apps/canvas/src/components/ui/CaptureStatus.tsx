@@ -6,7 +6,9 @@ export function CaptureStatus({ cell }: { cell?: Cell }) {
   if (!cell) return <span className="capture-reason">{t.noCaptureAtWidth}</span>;
   const label =
     cell.status === "verified"
-      ? t.verified
+      ? cell.screenEvidence
+        ? t.captureVerified
+        : t.verified
       : cell.status === "unrenderable"
         ? t.unrenderable
         : t.unverified;

@@ -31,6 +31,7 @@ pub struct CellItem {
     pub locale: Option<String>,
     pub status_kind: String,
     pub reason: Option<String>,
+    pub screen_evidence: Option<Value>,
     pub observed_path: Option<String>,
     pub http_errors: Vec<String>,
     pub blob_id: Option<String>,
@@ -638,6 +639,7 @@ fn load_run_screens(
             rows.flatten()
         {
             let (status_kind, reason) = parse_status(&status_json);
+            let mut screen_evidence = None;
             let mut observed_path = None;
             let mut http_errors = Vec::new();
             if let Some(raw_ev) = evidence_json
@@ -648,6 +650,7 @@ fn load_run_screens(
                 } else {
                     &ev
                 };
+                screen_evidence = obs.get("screenEvidence").cloned();
                 observed_path = obs["path"].as_str().map(str::to_owned);
                 if let Some(resps) = obs["responses"].as_object() {
                     for (url, code) in resps {
@@ -685,6 +688,7 @@ fn load_run_screens(
                 locale,
                 status_kind,
                 reason,
+                screen_evidence,
                 observed_path,
                 http_errors,
                 blob_id,
@@ -1180,6 +1184,7 @@ mod tests {
                     locale: None,
                     status_kind: "verified".into(),
                     reason: None,
+                    screen_evidence: None,
                     observed_path: Some("/".into()),
                     http_errors: Vec::new(),
                     blob_id: Some(blob_id.into()),

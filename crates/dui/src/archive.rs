@@ -551,7 +551,8 @@ pub(crate) fn import_run(
                 BTreeMap::new(),
                 raw["checks"].as_array().cloned().unwrap_or_default(),
                 vec![],
-            );
+            )
+            .with_screen_evidence(obs.get("screenEvidence"));
             let id = ev.id().clone();
             evidence_by_id.entry(id.clone()).or_insert(ev);
             id

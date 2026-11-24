@@ -17,7 +17,9 @@ interface ReportCell {
   width: number;
   status: string;
   image?: string;
+  state: string;
   observation?: {
+    screenEvidence?: Record<string, unknown>;
     redirectedTo?: string;
     renderTree?: Array<{ id: string; tag: string; text: string }>;
   };
@@ -126,7 +128,7 @@ try {
     path.join(staticDir, "pricing.html"),
     `<!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8" /><title>Pricing</title></head>
+  <head><meta charset="utf-8" /><title>Pricing</title><link rel="canonical" href="/pricing.html"></head>
   <body style="font-family:sans-serif;padding:24px">
     <h1>Pricing Plans</h1>
     <a href="/">Back Home</a>
@@ -167,6 +169,36 @@ try {
     10,
     `expected 10 verified static cells (incl. /more.html + /#overlay:create-item), got ${report1.coverage.verified}`,
   );
+  const pricing = report1.cells.find((c) => c.path === "/pricing.html");
+  assert.ok(pricing);
+  const evidence = pricing.observation?.screenEvidence;
+  assert.deepEqual(evidence, {
+    screenStatus: "unverified",
+    settled: true,
+    canonicalPath: "/pricing.html",
+    canonicalMatches: true,
+    requestedPath: "/pricing.html",
+    observedPath: "/pricing.html",
+    documentStatus: 200,
+    routeMatches: true,
+    heading: "Pricing Plans",
+    selector: "body",
+    selectorMatched: true,
+    selectorVisible: true,
+    selectorSource: "default",
+  });
+  const inspected = (await runDui(
+    [
+      "inspect",
+      staticOut1,
+      JSON.stringify({
+        state: pricing.state,
+        width: pricing.width,
+      }),
+    ],
+    duiHome,
+  )) as { screenEvidence: unknown };
+  assert.deepEqual(inspected.screenEvidence, evidence);
   const discoveredPaths = new Set(report1.cells.map((c) => c.path));
   assert.ok(discoveredPaths.has("/"), "static run includes /");
   assert.ok(discoveredPaths.has("/pricing.html"), "static run discovers /pricing.html");
@@ -248,6 +280,7 @@ try {
       JSON.stringify({
         host: "url",
         url: `http://127.0.0.1:${addr.port}`,
+        readySelector: "h1",
         widths: [375],
         routeSelector: "a[href]",
       }),
@@ -261,6 +294,12 @@ try {
       urlReport.cells.find((cell) => cell.path === "/")?.observation?.redirectedTo,
       "/dashboard",
     );
+    const entryEvidence = urlReport.cells.find((c) => c.path === "/")?.observation?.screenEvidence;
+    assert.equal(entryEvidence?.observedPath, "/dashboard");
+    assert.equal(entryEvidence?.routeMatches, false);
+    assert.equal(entryEvidence?.screenStatus, "verified");
+    assert.equal(entryEvidence?.selectorSource, "project");
+    assert.equal(entryEvidence?.selectorMatched, true);
     const urlGraph = JSON.parse(
       fs.readFileSync(path.join(urlOut, "graph.json"), "utf8"),
     ) as GraphView;
@@ -294,7 +333,7 @@ try {
 const port = Number(process.env.PORT);
 http.createServer((_req, res) => {
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end("<html><body><h1>Command Server</h1><p>Spawned on demand</p></body></html>");
+  res.end("<html><body><h1>Command Server</h1><aside hidden></aside><p>Spawned on demand</p></body></html>");
 }).listen(port, "127.0.0.1");
 `,
   );
@@ -304,6 +343,7 @@ http.createServer((_req, res) => {
     JSON.stringify({
       host: "command",
       command: [process.execPath, "serve.mjs"],
+      readySelector: "aside",
       widths: [768],
     }),
   );
@@ -312,6 +352,10 @@ http.createServer((_req, res) => {
   const cmdReport = JSON.parse(
     fs.readFileSync(path.join(cmdOut, "report.json"), "utf8"),
   ) as RunReport;
+  const hidden = cmdReport.cells[0]?.observation?.screenEvidence;
+  assert.equal(hidden?.selectorMatched, true);
+  assert.equal(hidden?.selectorVisible, false);
+  assert.equal(hidden?.screenStatus, "unverified");
   assert.equal(
     cmdReport.coverage.verified,
     1,

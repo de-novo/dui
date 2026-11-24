@@ -126,6 +126,7 @@ pub(crate) fn exercise_with_renderer(
         }
         if spec["readySelector"].as_str().is_none() {
             spec["readySelector"] = json!("body");
+            spec["hasScreenAssertion"] = json!(false);
         }
     }
     if matches!(
@@ -320,6 +321,9 @@ fn execute_with_locales(
             .ok_or_else(|| failure(2, "invalid scenario"))?
         {
             case[k] = v.clone();
+        }
+        if overrides["readySelector"].is_string() && overrides.get("hasScreenAssertion").is_none() {
+            case["hasScreenAssertion"] = json!(true);
         }
         scenarios.push_back((format!("case-{}", i + 1), case));
     }

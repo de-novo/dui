@@ -45,6 +45,17 @@ export type Messages = {
   screenDetails: string;
   screenUnavailable: string;
   archive: string;
+  screenEvidence: string;
+  documentReady: string;
+  projectReady: string;
+  noScreenCondition: string;
+  matched: string;
+  unmatched: string;
+  notObserved: string;
+  visibility: string;
+  didNotSettle: string;
+  observedHeading: string;
+  captureVerified: string;
   overview: string;
   backToOverview: string;
   backToArchive: string;
@@ -173,6 +184,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     screenDetails: "Screen details",
     screenUnavailable: "Screen unavailable",
     archive: "Archive",
+    screenEvidence: "Screen verification",
+    documentReady: "Default readiness check",
+    projectReady: "Project condition",
+    noScreenCondition: "No project screen condition configured",
+    matched: "Matched",
+    unmatched: "Not matched",
+    notObserved: "Not observed",
+    visibility: "Visible match",
+    didNotSettle: "Page did not settle",
+    observedHeading: "Observed heading",
+    captureVerified: "Capture verified",
     overview: "Overview",
     backToOverview: "Back to overview",
     backToArchive: "Back to archive",
@@ -300,6 +322,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     screenDetails: "界面详情",
     screenUnavailable: "界面不可用",
     archive: "归档",
+    screenEvidence: "页面验证",
+    documentReady: "默认就绪检查",
+    projectReady: "项目条件",
+    noScreenCondition: "未配置项目画面条件",
+    matched: "匹配",
+    unmatched: "不匹配",
+    notObserved: "未观测",
+    visibility: "可见匹配",
+    didNotSettle: "页面未稳定",
+    observedHeading: "观测到的标题",
+    captureVerified: "捕获已验证",
     overview: "概览",
     backToOverview: "返回概览",
     backToArchive: "返回归档",
@@ -427,6 +460,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     screenDetails: "화면 상세",
     screenUnavailable: "화면 없음",
     archive: "아카이브",
+    screenEvidence: "화면 검증",
+    documentReady: "기본 준비 조건",
+    projectReady: "프로젝트 조건",
+    noScreenCondition: "프로젝트 화면 조건 미지정",
+    matched: "일치",
+    unmatched: "불일치",
+    notObserved: "관측되지 않음",
+    visibility: "보이는 요소",
+    didNotSettle: "페이지 안정화 미확인",
+    observedHeading: "관측한 제목",
+    captureVerified: "캡처 검증됨",
     overview: "개요",
     backToOverview: "개요로 돌아가기",
     backToArchive: "아카이브로 돌아가기",

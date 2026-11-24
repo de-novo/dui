@@ -94,6 +94,62 @@ pub fn analyze_url_match(expected: &str, observed: &str) -> UrlMatch {
     }
 }
 
+fn route_reached(requested: &str, observed: &Value) -> bool {
+    observed["path"].as_str().is_some_and(|obs_path| {
+        analyze_url_match(requested, obs_path).matched
+            || (requested == "/"
+                && observed["redirectedTo"].as_str() == Some(obs_path)
+                && obs_path.starts_with('/')
+                && !obs_path.starts_with("//")
+                && observed["responses"]["/"] == 200
+                && observed["renderTree"]
+                    .as_array()
+                    .is_some_and(|tree| !tree.is_empty()))
+    })
+}
+
+/// A captured document can be ready even when no project condition identifies the screen.
+pub fn screen_evidence(spec: &Value, observed: &Value) -> Value {
+    let requested = spec["path"].as_str().unwrap_or("/");
+    let configured = spec["hasScreenAssertion"] != false && spec["readySelector"].is_string();
+    let heading = observed["renderTree"].as_array().and_then(|tree| {
+        tree.iter().find_map(|node| {
+            (node["tag"] == "h1" || node["role"] == "heading")
+                .then(|| node["text"].as_str())
+                .flatten()
+                .filter(|text| !text.is_empty())
+        })
+    });
+    let route_matches = observed["path"].as_str().map(|actual| {
+        analyze_url_match(requested, actual).matched
+            && requested.split_once('#').is_none_or(|(_, fragment)| {
+                actual
+                    .split_once('#')
+                    .is_some_and(|(_, got)| got == fragment)
+            })
+    });
+    let verified = configured
+        && observed["selectorVisible"] == true
+        && observed["ready"] == true
+        && observed["settled"] == true
+        && observed["documentStatus"]
+            .as_u64()
+            .is_some_and(|s| (200..300).contains(&s))
+        && (route_matches == Some(true)
+            || (requested == "/" && route_reached(requested, observed)));
+    serde_json::json!({
+        "canonicalPath": observed["canonicalPath"],
+        "canonicalMatches": observed["canonicalPath"].as_str().zip(observed["path"].as_str())
+            .map(|(declared, actual)| declared == actual),
+        "screenStatus": if verified { "verified" } else { "unverified" },
+        "requestedPath": requested, "observedPath": observed["path"],
+        "routeMatches": route_matches,
+        "documentStatus": observed["documentStatus"], "heading": heading, "settled": observed["settled"],
+        "selector": spec["readySelector"], "selectorMatched": observed["ready"], "selectorVisible": observed["selectorVisible"],
+        "selectorSource": if configured { "project" } else { "default" },
+    })
+}
+
 impl Intent<'_> {
     pub fn failure(&self, observed: &Value) -> Option<Failure> {
         self.failure_with(observed, &std::collections::BTreeSet::new())
@@ -140,17 +196,6 @@ impl Intent<'_> {
         let probe_ran = observed["hits"]
             .as_array()
             .is_some_and(|hits| hits.iter().any(Value::is_string));
-        let path_matches = observed["path"].as_str().is_some_and(|obs_path| {
-            analyze_url_match(self.path, obs_path).matched
-                || (self.path == "/"
-                    && observed["redirectedTo"].as_str() == Some(obs_path)
-                    && obs_path.starts_with('/')
-                    && !obs_path.starts_with("//")
-                    && observed["responses"]["/"] == 200
-                    && observed["renderTree"]
-                        .as_array()
-                        .is_some_and(|tree| !tree.is_empty()))
-        });
         let matches = self.analyzed
             && values_match
             && targets_match
@@ -158,7 +203,7 @@ impl Intent<'_> {
             && observed["settled"] != false
             && observed["ready"] == true
             && observed["width"] == self.width
-            && path_matches
+            && route_reached(self.path, observed)
             && (!self.expects_probe || probe_ran);
         (!matches).then_some(Failure::AssertFailed)
     }
@@ -187,6 +232,38 @@ pub fn slot_witness(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn screen_verification_requires_independent_observations() {
+        let spec = json!({"path": "/record", "readySelector": "[data-ready]"});
+        let observed = json!({"path": "/record", "documentStatus": 200, "ready": true,
+            "selectorVisible": true, "settled": true, "renderTree":[{"tag":"h1","text":"404"}]});
+        assert_eq!(
+            screen_evidence(&spec, &observed)["screenStatus"],
+            "verified"
+        );
+        for (key, value) in [
+            ("path", json!("/elsewhere")),
+            ("documentStatus", json!(404)),
+            ("documentStatus", Value::Null),
+            ("ready", json!(false)),
+            ("selectorVisible", json!(false)),
+            ("settled", json!(false)),
+        ] {
+            let mut changed = observed.clone();
+            changed[key] = value;
+            assert_eq!(
+                screen_evidence(&spec, &changed)["screenStatus"],
+                "unverified"
+            );
+        }
+        let mut fallback = spec;
+        fallback["hasScreenAssertion"] = json!(false);
+        assert_eq!(
+            screen_evidence(&fallback, &observed)["screenStatus"],
+            "unverified"
+        );
+    }
 
     #[test]
     fn a_matching_image_location_cannot_replace_runtime_evidence() {
