@@ -101,6 +101,7 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
       </label>
       <button
         type="button"
+        className="rail-collapse-btn"
         aria-label={collapsed ? t.expandRail : t.collapseRail}
         title={collapsed ? t.expandRail : t.collapseRail}
         aria-expanded={!collapsed}
