@@ -84,6 +84,7 @@
 | `dui desktop` | — | `~/.dui/dui.db`를 직접 읽는 네이티브 GPUI 데스크톱 뷰어를 연다. |
 | `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | 두 캡처를 비교한다(요소 `renderDiff`, 지연 픽셀 오버레이, `--base BRANCH --markdown` PR 코멘트 출력). |
 | `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | 검증률·누락 사유·미해결 리뷰 코멘트를 계산한다. |
+| `dui audit RUN_DIR --design MANIFEST [--goal PERCENT]` | — | 캡처한 노드를 프로젝트 명세와 비교하고 결과를 `designAudit`에 기록한다. [플러그인 규약](architecture.md#63-프로젝트-디자인-검사) |
 | `dui comment <add\|list\|resolve\|reopen>` | `comment_*` | 화면·상태·폭·전이에 고정된 리뷰 코멘트를 관리한다. |
 | `dui transitions PROJECT MANIFEST [RUN]` | `transitions(...)` | 액션을 재실행해 화면 전이를 검증한다. |
 | `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | 저장한 계획의 모든 칸을 시도한다. |

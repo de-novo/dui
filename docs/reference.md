@@ -84,6 +84,7 @@ The commands assume `dui` is on your `PATH`. With the default installation you c
 | `dui desktop` | — | Open the native GPUI desktop viewer over `~/.dui/dui.db`. |
 | `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | Compare two runs (element `renderDiff`, lazy pixel overlay, or `--base BRANCH --markdown` for PR comments). |
 | `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | Compute coverage percentage, gaps, and unresolved review comments. |
+| `dui audit RUN_DIR --design MANIFEST [--goal PERCENT]` | — | Compare recorded nodes with a project specification and return findings under `designAudit`. [Plugin contract](en/architecture.md#63-project-owned-design-audit) |
 | `dui comment <add\|list\|resolve\|reopen>` | `comment_*` | Manage review comments anchored to screens, states, widths, or transitions. |
 | `dui transitions PROJECT MANIFEST [RUN]` | `transitions(...)` | Replay actions and verify extracted/inferred screen transitions. |
 | `dui replay PROJECT MANIFEST PLAN [OUTPUT]` | `replay(project, manifest, plan, output?)` | Attempt every cell in a saved plan, including pending states. |

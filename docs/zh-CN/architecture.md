@@ -254,6 +254,27 @@ flowchart BT
 6. **Fixture**：`stacks.toml` 的每个条目都有 fixture 和经过审查的快照。
 7. **Web 和工具源码**：Oxlint 检查 TypeScript、React 钩子与 JSX 无障碍规则。Oxfmt 检查 TypeScript 和 CSS 格式。本地和 PR 均运行 `npm run check:style`，使用 `npm run format` 应用格式。
 
+### 6.3 项目设计检查
+
+调用者通过 `dui audit RUN_DIR --design MANIFEST` 显式指定可信配置后，CLI 才会执行项目代码。在捕获配置中加入以下字段。
+
+```json
+{ "designSpec": "./tokens.json", "plugins": ["./token-check.mjs"] }
+```
+
+所有路径均在配置文件所在目录内解析。CLI 对每个拥有非空渲染树且已验证的单元按配置顺序调用插件。它使用 Node.js 执行 `.mjs` 文件，直接调用其他可执行文件。插件以调用者的本地权限运行，从标准输入读取一个 JSON 对象，向标准输出写入一个 JSON 对象。
+
+- 输入字段为 `version`（1）、`index`（从 0 开始的单元序号）、`path`、`width`、`state`、`locale`、`scenario`、`renderTree` 和 `designSpec`。规范包含配置中的 `path` 和 `content`。`.json` 文件解析为 JSON，`DESIGN.md` 等文件按 UTF-8 文本读取。
+- 输出包括 `findings` 和可选的原因列表 `unverified`。每条发现包含 `rule`、`severity`（`info`、`warning` 或 `error`）、`nodeId`、`rect`、`summary`、`measured`、`expected` 和可选的 `specRef`。节点 ID 和矩形必须匹配同一捕获节点。
+- 覆盖率报告的 `designAudit` 包含单元位置和插件路径。检查通过返回 0；有发现或缺少证据返回 5；配置无效返回 2；插件失败、响应无效或插件超时 30 秒返回 3。
+
+[示例检查器](../../examples/design-audit/token-check.mjs) 从[项目规范](../../examples/design-audit/tokens.json)读取标签、计算样式属性和设计令牌。它接受计算样式字符串以及六位 sRGB 十六进制颜色。
+
+```sh
+dui run examples/design-audit examples/design-audit/dui.json ./capture
+dui audit ./capture --design examples/design-audit/dui.json
+```
+
 ## 7. M0 和 M1 验收标准
 
 **M0 —— 用手选状态证明真实的渲染路径。** 一个 obora-web 审阅界面，在 obora 满足 TS 7 基线之后。

@@ -1,0 +1,7 @@
+{
+  "host": "static",
+  "widths": [390, 1280],
+  "readySelector": "button",
+  "designSpec": "./tokens.json",
+  "plugins": ["./token-check.mjs"]
+}
