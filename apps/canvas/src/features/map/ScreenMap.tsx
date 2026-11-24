@@ -1,4 +1,15 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { Search, Map as MapIcon } from "lucide-react";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -17,6 +28,10 @@ import {
   Position,
   ReactFlow,
   getSmoothStepPath,
+  getViewportForBounds,
+  useViewportStore,
+  type Viewport,
+  type FitViewOptions,
   useReactFlow,
   type Edge,
   type EdgeProps,
@@ -47,11 +62,50 @@ type CardNode = Node<
   "screen"
 >;
 
+const minMapZoom = 0.02;
+const maxMapZoom = 3;
+
+function ResponsiveOverview({
+  padding,
+  measured,
+}: {
+  padding: FitViewOptions["padding"];
+  measured: boolean;
+}) {
+  const width = useViewportStore((state) => state.width);
+  const height = useViewportStore((state) => state.height);
+  const flow = useReactFlow();
+  const ready = measured && flow.viewportInitialized;
+  const lastFit = useRef<Viewport | null>(null);
+  const refit = useEffectEvent(() => {
+    const bounds = flow.getNodesBounds(flow.getNodes());
+    const next = getViewportForBounds(bounds, width, height, minMapZoom, maxMapZoom, padding);
+    const current = flow.getViewport();
+    const previous = lastFit.current;
+    // Leave a user-selected camera in place until the next explicit Fit view.
+    if (
+      !previous ||
+      (Math.abs(current.x - previous.x) < 0.5 &&
+        Math.abs(current.y - previous.y) < 0.5 &&
+        Math.abs(current.zoom - previous.zoom) < 0.00001)
+    ) {
+      void flow.setViewport(next);
+    }
+    lastFit.current = next;
+  });
+  useLayoutEffect(() => {
+    if (ready && width && height) refit();
+  }, [ready, width, height, padding]);
+  return null;
+}
+
 function ZoomOneToOneButton({
+  fitOptions,
   target,
   cardWidth,
   frameHeight,
 }: {
+  fitOptions: FitViewOptions;
   target?: { position: { x: number; y: number }; frameHeight?: number };
   cardWidth: number;
   frameHeight: number;
@@ -93,7 +147,7 @@ function ZoomOneToOneButton({
         jumpOneToOne();
       } else if (event.key === "!" || (event.shiftKey && event.key === "1")) {
         event.preventDefault();
-        void fitView({ duration: 200 });
+        void fitView({ ...fitOptions, duration: 200 });
       }
     };
     addEventListener("keydown", onKey);
@@ -274,6 +328,7 @@ const edgeTypes = { gutter: GutterEdge };
 
 export function ScreenMap({
   desktop,
+  mapOptions,
   openSearch,
   railInset,
   archive,
@@ -292,6 +347,7 @@ export function ScreenMap({
   onClearSelection,
 }: {
   desktop: boolean;
+  mapOptions: ReactNode;
   openSearch: () => void;
   railInset: number;
   archive: Archive;
@@ -522,6 +578,14 @@ export function ScreenMap({
     }
   }
 
+  const fitOptions = useMemo<FitViewOptions>(
+    () => ({
+      padding: { left: `${railInset + 18}px`, right: "18px", top: "48px", bottom: "18px" },
+      minZoom: minMapZoom,
+    }),
+    [railInset],
+  );
+
   return (
     <ReactFlow
       key={JSON.stringify([mode, width])}
@@ -531,8 +595,8 @@ export function ScreenMap({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       fitView
-      minZoom={0.02}
-      maxZoom={3}
+      minZoom={minMapZoom}
+      maxZoom={maxMapZoom}
       panOnDrag
       panOnScroll
       panOnScrollMode={PanOnScrollMode.Free}
@@ -541,15 +605,7 @@ export function ScreenMap({
       zoomOnPinch
       zoomOnDoubleClick={false}
       zoomActivationKeyCode={["Meta", "Control"]}
-      fitViewOptions={{
-        padding: {
-          left: `${railInset + 18}px`,
-          right: "18px",
-          top: "48px",
-          bottom: "18px",
-        },
-        minZoom: 0.02,
-      }}
+      fitViewOptions={fitOptions}
       nodesDraggable={false}
       nodesConnectable={false}
       onKeyDown={handleKeyDown}
@@ -560,6 +616,10 @@ export function ScreenMap({
         if (focusActive) onClearSelection?.();
       }}
     >
+      <ResponsiveOverview
+        padding={fitOptions.padding}
+        measured={nodes.length > 0 && nodes.every((node) => heights.has(node.id))}
+      />
       <Background color="var(--map-grid)" gap={20} size={1} />
       {desktop && miniMap && (
         <MiniMap
@@ -572,31 +632,41 @@ export function ScreenMap({
           maskColor="var(--glass-surface)"
         />
       )}
-      <Controls showInteractive={false}>
-        <ControlButton
-          onClick={openSearch}
-          aria-label={t.findScreen}
-          title={t.findScreen + " (⌘/Ctrl K)"}
-          aria-keyshortcuts="Meta+K Control+K"
+      <div className="map-toolbar">
+        <Controls
+          fitViewOptions={fitOptions}
+          showInteractive={false}
+          orientation={desktop ? "vertical" : "horizontal"}
         >
-          <Search aria-hidden="true" />
-        </ControlButton>
-        {desktop && (
-          <ControlButton
-            onClick={() => setMiniMap((open) => !open)}
-            aria-label={t.miniMap}
-            aria-pressed={miniMap}
-            title={t.miniMap}
-          >
-            <MapIcon aria-hidden="true" />
-          </ControlButton>
-        )}
-        <ZoomOneToOneButton
-          target={layout.nodes.find((n) => n.screen.id === selectedId) ?? layout.nodes[0]}
-          cardWidth={cardWidth}
-          frameHeight={frameHeight}
-        />
-      </Controls>
+          {desktop && (
+            <>
+              <ControlButton
+                onClick={openSearch}
+                aria-label={t.findScreen}
+                title={t.findScreen + " (⌘/Ctrl K)"}
+                aria-keyshortcuts="Meta+K Control+K"
+              >
+                <Search aria-hidden="true" />
+              </ControlButton>
+              <ControlButton
+                onClick={() => setMiniMap((open) => !open)}
+                aria-label={t.miniMap}
+                aria-pressed={miniMap}
+                title={t.miniMap}
+              >
+                <MapIcon aria-hidden="true" />
+              </ControlButton>
+            </>
+          )}
+          <ZoomOneToOneButton
+            fitOptions={fitOptions}
+            target={layout.nodes.find((n) => n.screen.id === selectedId) ?? layout.nodes[0]}
+            cardWidth={cardWidth}
+            frameHeight={frameHeight}
+          />
+        </Controls>
+        {mapOptions}
+      </div>
     </ReactFlow>
   );
 }
