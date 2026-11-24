@@ -18,14 +18,15 @@ guard let buffer = context.data,
       Set(UnsafeBufferPointer(start: buffer.assumingMemoryBound(to: UInt8.self), count: 4096)).count > 8
 else { throw CaptureError.blank }
 
-// Read the visible sample name from pixels independently of the Flutter widget assertion.
-if url.lastPathComponent == "home.png" {
+// An optional text witness checks the actual image independently of the UI driver.
+if CommandLine.arguments.count == 3 {
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.recognitionLanguages = ["en-US"]
     try VNImageRequestHandler(cgImage: image).perform([request])
     let words = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
-    let text = words.joined().lowercased().filter { $0.isLetter }
-    guard text.contains("sofiestrips") else { throw CaptureError.unexpectedHeading }
+    let text = words.joined().lowercased().filter { $0.isLetter || $0.isNumber }
+    let expected = CommandLine.arguments[2].lowercased().filter { $0.isLetter || $0.isNumber }
+    guard !expected.isEmpty && text.contains(expected) else { throw CaptureError.unexpectedHeading }
 }
 print("\(image.width) \(image.height)")

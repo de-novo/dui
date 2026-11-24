@@ -4,6 +4,8 @@ on:
     paths:
       - "fixtures/compass-ios/**"
       - "scripts/check-compass-ios.py"
+      - "scripts/ios_simulator.py"
+      - "scripts/check-ios-screenshot.swift"
       - ".github/workflows/ios-simulator.yml"
   workflow_dispatch:
     inputs:
