@@ -6,6 +6,8 @@ dui maps the screens an app actually renders so a reviewer can follow a task fro
 
 **A review should answer a concrete question.** After cancelling an order on a phone, where does the user land? The reviewer follows the path from order details through confirmation, opens the result at mobile width and records what feels unclear. An agent fixes the code. The reviewer returns to the same point on the map and compares the two worktrees.
 
+Capture a pickup board with `dui map .`, inspect its dialog, compare a heading change and open the same run on the native desktop. [Run the Dispatch example](../../examples/dispatch/README.md)
+
 ## v0.0.1 · Capture baseline complete
 
 Chromium renders the app with its project types and mock data. The local gallery shows captured states at each width, and the history viewer compares snapshots under `~/.dui/` by project, branch and worktree. The npmgraph example starts at one URL, discovers the search screen and produces four verified cells across two widths. [Reproduce the example](../../examples/npmgraph/README.md)

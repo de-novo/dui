@@ -1,0 +1,110 @@
+:root {
+  color-scheme: light;
+  font:
+    100%/1.5 "Source Sans 3",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  color: #192a23;
+  background: #f7f6ef;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+header {
+  background: #173e32;
+  color: white;
+  padding: 1rem max(5vw, 1.25rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+header strong {
+  font:
+    bold 1.5rem "Baskervville",
+    Georgia,
+    serif;
+}
+header span,
+dt {
+  font-size: 0.9rem;
+}
+main {
+  max-width: 62rem;
+  margin: 4rem auto;
+  padding: 0 1.25rem;
+}
+h1 {
+  font:
+    normal clamp(3rem, 8vw, 6rem)/1.05 "Baskervville",
+    Georgia,
+    serif;
+  margin: 0 0 3rem;
+  letter-spacing: -0.045em;
+}
+h2 {
+  font-size: 1rem;
+  margin: 0 0 1rem;
+}
+h3,
+p {
+  margin: 0;
+}
+.ticket,
+dl {
+  border-block: 1px solid #85978d;
+  padding: 1.5rem 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem 3rem;
+}
+.time,
+dd {
+  font:
+    normal 2.25rem "Baskervville",
+    Georgia,
+    serif;
+  margin: 0;
+}
+a {
+  color: inherit;
+  text-underline-offset: 0.25em;
+}
+.ticket a {
+  margin-inline-start: auto;
+}
+button {
+  cursor: pointer;
+  font: inherit;
+  background: #173e32;
+  color: white;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0.65rem 1rem;
+}
+dialog {
+  max-width: min(26rem, 90vw);
+  padding: 2rem;
+  border: 1px solid #85978d;
+  background: #fffdf4;
+  color: inherit;
+}
+dialog::backdrop {
+  background: #132b23a8;
+}
+dialog form {
+  margin-top: 1.5rem;
+}
+@media (max-width: 35rem) {
+  main {
+    margin-block: 2.5rem;
+  }
+  .ticket a {
+    margin-inline-start: 0;
+  }
+}
