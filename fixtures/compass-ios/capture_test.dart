@@ -12,6 +12,25 @@ import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 
+Future<void> waitForSimulatorSemantics(
+  TestWidgetsFlutterBinding binding,
+) async {
+  if (binding.platformDispatcher.semanticsEnabled) return;
+  final ready = Completer<void>();
+  void onSemanticsChanged() {
+    if (binding.platformDispatcher.semanticsEnabled && !ready.isCompleted) {
+      ready.complete();
+    }
+  }
+
+  binding.addSemanticsEnabledListener(onSemanticsChanged);
+  try {
+    await ready.future.timeout(const Duration(seconds: 45));
+  } finally {
+    binding.removeSemanticsEnabledListener(onSemanticsChanged);
+  }
+}
+
 void main() {
   final output = Directory('${Directory.systemTemp.path}/dui-capture')
     ..createSync(recursive: true);
@@ -21,6 +40,15 @@ void main() {
     flush: true,
   );
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // UIKit enables the simulator accessibility bridge in viewDidAppear.
+  // Let Flutter acquire that platform-owned handle before testWidgets records its baseline.
+  setUpAll(() async {
+    progress.writeAsStringSync(
+      'Waiting for the iOS accessibility bridge',
+      flush: true,
+    );
+    await waitForSimulatorSemantics(binding);
+  });
   final screens = <Map<String, Object>>[];
   unawaited(
     binding.allTestsPassed.future.then((passed) {
