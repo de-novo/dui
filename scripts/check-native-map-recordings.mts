@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { withChromiumPage } from "./chromium-page.mts";
@@ -12,16 +12,23 @@ const binary = process.env.DUI_BIN || resolve(import.meta.dirname, "../target/de
 export async function verifyAttachedRecordings(source: string) {
   const graphBytes = await readFile(join(source, "graph.json"));
   const { nodes } = JSON.parse(graphBytes.toString()) as { nodes: { id: string; label: string }[] };
-  const { id: sourceSnapshot } = JSON.parse(await readFile(join(source, "snapshot.json"), "utf8"));
+  const { id: sourceSnapshot, projectId } = JSON.parse(
+    await readFile(join(source, "snapshot.json"), "utf8"),
+  );
   assert(nodes.length >= 3);
   const temp = await mkdtemp(join(tmpdir(), "dui-native-recordings-"));
   const manifest = join(temp, "recordings.json");
+  const runs = join(temp, ".dui", "projects", projectId, "runs");
+  const localSource = join(runs, sourceSnapshot);
   const attach = () =>
-    execFileSync(binary, ["map", "attach", source, manifest], {
+    execFileSync(binary, ["map", "attach", localSource, manifest], {
       encoding: "utf8",
+      env: { ...process.env, HOME: temp },
       stdio: ["ignore", "pipe", "pipe"],
     });
   try {
+    await mkdir(runs, { recursive: true });
+    await cp(source, localSource, { recursive: true });
     const captures = await withChromiumPage(async ({ call }) => {
       const captures = [];
       for (const [index, node] of nodes.slice(0, 2).entries()) {
@@ -62,7 +69,7 @@ export async function verifyAttachedRecordings(source: string) {
     assert.equal(run.coverage.attempted, 0);
     assert.equal(run.coverage.verified, 0);
     assert.equal(run.cells.length, captures.length);
-    const db = new DatabaseSync(join(homedir(), ".dui", "dui.db"), { readOnly: true });
+    const db = new DatabaseSync(join(temp, ".dui", "dui.db"), { readOnly: true });
     try {
       for (const cap of captures) {
         const cell = run.cells.find((c: { screenId: string }) => c.screenId === cap.screenId);
