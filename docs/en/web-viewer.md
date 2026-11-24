@@ -18,6 +18,8 @@ Run `dui map PATH` on a React Navigation, Expo Router or Flutter app package to 
 
 Open the resulting archive with `dui open`. Source cards identify the declaration and its file and line. Named registrations can have a navigation key instead of a URL. Conditional and parameterized routes keep their expressions or patterns. Unresolved declarations appear in the discovery limitations. Source-only maps have zero attempted captures. Native appearance, transitions and runtime coverage require capture evidence.
 
+For iOS evidence, install the app’s simulator build on an iPhone simulator and capture a route after checking that its expected content is visible. Record the logical width, PNG dimensions, route and app revision. The simulator checks use public sample data. A standard run verifies the images on the runner. Explicitly requested fixture exports contain PNGs and expire after one day.
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.
