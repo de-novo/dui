@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/",
+    "heading": "Bakery counter",
+    "body": "See what is coming out of the oven.",
+    "next": "/batches"
+  },
+  {
+    "path": "/batches",
+    "heading": "Morning batches",
+    "body": "The first loaves are ready for pickup.",
+    "next": "/batches/rye"
+  },
+  {
+    "path": "/batches/rye",
+    "heading": "Caraway rye",
+    "body": "A slow-fermented loaf with toasted caraway.",
+    "next": "/"
+  }
+]

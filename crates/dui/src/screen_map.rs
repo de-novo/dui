@@ -6,9 +6,14 @@ pub fn capture(project: &Path) -> Reply {
     capture_target(project, None)
 }
 
-pub fn capture_target(project: &Path, url: Option<&str>) -> Reply {
+pub(crate) enum WebTarget<'a> {
+    Url(&'a str),
+    BuildDir(&'a Path),
+}
+
+pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> Reply {
     let project = project.canonicalize().map_err(io)?;
-    if url.is_none()
+    if target.is_none()
         && let Some((app, adapter)) = crate::native_map::target(&project)?
     {
         let inventory = adapter.discover(&app)?;
@@ -16,24 +21,23 @@ pub fn capture_target(project: &Path, url: Option<&str>) -> Reply {
     }
     let work = tempfile::tempdir().map_err(io)?;
     let manifest = work.path().join("map.json");
-    if let Some(url) = url {
-        let profile = url_manifest(&project, url)?;
-        fs::write(&manifest, serde_json::to_vec(&profile).map_err(io)?).map_err(io)?;
-    } else {
-        discover(&project, &manifest)?;
+    let explicit = target.is_some();
+    match target {
+        None => discover(&project, &manifest)?,
+        Some(target) => {
+            let profile = web_manifest(&project, target)?;
+            fs::write(&manifest, serde_json::to_vec(&profile).map_err(io)?).map_err(io)?;
+        }
     }
     archive::capture(
         &project,
         &manifest,
         None,
-        archive::Capture::Run {
-            force: url.is_some(),
-        },
+        archive::Capture::Run { force: explicit },
     )
 }
 
-fn url_manifest(project: &Path, url: &str) -> Reply {
-    let (_, path) = crate::universal_web::parse_loopback_url(url).map_err(|e| failure(2, &e))?;
+fn web_manifest(project: &Path, target: WebTarget<'_>) -> Reply {
     let mut profile = match fs::read(project.join("dui.json")) {
         Ok(bytes) => serde_json::from_slice(&bytes)
             .map_err(|e| failure(2, &format!("invalid dui.json: {e}")))?,
@@ -43,13 +47,51 @@ fn url_manifest(project: &Path, url: &str) -> Reply {
     let fields = profile
         .as_object_mut()
         .ok_or_else(|| failure(2, "dui.json must be an object"))?;
-    fields.insert("host".into(), json!("url"));
+    match target {
+        WebTarget::Url(url) => {
+            let (_, path) =
+                crate::universal_web::parse_loopback_url(url).map_err(|e| failure(2, &e))?;
+            fields.insert("host".into(), json!("url"));
+            fields.insert("url".into(), json!(url));
+            fields.insert("path".into(), json!(path));
+        }
+        WebTarget::BuildDir(dir) => {
+            let root = project
+                .join(dir)
+                .canonicalize()
+                .map_err(|e| failure(2, &format!("invalid build directory: {e}")))?;
+            let relative = root
+                .strip_prefix(project)
+                .ok()
+                .filter(|_| root.is_dir())
+                .ok_or_else(|| failure(2, "build directory must be inside the project"))?;
+            let entry = fields.get("path").and_then(Value::as_str).unwrap_or("/");
+            let fallback = fields
+                .get("spaFallback")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let file = crate::universal_web::resolve_static_file(&root, entry, fallback);
+            if !file.is_some_and(|path| {
+                path.extension().is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("html") || ext.eq_ignore_ascii_case("htm")
+                })
+            }) {
+                return Err(failure(
+                    2,
+                    &format!(
+                        "no built HTML page for {entry}; set path in dui.json to the build entry"
+                    ),
+                ));
+            }
+            fields.insert("host".into(), json!("static"));
+            fields.insert("root".into(), json!(relative));
+            fields.remove("url");
+        }
+    }
     fields.insert(
         "surface".into(),
         json!(dui_core::surface::SURFACE_UNIVERSAL_WEB),
     );
-    fields.insert("url".into(), json!(url));
-    fields.insert("path".into(), json!(path));
     fields.remove("rendererUrl");
     apply_discovery_defaults(&mut profile);
     // The generated manifest lives outside the project. Keep profile resources
@@ -180,6 +222,40 @@ pub(crate) fn discover(project: &Path, manifest: &Path) -> Result<(), (u8, serde
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn build_map_uses_the_project_entry_and_checks_the_resolved_html() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let project = dir.path().canonicalize().expect("project");
+        let build = project.join("output");
+        fs::create_dir_all(build.join("start")).expect("build");
+        fs::write(build.join("start/index.html"), "<h1>Start</h1>").expect("entry");
+        fs::write(project.join("dui.json"), r#"{"host":"url","url":"http://localhost:80","rendererUrl":"old","path":"/start","widths":[412]}"#).expect("profile");
+        let manifest =
+            web_manifest(&project, WebTarget::BuildDir(Path::new("output"))).expect("map");
+        assert_eq!(manifest["host"], "static");
+        assert_eq!(manifest["root"], "output");
+        assert_eq!(manifest["path"], "/start");
+        assert_eq!(manifest["widths"], json!([412]));
+        assert!(manifest.get("rendererUrl").is_none());
+        assert!(manifest.get("url").is_none());
+        fs::remove_file(build.join("start/index.html")).expect("remove entry");
+        assert_eq!(
+            web_manifest(&project, WebTarget::BuildDir(&build))
+                .expect_err("missing HTML")
+                .0,
+            2
+        );
+        let outside = tempfile::tempdir().expect("outside");
+        assert_eq!(
+            web_manifest(&project, WebTarget::BuildDir(outside.path()))
+                .expect_err("outside project")
+                .0,
+            2
+        );
+        std::os::unix::fs::symlink(outside.path(), build.join("loop")).expect("link");
+        assert!(crate::universal_web::collect_static_source_files(&project, "output").is_empty());
+    }
 
     #[test]
     fn detects_nextjs_and_static_projects_without_requiring_vite() {

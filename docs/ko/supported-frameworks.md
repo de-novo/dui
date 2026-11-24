@@ -8,6 +8,8 @@
 
 실행 중인 로컬 웹 앱은 공통 Chromium 경로를 사용하는 `dui map . --url http://localhost:4200/`로 지도화할 수 있다. 아래 프레임워크 지원 표는 컴파일러 연동 범위를 다룬다. React Navigation, Expo Router, Flutter는 소스에서 라우트 선언을 찾아 지도를 생성할 수도 있다. [화면 지도 계약](web-viewer.md)을 참고한다.
 
+빌드 디렉터리 검사에서는 Vue Router, SvelteKit, Astro, Preact 앱을 빌드하고 `dui map . --build-dir dist`로 링크된 페이지를 두 화면 폭에서 검증한다.
+
 ## 적용한 원칙
 
 1. **공식 컴파일러만.** 타입 정보는 프로젝트가 이미 쓰는 컴파일러(`tsc`, `rustc`, `swiftc`, `kotlinc`, `dart`)에서 얻는다.

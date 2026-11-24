@@ -1,0 +1,4 @@
+{
+  "spaFallback": true,
+  "readySelector": "main h1"
+}

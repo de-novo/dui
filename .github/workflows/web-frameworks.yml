@@ -1,0 +1,34 @@
+name: Built web framework screen maps
+on:
+  pull_request:
+    paths:
+      - "adapters/browser/**"
+      - "crates/dui*/**"
+      - "fixtures/web-frameworks/**"
+      - "scripts/check-web-frameworks.mts"
+      - "dependency-catalog.json"
+      - ".github/workflows/web-frameworks.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - name: Build dui and install fixture toolchains
+        run: |
+          npm ci
+          npm ci --prefix apps/canvas
+          npm install --prefix "$RUNNER_TEMP/astro-toolchain" --no-audit --no-fund astro@7.4.13
+          cargo build --locked
+      - name: Build the four apps and check their rendered screen maps
+        run: |
+          export DUI_CHROMIUM="$(command -v google-chrome)"
+          "$DUI_CHROMIUM" --version
+          node scripts/check-web-frameworks.mts "$RUNNER_TEMP/astro-toolchain"
