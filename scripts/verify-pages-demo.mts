@@ -287,6 +287,15 @@ async function main() {
   const archiveSummary = verifyArchives();
   const { server, port } = await startStaticServer();
   try {
+    const installer = await fetch(`http://127.0.0.1:${port}/install`);
+    if (
+      installer.status !== 200 ||
+      !Buffer.from(await installer.arrayBuffer()).equals(
+        fs.readFileSync(path.join(root, "scripts/install")),
+      )
+    ) {
+      throw new Error("The published /install must serve scripts/install byte for byte");
+    }
     const rendered = await verifyRenderedPages(port, archiveSummary[0]!.key);
     console.log(JSON.stringify({ status: "ok", archives: archiveSummary, rendered }, null, 2));
   } finally {

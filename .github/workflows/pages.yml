@@ -8,6 +8,8 @@ on:
       - "examples/**"
       - "apps/canvas/**"
       - "scripts/build-pages-demo.mts"
+      - "scripts/verify-pages-demo.mts"
+      - "scripts/install"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

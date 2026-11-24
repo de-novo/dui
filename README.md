@@ -38,7 +38,7 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 On macOS or Linux, run this command to clone the latest release tag (`vX.Y.Z`, falling back to `main` if no tags exist) and build dui from source. Pass a tag with `DUI_TAG=v0.0.1` to pin a specific release.
 
 ```sh
-curl -fsSL https://github.com/de-novo/dui/raw/main/scripts/install | bash
+curl -fsSL https://dui.sh/install | sh
 ```
 
 You need Git, curl, and a C toolchain (Xcode Command Line Tools on macOS). The installer builds dui on your machine, adds the install directory (`~/.local/bin` by default) to your shell `PATH` automatically (set `DUI_NO_MODIFY_PATH=1` to opt out), and symlinks into a writable `PATH` directory when available so `dui` works immediately. If Rust or Node.js 26 with npm is missing, the installer downloads a temporary copy for the build and removes it afterward.
