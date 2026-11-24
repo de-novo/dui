@@ -19,8 +19,13 @@ final class OrcaCaptureTests: XCTestCase {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let heading = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] %@", witness)).firstMatch
+        let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
+                                                    appropriateFor: nil, create: true)
+        let candidate = documents.appendingPathComponent(name + ".candidate.png")
+        let accepted = documents.appendingPathComponent(name + ".accepted")
         let deadline = Date().addingTimeInterval(100)
         repeat {
+            if FileManager.default.fileExists(atPath: accepted.path) { return }
             let alert = springboard.alerts.firstMatch
             if alert.exists {
                 // A fresh device can ask about notifications or opening the app's URL.
@@ -28,15 +33,12 @@ final class OrcaCaptureTests: XCTestCase {
                 let button = choices.map { alert.buttons[$0] }.first(where: { $0.exists })
                 try XCTUnwrap(button, alert.debugDescription).tap()
             } else if app.state == .runningForeground && heading.exists {
-                let shot = XCTAttachment(data: XCUIScreen.main.screenshot().pngRepresentation,
-                                         uniformTypeIdentifier: "public.png")
-                shot.name = name
-                shot.lifetime = .keepAlways
-                add(shot)
-                return
+                // Accessibility can expose this heading before the app has painted it.
+                // Keep this route open while the host checks the actual frame with OCR.
+                try XCUIScreen.main.screenshot().pngRepresentation.write(to: candidate, options: .atomic)
             }
             RunLoop.current.run(until: Date().addingTimeInterval(1))
         } while Date() < deadline
-        XCTFail("Missing \(witness). Application tree: \(app.debugDescription); system: \(springboard.debugDescription)")
+        XCTFail("No frame confirmed \(witness). Application tree: \(app.debugDescription); system: \(springboard.debugDescription)")
     }
 }

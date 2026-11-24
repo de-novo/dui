@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/workflows/ios-orca.yml"
       - "scripts/check-ios-orca.py"
+      - "scripts/check-orca-frame-selection.py"
       - "fixtures/ios-orca/**"
       - "scripts/check-ios-screenshot.swift"
       - "scripts/ios_simulator.py"
@@ -68,6 +69,8 @@ jobs:
           python3 scripts/ios_simulator.py orca -- python3 scripts/check-ios-orca.py capture \
             "$RUNNER_TEMP/orca-build/Build/Products" \
             "$RUNNER_TEMP/check-ios-screenshot" "$RUNNER_TEMP/orca-images"
+      - name: Verify frame selection when visible content lags navigation
+        run: python3 scripts/check-orca-frame-selection.py "$RUNNER_TEMP/orca-images"
       - name: Export approved fixture PNGs
         if: >-
           (github.event_name == 'workflow_dispatch' && inputs.export_pngs) ||

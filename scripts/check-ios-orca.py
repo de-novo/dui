@@ -6,10 +6,12 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 
 REVISION = "55049f5745a7a6c1755e6d9c6641bb02f158fcc5"
 BUNDLE = "com.stably.orca.mobile"
+SCREENS = (("/", "home", "Connect your desktop"), ("/about", "about", "Open-source agent IDE"))
 
 
 def instrument(mobile):
@@ -43,55 +45,66 @@ def normalized_text(text):
     return "".join(character for character in text.casefold() if character.isalnum())
 
 
+def wait_for_visible_frame(app_containers, process, name, witness):
+    previous = None
+    while process.poll() is None:
+        for candidate in app_containers.glob(f"*/Documents/orca-{name}.candidate.png"):
+            pixels = candidate.read_bytes()
+            if pixels == previous:
+                continue
+            previous = pixels
+            for mode in ("11", "6"):
+                result = subprocess.run(["tesseract", "stdin", "stdout", "-l", "eng", "--psm", mode],
+                                        input=pixels, stdout=subprocess.PIPE, check=True, timeout=25)
+                if normalized_text(witness) in normalized_text(result.stdout.decode("utf-8")):
+                    candidate.with_name(f"orca-{name}.accepted").touch()
+                    print(f"Confirmed {witness!r} in the {name} screenshot", flush=True)
+                    return pixels
+        time.sleep(0.4)
+    raise RuntimeError(f"XCTest exited with {process.returncode} before OCR confirmed {witness!r}")
+
+
 def capture(products, checker, output):
     udid = os.environ["DUI_IOS_UDID"]
     xctestrun, = products.glob("*.xctestrun")
     output.mkdir(parents=True, exist_ok=False)
     recordings = []
+    devices = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "-j"]))["devices"]
+    device = next(device for group in devices.values() for device in group if device["udid"] == udid)
+    app_containers = Path(device["dataPath"]) / "Containers/Data/Application"
     with tempfile.TemporaryDirectory() as work:
         result = Path(work) / "Capture.xcresult"
-        attachments = Path(work) / "attachments"
-        subprocess.run([
+        frames = {}
+        with subprocess.Popen([
             "xcodebuild", "test-without-building", "-xctestrun", xctestrun,
             "-destination", f"platform=iOS Simulator,id={udid}",
             "-parallel-testing-enabled", "NO", "-resultBundlePath", result,
-        ], check=True)
-        subprocess.run(["xcrun", "xcresulttool", "export", "attachments",
-                        "--path", result, "--output-path", attachments], check=True)
-        manifest = json.loads((attachments / "manifest.json").read_text())
+        ]) as process:
+            try:
+                for _, name, witness in SCREENS:
+                    frames[name] = wait_for_visible_frame(app_containers, process, name, witness)
+                if process.wait() != 0:
+                    raise subprocess.CalledProcessError(process.returncode, process.args)
+            finally:
+                if process.poll() is None:
+                    process.terminate()
         container = subprocess.check_output(
             ["xcrun", "simctl", "get_app_container", udid, BUNDLE, "data"], text=True
         )
-        for route, name, witness in [
-            ("/", "home", "Connect your desktop"),
-            ("/about", "about", "Open-source agent IDE"),
-        ]:
+        for route, name, witness in SCREENS:
             state_file = Path(container.strip()) / f"Documents/dui-observation-{name}.json"
             state = json.loads(state_file.read_text())
             if state["pathname"] != route or state["width"] <= 0 or state["height"] <= 0:
                 raise ValueError(f"Invalid route observation {state}")
             filename = f"orca-{name}.png"
-            match, = [item for test in manifest for item in test["attachments"]
-                      if item["suggestedHumanReadableName"].startswith(f"orca-{name}")]
-            frame = attachments / match["exportedFileName"]
-            # The virtual Xcode 27 host lacks the Vision recognition service.
-            # ImageIO still validates the PNG; CPU OCR checks its visible content.
+            pixels = frames[name]
+            frame = Path(work) / filename
+            frame.write_bytes(pixels)
             geometry = subprocess.check_output([checker, frame], text=True)
-            lines = []
-            for page_segmentation in ["11", "6"]:
-                text = subprocess.check_output([
-                    "tesseract", frame, "stdout", "-l", "eng", "--psm", page_segmentation
-                ], text=True)
-                lines.append(text)
-                if normalized_text(witness) in normalized_text(text):
-                    break
-            else:
-                raise ValueError(f"Missing {witness!r} in {filename}. OCR read {lines!r}")
             width, height = map(int, geometry.split())
             screen = state["screen"]
             if (width, height) != (round(screen["width"] * screen["scale"]), round(screen["height"] * screen["scale"])):
                 raise ValueError(f"PNG {width}×{height} disagrees with iOS screen {screen}")
-            pixels = frame.read_bytes()
             (output / filename).write_bytes(pixels)
             recordings.append({
                 "runtime": "ios", "observedPath": route, "width": state["width"],
