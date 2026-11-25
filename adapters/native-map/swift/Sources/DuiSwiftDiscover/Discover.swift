@@ -127,6 +127,10 @@ struct Scan {
         if let closure = expr.as(ClosureExprSyntax.self) {
             return statements(closure.statements, site: site, dynamic: dynamic, condition: condition)
         }
+        // `X() #if … .modifier() #endif` presents X.
+        if let postfix = expr.as(PostfixIfConfigExprSyntax.self), let base = postfix.base {
+            return targets(of: base, site: site, dynamic: dynamic, condition: condition)
+        }
         if let branch = expr.as(IfExprSyntax.self) {
             return branches(of: branch, site: site, condition: condition)
         }
@@ -140,9 +144,20 @@ struct Scan {
             }
         }
         if let call = expr.as(FunctionCallExprSyntax.self) {
-            // A modifier chain (`X().navigationTitle(...)`) presents its receiver.
             if let member = call.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base {
-                return targets(of: base, site: site, dynamic: dynamic, condition: condition)
+                // `X.init(...)` constructs X.
+                if member.declName.baseName.text == "init" {
+                    if let type = site.type(at: base), views.contains(type.usr) {
+                        return [Target(usr: type.usr, dynamic: dynamic, condition: condition)]
+                    }
+                } else if site.type(at: base) != nil {
+                    // `X.make(...)`: the index does not record what a static member returns.
+                    limit(site, call, "is returned by `\(call.calledExpression.trimmedDescription)`, whose result type the index does not record")
+                    return []
+                } else {
+                    // A modifier chain (`X().navigationTitle(...)`) presents its receiver.
+                    return targets(of: base, site: site, dynamic: dynamic, condition: condition)
+                }
             }
             guard let type = site.type(at: call.calledExpression) else {
                 limit(site, call, "is produced by `\(call.calledExpression.trimmedDescription)` at runtime")

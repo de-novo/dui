@@ -45,6 +45,7 @@ try {
     `SwiftUIMapFixture/RootView.swift#RootView ${file}/RootView.swift 3 static`,
     `SwiftUIMapFixture/Screens.swift#ComposeView ${file}/Screens.swift 16 static`,
     `SwiftUIMapFixture/Screens.swift#DetailView ${file}/Screens.swift 3 static`,
+    `SwiftUIMapFixture/Screens.swift#HelpView ${file}/Screens.swift 46 static`,
     `SwiftUIMapFixture/Screens.swift#HostedView ${file}/Screens.swift 40 static`,
     `SwiftUIMapFixture/Screens.swift#ItemView ${file}/Screens.swift 11 static`,
     `SwiftUIMapFixture/Screens.swift#LoginView ${file}/Screens.swift 24 dynamic: !(signedIn)`,
@@ -54,10 +55,11 @@ try {
   ]);
   assert.deepEqual(run.screenDiscovery.limitations, [
     `${file}/HomeView.swift:23: destination is type-erased with AnyView.`,
+    `${file}/HomeView.swift:51: destination is returned by \`FactoryView.make\`, whose result type the index does not record.`,
   ]);
   assert.equal(run.screenDiscovery.kind, "native-source");
   console.log(
-    `SwiftUI map: ${screens.length} declarations from the index store, 1 stated limitation, zero captures.`,
+    `SwiftUI map: ${screens.length} declarations from the index store, 2 stated limitations, zero captures.`,
   );
 } finally {
   rmSync(home, { recursive: true, force: true });

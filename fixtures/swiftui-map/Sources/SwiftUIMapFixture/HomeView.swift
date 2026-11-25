@@ -41,6 +41,15 @@ struct HomeView: View {
                     LoginView()
                 }
             }
+            .popover(isPresented: $composing) {
+                HelpView()
+                #if os(iOS)
+                    .presentationDetents([.medium])
+                #endif
+            }
+            .navigationDestination(isPresented: $signedIn) {
+                FactoryView.make()
+            }
         }
     }
 }

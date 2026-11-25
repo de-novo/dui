@@ -42,3 +42,13 @@ struct HostedView {
 }
 
 extension HostedView: Screen {}
+
+struct HelpView: View {
+    var body: some View { Text("Help") }
+}
+
+/// Reached only through a static factory, whose result type the index does not record.
+struct FactoryView: View {
+    static func make() -> FactoryView { FactoryView() }
+    var body: some View { Text("Factory") }
+}
