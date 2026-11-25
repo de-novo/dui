@@ -33,6 +33,9 @@ struct Rule: Sendable {
     let destinations: Set<String>
     /// Each top-level child is its own screen (tab containers).
     var eachChild = false
+    /// A stack root is usually the enclosing view's own inline content, so only resolved view
+    /// types count and nothing else is reported.
+    var quiet = false
 }
 
 let swiftUI = "s:7SwiftUI"
@@ -47,6 +50,8 @@ func viewModifier(_ names: [String]) -> @Sendable (Symbol) -> Bool {
 
 let rules: [Rule] = [
     Rule(callee: constructor(of: "11WindowGroupV"), destinations: ["content", "makeContent"]),
+    Rule(callee: constructor(of: "15NavigationStackV"), destinations: ["root", "content"], quiet: true),
+    Rule(callee: constructor(of: "14NavigationViewV"), destinations: ["content"], quiet: true),
     Rule(callee: constructor(of: "13DocumentGroupV"), destinations: ["editor", "viewer"]),
     Rule(callee: constructor(of: "14NavigationLinkV"), destinations: ["destination"]),
     Rule(callee: constructor(of: "7TabViewV"), destinations: ["content"], eachChild: true),
@@ -87,17 +92,28 @@ struct Scan {
     lazy var views = index.conformers(of: USR.view)
     var found: [String: Screen] = [:]
     var limitations: Set<String> = []
+    /// Project properties and functions being followed, to stop at recursion.
+    var following: Set<String> = []
+    var quiet = false
+    var parsed: [String: Site] = [:]
 
     init(index: Index, root: String) {
         self.index = index
         self.root = root
     }
 
-    mutating func visit(file: String) {
-        guard let text = try? String(contentsOfFile: file, encoding: .utf8) else { return }
+    mutating func site(for file: String) -> Site? {
+        if let cached = parsed[file] { return cached }
+        guard let text = try? String(contentsOfFile: file, encoding: .utf8) else { return nil }
         let tree = Parser.parse(source: text)
-        let site = Site(file: file, converter: SourceLocationConverter(fileName: file, tree: tree), index: index)
-        for call in Calls(viewMode: .sourceAccurate).collect(tree) {
+        let site = Site(file: file, tree: tree, converter: SourceLocationConverter(fileName: file, tree: tree), index: index)
+        parsed[file] = site
+        return site
+    }
+
+    mutating func visit(file: String) {
+        guard let site = site(for: file) else { return }
+        for call in Calls(viewMode: .sourceAccurate).collect(site.tree) {
             guard let symbol = site.callee(of: call), let rule = rules.first(where: { $0.callee(symbol) })
             else { continue }
             guard let argument = destination(of: call, resolvedName: symbol.name, labels: rule.destinations)
@@ -108,6 +124,8 @@ struct Scan {
             } else {
                 children = [argument]
             }
+            quiet = rule.quiet
+            defer { quiet = false }
             for child in children {
                 // A Tab inside a TabView is matched by its own rule.
                 if rule.eachChild, let tab = child.as(FunctionCallExprSyntax.self),
@@ -160,6 +178,9 @@ struct Scan {
                 }
             }
             guard let type = site.type(at: call.calledExpression) else {
+                if let followed = follow(call.calledExpression, site: site, dynamic: dynamic, condition: condition) {
+                    return followed
+                }
                 limit(site, call, "is produced by `\(call.calledExpression.trimmedDescription)` at runtime")
                 return []
             }
@@ -186,6 +207,9 @@ struct Scan {
         {
             return [Target(usr: type.usr, dynamic: dynamic, condition: condition)]
         }
+        if let followed = follow(expr, site: site, dynamic: dynamic, condition: condition) {
+            return followed
+        }
         limit(site, expr, "is chosen at runtime (`\(expr.trimmedDescription.prefix(60))`)")
         return []
     }
@@ -198,8 +222,24 @@ struct Scan {
             if let statement = item.item.as(ExpressionStmtSyntax.self) {
                 return targets(of: statement.expression, site: site, dynamic: dynamic, condition: condition)
             }
+            if let result = item.item.as(ReturnStmtSyntax.self), let expr = result.expression {
+                return targets(of: expr, site: site, dynamic: dynamic, condition: condition)
+            }
             return []
         }
+    }
+
+    /// A reference to a project property or function (`root`, `view(for:)`) produces what its
+    /// body produces. The index resolves the declaration; its body is read with the same rules.
+    mutating func follow(_ expr: ExprSyntax, site: Site, dynamic: Bool, condition: String?) -> [Target]? {
+        guard let symbol = site.declaration(at: expr), !following.contains(symbol.usr),
+            let definition = index.definition(of: symbol.usr), inProject(definition),
+            let target = self.site(for: URL(fileURLWithPath: definition.location.path).resolvingSymlinksInPath().path),
+            let body = target.body(at: definition)
+        else { return nil }
+        following.insert(symbol.usr)
+        defer { following.remove(symbol.usr) }
+        return statements(body, site: target, dynamic: dynamic, condition: condition)
     }
 
     mutating func branches(of branch: IfExprSyntax, site: Site, condition: String?) -> [Target] {
@@ -218,12 +258,18 @@ struct Scan {
     }
 
     mutating func limit(_ site: Site, _ node: some SyntaxProtocol, _ reason: String) {
+        if quiet { return }
         let line = site.converter.location(for: node.positionAfterSkippingLeadingTrivia).line
         limitations.insert("\(relative(site.file)):\(line): destination \(reason).")
     }
 
+    /// Declared in the project's own sources, not in a dependency checkout or the SDK.
+    func inProject(_ definition: SymbolOccurrence) -> Bool {
+        URL(fileURLWithPath: definition.location.path).resolvingSymlinksInPath().path.hasPrefix(root + "/")
+    }
+
     mutating func add(_ usr: String, dynamic: Bool, condition: String?) {
-        guard let definition = index.definition(of: usr) else { return }
+        guard let definition = index.definition(of: usr), inProject(definition) else { return }
         let file = URL(fileURLWithPath: definition.location.path).resolvingSymlinksInPath().path
         let name = index.qualifiedName(of: definition)
         let screen = Screen(
@@ -284,6 +330,43 @@ func argumentLabels(_ name: String) -> [String] {
     return name[name.index(after: open)..<close].split(separator: ":", omittingEmptySubsequences: true).map(String.init)
 }
 
+final class Declarations: SyntaxVisitor {
+    let converter: SourceLocationConverter
+    let line: Int
+    let column: Int
+    var body: CodeBlockItemListSyntax?
+
+    init(converter: SourceLocationConverter, line: Int, column: Int) {
+        self.converter = converter
+        self.line = line
+        self.column = column
+        super.init(viewMode: .sourceAccurate)
+    }
+
+    func at(_ token: TokenSyntax) -> Bool {
+        let location = converter.location(for: token.positionAfterSkippingLeadingTrivia)
+        return location.line == line && location.column == column
+    }
+
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+        if at(node.name) { body = node.body?.statements }
+        return body == nil ? .visitChildren : .skipChildren
+    }
+
+    override func visit(_ node: PatternBindingSyntax) -> SyntaxVisitorContinueKind {
+        guard let name = node.pattern.as(IdentifierPatternSyntax.self)?.identifier, at(name),
+            let accessors = node.accessorBlock?.accessors
+        else { return .visitChildren }
+        switch accessors {
+        case .getter(let statements):
+            body = statements
+        case .accessors(let list):
+            body = list.first { $0.accessorSpecifier.tokenKind == .keyword(.get) }?.body?.statements
+        }
+        return .skipChildren
+    }
+}
+
 final class Calls: SyntaxVisitor {
     var calls: [FunctionCallExprSyntax] = []
     func collect(_ tree: SourceFileSyntax) -> [FunctionCallExprSyntax] {
@@ -299,8 +382,29 @@ final class Calls: SyntaxVisitor {
 /// Joins syntax positions in one file with the index occurrences at the same line and column.
 struct Site {
     let file: String
+    let tree: SourceFileSyntax
     let converter: SourceLocationConverter
     let index: Index
+
+    /// The project property or function a name refers to, as resolved by the compiler. Result
+    /// builder calls recorded at the same position are SwiftUI's own and have no project definition.
+    func declaration(at expr: ExprSyntax) -> Symbol? {
+        guard let token = nameToken(of: expr) else { return nil }
+        let kinds: [IndexSymbolKind] = [.instanceProperty, .classProperty, .staticProperty, .variable,
+                                        .instanceMethod, .classMethod, .staticMethod, .function]
+        let candidates = occurrences(at: token)
+            .filter { kinds.contains($0.symbol.kind) && !$0.symbol.name.hasPrefix("getter:") }
+            .map(\.symbol)
+        return candidates.first { index.definition(of: $0.usr) != nil }
+    }
+
+    /// The statements of the property getter or function declared at an index definition.
+    func body(at definition: SymbolOccurrence) -> CodeBlockItemListSyntax? {
+        let finder = Declarations(converter: converter, line: definition.location.line,
+                                  column: definition.location.utf8Column)
+        finder.walk(tree)
+        return finder.body
+    }
 
     func occurrences(at token: TokenSyntax) -> [SymbolOccurrence] {
         let location = converter.location(for: token.positionAfterSkippingLeadingTrivia)
