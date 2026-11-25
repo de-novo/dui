@@ -83,7 +83,10 @@ impl ScreenItem {
             } else {
                 &origin.source
             };
-            return format!("{path}:{}", origin.line);
+            return match origin.line {
+                Some(line) => format!("{path}:{line}"),
+                None => path.to_owned(),
+            };
         }
         "No image".into()
     }

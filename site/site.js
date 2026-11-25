@@ -84,6 +84,36 @@
         "dui never invents screenshots or forces hardcoded aesthetic opinions onto diverse design systems.",
       factStatesTitle: "Honest verification states",
       factConformanceTitle: "Pluggable design conformance (v0.3.0)",
+      tabOverview: "2D Screen Map",
+      tabOverviewAlt:
+        "dui 2D Web Canvas showing 11 full-page dashboard screens and a Preferences modal child node with obstacle-free gutter edges",
+      tabOverviewCaption:
+        "2D Web Canvas (dui open): Full-page true-aspect screens, auto-discovered modal/drawer child nodes, quick search, minimap, and obstacle-free gutter routing.",
+      tabInspector: "Modal + Inspector",
+      tabInspectorAlt:
+        "dui Element Inspector displaying Element frames, Alignment guides, DevTools box model, computed oklch styles, and highlighted verified edge to the Theme Settings drawer",
+      tabInspectorCaption:
+        "Modal & Element Inspector: Auto-captured Theme Settings drawer with Element frames, Alignment guides, DevTools box model, and computed oklch styles.",
+      tabDiff: "2D Inline Diff",
+      tabDiffAlt:
+        "dui 2D Inline Diff highlighting element-level changes on the map alongside Before, After, and Pixel difference overlays in the inspector",
+      tabDiffCaption:
+        "2D Inline Diff: Compare captures directly on the map with element-level change highlights, pixel-difference overlays, and screen verification evidence.",
+      tabSourcePreview: "SwiftUI & Compose",
+      tabSourcePreviewAlt:
+        "dui source map with compiled SwiftUI and Compose component cards and interactive switches in the inspector",
+      tabSourcePreviewCaption:
+        "Portable Source Preview: Compile self-contained SwiftUI and Compose entries with their official toolchains and operate observed switches directly on the map.",
+      tabDesktopOverview: "macOS Desktop",
+      tabDesktopOverviewAlt:
+        "dui native GPUI macOS desktop viewer with transparent TitleBar, 11-screen full-page map, screen search, and gutter edges",
+      tabDesktopOverviewCaption:
+        "Native GPUI Desktop (dui desktop): macOS transparent TitleBar, full-bleed Metal canvas, screen search, cursor-anchored continuous zoom, and gutter edges.",
+      tabDesktopInspector: "Desktop Inspector",
+      tabDesktopInspectorAlt:
+        "dui native GPUI desktop viewer showing selected dashboard screen with highlighted routes, screen verification, element tree, and box model",
+      tabDesktopInspectorCaption:
+        "Desktop Inspector: Clicking any card highlights connected routes and opens screen verification, the element tree, and box-model measurements.",
     },
     ko: {
       releaseGuide: "릴리스 문서",
@@ -147,6 +177,36 @@
         "dui는 스크린샷을 꾸며내지 않으며, 특정 디자인 기준을 강제하지 않습니다.",
       factStatesTitle: "정직한 검증 상태",
       factConformanceTitle: "플러그인형 디자인 적합성 (v0.3.0)",
+      tabOverview: "2D 화면 지도",
+      tabOverviewAlt:
+        "11개 전체 페이지 대시보드와 Preferences 모달 자식 노드, 거터 연결선이 보이는 dui 2D 웹 캔버스",
+      tabOverviewCaption:
+        "2D 웹 캔버스(dui open): 원본 비율 전체 페이지 캡처, 자동 발견된 모달·드로어 자식 노드, 빠른 검색, 미니맵, 겹침 없는 거터 연결선.",
+      tabInspector: "모달 · 인스펙터",
+      tabInspectorAlt:
+        "Theme Settings 드로어와 연결된 검증 선, 요소 프레임·정렬 가이드, 박스 모델, 계산된 oklch 스타일을 보여 주는 요소 인스펙터",
+      tabInspectorCaption:
+        "모달·요소 인스펙터: 자동 캡처한 Theme Settings 드로어에서 요소 프레임, 정렬 가이드, DevTools 박스 모델, 계산된 oklch 스타일을 확인합니다.",
+      tabDiff: "2D 인라인 Diff",
+      tabDiffAlt:
+        "지도 카드 위 요소 단위 변경 강조와 인스펙터의 이전·이후·픽셀 차이 오버레이를 함께 보여 주는 2D 인라인 Diff",
+      tabDiffCaption:
+        "2D 인라인 Diff: 지도 위에서 이전·이후 캡처를 바로 비교하고, 요소 단위 변경 표시·픽셀 차이 오버레이·화면 검증 근거를 함께 확인합니다.",
+      tabSourcePreview: "SwiftUI · Compose",
+      tabSourcePreviewAlt:
+        "공식 컴파일러로 빌드한 SwiftUI·Compose 컴포넌트 카드와 인스펙터의 조작 가능한 스위치를 보여 주는 소스 지도",
+      tabSourcePreviewCaption:
+        "포터블 소스 미리보기: SwiftUI·Compose 컴포넌트를 공식 툴체인으로 컴파일해, 관찰된 스위치를 지도 카드에서 바로 조작합니다.",
+      tabDesktopOverview: "macOS 데스크톱",
+      tabDesktopOverviewAlt:
+        "투명 TitleBar, 11개 전체 페이지 지도, 화면 검색, 거터 연결선을 갖춘 네이티브 GPUI macOS 데스크톱 뷰어",
+      tabDesktopOverviewCaption:
+        "네이티브 GPUI 데스크톱(dui desktop): macOS 투명 TitleBar, 풀블리드 Metal 캔버스, 화면 검색, 커서 기준 연속 줌, 겹침 없는 거터 연결선.",
+      tabDesktopInspector: "데스크톱 인스펙터",
+      tabDesktopInspectorAlt:
+        "선택한 대시보드 화면과 강조된 연결 경로, 화면 검증, 요소 트리, 박스 모델을 보여 주는 GPUI 데스크톱 인스펙터",
+      tabDesktopInspectorCaption:
+        "데스크톱 인스펙터: 카드를 선택하면 연결된 경로를 강조하고 화면 검증 결과, 요소 트리, 박스 모델 치수를 캔버스 좌표 이동 없이 띄웁니다.",
     },
     "zh-CN": {
       releaseGuide: "发布版文档",
@@ -210,8 +270,61 @@
         "dui 不会虚构截图，也不向不同的设计系统强加硬编码审美规则。",
       factStatesTitle: "诚实的验证状态",
       factConformanceTitle: "可插拔设计规范校验 (v0.3.0)",
+      tabOverview: "2D 界面地图",
+      tabOverviewAlt:
+        "展示 11 个整页仪表盘界面、Preferences 弹窗子节点和避让通道连线的 dui 2D Web 画布",
+      tabOverviewCaption:
+        "2D Web 画布（dui open）：按真实比例呈现整页截图，自动发现弹窗/抽屉子节点，支持快速搜索、缩略地图与避让卡片的通道连线。",
+      tabInspector: "弹窗与检查器",
+      tabInspectorAlt:
+        "展示 Theme Settings 抽屉、已验证连线、元素边框、对齐参考线、盒模型与 oklch 计算样式的 dui 元素检查器",
+      tabInspectorCaption:
+        "弹窗与元素检查器：在自动捕获的 Theme Settings 抽屉中查看元素边框、对齐参考线、DevTools 盒模型与计算后的 oklch 样式。",
+      tabDiff: "2D 内联差异",
+      tabDiffAlt:
+        "在界面地图卡片上高亮元素级变更，并在检查器中并排展示变更前、变更后与像素差异叠加层的 dui 2D 内联差异视图",
+      tabDiffCaption:
+        "2D 内联差异：直接在界面地图上对比两次捕获，高亮元素级变更，并查看像素差异叠加层与页面验证依据。",
+      tabSourcePreview: "SwiftUI 与 Compose",
+      tabSourcePreviewAlt:
+        "展示经官方工具链编译的 SwiftUI 与 Compose 组件卡片及检查器内可交互开关的 dui 源码地图",
+      tabSourcePreviewCaption:
+        "便携式源码预览：使用官方工具链编译自包含的 SwiftUI 与 Compose 组件，在界面地图卡片上直接操作已观测到的开关。",
+      tabDesktopOverview: "macOS 桌面端",
+      tabDesktopOverviewAlt:
+        "带有透明 TitleBar、11 个整页界面地图、界面搜索与避让通道连线的原生 GPUI macOS 桌面查看器",
+      tabDesktopOverviewCaption:
+        "原生 GPUI 桌面端（dui desktop）：macOS 透明 TitleBar、全出血 Metal 画布、界面搜索、以光标为锚点的连续缩放与通道连线。",
+      tabDesktopInspector: "桌面端检查器",
+      tabDesktopInspectorAlt:
+        "选中仪表盘界面后高亮关联路径并打开页面验证、元素树与盒模型测量的 GPUI 桌面检查器",
+      tabDesktopInspectorCaption:
+        "桌面端检查器：点击任意卡片即可高亮关联路径，并在不移动画布坐标的情况下打开页面验证、元素树与盒模型测量。",
     },
   };
+
+  const tabs = Array.from(document.querySelectorAll("[data-showcase-tab]"));
+  const img = document.querySelector("[data-showcase-img]");
+  const caption = document.querySelector("[data-showcase-caption]");
+  const syncShowcase = (tab) => {
+    if (!tab) return;
+    const dict = i18n[root.lang] || i18n.en;
+    const altKey = tab.getAttribute("data-alt-key");
+    const captionKey = tab.getAttribute("data-caption-key");
+    const alt = (altKey && dict[altKey]) || tab.getAttribute("data-alt") || "";
+    const text = (captionKey && dict[captionKey]) || tab.getAttribute("data-caption") || "";
+    if (img) {
+      img.setAttribute("src", tab.getAttribute("data-src") || "");
+      img.setAttribute("alt", alt);
+    }
+    if (caption) caption.textContent = text;
+  };
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      for (const other of tabs) other.setAttribute("aria-selected", String(other === tab));
+      syncShowcase(tab);
+    });
+  }
 
   const langSelect = document.querySelector("[data-lang-select]");
   const applyLang = (lang) => {
@@ -229,6 +342,8 @@
       const filename = lang === "en" ? "README.md" : `README.${lang}.md`;
       guide.href = new URL(filename + guide.hash, guide.href).href;
     }
+    const activeTab = tabs.find((tab) => tab.getAttribute("aria-selected") === "true") || tabs[0];
+    syncShowcase(activeTab);
     if (langSelect && langSelect.value !== lang) langSelect.value = lang;
   };
   const params = new URLSearchParams(location.search);
@@ -255,20 +370,6 @@
       } catch {
         // Ignore clipboard errors in headless environments.
       }
-    });
-  }
-
-  const tabs = Array.from(document.querySelectorAll("[data-showcase-tab]"));
-  const img = document.querySelector("[data-showcase-img]");
-  const caption = document.querySelector("[data-showcase-caption]");
-  for (const tab of tabs) {
-    tab.addEventListener("click", () => {
-      for (const other of tabs) other.setAttribute("aria-selected", String(other === tab));
-      if (img) {
-        img.setAttribute("src", tab.getAttribute("data-src") || "");
-        img.setAttribute("alt", tab.getAttribute("data-alt") || "");
-      }
-      if (caption) caption.textContent = tab.getAttribute("data-caption") || "";
     });
   }
 
