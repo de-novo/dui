@@ -1,0 +1,2237 @@
+{
+  "cells": [
+    {
+      "image": "c49d7c877439ff178bd7ec8646d574e72e16099fa713c5e6168e99855be04aad-ios-402.png",
+      "imageHeight": 2622,
+      "imageWidth": 1206,
+      "input": {
+        "observedPath": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView"
+      },
+      "observation": {
+        "path": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+        "width": 402
+      },
+      "observedPath": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+      "path": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+      "planIndex": 0,
+      "reason": "Imported ios recording without automated verification",
+      "runtime": "ios",
+      "scenario": "ios",
+      "screenId": "c49d7c877439ff178bd7ec8646d574e72e16099fa713c5e6168e99855be04aad",
+      "state": "f0d5bde70f672268f0cd1bb884e34beae6710c78f2537fd66d11e26a5ffbcb21",
+      "status": "unverified",
+      "width": 402
+    }
+  ],
+  "edges": [],
+  "nodes": [
+    {
+      "id": "6d2373c736b801055e65cab465ad96153e5ba268ad1c13d21e381aaa1a234826",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/CameraStreamHLSViewController.swift#CameraStreamHLSViewController",
+      "nativeSource": {
+        "line": 7,
+        "name": "CameraStreamHLSViewController",
+        "source": "Sources/Extensions/NotificationContent/CameraStreamHLSViewController.swift"
+      }
+    },
+    {
+      "id": "635520eca771993a400c3f857d95b9a19413e77f1a55461cf080fbac94ef638b",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/CameraStreamMJPEGViewController.swift#CameraStreamMJPEGViewController",
+      "nativeSource": {
+        "line": 7,
+        "name": "CameraStreamMJPEGViewController",
+        "source": "Sources/Extensions/NotificationContent/CameraStreamMJPEGViewController.swift"
+      }
+    },
+    {
+      "id": "1672a5b373b6136d7da2ecb26885c8809048c9a440c4b783172b23e0b0723abe",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/CameraStreamWebRTCViewController.swift#CameraStreamWebRTCViewController",
+      "nativeSource": {
+        "line": 9,
+        "name": "CameraStreamWebRTCViewController",
+        "source": "Sources/Extensions/NotificationContent/CameraStreamWebRTCViewController.swift"
+      }
+    },
+    {
+      "id": "6e4eb71a803655df0cb43d0658b2d9398535df67f49c5970649765b6c88c927e",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/CameraViewController.swift#CameraViewController",
+      "nativeSource": {
+        "line": 12,
+        "name": "CameraViewController",
+        "source": "Sources/Extensions/NotificationContent/CameraViewController.swift"
+      }
+    },
+    {
+      "id": "086252b9172b3b2e85efee3549574a5fccdca695dea77acc0b42f31b6287f460",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/ImageAttachmentViewController.swift#ImageAttachmentViewController",
+      "nativeSource": {
+        "line": 9,
+        "name": "ImageAttachmentViewController",
+        "source": "Sources/Extensions/NotificationContent/ImageAttachmentViewController.swift"
+      }
+    },
+    {
+      "id": "0268f9215118d56941498a1344a1f32ecb8fd73b86dd87ebfec6393facbfa35b",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/MapViewController.swift#MapViewController",
+      "nativeSource": {
+        "line": 8,
+        "name": "MapViewController",
+        "source": "Sources/Extensions/NotificationContent/MapViewController.swift"
+      }
+    },
+    {
+      "id": "1f16feac9efaa8fe921d9897c7226bf2f68a40b090344beb734886fa977dd380",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/NotificationErrorViewController.swift#NotificationErrorViewController",
+      "nativeSource": {
+        "line": 7,
+        "name": "NotificationErrorViewController",
+        "source": "Sources/Extensions/NotificationContent/NotificationErrorViewController.swift"
+      }
+    },
+    {
+      "id": "5419777e2c4b4d9068381c3d7044e527a2ba05ec042502b0808abff8d205f92c",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/NotificationLoadingViewController.swift#NotificationLoadingViewController",
+      "nativeSource": {
+        "line": 7,
+        "name": "NotificationLoadingViewController",
+        "source": "Sources/Extensions/NotificationContent/NotificationLoadingViewController.swift"
+      }
+    },
+    {
+      "id": "bbb27ee87d08afadefd07a12de86934e7afe4a3b7a832c39b95024be742c04bc",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/NotificationViewController.swift#NotificationViewController",
+      "nativeSource": {
+        "line": 9,
+        "name": "NotificationViewController",
+        "source": "Sources/Extensions/NotificationContent/NotificationViewController.swift"
+      }
+    },
+    {
+      "id": "8c09247da4a2d0d1ab02eca758fb6387d63a3e44732ff6f744ae0799c529fdf0",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/VideoAudioAttachmentViewController.swift#PlayerAttachmentViewController",
+      "nativeSource": {
+        "line": 8,
+        "name": "PlayerAttachmentViewController",
+        "source": "Sources/Extensions/NotificationContent/VideoAudioAttachmentViewController.swift"
+      }
+    },
+    {
+      "id": "7c0ff672716de61340dca798acb1946a562de1fae7f343b735b95eb536f1eaa9",
+      "kind": "screen",
+      "label": "Extensions_NotificationContent/WebRTCVideoPlayerViewController.swift#WebRTCVideoPlayerViewController",
+      "nativeSource": {
+        "line": 6,
+        "name": "WebRTCVideoPlayerViewController",
+        "source": "Sources/App/Cameras/CameraPlayer/WebRTC/WebRTCVideoPlayerViewController.swift"
+      }
+    },
+    {
+      "id": "092fe76f24bfaa91ce8b1c7556f1c45bed607eca4158705853dd22decbd5215e",
+      "kind": "screen",
+      "label": "Extensions_Share/ShareViewController.swift#ShareViewController",
+      "nativeSource": {
+        "line": 8,
+        "name": "ShareViewController",
+        "source": "Sources/Extensions/Share/ShareViewController.swift"
+      }
+    },
+    {
+      "id": "3eccc5e23bf67cad7df37c0d2320b25796cd981bef1d73e599085b9a87108827",
+      "kind": "screen",
+      "label": "HADesignSystem/AppleLikeBottomSheet.swift#AppleLikeBottomSheet",
+      "nativeSource": {
+        "line": 19,
+        "name": "AppleLikeBottomSheet",
+        "source": "Sources/HADesignSystem/Sources/Components/AppleLikeBottomSheet.swift"
+      }
+    },
+    {
+      "id": "0a046d40beb54b2a5e5ec213d760fa246ac1038becb7c6f8e171c4c0e9005801",
+      "kind": "screen",
+      "label": "HADesignSystem/ComponentsLibraryView.swift#ComponentsLibraryView",
+      "nativeSource": {
+        "line": 9,
+        "name": "ComponentsLibraryView",
+        "source": "Sources/HADesignSystem/Sources/Gallery/ComponentsLibraryView.swift"
+      }
+    },
+    {
+      "id": "5438776fe6458737addf4cc439b6174f400faee0245fb847c4c82be85815d211",
+      "kind": "screen",
+      "label": "HADesignSystem/HAProgressView.swift#HAProgressView",
+      "nativeSource": {
+        "line": 5,
+        "name": "HAProgressView",
+        "source": "Sources/HADesignSystem/Sources/Components/HAProgressView.swift"
+      }
+    },
+    {
+      "id": "30de42c754b35f59e1eda8bde88f0108502514a5987dd8e1d467e3371ddb8ed3",
+      "kind": "screen",
+      "label": "HomeAssistant/AboutView.swift#AboutView",
+      "nativeSource": {
+        "line": 4,
+        "name": "AboutView",
+        "source": "Sources/App/Settings/AboutView.swift"
+      }
+    },
+    {
+      "id": "52c17946c922b5859f2dee99122a6383d917a3c49fc4717364ed92d4ee100ee7",
+      "kind": "screen",
+      "label": "HomeAssistant/AcknowledgementsView.swift#AcknowledgementLicenseView",
+      "nativeSource": {
+        "line": 27,
+        "name": "AcknowledgementLicenseView",
+        "source": "Sources/App/Settings/AcknowledgementsView.swift"
+      }
+    },
+    {
+      "id": "355b9d706210b6e0dbbbc2cf733fd85a21dedee4b4dea69645c68583d972de3c",
+      "kind": "screen",
+      "label": "HomeAssistant/AcknowledgementsView.swift#AcknowledgementsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "AcknowledgementsView",
+        "source": "Sources/App/Settings/AcknowledgementsView.swift"
+      }
+    },
+    {
+      "id": "0c80155d10467318838ca901f61cba40e888193431d6b804560d11fcc8251ecc",
+      "kind": "screen",
+      "label": "HomeAssistant/ActivityViewController.swift#ActivityViewController",
+      "nativeSource": {
+        "line": 9,
+        "name": "ActivityViewController",
+        "source": "Sources/App/Frontend/DownloadManager/ActivityViewController.swift"
+      }
+    },
+    {
+      "id": "a0fb475a2843301068d330513ee73f972c750e0e95429ce1fd5bdf2cf15719ad",
+      "kind": "screen",
+      "label": "HomeAssistant/AllowedTagsView.swift#AllowedTagsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "AllowedTagsView",
+        "source": "Sources/App/Settings/NFC/AllowedTagsView.swift"
+      }
+    },
+    {
+      "id": "c37760345efd2094940ac95f45e7305f0c9a6365712ba72c79377e8b48ba4f2a",
+      "kind": "screen",
+      "label": "HomeAssistant/AppIconSelectorView.swift#AppIconSelectorView",
+      "nativeSource": {
+        "line": 5,
+        "name": "AppIconSelectorView",
+        "source": "Sources/App/Settings/AppIcon/AppIconSelectorView.swift"
+      }
+    },
+    {
+      "id": "2eb41b4d8961cfa265227ea03a1669f8743dd96a13b56c8ff11488da79ade8c4",
+      "kind": "screen",
+      "label": "HomeAssistant/AppIconShortcutsConfigurationView.swift#AppIconShortcutsConfigurationView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .appIconShortcuts",
+        "dynamic": true,
+        "line": 6,
+        "name": "AppIconShortcutsConfigurationView",
+        "source": "Sources/App/Settings/AppIconShortcuts/AppIconShortcutsConfigurationView.swift"
+      }
+    },
+    {
+      "id": "bc43b269d2d618d6ff12cf340de3a60eae28877be4848c700b79eede56d967ed",
+      "kind": "screen",
+      "label": "HomeAssistant/AppLabsView.swift#AppLabsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "AppLabsView",
+        "source": "Sources/App/Settings/AppLabs/AppLabsView.swift"
+      }
+    },
+    {
+      "id": "d3ac027d87c90c82dedb8c0c6c963c1d82e7a50e904a40c82f56f3704252d276",
+      "kind": "screen",
+      "label": "HomeAssistant/AssistPromptMagicItemView.swift#AssistPromptMagicItemView",
+      "nativeSource": {
+        "line": 5,
+        "name": "AssistPromptMagicItemView",
+        "source": "Sources/App/Settings/MagicItem/Add/AssistPromptMagicItemView.swift"
+      }
+    },
+    {
+      "id": "74837259d777b1ed1e208d174e9240b02adbd92fbadceb7b8a90dd6ae8bf7437",
+      "kind": "screen",
+      "label": "HomeAssistant/AssistSettingsView.swift#AssistSettingsView",
+      "nativeSource": {
+        "line": 8,
+        "name": "AssistSettingsView",
+        "source": "Sources/App/Assist/AssistSettingsView.swift"
+      }
+    },
+    {
+      "id": "06d6a5e2b6a711a4cb9cb113e5a33fb0f9daee8f769d52c1f10b97cb7956ab98",
+      "kind": "screen",
+      "label": "HomeAssistant/AssistWindowView.swift#AssistWindowView",
+      "nativeSource": {
+        "line": 9,
+        "name": "AssistWindowView",
+        "source": "Sources/App/Assist/MacWindow/AssistWindowView.swift"
+      }
+    },
+    {
+      "id": "9a95743b20f7004182d9b2e26a0f09b9437a950fce4003f612d94832c1fbed44",
+      "kind": "screen",
+      "label": "HomeAssistant/BarcodeScannerView.swift#BarcodeScannerHostingController",
+      "nativeSource": {
+        "line": 146,
+        "name": "BarcodeScannerHostingController",
+        "source": "Sources/App/BarcodeScanner/Camera/BarcodeScannerView.swift"
+      }
+    },
+    {
+      "id": "f05d14704e1549dea57e8a9a8d2a5b9bed76d426594e59d3b8d0a32fdb6c7782",
+      "kind": "screen",
+      "label": "HomeAssistant/BaseOnboardingView.swift#BaseOnboardingView",
+      "nativeSource": {
+        "line": 12,
+        "name": "BaseOnboardingView",
+        "source": "Sources/App/Onboarding/Views/BaseOnboardingView.swift"
+      }
+    },
+    {
+      "id": "9e15d0d08a0900f9045f6c86fe9fe05cec3e04466284ac1d5b301ad5ab1b6937",
+      "kind": "screen",
+      "label": "HomeAssistant/BluetoothPermissionView.swift#BluetoothPermissionView",
+      "nativeSource": {
+        "line": 6,
+        "name": "BluetoothPermissionView",
+        "source": "Sources/App/PermissionScreen/Bluetooth/BluetoothPermissionView.swift"
+      }
+    },
+    {
+      "id": "63b89a750876a81c913f4fa3400488d9d8a29f680e55dff05bbea051f7b1d817",
+      "kind": "screen",
+      "label": "HomeAssistant/CalendarDebugView.swift#CalendarDebugView",
+      "nativeSource": {
+        "line": 7,
+        "name": "CalendarDebugView",
+        "source": "Sources/App/Settings/Calendars/CalendarDebugView.swift"
+      }
+    },
+    {
+      "id": "301e763086d24f39cd69fe2ed593df922d4992286d1780d43493e50c928e84f0",
+      "kind": "screen",
+      "label": "HomeAssistant/CalendarsDebugListView.swift#CalendarsDebugListView",
+      "nativeSource": {
+        "line": 6,
+        "name": "CalendarsDebugListView",
+        "source": "Sources/App/Settings/Calendars/CalendarsDebugListView.swift"
+      }
+    },
+    {
+      "id": "687919b17be9b4e543ccfb5bdf426915962ba9614996878bb1a3428efeec580b",
+      "kind": "screen",
+      "label": "HomeAssistant/CalendarsDebugServerListView.swift#CalendarsDebugServerListView",
+      "nativeSource": {
+        "line": 6,
+        "name": "CalendarsDebugServerListView",
+        "source": "Sources/App/Settings/Calendars/CalendarsDebugServerListView.swift"
+      }
+    },
+    {
+      "id": "8cb7db198cb7f6abfe1b5a769d527f192a86b99e5cafb2390719d2523a9d7a51",
+      "kind": "screen",
+      "label": "HomeAssistant/CameraMJPEGPlayerView.swift#CameraMJPEGPlayerView",
+      "nativeSource": {
+        "condition": "let playerType = playback.current && playerType case .mjpeg",
+        "dynamic": true,
+        "line": 6,
+        "name": "CameraMJPEGPlayerView",
+        "source": "Sources/App/Cameras/CameraPlayer/CameraMJPEGPlayerView.swift"
+      }
+    },
+    {
+      "id": "f7667b89bcc60bc830b031b4066f2a7b93372eaf687516223bbca13731974f69",
+      "kind": "screen",
+      "label": "HomeAssistant/CameraMJPEGPlayerView.swift#MJPEGStreamViewController",
+      "nativeSource": {
+        "line": 117,
+        "name": "MJPEGStreamViewController",
+        "source": "Sources/App/Cameras/CameraPlayer/CameraMJPEGPlayerView.swift"
+      }
+    },
+    {
+      "id": "7ce882e5b5ba6950f6fa1f887927029e04e533835d438ce4d91d24e4747f3ec9",
+      "kind": "screen",
+      "label": "HomeAssistant/CameraStreamHLSView.swift#CameraStreamHLSView",
+      "nativeSource": {
+        "condition": "let playerType = playback.current && playerType case .hls",
+        "dynamic": true,
+        "line": 6,
+        "name": "CameraStreamHLSView",
+        "source": "Sources/App/Cameras/CameraPlayer/CameraStreamHLSView.swift"
+      }
+    },
+    {
+      "id": "688a2adc7d8f338a13439b586755b9409cf2e46ca1632ca19e4af9942c47097a",
+      "kind": "screen",
+      "label": "HomeAssistant/CarPlayConfigurationView.swift#CarPlayConfigurationView",
+      "nativeSource": {
+        "line": 8,
+        "name": "CarPlayConfigurationView",
+        "source": "Sources/App/Settings/CarPlay/CarPlayConfigurationView.swift"
+      }
+    },
+    {
+      "id": "914451840b88fb5e3937fc7cb39576135f8dab25b833be1d38a910abc9698c98",
+      "kind": "screen",
+      "label": "HomeAssistant/CarPlayFolderDetailView.swift#CarPlayFolderDetailView",
+      "nativeSource": {
+        "line": 7,
+        "name": "CarPlayFolderDetailView",
+        "source": "Sources/App/Settings/CarPlay/CarPlayFolderDetailView.swift"
+      }
+    },
+    {
+      "id": "3ef79cc8b71997094839e0b7b40dc27df7dc0f1f9f2392e99552b9eb38f9093e",
+      "kind": "screen",
+      "label": "HomeAssistant/CarPlayTabsSelectionView.swift#CarPlayTabsSelectionView",
+      "nativeSource": {
+        "line": 6,
+        "name": "CarPlayTabsSelectionView",
+        "source": "Sources/App/Settings/CarPlay/CarPlayTabsSelectionView.swift"
+      }
+    },
+    {
+      "id": "f2b2dbdec41d29d3a28a97b0a8bbb7ed5257c9778d92fbc03b8d6bdf8b436a4c",
+      "kind": "screen",
+      "label": "HomeAssistant/CarPlayTroubleshootingSettingsView.swift#CarPlayTroubleshootingSettingsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "CarPlayTroubleshootingSettingsView",
+        "source": "Sources/App/Settings/CarPlay/CarPlayTroubleshootingSettingsView.swift"
+      }
+    },
+    {
+      "id": "360ab83f72fbd2731157fc7e0cb074aa1aefe1c4e9bb6d471a621c6bd923adce",
+      "kind": "screen",
+      "label": "HomeAssistant/ClientCertificateOnboardingView.swift#ClientCertificateOnboardingView",
+      "nativeSource": {
+        "line": 14,
+        "name": "ClientCertificateOnboardingView",
+        "source": "Sources/App/Onboarding/Views/ClientCertificateOnboardingView.swift"
+      }
+    },
+    {
+      "id": "9e87ac05962d5fb2eac255dd1d0d331a9e27ae1c2dd92350381bba96657e2b6d",
+      "kind": "screen",
+      "label": "HomeAssistant/ClientEventsLogView.swift#ClientEventsLogView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ClientEventsLogView",
+        "source": "Sources/App/Settings/ClientEventsLogView/ClientEventsLogView.swift"
+      }
+    },
+    {
+      "id": "bd4b382885214a35430ab2bc3012cfb0eadf2520eafa9b0d15407db5705a796c",
+      "kind": "screen",
+      "label": "HomeAssistant/ComplicationEditView.swift#ComplicationEditView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ComplicationEditView",
+        "source": "Sources/App/Settings/AppleWatch/Complications/ComplicationEditView.swift"
+      }
+    },
+    {
+      "id": "02b401aa9d501a6b9d4f9eeefd8dac0426b2092d9c81c37c77898515f7b53f2b",
+      "kind": "screen",
+      "label": "HomeAssistant/ComplicationEditView.swift#TemplateStylePicker",
+      "nativeSource": {
+        "line": 171,
+        "name": "TemplateStylePicker",
+        "source": "Sources/App/Settings/AppleWatch/Complications/ComplicationEditView.swift"
+      }
+    },
+    {
+      "id": "c4abe9634b5892e9f3e0ac43577487230abe63c4722f935d630850265e895854",
+      "kind": "screen",
+      "label": "HomeAssistant/ComplicationFamilySelectView.swift#ComplicationFamilySelectView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ComplicationFamilySelectView",
+        "source": "Sources/App/Settings/AppleWatch/Complications/ComplicationFamilySelectView.swift"
+      }
+    },
+    {
+      "id": "4b24fda74e7989b8af2889c678d2a6c615f25bce78e68358f20d716ca366b6fc",
+      "kind": "screen",
+      "label": "HomeAssistant/ComplicationListView.swift#ComplicationListView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ComplicationListView",
+        "source": "Sources/App/Settings/AppleWatch/Complications/ComplicationListView.swift"
+      }
+    },
+    {
+      "id": "64b1132b142b49faf5ea3d597b477237f6ace9f6256abbe24f61cc6f7ec6ea12",
+      "kind": "screen",
+      "label": "HomeAssistant/ComplicationMagicItemAddList.swift#ComplicationMagicItemAddList",
+      "nativeSource": {
+        "line": 9,
+        "name": "ComplicationMagicItemAddList",
+        "source": "Sources/App/Settings/MagicItem/Add/ComplicationMagicItemAddList.swift"
+      }
+    },
+    {
+      "id": "f2fcdbd51656ee7c3de1f7c553a5a73dee3bb5b4f3efc0670318bb3f532f7b84",
+      "kind": "screen",
+      "label": "HomeAssistant/ComplicationsRootView.swift#ComplicationsRootView",
+      "nativeSource": {
+        "line": 8,
+        "name": "ComplicationsRootView",
+        "source": "Sources/App/Settings/AppleWatch/Complications/ComplicationsRootView.swift"
+      }
+    },
+    {
+      "id": "4ddc92cb859f9b43f1ff8bb801389eaa131dde0b69b9189eae5bc122012ca28f",
+      "kind": "screen",
+      "label": "HomeAssistant/ConnectionErrorDetailsView.swift#ConnectionErrorDetailsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ConnectionErrorDetailsView",
+        "source": "Sources/App/Frontend/WebView/Views/ConnectionErrorDetailsView.swift"
+      }
+    },
+    {
+      "id": "e7ecff9056c358970ff4ba234881bd8f02a1efe9d54e7274ee6488c1fbbd1b24",
+      "kind": "screen",
+      "label": "HomeAssistant/ConnectionSettingsView.swift#ConnectionSettingsView",
+      "nativeSource": {
+        "line": 7,
+        "name": "ConnectionSettingsView",
+        "source": "Sources/App/Settings/Connection/ConnectionSettingsView.swift"
+      }
+    },
+    {
+      "id": "a9130ac2610f560114dd4f9b8e7137deb8c69dd436894fd9bc90fbb349b14b70",
+      "kind": "screen",
+      "label": "HomeAssistant/ConnectionSettingsView.swift#PrivacyPickerView",
+      "nativeSource": {
+        "line": 721,
+        "name": "PrivacyPickerView",
+        "source": "Sources/App/Settings/Connection/ConnectionSettingsView.swift"
+      }
+    },
+    {
+      "id": "e695fc8ab33d63ef1955be51f3a214b6287a023c0f13b01ce7997265dbed17f9",
+      "kind": "screen",
+      "label": "HomeAssistant/ConnectionURLView.swift#ConnectionURLView",
+      "nativeSource": {
+        "line": 8,
+        "name": "ConnectionURLView",
+        "source": "Sources/App/Settings/Connection/ConnectionURLView.swift"
+      }
+    },
+    {
+      "id": "d4f62cc43c7970b821072519fdaf3f73b7bf677bbd15e71129d88219d449bd2f",
+      "kind": "screen",
+      "label": "HomeAssistant/CustomWidgetsListView.swift#CustomWidgetsListView",
+      "nativeSource": {
+        "line": 4,
+        "name": "CustomWidgetsListView",
+        "source": "Sources/App/Settings/Widgets/Builder/CustomWidgetsListView.swift"
+      }
+    },
+    {
+      "id": "9adf3dd8f384217b7b5c0e58f36ed501621ea1cd9a84ac9051c7e4ec8cc792ad",
+      "kind": "screen",
+      "label": "HomeAssistant/DatabaseExplorerView.swift#DatabaseExplorerView",
+      "nativeSource": {
+        "line": 6,
+        "name": "DatabaseExplorerView",
+        "source": "Sources/App/Settings/DatabaseExplorer/DatabaseExplorerView.swift"
+      }
+    },
+    {
+      "id": "7fd494ee748c8021d9dae38be193f1c230400693f48c9bb6b736266929c0f5e6",
+      "kind": "screen",
+      "label": "HomeAssistant/DatabaseTableDetailView.swift#DatabaseRowDetailView",
+      "nativeSource": {
+        "line": 202,
+        "name": "DatabaseRowDetailView",
+        "source": "Sources/App/Settings/DatabaseExplorer/DatabaseTableDetailView.swift"
+      }
+    },
+    {
+      "id": "cc7c237d16c531444b37aaae29be2d6a4c82900e879f7dade34441dd5662a460",
+      "kind": "screen",
+      "label": "HomeAssistant/DatabaseTableDetailView.swift#DatabaseTableDetailView",
+      "nativeSource": {
+        "line": 19,
+        "name": "DatabaseTableDetailView",
+        "source": "Sources/App/Settings/DatabaseExplorer/DatabaseTableDetailView.swift"
+      }
+    },
+    {
+      "id": "7f964e4aa432f44baafec27b32de731f912854ada141c92b8dfdcc0f77e382d3",
+      "kind": "screen",
+      "label": "HomeAssistant/DebugView.swift#CarPlayDebugSettingsView",
+      "nativeSource": {
+        "line": 770,
+        "name": "CarPlayDebugSettingsView",
+        "source": "Sources/App/Settings/DebugView.swift"
+      }
+    },
+    {
+      "id": "a6b1c9927dc457064f10b7c82716a4561f5684d6bc1c5e813a86925699dfc18a",
+      "kind": "screen",
+      "label": "HomeAssistant/DebugView.swift#DebugView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .debugging",
+        "dynamic": true,
+        "line": 8,
+        "name": "DebugView",
+        "source": "Sources/App/Settings/DebugView.swift"
+      }
+    },
+    {
+      "id": "332ef01169754a1a18e93daa837c8f04809a78d36094796f5b08a04ff6f66663",
+      "kind": "screen",
+      "label": "HomeAssistant/DebugView.swift#MediaTypesRequiringUserActionForPlaybackView",
+      "nativeSource": {
+        "line": 719,
+        "name": "MediaTypesRequiringUserActionForPlaybackView",
+        "source": "Sources/App/Settings/DebugView.swift"
+      }
+    },
+    {
+      "id": "45820610b34dd795057e83f1a48ff8248951ca404013a2de8c82e7927f78c7b2",
+      "kind": "screen",
+      "label": "HomeAssistant/DeeplinkView.swift#DeeplinkView",
+      "nativeSource": {
+        "line": 4,
+        "name": "DeeplinkView",
+        "source": "Sources/App/Frontend/EntityDeeplink/DeeplinkView.swift"
+      }
+    },
+    {
+      "id": "6aac0235a4df2229c577069228e8f5fb80888631da29d4b297b71338e4a21f59",
+      "kind": "screen",
+      "label": "HomeAssistant/DeviceNameView.swift#DeviceNameView",
+      "nativeSource": {
+        "line": 7,
+        "name": "DeviceNameView",
+        "source": "Sources/App/Onboarding/Steps/DeviceName/DeviceNameView.swift"
+      }
+    },
+    {
+      "id": "b1358a25abc885cf06b959b90f5405ef2a5b823de1c2b37433f55e21c2703c96",
+      "kind": "screen",
+      "label": "HomeAssistant/DownloadManagerView.swift#DownloadManagerView",
+      "nativeSource": {
+        "condition": "sheet case let .downloadManager(viewModel) && #available(iOS 17.0, *)",
+        "dynamic": true,
+        "line": 5,
+        "name": "DownloadManagerView",
+        "source": "Sources/App/Frontend/DownloadManager/DownloadManagerView.swift"
+      }
+    },
+    {
+      "id": "1145386ce8a2b6943667e5395aef30348060c1e25bc98e024fd5679b119652bd",
+      "kind": "screen",
+      "label": "HomeAssistant/EntityPicker.swift#EntityPicker",
+      "nativeSource": {
+        "line": 5,
+        "name": "EntityPicker",
+        "source": "Sources/App/Settings/EntityPicker/EntityPicker.swift"
+      }
+    },
+    {
+      "id": "a4e46dbe964a2e8e4d4f89918f559cfffe432be9624a3df1628b76773ffbb372",
+      "kind": "screen",
+      "label": "HomeAssistant/FocusHowItWorksView.swift#FocusHowItWorksView",
+      "nativeSource": {
+        "line": 5,
+        "name": "FocusHowItWorksView",
+        "source": "Sources/App/Settings/Focus/FocusHowItWorksView.swift"
+      }
+    },
+    {
+      "id": "2c566d74b653f23894b659d71a9079fe5ead090077abf6ce9859b28ee8aaaca1",
+      "kind": "screen",
+      "label": "HomeAssistant/FocusSettingsView.swift#FocusSettingsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "FocusSettingsView",
+        "source": "Sources/App/Settings/Focus/FocusSettingsView.swift"
+      }
+    },
+    {
+      "id": "c5c089662bebbb7ccfe41286782691e45cb876bf842f189b8062e0b07b048acf",
+      "kind": "screen",
+      "label": "HomeAssistant/FolderDetailView.swift#FolderDetailView",
+      "nativeSource": {
+        "line": 5,
+        "name": "FolderDetailView",
+        "source": "Sources/App/Settings/AppleWatch/HomeCustomization/FolderDetailView.swift"
+      }
+    },
+    {
+      "id": "3cff0c5f5965afd42e940c1f2e09ba3c96925b780ec8ffcb1e73f4ff0206df7f",
+      "kind": "screen",
+      "label": "HomeAssistant/FolderEditView.swift#FolderEditView",
+      "nativeSource": {
+        "line": 4,
+        "name": "FolderEditView",
+        "source": "Sources/App/Settings/AppleWatch/HomeCustomization/FolderEditView.swift"
+      }
+    },
+    {
+      "id": "1a33199ec0069839ad4b645acd93aaace638d62e0a70ac6464fd06d425161d65",
+      "kind": "screen",
+      "label": "HomeAssistant/GeneralSettingsView.swift#GeneralSettingsView",
+      "nativeSource": {
+        "line": 10,
+        "name": "GeneralSettingsView",
+        "source": "Sources/App/Settings/General/GeneralSettingsView.swift"
+      }
+    },
+    {
+      "id": "9043aab61a4b2137c3ca6dbcb67f5ce4c555c717afd42f1cfff4f9d8284e2f91",
+      "kind": "screen",
+      "label": "HomeAssistant/GesturesSetupView.swift#GesturesSetupView",
+      "nativeSource": {
+        "line": 4,
+        "name": "GesturesSetupView",
+        "source": "Sources/App/Settings/Gestures/GesturesSetupView.swift"
+      }
+    },
+    {
+      "id": "67994d97962428b39d00b5e4f46427127d9e9a354acf7e497b951492f3d7e139",
+      "kind": "screen",
+      "label": "HomeAssistant/GreetingsSettingsView.swift#GreetingsSettingsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "GreetingsSettingsView",
+        "source": "Sources/App/FlightGreetings/GreetingsSettingsView.swift"
+      }
+    },
+    {
+      "id": "5a3e49b1f0b8ffa430c3695a9c46d527f5d8e1343e2dac8b20c7c352b5310653",
+      "kind": "screen",
+      "label": "HomeAssistant/HealthSensorListView.swift#HealthSensorListView",
+      "nativeSource": {
+        "line": 8,
+        "name": "HealthSensorListView",
+        "source": "Sources/App/Settings/Sensors/Health/HealthSensorListView.swift"
+      }
+    },
+    {
+      "id": "cde70241eb62d50291f21edb1c67aa919bedcd44cbf87b4c44d7bf8e412b1560",
+      "kind": "screen",
+      "label": "HomeAssistant/HomeNetworkInputView.swift#HomeNetworkInputView",
+      "nativeSource": {
+        "line": 4,
+        "name": "HomeNetworkInputView",
+        "source": "Sources/App/Onboarding/Steps/Permissions/Steps/LocalAccessAndNetworkInput/NetworkInput/HomeNetworkInputView.swift"
+      }
+    },
+    {
+      "id": "fdf9d2ec92a8688fa9e3aefd4bbb918a34f4f4642034877b1c2af8a5dc7f9c83",
+      "kind": "screen",
+      "label": "HomeAssistant/IconSearchPicker.swift#IconSearchSheet",
+      "nativeSource": {
+        "line": 47,
+        "name": "IconSearchSheet",
+        "source": "Sources/App/Settings/AppleWatch/Complications/IconSearchPicker.swift"
+      }
+    },
+    {
+      "id": "8bae776ed9daebcd4f5e3de7d19bc6d89df68a733ba6197ea503f006d642e2e1",
+      "kind": "screen",
+      "label": "HomeAssistant/ImportExportConfigurationView.swift#ImportExportConfigurationView",
+      "nativeSource": {
+        "line": 11,
+        "name": "ImportExportConfigurationView",
+        "source": "Sources/App/Settings/ConfigurationTransfer/ImportExportConfigurationView.swift"
+      }
+    },
+    {
+      "id": "37043a5d290ab4a91f34bc571f9f63f2d6034233f8cc6d2afc03c8ea764159f3",
+      "kind": "screen",
+      "label": "HomeAssistant/ImprovDiscoverView.swift#ImprovDiscoverView",
+      "nativeSource": {
+        "line": 7,
+        "name": "ImprovDiscoverView",
+        "source": "Sources/Improv/ImprovDiscoverView.swift"
+      }
+    },
+    {
+      "id": "4121e3987ec3e6df5ac565416fab193ae2326ca5b9a9be70cf19ab29eeb6ca96",
+      "kind": "screen",
+      "label": "HomeAssistant/InvitationView.swift#InvitationView",
+      "nativeSource": {
+        "line": 5,
+        "name": "InvitationView",
+        "source": "Sources/App/Onboarding/Steps/Welcome/InvitationView.swift"
+      }
+    },
+    {
+      "id": "ade252f31c0698a1fe425db7b1243c3708dd2f6cd30feb3e718808d73d26479d",
+      "kind": "screen",
+      "label": "HomeAssistant/JinjaTemplateEditorSheet.swift#JinjaTemplateEditorSheet",
+      "nativeSource": {
+        "line": 10,
+        "name": "JinjaTemplateEditorSheet",
+        "source": "Sources/App/Templating/JinjaTemplateEditorSheet.swift"
+      }
+    },
+    {
+      "id": "6c9191852d1d2c620de8d166b3748f69aaa533dce40b945ffbc979ed1e845361",
+      "kind": "screen",
+      "label": "HomeAssistant/KeychainExplorerView.swift#KeychainExplorerView",
+      "nativeSource": {
+        "line": 6,
+        "name": "KeychainExplorerView",
+        "source": "Sources/App/Settings/KeychainExplorer/KeychainExplorerView.swift"
+      }
+    },
+    {
+      "id": "9ebb85fc1014f9c0712d6ffe35f71bd4c556089f7ac2491ce9cc27998aae3c2e",
+      "kind": "screen",
+      "label": "HomeAssistant/KeychainExplorerView.swift#KeychainItemDetailView",
+      "nativeSource": {
+        "line": 90,
+        "name": "KeychainItemDetailView",
+        "source": "Sources/App/Settings/KeychainExplorer/KeychainExplorerView.swift"
+      }
+    },
+    {
+      "id": "0f9617fa3f4364282163e22360a26e1b6b1ee90d65ebb4d338eed76a2be44029",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskScreensaverSettingsView.swift#KioskScreensaverClockSettingsView",
+      "nativeSource": {
+        "line": 85,
+        "name": "KioskScreensaverClockSettingsView",
+        "source": "Sources/App/Settings/Kiosk/KioskScreensaverSettingsView.swift"
+      }
+    },
+    {
+      "id": "c1dc5696a98a8d5d0e67f86b33daccfbed2bdfde34f56cda574be27cff89d6ab",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskScreensaverSettingsView.swift#KioskScreensaverDimmingSettingsView",
+      "nativeSource": {
+        "line": 139,
+        "name": "KioskScreensaverDimmingSettingsView",
+        "source": "Sources/App/Settings/Kiosk/KioskScreensaverSettingsView.swift"
+      }
+    },
+    {
+      "id": "206943843200385d4c1a7558a4c2deed5af9c64163b73d13167efe66579c469a",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskScreensaverSettingsView.swift#KioskScreensaverSettingsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "KioskScreensaverSettingsView",
+        "source": "Sources/App/Settings/Kiosk/KioskScreensaverSettingsView.swift"
+      }
+    },
+    {
+      "id": "a80d8c63fbcd8f2ec0ea962a2fff1442562d6be55ac7840c5123442baee60ea7",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskScreensaverView.swift#KioskScreensaverView",
+      "nativeSource": {
+        "line": 6,
+        "name": "KioskScreensaverView",
+        "source": "Sources/App/Settings/Kiosk/KioskScreensaverView.swift"
+      }
+    },
+    {
+      "id": "33ea268d023154168df04e53749963c2d6714fa65f6dc6235c040c43fcbeab68",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskSensorsView.swift#KioskSensorsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "KioskSensorsView",
+        "source": "Sources/App/Settings/Kiosk/KioskSensorsView.swift"
+      }
+    },
+    {
+      "id": "156dd8ba0e70beb875b0c2e610bf16ec2fe38302158c07a5a31ec82a808cf134",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskSettingsEntryCustomizationView.swift#KioskSettingsEntryCustomizationView",
+      "nativeSource": {
+        "line": 4,
+        "name": "KioskSettingsEntryCustomizationView",
+        "source": "Sources/App/Settings/Kiosk/KioskSettingsEntryCustomizationView.swift"
+      }
+    },
+    {
+      "id": "0d1e22a4405fcd0fd198fd275f25fc842a970771a0af718fbcd454a111fe724f",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskSettingsView.swift#KioskSettingsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "KioskSettingsView",
+        "source": "Sources/App/Settings/Kiosk/KioskSettingsView.swift"
+      }
+    },
+    {
+      "id": "758c328be6fc58abf758bd773e5af841f99c47b9b9f30a48b24d14c8f9497d4e",
+      "kind": "screen",
+      "label": "HomeAssistant/KioskView.swift#ConditionalContainerView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ConditionalContainerView",
+        "source": "Sources/App/Settings/Kiosk/KioskView.swift"
+      }
+    },
+    {
+      "id": "27078c9a238605f667b92b44eceb4581f9501bcd672d7e111ee13df01a1c7035",
+      "kind": "screen",
+      "label": "HomeAssistant/ListPicker.swift#ListPickerContentView",
+      "nativeSource": {
+        "line": 95,
+        "name": "ListPickerContentView",
+        "source": "Sources/App/Settings/Gestures/ListPicker.swift"
+      }
+    },
+    {
+      "id": "f0af7c20fd79029bfc2f1b0f6b52b9f7f5703d9e33a6bd814777203d3ab1ef9b",
+      "kind": "screen",
+      "label": "HomeAssistant/LiveActivitySettingsView.swift#LiveActivitySampleDetailView",
+      "nativeSource": {
+        "line": 868,
+        "name": "LiveActivitySampleDetailView",
+        "source": "Sources/App/Settings/LiveActivity/LiveActivitySettingsView.swift"
+      }
+    },
+    {
+      "id": "0cef1485f7270d85af35c377e942788efcc837aecff9b894cd27bf1e1133503b",
+      "kind": "screen",
+      "label": "HomeAssistant/LiveActivitySettingsView.swift#LiveActivityYAMLView",
+      "nativeSource": {
+        "line": 911,
+        "name": "LiveActivityYAMLView",
+        "source": "Sources/App/Settings/LiveActivity/LiveActivitySettingsView.swift"
+      }
+    },
+    {
+      "id": "71f5d156aa39e01f86556dbdbb1e3e29fd735d3f619bb44d7e6df197c53d8f95",
+      "kind": "screen",
+      "label": "HomeAssistant/LocalAccessPermissionView.swift#LocalAccessPermissionView",
+      "nativeSource": {
+        "line": 37,
+        "name": "LocalAccessPermissionView",
+        "source": "Sources/App/Onboarding/Steps/Permissions/Steps/LocalAccessAndNetworkInput/LocalAccess/LocalAccessPermissionView.swift"
+      }
+    },
+    {
+      "id": "67f4a76dc8d30b8809261976a1040dda3f8c64e74b2ba4f6dcbb823d938532fc",
+      "kind": "screen",
+      "label": "HomeAssistant/LocalAccessPermissionView.swift#LocalAccessPermissionViewInNavigationView",
+      "nativeSource": {
+        "line": 9,
+        "name": "LocalAccessPermissionViewInNavigationView",
+        "source": "Sources/App/Onboarding/Steps/Permissions/Steps/LocalAccessAndNetworkInput/LocalAccess/LocalAccessPermissionView.swift"
+      }
+    },
+    {
+      "id": "42e90f4a49b2213f6f9342595b80681a14d865fb7f02c4f295dd6aa53311de9e",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationHistoryDetailViewController.swift#LocationHistoryDetailViewController",
+      "nativeSource": {
+        "line": 43,
+        "name": "LocationHistoryDetailViewController",
+        "source": "Sources/App/ClientEvents/LocationHistoryDetailViewController.swift"
+      }
+    },
+    {
+      "id": "57f49048d99db6eebe74f4e1c16bcb9829b4ebc72d018dc694e602d7795d4291",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationHistoryDetailViewController.swift#LocationHistoryDetailViewControllerWrapper",
+      "nativeSource": {
+        "line": 11,
+        "name": "LocationHistoryDetailViewControllerWrapper",
+        "source": "Sources/App/ClientEvents/LocationHistoryDetailViewController.swift"
+      }
+    },
+    {
+      "id": "4489b6567c56e9aa9264c30e274c9ce2621d06f16e14c63d0f4f5fc0df03f842",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationHistoryListView.swift#LocationHistoryListView",
+      "nativeSource": {
+        "line": 55,
+        "name": "LocationHistoryListView",
+        "source": "Sources/App/ClientEvents/LocationHistoryListView.swift"
+      }
+    },
+    {
+      "id": "7734491a5bc8b855d86f8d3cf4422644e2a2b4b147053166642f262925472981",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationHistoryListView.swift#LocationHistoryListViewHostingController",
+      "nativeSource": {
+        "line": 88,
+        "name": "LocationHistoryListViewHostingController",
+        "source": "Sources/App/ClientEvents/LocationHistoryListView.swift"
+      }
+    },
+    {
+      "id": "5b1f0f27438a059f9c3de991e09860aa3f69b86d24560e24d51a6f8f2e3ab8fa",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationHistoryListView.swift#PreviewLocationHistoryListView",
+      "nativeSource": {
+        "line": 90,
+        "name": "PreviewLocationHistoryListView",
+        "source": "Sources/App/ClientEvents/LocationHistoryListView.swift"
+      }
+    },
+    {
+      "id": "ad5f9f8fb59febb9157cd2d56c8198543e8bca3700140a9414d23bbdc92aff53",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationSettingsView.swift#LocationSettingsView",
+      "nativeSource": {
+        "line": 9,
+        "name": "LocationSettingsView",
+        "source": "Sources/App/Settings/Location/LocationSettingsView.swift"
+      }
+    },
+    {
+      "id": "946284247682e5b7a5e2eabb77fb507a2c4db3b8058fdbd40d640379d61ab7ae",
+      "kind": "screen",
+      "label": "HomeAssistant/LocationSettingsView.swift#LocationZoneMapView",
+      "nativeSource": {
+        "line": 238,
+        "name": "LocationZoneMapView",
+        "source": "Sources/App/Settings/Location/LocationSettingsView.swift"
+      }
+    },
+    {
+      "id": "cbd7038318687a3f784509a16c8cced7ed4163abef7fd28500b87a69cd2528de",
+      "kind": "screen",
+      "label": "HomeAssistant/MacToolbarSettingsView.swift#MacToolbarSettingsView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .macToolbar",
+        "dynamic": true,
+        "line": 4,
+        "name": "MacToolbarSettingsView",
+        "source": "Sources/App/Settings/MacToolbar/MacToolbarSettingsView.swift"
+      }
+    },
+    {
+      "id": "07964d3f94489933b3aca50fe05981ac825bcc87b44fe50f216e566855770db1",
+      "kind": "screen",
+      "label": "HomeAssistant/MacWebViewTitleBar.swift#MacWebViewTitleBarViewController",
+      "nativeSource": {
+        "line": 33,
+        "name": "MacWebViewTitleBarViewController",
+        "source": "Sources/App/Frontend/WebView/MacWebViewTitleBar.swift"
+      }
+    },
+    {
+      "id": "8eade2ff7015f32b9819868a7c913e0df470d328d618b917e29cc3ee38a3ea1a",
+      "kind": "screen",
+      "label": "HomeAssistant/MagicItemAddView.swift#MagicItemAddView",
+      "nativeSource": {
+        "line": 5,
+        "name": "MagicItemAddView",
+        "source": "Sources/App/Settings/MagicItem/Add/MagicItemAddView.swift"
+      }
+    },
+    {
+      "id": "a3d326ec3436ced93bc7a385b6a219251cb788768e57be77ae946be0a52e21f9",
+      "kind": "screen",
+      "label": "HomeAssistant/MagicItemCustomizationView.swift#MagicItemCustomizationView",
+      "nativeSource": {
+        "line": 4,
+        "name": "MagicItemCustomizationView",
+        "source": "Sources/App/Settings/MagicItem/Edit/MagicItemCustomizationView.swift"
+      }
+    },
+    {
+      "id": "210a5fb0bc8e1f9bf27296f86600d287671aaefc259964333240bcc77e85658e",
+      "kind": "screen",
+      "label": "HomeAssistant/ManageStorageView.swift#ManageStorageView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ManageStorageView",
+        "source": "Sources/App/Settings/ManageStorage/ManageStorageView.swift"
+      }
+    },
+    {
+      "id": "206671494d400b9d1b5ad642c2fb81cfb5770742795b9465283de526da66a11f",
+      "kind": "screen",
+      "label": "HomeAssistant/ManualURLEntryView.swift#ManualURLEntryView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ManualURLEntryView",
+        "source": "Sources/App/Onboarding/Steps/Servers/ManualURLEntry/ManualURLEntryView.swift"
+      }
+    },
+    {
+      "id": "88e728b2b6e25cbbb0e99643eaad6c1928cadd73aa47ab2ac8175d805a3cf18e",
+      "kind": "screen",
+      "label": "HomeAssistant/NFCListView.swift#NFCListView",
+      "nativeSource": {
+        "line": 5,
+        "name": "NFCListView",
+        "source": "Sources/App/Settings/NFC/NFCListView.swift"
+      }
+    },
+    {
+      "id": "059a23806b5867d48127866d19cd9ad0cdfcc277f919334a6e6c435972641b68",
+      "kind": "screen",
+      "label": "HomeAssistant/NFCTagView.swift#NFCShareSheet",
+      "nativeSource": {
+        "line": 132,
+        "name": "NFCShareSheet",
+        "source": "Sources/App/Settings/NFC/NFCTagView.swift"
+      }
+    },
+    {
+      "id": "77e7d6ef3699f4266320e380faa5a0e73a3a9ff1a09f2ae1b2e0fad063b5d0cb",
+      "kind": "screen",
+      "label": "HomeAssistant/NFCTagView.swift#NFCTagView",
+      "nativeSource": {
+        "line": 5,
+        "name": "NFCTagView",
+        "source": "Sources/App/Settings/NFC/NFCTagView.swift"
+      }
+    },
+    {
+      "id": "276343e6599c333f7213ba3560b085f9238ab79f5ea2c61bed63c1917ee7175c",
+      "kind": "screen",
+      "label": "HomeAssistant/NFCTagView.swift#YamlCodeView",
+      "nativeSource": {
+        "line": 148,
+        "name": "YamlCodeView",
+        "source": "Sources/App/Settings/NFC/NFCTagView.swift"
+      }
+    },
+    {
+      "id": "7dc20136e0a6a68ef3f312ff31c2ea994887ddb469b291a98c4b9528cc472bc9",
+      "kind": "screen",
+      "label": "HomeAssistant/NativeTabBarCustomizeView.swift#NativeTabBarCustomizeView",
+      "nativeSource": {
+        "line": 6,
+        "name": "NativeTabBarCustomizeView",
+        "source": "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarCustomizeView.swift"
+      }
+    },
+    {
+      "id": "9a6fe10edac6ad4022ab22bb715c18fa2a2492e66e0d63840fb1e46a60d5b589",
+      "kind": "screen",
+      "label": "HomeAssistant/NativeTabBarFrontendSlot.swift#NativeTabBarFrontendSlot.SlotViewController",
+      "nativeSource": {
+        "line": 20,
+        "name": "NativeTabBarFrontendSlot.SlotViewController",
+        "source": "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarFrontendSlot.swift"
+      }
+    },
+    {
+      "id": "9a55c52af105054ee64e5afff75dc0650e0cc9df20179b8ff81f7dfe7c991996",
+      "kind": "screen",
+      "label": "HomeAssistant/NativeTabBarMoreView.swift#NativeTabBarMoreView",
+      "nativeSource": {
+        "line": 7,
+        "name": "NativeTabBarMoreView",
+        "source": "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarMoreView.swift"
+      }
+    },
+    {
+      "id": "a65af151440d9f67542cd52400c2836217e97ce1bd0d76c792bbd0e79bd5ee87",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationActionEditorView.swift#NotificationActionEditorView",
+      "nativeSource": {
+        "line": 10,
+        "name": "NotificationActionEditorView",
+        "source": "Sources/App/Settings/Notifications/NotificationActionEditorView.swift"
+      }
+    },
+    {
+      "id": "d41150a2dcdbd94b88fc5eb5cfaf52e1f162cec88f10bd776ffe87a9168f4d7a",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationCategoryEditorView.swift#NotificationCategoryEditorView",
+      "nativeSource": {
+        "line": 12,
+        "name": "NotificationCategoryEditorView",
+        "source": "Sources/App/Settings/Notifications/NotificationCategoryEditorView.swift"
+      }
+    },
+    {
+      "id": "e83b0562f37d84246373994d9e9b549e7ceece29ce2acbfc9843e11e7c2665d7",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationDebugNotificationsView.swift#NotificationDebugNotificationsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "NotificationDebugNotificationsView",
+        "source": "Sources/App/Settings/Notifications/NotificationDebugNotificationsView.swift"
+      }
+    },
+    {
+      "id": "56a6e6bdbd791cf80fb1dffe6fb0f4801b8b30ce38a13283cdf5707e43cee48f",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationDebugView.swift#NotificationDebugView",
+      "nativeSource": {
+        "line": 5,
+        "name": "NotificationDebugView",
+        "source": "Sources/App/Settings/Notifications/NotificationDebugView.swift"
+      }
+    },
+    {
+      "id": "158095a9c73dce54f446b53fac7da5dc57d3baa4338f5eaaa0b0be3500e06a72",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationHistoryView.swift#NotificationHistoryDetailView",
+      "nativeSource": {
+        "line": 182,
+        "name": "NotificationHistoryDetailView",
+        "source": "Sources/App/Settings/Notifications/NotificationHistoryView.swift"
+      }
+    },
+    {
+      "id": "49ca5428b07d70d73403669230e98f930639124ff0cd1ea3afe8c5957997bcf6",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationHistoryView.swift#NotificationHistoryView",
+      "nativeSource": {
+        "line": 5,
+        "name": "NotificationHistoryView",
+        "source": "Sources/App/Settings/Notifications/NotificationHistoryView.swift"
+      }
+    },
+    {
+      "id": "4f4703c9e74b696f8a918d5e376725d4a6f6db6eedb5b7610f36fb52a06fa151",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationRateLimitView.swift#NotificationRateLimitView",
+      "nativeSource": {
+        "line": 5,
+        "name": "NotificationRateLimitView",
+        "source": "Sources/App/Settings/Notifications/NotificationRateLimitView.swift"
+      }
+    },
+    {
+      "id": "cb722ea9ee2a7147c5cb19187629d7cb2c236ff550e4f83cda536859acde8826",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationSettingsView.swift#NotificationSettingsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "NotificationSettingsView",
+        "source": "Sources/App/Settings/Notifications/NotificationSettingsView.swift"
+      }
+    },
+    {
+      "id": "c747b1b79c3e67b627dd29d848957f0613c7d7c8a92a744a611003464362c79e",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationSnoozeActionsView.swift#NotificationSnoozeActionAddView",
+      "nativeSource": {
+        "line": 55,
+        "name": "NotificationSnoozeActionAddView",
+        "source": "Sources/App/Settings/Notifications/NotificationSnoozeActionsView.swift"
+      }
+    },
+    {
+      "id": "9caec40eabd59e3e3d41246d2afdff0a30220c32fd6444680f336b93d47c5d73",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationSnoozeActionsView.swift#NotificationSnoozeActionsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "NotificationSnoozeActionsView",
+        "source": "Sources/App/Settings/Notifications/NotificationSnoozeActionsView.swift"
+      }
+    },
+    {
+      "id": "c23b6f7201c16d56a7f8089fdac039630fece9428bb124bf22d156c138a24ea7",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationSoundsView.swift#NotificationSoundsView",
+      "nativeSource": {
+        "line": 7,
+        "name": "NotificationSoundsView",
+        "source": "Sources/App/Settings/Notifications/NotificationSoundsView.swift"
+      }
+    },
+    {
+      "id": "2fee0de6f68ea5b50c9548f5d7f5f4feb3812a31a72dcfc05bd3bf10df9aca8c",
+      "kind": "screen",
+      "label": "HomeAssistant/NotificationsShareSheet.swift#NotificationsShareSheet",
+      "nativeSource": {
+        "line": 3,
+        "name": "NotificationsShareSheet",
+        "source": "Sources/App/Settings/Notifications/NotificationsShareSheet.swift"
+      }
+    },
+    {
+      "id": "72ffa4f46e15e64fc8c2d08b12258eb2cd78e65b3a125141fc625a3a95eec83e",
+      "kind": "screen",
+      "label": "HomeAssistant/OnboardingAuthLoginView.swift#OnboardingAuthLoginView",
+      "nativeSource": {
+        "line": 9,
+        "name": "OnboardingAuthLoginView",
+        "source": "Sources/App/Onboarding/API/OnboardingAuthLoginView.swift"
+      }
+    },
+    {
+      "id": "a8f61c28cf7e10a0c1ae70c577509872588a16156ed0877fedbf8ecc3f42df6d",
+      "kind": "screen",
+      "label": "HomeAssistant/OnboardingAuthLoginView.swift#OnboardingAuthLoginView.LoginWebView",
+      "nativeSource": {
+        "line": 75,
+        "name": "OnboardingAuthLoginView.LoginWebView",
+        "source": "Sources/App/Onboarding/API/OnboardingAuthLoginView.swift"
+      }
+    },
+    {
+      "id": "951cb046485c8b269a6f0928c68a3174fadee7abfb1c4786787dddb3b4614206",
+      "kind": "screen",
+      "label": "HomeAssistant/OnboardingNavigationView.swift#OnboardingNavigationView",
+      "nativeSource": {
+        "line": 30,
+        "name": "OnboardingNavigationView",
+        "source": "Sources/App/Onboarding/Container/OnboardingNavigationView.swift"
+      }
+    },
+    {
+      "id": "155eab3d6926080469d5e521c83caba658213bf70b9462551e14da267cc5099a",
+      "kind": "screen",
+      "label": "HomeAssistant/OnboardingPermissionsNavigationView.swift#OnboardingPermissionsNavigationView",
+      "nativeSource": {
+        "line": 7,
+        "name": "OnboardingPermissionsNavigationView",
+        "source": "Sources/App/Onboarding/Steps/Permissions/OnboardingPermissionsNavigationView.swift"
+      }
+    },
+    {
+      "id": "8628cf6471608b9f96e0461495111a0be6c777956e6da7432022048662fdc436",
+      "kind": "screen",
+      "label": "HomeAssistant/OnboardingServersListView.swift#OnboardingServersListView",
+      "nativeSource": {
+        "line": 5,
+        "name": "OnboardingServersListView",
+        "source": "Sources/App/Onboarding/Steps/Servers/OnboardingServersListView.swift"
+      }
+    },
+    {
+      "id": "c49d7c877439ff178bd7ec8646d574e72e16099fa713c5e6168e99855be04aad",
+      "kind": "screen",
+      "label": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+      "nativeSource": {
+        "line": 5,
+        "name": "OnboardingWelcomeView",
+        "source": "Sources/App/Onboarding/Steps/Welcome/OnboardingWelcomeView.swift"
+      }
+    },
+    {
+      "id": "5f3ea8d944110fbdf67e5cb64aafb8456d6b40e9c6c10db77a8a3b5a44bf46ec",
+      "kind": "screen",
+      "label": "HomeAssistant/PrivacyView.swift#PrivacyView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .privacy",
+        "dynamic": true,
+        "line": 5,
+        "name": "PrivacyView",
+        "source": "Sources/App/Settings/PrivacyView.swift"
+      }
+    },
+    {
+      "id": "736902d50b96fb7ac0139f6e9a20e7430d7e12a131de2bdde0ed4876bfcc9189",
+      "kind": "screen",
+      "label": "HomeAssistant/RemindersSyncAddView.swift#RemindersSyncAddView",
+      "nativeSource": {
+        "line": 4,
+        "name": "RemindersSyncAddView",
+        "source": "Sources/App/Utilities/RemindersSync/RemindersSyncAddView.swift"
+      }
+    },
+    {
+      "id": "e316d9981a1ac80f9fd5508551a4bb408a1c717eb9a438d0fec0d3a3bb59cca6",
+      "kind": "screen",
+      "label": "HomeAssistant/RemindersSyncHistoryView.swift#RemindersSyncHistoryView",
+      "nativeSource": {
+        "line": 7,
+        "name": "RemindersSyncHistoryView",
+        "source": "Sources/App/Utilities/RemindersSync/RemindersSyncHistoryView.swift"
+      }
+    },
+    {
+      "id": "0534578db989db54e38dad93981a9affb3ff81bf05950ae31af557a367b0e0e4",
+      "kind": "screen",
+      "label": "HomeAssistant/RemindersSyncSettingsView.swift#RemindersSyncSettingsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "RemindersSyncSettingsView",
+        "source": "Sources/App/Utilities/RemindersSync/RemindersSyncSettingsView.swift"
+      }
+    },
+    {
+      "id": "0e02fad55d174dde4741d0c0aae78dc6d3e97f44d100f883d34b868ab6f3640b",
+      "kind": "screen",
+      "label": "HomeAssistant/SafariWebView.swift#SafariWebView",
+      "nativeSource": {
+        "line": 4,
+        "name": "SafariWebView",
+        "source": "Sources/App/Onboarding/Views/SafariWebView.swift"
+      }
+    },
+    {
+      "id": "dd010f7b073cb02c125915e0cd4d2c8e2e751f875692c724a28f38eca0d3d5d5",
+      "kind": "screen",
+      "label": "HomeAssistant/SensorDetailView.swift#SensorDetailView",
+      "nativeSource": {
+        "line": 5,
+        "name": "SensorDetailView",
+        "source": "Sources/App/Settings/Sensors/Details/SensorDetailView.swift"
+      }
+    },
+    {
+      "id": "b2bae6c30fbaa4a3cd65b0add0443be7afc99bcaf8999bac5c65dd5f721b577a",
+      "kind": "screen",
+      "label": "HomeAssistant/SensorListView.swift#SensorListView",
+      "nativeSource": {
+        "line": 5,
+        "name": "SensorListView",
+        "source": "Sources/App/Settings/Sensors/List/SensorListView.swift"
+      }
+    },
+    {
+      "id": "ca6ae94d0c625b1be92fd7bdc9bf0b6ded35c7b412a8ad9d2ed8e62e62bfe471",
+      "kind": "screen",
+      "label": "HomeAssistant/SensorPermissionsView.swift#SensorPermissionsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "SensorPermissionsView",
+        "source": "Sources/App/Settings/Sensors/Permissions/SensorPermissionsView.swift"
+      }
+    },
+    {
+      "id": "ecb8ac9d0991b876dec5498d0b79e168133906b3498cc04801cc9b0f45a1f61e",
+      "kind": "screen",
+      "label": "HomeAssistant/ServerActionPickerList.swift#ServerActionPickerList",
+      "nativeSource": {
+        "line": 10,
+        "name": "ServerActionPickerList",
+        "source": "Sources/App/Settings/MagicItem/ServerActionPickerList.swift"
+      }
+    },
+    {
+      "id": "e47e34afed74c3f74d8e43e7f852e451e56c9085234821163b86d7706bdb527d",
+      "kind": "screen",
+      "label": "HomeAssistant/ServerSwitchingHowItWorksView.swift#ServerSwitchingHowItWorksView",
+      "nativeSource": {
+        "line": 5,
+        "name": "ServerSwitchingHowItWorksView",
+        "source": "Sources/App/Settings/Settings/ServerSwitchingHowItWorksView.swift"
+      }
+    },
+    {
+      "id": "d549991f0da311860b3117d5d48175861c79196891d0aaf03587058c3528e128",
+      "kind": "screen",
+      "label": "HomeAssistant/ServerSwitchingSettingsView.swift#ServerSwitchingSettingsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "ServerSwitchingSettingsView",
+        "source": "Sources/App/Settings/Settings/ServerSwitchingSettingsView.swift"
+      }
+    },
+    {
+      "id": "08f7b79d94a154569cb63f9dc076cb00b5fd4acc1b381fcb4c209868f41fa57b",
+      "kind": "screen",
+      "label": "HomeAssistant/SettingsItem.swift#SettingsComplicationsView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .complications",
+        "dynamic": true,
+        "line": 348,
+        "name": "SettingsComplicationsView",
+        "source": "Sources/App/Settings/Settings/SettingsItem.swift"
+      }
+    },
+    {
+      "id": "8bcccfb0a5f70511688d9d2d6a19b152083e31f28b0fa5e7a3c289eac8744350",
+      "kind": "screen",
+      "label": "HomeAssistant/SettingsItem.swift#SettingsNotificationsView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .notifications",
+        "dynamic": true,
+        "line": 342,
+        "name": "SettingsNotificationsView",
+        "source": "Sources/App/Settings/Settings/SettingsItem.swift"
+      }
+    },
+    {
+      "id": "747d70230a6275106162362e2a844951320fccd6abfbdf4cd01da44400524add",
+      "kind": "screen",
+      "label": "HomeAssistant/SettingsServersView.swift#SettingsServersView",
+      "nativeSource": {
+        "line": 4,
+        "name": "SettingsServersView",
+        "source": "Sources/App/Settings/Settings/SettingsServersView.swift"
+      }
+    },
+    {
+      "id": "40a6d8def40513372b74b18265826065e29e155e4eda81ef8d8ae72d4a349f37",
+      "kind": "screen",
+      "label": "HomeAssistant/SettingsView.swift#SettingsView",
+      "nativeSource": {
+        "line": 4,
+        "name": "SettingsView",
+        "source": "Sources/App/Settings/Settings/SettingsView.swift"
+      }
+    },
+    {
+      "id": "99dbbbda0de2d8412c9f086be9822de6cbcfbb00ccc6444bbf64ae579ce62b58",
+      "kind": "screen",
+      "label": "HomeAssistant/ShareActivityView.swift#ShareActivityView",
+      "nativeSource": {
+        "line": 4,
+        "name": "ShareActivityView",
+        "source": "Sources/App/Onboarding/Views/ShareActivityView.swift"
+      }
+    },
+    {
+      "id": "97620326e96c103b555d27291ccaf1723f27150c403efca9fa6262af27f272ba",
+      "kind": "screen",
+      "label": "HomeAssistant/SiriSettingsView.swift#SiriSettingsView",
+      "nativeSource": {
+        "line": 6,
+        "name": "SiriSettingsView",
+        "source": "Sources/App/Settings/Siri/SiriSettingsView.swift"
+      }
+    },
+    {
+      "id": "17f44478b4ccb451f06c321d2b2c0c595d8249238bbc4dc9be30523f690037b4",
+      "kind": "screen",
+      "label": "HomeAssistant/TTSVoicePickerView.swift#TTSVoicePickerView",
+      "nativeSource": {
+        "line": 6,
+        "name": "TTSVoicePickerView",
+        "source": "Sources/App/Assist/Local/TTSVoicePickerView.swift"
+      }
+    },
+    {
+      "id": "659f3b95d0780771eba362991bf2dd9acf865037c92dd4e3774078982d00acfa",
+      "kind": "screen",
+      "label": "HomeAssistant/TagsView.swift#TagsView",
+      "nativeSource": {
+        "condition": "route case let .item(item) && self case .nfc",
+        "dynamic": true,
+        "line": 4,
+        "name": "TagsView",
+        "source": "Sources/App/Settings/NFC/TagsView.swift"
+      }
+    },
+    {
+      "id": "8748c27b3a64ab47a3e3da52d605684f59b5834dcd2d90d3e77b69f7ce4dcd73",
+      "kind": "screen",
+      "label": "HomeAssistant/TestFlightCommunicationView.swift#TestFlightCommunicationView",
+      "nativeSource": {
+        "line": 6,
+        "name": "TestFlightCommunicationView",
+        "source": "Sources/App/TestFlightCommunication/TestFlightCommunicationView.swift"
+      }
+    },
+    {
+      "id": "3f8c54c42f2439a355e07a84af845f07490312f79bd187c36cb8ac6f8a40d704",
+      "kind": "screen",
+      "label": "HomeAssistant/ThreadCredentialsManagementView.swift#ThreadCredentialsManagementView",
+      "nativeSource": {
+        "line": 4,
+        "name": "ThreadCredentialsManagementView",
+        "source": "Sources/Thread/CredentialsManagement/ThreadCredentialsManagementView.swift"
+      }
+    },
+    {
+      "id": "2cefd3a3739feb0bdb47f3c9731a9d9c8ad5f090ac477105f60a76cee15cb1fd",
+      "kind": "screen",
+      "label": "HomeAssistant/VoiceToolsServerLanguagesView.swift#VoiceToolsServerLanguagesView",
+      "nativeSource": {
+        "line": 7,
+        "name": "VoiceToolsServerLanguagesView",
+        "source": "Sources/App/VoiceToolsServer/VoiceToolsServerLanguagesView.swift"
+      }
+    },
+    {
+      "id": "062cd796814a852a2ffb1d27e4aa7a9cf49946cdba9eac18c74236938b2857e9",
+      "kind": "screen",
+      "label": "HomeAssistant/VoiceToolsServerSettingsView.swift#VoiceToolsServerSettingsView",
+      "nativeSource": {
+        "line": 5,
+        "name": "VoiceToolsServerSettingsView",
+        "source": "Sources/App/VoiceToolsServer/VoiceToolsServerSettingsView.swift"
+      }
+    },
+    {
+      "id": "5f732e0e88119db767ff60538736ab84571368a679a61efd88b989d32d0250db",
+      "kind": "screen",
+      "label": "HomeAssistant/VoiceToolsServerVoicesView.swift#VoiceToolsServerVoicesView",
+      "nativeSource": {
+        "line": 8,
+        "name": "VoiceToolsServerVoicesView",
+        "source": "Sources/App/VoiceToolsServer/VoiceToolsServerVoicesView.swift"
+      }
+    },
+    {
+      "id": "d695e2f9a583cc6a5ec19341597c0c4a96a599fbbc8030a489ef19fb83ee5749",
+      "kind": "screen",
+      "label": "HomeAssistant/WatchComplicationBuilderEditView.swift#WatchComplicationBuilderEditView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchComplicationBuilderEditView",
+        "source": "Sources/App/Settings/AppleWatch/Complications/WatchComplicationBuilderEditView.swift"
+      }
+    },
+    {
+      "id": "6d9f33078ce0a54f08c8fc4c4691105a91aadde131b2bffbab1e3d24f2fad61e",
+      "kind": "screen",
+      "label": "HomeAssistant/WatchComplicationConfigurationSheet.swift#WatchComplicationConfigurationSheet",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchComplicationConfigurationSheet",
+        "source": "Sources/App/Settings/AppleWatch/Complications/WatchComplicationConfigurationSheet.swift"
+      }
+    },
+    {
+      "id": "832fcb433b2ed3aeeaae5950895b8e444ff4debafa3149d2ef8efa8b68cea0af",
+      "kind": "screen",
+      "label": "HomeAssistant/WatchConfigurationView.swift#WatchConfigurationView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WatchConfigurationView",
+        "source": "Sources/App/Settings/AppleWatch/HomeCustomization/WatchConfigurationView.swift"
+      }
+    },
+    {
+      "id": "97b6089b17bcce65b00274a5dedd04ffe9290ca975bdefdb4334c6b6b801b322",
+      "kind": "screen",
+      "label": "HomeAssistant/WebRTCVideoPlayerControlsView.swift#WebRTCVideoPlayerControlsView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WebRTCVideoPlayerControlsView",
+        "source": "Sources/App/Cameras/CameraPlayer/WebRTC/WebRTCVideoPlayerControlsView.swift"
+      }
+    },
+    {
+      "id": "374b7151635c556c717149d6009223c420b26675d6ed411ff093008a573b3313",
+      "kind": "screen",
+      "label": "HomeAssistant/WebRTCVideoPlayerView.swift#WebRTCVideoPlayerView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WebRTCVideoPlayerView",
+        "source": "Sources/App/Cameras/CameraPlayer/WebRTC/WebRTCVideoPlayerView.swift"
+      }
+    },
+    {
+      "id": "1a1f5762acf15d3dec25dd4275f68bfac4dc08a601ef6dc076fe2265b785d481",
+      "kind": "screen",
+      "label": "HomeAssistant/WebRTCVideoPlayerViewController.swift#WebRTCVideoPlayerViewController",
+      "nativeSource": {
+        "line": 6,
+        "name": "WebRTCVideoPlayerViewController",
+        "source": "Sources/App/Cameras/CameraPlayer/WebRTC/WebRTCVideoPlayerViewController.swift"
+      }
+    },
+    {
+      "id": "12785acb9fd23457c9c272ab58e167d80bab64d2b8f46f32dbed36b40f92a8df",
+      "kind": "screen",
+      "label": "HomeAssistant/WebViewController.swift#WebViewController",
+      "nativeSource": {
+        "line": 14,
+        "name": "WebViewController",
+        "source": "Sources/App/Frontend/WebView/WebViewController/WebViewController.swift"
+      }
+    },
+    {
+      "id": "9b6456152c404f21e795f8abe4483c8395caada9d575f7cac424a4506ef5ee92",
+      "kind": "screen",
+      "label": "HomeAssistant/WebhookDetailView.swift#WebhookDetailView",
+      "nativeSource": {
+        "line": 7,
+        "name": "WebhookDetailView",
+        "source": "Sources/App/Settings/Connection/Webhook/WebhookDetailView.swift"
+      }
+    },
+    {
+      "id": "9b4d6d7728906e457e62f2bf08e34ef14ac76042dfef789b14747931d418d56b",
+      "kind": "screen",
+      "label": "HomeAssistant/WhatsNewArticleView.swift#WhatsNewArticleView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WhatsNewArticleView",
+        "source": "Sources/App/WhatsNew/WhatsNewArticleView.swift"
+      }
+    },
+    {
+      "id": "be4b35ae77166a125a00699b886cf3347b5576cbfab6079baebbf07718e68aad",
+      "kind": "screen",
+      "label": "HomeAssistant/WhatsNewView.swift#WhatsNewView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WhatsNewView",
+        "source": "Sources/App/WhatsNew/WhatsNewView.swift"
+      }
+    },
+    {
+      "id": "c2264a9b2849f4665d05ea1a77c5fbac1204e16c6a6b0d21f5d581994f65c386",
+      "kind": "screen",
+      "label": "HomeAssistant/WidgetCreationView.swift#WidgetCreationView",
+      "nativeSource": {
+        "line": 7,
+        "name": "WidgetCreationView",
+        "source": "Sources/App/Settings/Widgets/Builder/WidgetCreationView.swift"
+      }
+    },
+    {
+      "id": "535ac9d3409795f4d70695e032b831b768c3d8f6c155565ea5f972387dd43fc8",
+      "kind": "screen",
+      "label": "HomeAssistant/YamlPreviewSection.swift#YamlCodePreviewView",
+      "nativeSource": {
+        "line": 84,
+        "name": "YamlCodePreviewView",
+        "source": "Sources/App/Settings/Components/YamlPreviewSection.swift"
+      }
+    },
+    {
+      "id": "506db7b1beabb4aed8ae73d51f6ce05ce58f9f57223781a3579751352b0ab568",
+      "kind": "screen",
+      "label": "HomeAssistant/YamlPreviewSection.swift#YamlShareSheet",
+      "nativeSource": {
+        "line": 68,
+        "name": "YamlShareSheet",
+        "source": "Sources/App/Settings/Components/YamlPreviewSection.swift"
+      }
+    },
+    {
+      "id": "50793835886047849841668e8bac2907e712c0d307f27bb53499946d9279ef20",
+      "kind": "screen",
+      "label": "HomeAssistant/ZonesListView.swift#ZonesListView",
+      "nativeSource": {
+        "line": 8,
+        "name": "ZonesListView",
+        "source": "Sources/App/Settings/Location/Zones/ZonesListView.swift"
+      }
+    },
+    {
+      "id": "1a4bc0c7656795afb72f26bda9a6128b8fc18ac16d3158d2fc597adb55196baf",
+      "kind": "screen",
+      "label": "Shared/ToastView.swift#ToastWindowInstaller.ToastHostingController",
+      "nativeSource": {
+        "line": 117,
+        "name": "ToastWindowInstaller.ToastHostingController",
+        "source": "Sources/Shared/Toast/DynamicIslandToast/ToastView.swift"
+      }
+    },
+    {
+      "id": "1035948b3cb86966da8026fd9b8d6f7c917f85712ffea6560330ef7dfa3ecd63",
+      "kind": "screen",
+      "label": "Shared/View+HA.swift#ResolverViewController",
+      "nativeSource": {
+        "line": 86,
+        "name": "ResolverViewController",
+        "source": "Sources/Shared/Common/Extensions/View+HA.swift"
+      }
+    },
+    {
+      "id": "7889c80a19657e3591ec31487635db180d704e507fcb471697c12ff1c0d2c710",
+      "kind": "screen",
+      "label": "Shared/View+HA.swift#ViewControllerWrapper",
+      "nativeSource": {
+        "condition": "let activityVC = activityViewController",
+        "dynamic": true,
+        "line": 24,
+        "name": "ViewControllerWrapper",
+        "source": "Sources/Shared/Common/Extensions/View+HA.swift"
+      }
+    },
+    {
+      "id": "2d56fdf7a173ece9c6df9f89c7a0238d22c2f324c8e9b4d06628edf1d460bf43",
+      "kind": "screen",
+      "label": "WatchApp/MagicItemExecutionErrorView.swift#MagicItemExecutionErrorView",
+      "nativeSource": {
+        "line": 7,
+        "name": "MagicItemExecutionErrorView",
+        "source": "Sources/WatchApp/Home/MagicItemRow/MagicItemExecutionErrorView.swift"
+      }
+    },
+    {
+      "id": "f99f8bd56d113f600f2bc6f86a5b8f3b673db2e8b7b4617c65be1752772dfe5f",
+      "kind": "screen",
+      "label": "WatchApp/MagicItemExecutionTraceView.swift#MagicItemExecutionTraceView",
+      "nativeSource": {
+        "condition": "let trace = viewModel.trace",
+        "dynamic": true,
+        "line": 8,
+        "name": "MagicItemExecutionTraceView",
+        "source": "Sources/WatchApp/Home/MagicItemRow/MagicItemExecutionTraceView.swift"
+      }
+    },
+    {
+      "id": "a2be2d9c11f1b919d55f1d33812065529e5dabb25680d62c0ae1e18e5a93ed32",
+      "kind": "screen",
+      "label": "WatchApp/VolumeView.swift#VolumeView",
+      "nativeSource": {
+        "line": 7,
+        "name": "VolumeView",
+        "source": "Sources/WatchApp/Assist/Views/VolumeView.swift"
+      }
+    },
+    {
+      "id": "e5bf0bfe6eb6e3e9340a7b381bd5df9bed43d435671a2e0e094df428a18a0b65",
+      "kind": "screen",
+      "label": "WatchApp/WatchAreaEntitiesView.swift#WatchAreaEntitiesView",
+      "nativeSource": {
+        "line": 11,
+        "name": "WatchAreaEntitiesView",
+        "source": "Sources/WatchApp/Home/Areas/WatchAreaEntitiesView.swift"
+      }
+    },
+    {
+      "id": "eb91de8da1ec0d581f26d5ab5d205f9ff7546f16b97fb67eeab28227c46e483a",
+      "kind": "screen",
+      "label": "WatchApp/WatchAreasListView.swift#WatchAreasListView",
+      "nativeSource": {
+        "line": 9,
+        "name": "WatchAreasListView",
+        "source": "Sources/WatchApp/Home/Areas/WatchAreasListView.swift"
+      }
+    },
+    {
+      "id": "001571469ffe9473a545de681edea5f9ec0f685e2ab29c759f3f76a29ceb779d",
+      "kind": "screen",
+      "label": "WatchApp/WatchAreasServerPickerView.swift#WatchAreasServerPickerView",
+      "nativeSource": {
+        "line": 9,
+        "name": "WatchAreasServerPickerView",
+        "source": "Sources/WatchApp/Home/Areas/WatchAreasServerPickerView.swift"
+      }
+    },
+    {
+      "id": "ca5707e78b2e61500155ef56fbc91f56fac6aeced3e69d415ca82556c9d7f512",
+      "kind": "screen",
+      "label": "WatchApp/WatchAssistPipelineSelectionView.swift#WatchAssistPipelineSelectionView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchAssistPipelineSelectionView",
+        "source": "Sources/WatchApp/Home/Edit/WatchAssistPipelineSelectionView.swift"
+      }
+    },
+    {
+      "id": "5c886db18dee32a74dd0ef53bb18c8411b4ede788e9ba9f8dfde8a1318e784f6",
+      "kind": "screen",
+      "label": "WatchApp/WatchClimateControlView.swift#WatchClimateControlView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchClimateControlView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Climate/WatchClimateControlView.swift"
+      }
+    },
+    {
+      "id": "307b321582b333726bc9c1d808178b7fe9b7f400a2508f12f1f048aac54f751d",
+      "kind": "screen",
+      "label": "WatchApp/WatchColorPicker.swift#WatchColorPickerGrid",
+      "nativeSource": {
+        "line": 42,
+        "name": "WatchColorPickerGrid",
+        "source": "Sources/WatchApp/Home/Edit/WatchColorPicker.swift"
+      }
+    },
+    {
+      "id": "3b48505d8e15854c7b7325f20627150d31cab789e6d02459a91d971b13ac712d",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddAreaListView.swift#WatchConfigAddAreaListView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WatchConfigAddAreaListView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddAreaListView.swift"
+      }
+    },
+    {
+      "id": "a6ddbf624947541216b2c90ecaefae3cb433a7942ca2ac1a87bd942942f0b047",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddAreaSourceView.swift#WatchConfigAddAreaSourceView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchConfigAddAreaSourceView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddAreaSourceView.swift"
+      }
+    },
+    {
+      "id": "c4e2449c51e03bc4927f016f65e1e9fadd252225fa6e8589cb6a7762abc4d6eb",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddAssistListView.swift#WatchConfigAddAssistListView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchConfigAddAssistListView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddAssistListView.swift"
+      }
+    },
+    {
+      "id": "376fc0a19f731410f100ad413b27cc6adabb85dd78fc1faf676928b3f08c8838",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddAssistPromptView.swift#WatchConfigAddAssistPromptView",
+      "nativeSource": {
+        "line": 7,
+        "name": "WatchConfigAddAssistPromptView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddAssistPromptView.swift"
+      }
+    },
+    {
+      "id": "50c9047497fabe9aba3a9c8598003b57df1a60fdbfdef39e7a7a6d6d59212fe9",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddComplicationListView.swift#WatchConfigAddComplicationListView",
+      "nativeSource": {
+        "line": 15,
+        "name": "WatchConfigAddComplicationListView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddComplicationListView.swift"
+      }
+    },
+    {
+      "id": "6c843ec15014691bc7c4a3d233ea6fb4f621f65c7fbc7a829e11dff8d4f5aa47",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddEntityAreaFilterView.swift#WatchConfigAddEntityAreaFilterView",
+      "nativeSource": {
+        "line": 7,
+        "name": "WatchConfigAddEntityAreaFilterView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddEntityAreaFilterView.swift"
+      }
+    },
+    {
+      "id": "54e8a031d4feea0f464d458b21af55d1f1cb3bf98120dbed57e31b20f20002ff",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddEntityListView.swift#WatchConfigAddEntityListView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WatchConfigAddEntityListView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddEntityListView.swift"
+      }
+    },
+    {
+      "id": "7efb007108b86bcd2342f8824bcb4ad40ae4dbc5568a70c6036a6a9f1bb62550",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddEntitySourceView.swift#WatchConfigAddEntitySourceView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchConfigAddEntitySourceView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddEntitySourceView.swift"
+      }
+    },
+    {
+      "id": "46c1a00ae2462e86d218f3bb7336dd2f30f6a7f77ad77109266a6602e3b98c0b",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAddView.swift#WatchConfigAddView",
+      "nativeSource": {
+        "condition": "sheet case .add",
+        "dynamic": true,
+        "line": 10,
+        "name": "WatchConfigAddView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigAddView.swift"
+      }
+    },
+    {
+      "id": "f909d64dcf37d6b71fc3d370776dec2ba5a4eb9cd1166d5c52c7f5aa66d418db",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigAssistView.swift#WatchConfigAssistView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchConfigAssistView",
+        "source": "Sources/WatchApp/WatchConfigAssistView.swift"
+      }
+    },
+    {
+      "id": "d5d04e7c7c798976e0e90533aad0267a75885e4bbf4b61cdcc55852bbaabccda",
+      "kind": "screen",
+      "label": "WatchApp/WatchConfigItemEditView.swift#WatchConfigItemEditView",
+      "nativeSource": {
+        "line": 13,
+        "name": "WatchConfigItemEditView",
+        "source": "Sources/WatchApp/Home/Edit/WatchConfigItemEditView.swift"
+      }
+    },
+    {
+      "id": "9d848998c346c95e21727d2c7b98a6e73e0d7898ddabcca21e09bdaf4ef49dad",
+      "kind": "screen",
+      "label": "WatchApp/WatchCoverControlsView.swift#WatchCoverControlsView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchCoverControlsView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Cover/WatchCoverControlsView.swift"
+      }
+    },
+    {
+      "id": "988b33d99ac8d414a3c07659d9f4b919480708f30c9713f3a26fb9a59cd0184a",
+      "kind": "screen",
+      "label": "WatchApp/WatchDeveloperSettingsView.swift#WatchDeveloperSettingsView",
+      "nativeSource": {
+        "line": 7,
+        "name": "WatchDeveloperSettingsView",
+        "source": "Sources/WatchApp/WatchDeveloperSettingsView.swift"
+      }
+    },
+    {
+      "id": "43a0beec6ba03e963039eb0028badc8bd2491d4972edaf20fb68b3dd59608627",
+      "kind": "screen",
+      "label": "WatchApp/WatchDeviceEntitiesView.swift#WatchDeviceEntitiesView",
+      "nativeSource": {
+        "line": 9,
+        "name": "WatchDeviceEntitiesView",
+        "source": "Sources/WatchApp/Home/Devices/WatchDeviceEntitiesView.swift"
+      }
+    },
+    {
+      "id": "536021b0a1a68ed65ce9525f6413cf5dde78cc2c3d0c64409581caef1fd18052",
+      "kind": "screen",
+      "label": "WatchApp/WatchEntityDetailsView.swift#WatchEntityDetailsView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchEntityDetailsView",
+        "source": "Sources/WatchApp/Home/EntityDetails/WatchEntityDetailsView.swift"
+      }
+    },
+    {
+      "id": "5b668eee2d5f6bab487ea5b52707dd234f7441f0c4cfff0c94e40b7568078538",
+      "kind": "screen",
+      "label": "WatchApp/WatchFanControlsView.swift#WatchFanControlsView",
+      "nativeSource": {
+        "line": 9,
+        "name": "WatchFanControlsView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Fan/WatchFanControlsView.swift"
+      }
+    },
+    {
+      "id": "0e1dfcc7c5ae4f6e632cfcff29b2039160b961c51350fd6b726cc692e2193367",
+      "kind": "screen",
+      "label": "WatchApp/WatchFolderContentView.swift#WatchFolderContentView",
+      "nativeSource": {
+        "condition": "destination case let .folder(folderId)",
+        "dynamic": true,
+        "line": 8,
+        "name": "WatchFolderContentView",
+        "source": "Sources/WatchApp/Home/WatchFolderContentView.swift"
+      }
+    },
+    {
+      "id": "90a75c41260d7ba0b42743ea4c5152a817fa338e5ef434cfac454787ae72f9b2",
+      "kind": "screen",
+      "label": "WatchApp/WatchHomeView.swift#WatchHomeView",
+      "nativeSource": {
+        "line": 5,
+        "name": "WatchHomeView",
+        "source": "Sources/WatchApp/Home/WatchHomeView.swift"
+      }
+    },
+    {
+      "id": "019e40f00bf25a75da269624509eb7e06d7692971339b22ef9cf0a2129f4ae85",
+      "kind": "screen",
+      "label": "WatchApp/WatchIconPicker.swift#WatchIconPickerGrid",
+      "nativeSource": {
+        "line": 38,
+        "name": "WatchIconPickerGrid",
+        "source": "Sources/WatchApp/Home/Edit/WatchIconPicker.swift"
+      }
+    },
+    {
+      "id": "0e25871cc5dee8a977a30c98ba8f2653d551b5c18cf8b30b7c919cf1f1013ae0",
+      "kind": "screen",
+      "label": "WatchApp/WatchInternalURLInfoView.swift#WatchInternalURLInfoView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchInternalURLInfoView",
+        "source": "Sources/WatchApp/Home/WatchInternalURLInfoView.swift"
+      }
+    },
+    {
+      "id": "1781ec57bc07db04b9d8a094684cebafca4152b4f8b3420e53b002a20d0d1894",
+      "kind": "screen",
+      "label": "WatchApp/WatchLightControlsView.swift#WatchLightControlsView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchLightControlsView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Light/WatchLightControlsView.swift"
+      }
+    },
+    {
+      "id": "92f2b6af0ec7e59d09b02eb05f0720563e1d0670a1c9d1c7f0d8c5ea93afee1d",
+      "kind": "screen",
+      "label": "WatchApp/WatchLockControlsView.swift#WatchLockControlsView",
+      "nativeSource": {
+        "line": 14,
+        "name": "WatchLockControlsView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Lock/WatchLockControlsView.swift"
+      }
+    },
+    {
+      "id": "26cbf4e58bbc010facd7831751a51e3419097bfda990b588ddb9595cb91d4707",
+      "kind": "screen",
+      "label": "WatchApp/WatchModeSelectionView.swift#WatchModeSelectionView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchModeSelectionView",
+        "source": "Sources/WatchApp/Home/EntityDetails/WatchModeSelectionView.swift"
+      }
+    },
+    {
+      "id": "f97a5dfff0a452e9babaf1b875dfbcfa6d19f89183ff4d7ffcfa63f54c982f5c",
+      "kind": "screen",
+      "label": "WatchApp/WatchSensorsSettingsView.swift#WatchSensorsSettingsView",
+      "nativeSource": {
+        "line": 7,
+        "name": "WatchSensorsSettingsView",
+        "source": "Sources/WatchApp/WatchSensorsSettingsView.swift"
+      }
+    },
+    {
+      "id": "ed12feb97a56882812cfa46ae6df9ef1bb1eabdfd46e28527f63e06dfadeecc6",
+      "kind": "screen",
+      "label": "WatchApp/WatchServerDetailView.swift#WatchServerDetailView",
+      "nativeSource": {
+        "line": 6,
+        "name": "WatchServerDetailView",
+        "source": "Sources/WatchApp/WatchServerDetailView.swift"
+      }
+    },
+    {
+      "id": "bd835fa5b32d1a1e3f7a1cdcc974c95240530e44bbdbb0eaa723223060fe1813",
+      "kind": "screen",
+      "label": "WatchApp/WatchSettingsView.swift#ComplicationDiagnosticDetailView",
+      "nativeSource": {
+        "line": 418,
+        "name": "ComplicationDiagnosticDetailView",
+        "source": "Sources/WatchApp/WatchSettingsView.swift"
+      }
+    },
+    {
+      "id": "bc78dc043a7596542fd0dc8a5dad5ee153736b308b3c37b1e8e5d40bd9a5dc0c",
+      "kind": "screen",
+      "label": "WatchApp/WatchSettingsView.swift#WatchClientEventsView",
+      "nativeSource": {
+        "line": 487,
+        "name": "WatchClientEventsView",
+        "source": "Sources/WatchApp/WatchSettingsView.swift"
+      }
+    },
+    {
+      "id": "a31c351d812777305fa8386a07604e8d4d41b8d0a9a24e7e30ef667aeb6ad314",
+      "kind": "screen",
+      "label": "WatchApp/WatchSettingsView.swift#WatchComplicationsDiagnosticsView",
+      "nativeSource": {
+        "line": 333,
+        "name": "WatchComplicationsDiagnosticsView",
+        "source": "Sources/WatchApp/WatchSettingsView.swift"
+      }
+    },
+    {
+      "id": "d009b59f9967ee1553cb92e249d4bfbc035f32e97ea1e02b994c295437c817a7",
+      "kind": "screen",
+      "label": "WatchApp/WatchSettingsView.swift#WatchServersListView",
+      "nativeSource": {
+        "line": 201,
+        "name": "WatchServersListView",
+        "source": "Sources/WatchApp/WatchSettingsView.swift"
+      }
+    },
+    {
+      "id": "a9f0a690430fda2c75901b5b55966997c711eb034b949babd06f92d8c0d43b34",
+      "kind": "screen",
+      "label": "WatchApp/WatchSettingsView.swift#WatchSettingsView",
+      "nativeSource": {
+        "line": 8,
+        "name": "WatchSettingsView",
+        "source": "Sources/WatchApp/WatchSettingsView.swift"
+      }
+    },
+    {
+      "id": "168b133849a2c20a8d9181bfde9251129814f5b0e5050a01280523a5f5d54584",
+      "kind": "screen",
+      "label": "WatchApp/WatchSettingsView.swift#WatchTroubleshootingView",
+      "nativeSource": {
+        "line": 258,
+        "name": "WatchTroubleshootingView",
+        "source": "Sources/WatchApp/WatchSettingsView.swift"
+      }
+    },
+    {
+      "id": "dc31d395ee57b431079bd16f7dc388726853809ba59ab3d73b3b3fcf97e61ed7",
+      "kind": "screen",
+      "label": "WatchApp/WatchVacuumCleanAreasView.swift#WatchVacuumCleanAreasView",
+      "nativeSource": {
+        "line": 12,
+        "name": "WatchVacuumCleanAreasView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Vacuum/WatchVacuumCleanAreasView.swift"
+      }
+    },
+    {
+      "id": "1f2eedc12cb266f3333907be9ea3a7b8592ccb092b43bc1de6191bc2c3f42ce4",
+      "kind": "screen",
+      "label": "WatchApp/WatchVacuumControlsView.swift#WatchVacuumControlsView",
+      "nativeSource": {
+        "line": 10,
+        "name": "WatchVacuumControlsView",
+        "source": "Sources/WatchApp/Home/EntityDetails/Vacuum/WatchVacuumControlsView.swift"
+      }
+    }
+  ],
+  "overview": [
+    {
+      "image": "c49d7c877439ff178bd7ec8646d574e72e16099fa713c5e6168e99855be04aad-ios-402.png",
+      "imageHeight": 2622,
+      "imageWidth": 1206,
+      "input": {
+        "observedPath": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView"
+      },
+      "observation": {
+        "path": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+        "width": 402
+      },
+      "observedPath": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+      "path": "HomeAssistant/OnboardingWelcomeView.swift#OnboardingWelcomeView",
+      "planIndex": 0,
+      "reason": "Imported ios recording without automated verification",
+      "runtime": "ios",
+      "scenario": "ios",
+      "screenId": "c49d7c877439ff178bd7ec8646d574e72e16099fa713c5e6168e99855be04aad",
+      "state": "f0d5bde70f672268f0cd1bb884e34beae6710c78f2537fd66d11e26a5ffbcb21",
+      "status": "unverified",
+      "width": 402
+    }
+  ],
+  "screenDiscovery": {
+    "declared": 212,
+    "kind": "native-source",
+    "limitations": [
+      "Sources/App/Frontend/ExternalMessageBus/WebViewExternalMessageHandler.swift:326: destination is returned by `ThreadCredentialsSharingView<ThreadTransferCredentialToHAViewModel>\n                    .buildTransferToHomeAssistant`, whose result type the index does not record.",
+      "Sources/App/Frontend/ExternalMessageBus/WebViewExternalMessageHandler.swift:338: destination is returned by `ThreadCredentialsSharingView<ThreadTransferCredentialToKeychainViewModel>\n                    .buildTransferToAppleKeychain`, whose result type the index does not record.",
+      "Sources/App/Frontend/ExternalMessageBus/WebViewExternalMessageHandler.swift:530: destination is returned by `AssistView.build`, whose result type the index does not record.",
+      "Sources/App/Frontend/IncomingURLHandler.swift:192: destination is type-erased with AnyView.",
+      "Sources/App/Frontend/IncomingURLHandler.swift:631: destination is type-erased with AnyView.",
+      "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarContainerView.swift:25: destination is inline `ForEach` content, not a screen type.",
+      "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarContainerView.swift:28: destination is inline `ZStack` content, not a screen type.",
+      "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarContainerView.swift:39: destination is chosen at runtime (`Color.clear`).",
+      "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarContainerView.swift:54: destination is inline `ZStack` content, not a screen type.",
+      "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarContainerView.swift:79: destination is chosen at runtime (`Color.clear`).",
+      "Sources/App/Frontend/WebView/NativeTabBar/NativeTabBarContainerView.swift:83: destination is chosen at runtime (`Color.clear`).",
+      "Sources/App/Frontend/WebView/WebViewController/WebViewController+Alerts.swift:489: destination is type-erased with AnyView.",
+      "Sources/App/Onboarding/Steps/Servers/OnboardingServersListView.swift:347: destination is inline `Text` content, not a screen type.",
+      "Sources/App/Settings/AppleWatch/HomeCustomization/WatchConfigurationView.swift:195: destination is inline `Form` content, not a screen type.",
+      "Sources/App/Settings/CarPlay/CarPlayConfigurationView.swift:116: destination is inline `Form` content, not a screen type.",
+      "Sources/App/Settings/CarPlay/CarPlayTabsSelectionView.swift:101: destination is inline `Form` content, not a screen type.",
+      "Sources/App/Settings/ClientEventsLogView/ClientEventsLogView.swift:166: destination is inline `ScrollView` content, not a screen type.",
+      "Sources/App/Settings/EntityPicker/EntityPicker.swift:101: destination is inline `VStack` content, not a screen type.",
+      "Sources/App/Settings/Kiosk/KioskView.swift:27: destination is inline `ZStack` content, not a screen type.",
+      "Sources/App/Settings/LiveActivity/LiveActivitySettingsView.swift:156: destination is inline `List` content, not a screen type.",
+      "Sources/App/Settings/MagicItem/AssistPipelinePicker.swift:36: destination is inline `List` content, not a screen type.",
+      "Sources/App/Settings/MagicItem/Edit/IconPicker.swift:47: destination is inline `List` content, not a screen type.",
+      "Sources/App/Settings/Settings/SettingsItem.swift:154: destination is inline `EmptyView` content, not a screen type.",
+      "Sources/App/Settings/Settings/SettingsItem.swift:164: destination is inline `EmptyView` content, not a screen type.",
+      "Sources/HADesignSystem/Sources/Components/HADateInput.swift:146: destination is inline `DatePicker` content, not a screen type.",
+      "Sources/HADesignSystem/Sources/Components/LabsLabel.swift:57: destination is inline `ScrollView` content, not a screen type.",
+      "Sources/Shared/Common/Extensions/View+HA.swift:12: destination is chosen at runtime (`hostingAccessingView`).",
+      "Sources/Watch/WatchCommunicatorService.swift:347: destination is chosen at runtime (`importView`).",
+      "Sources/WatchApp/Home/WatchHomeView.swift:120: destination is returned by `WatchAssistView.build`, whose result type the index does not record.",
+      "Sources/WatchApp/Home/WatchHomeView.swift:128: destination is inline `Text` content, not a screen type."
+    ]
+  }
+}
