@@ -12,6 +12,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  DUI_CAPTURE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 jobs:
   ios:
     runs-on: macos-26

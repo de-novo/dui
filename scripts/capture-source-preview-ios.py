@@ -56,7 +56,8 @@ def build_app(temp):
     (app / "Info.plist").write_bytes(plistlib.dumps(plist))
     subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
     version = read("xcrun", "swiftc", "--version", stderr=subprocess.STDOUT)
-    return app, next(line for line in version.splitlines() if "Swift version" in line).strip()
+    line = next(line for line in version.splitlines() if "Apple Swift version" in line)
+    return app, line[line.index("Apple Swift version"):].strip()
 
 
 def wait_for_screen(udid, debug):
@@ -117,7 +118,7 @@ def main():
         "os": f"iOS {os_version}",
         "toolchain": swift,
         "witness": WITNESS,
-        "commit": os.environ.get("GITHUB_SHA", read("git", "-C", str(ROOT), "rev-parse", "HEAD")),
+        "commit": os.environ.get("DUI_CAPTURE_COMMIT") or read("git", "-C", str(ROOT), "rev-parse", "HEAD"),
         "workflowRun": run_url(),
     }
     (output / "ios.json").write_text(json.dumps(record, indent=2) + "\n")

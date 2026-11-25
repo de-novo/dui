@@ -96,7 +96,8 @@ const record = {
   toolchain: "Kotlin 2.4.21, Compose BOM 2026.11.01, Material 3",
   witness: "Notifications off",
   commit:
-    env.GITHUB_SHA ?? execFileSync("git", ["-C", root, "rev-parse", "HEAD"]).toString().trim(),
+    env.DUI_CAPTURE_COMMIT ||
+    execFileSync("git", ["-C", root, "rev-parse", "HEAD"]).toString().trim(),
   workflowRun:
     env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID
       ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`
