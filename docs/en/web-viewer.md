@@ -108,7 +108,7 @@ In a trusted local project, declare self-contained SwiftUI or Compose source ent
 }
 ```
 
-Run `dui map .`, then `dui open`. Each ready card shows its first observed frame read-only, labeled **Source preview · Unverified** with its source path. Select a card to operate its observed switches in the inspector. Mapping needs Node 26 and Swift 6 or Kotlin 2 with a JDK. Opening the saved map only needs the viewer. The archive stores the source SHA-256, layout primitives and observed transitions. The viewer interprets those primitives as text and controls.
+Run `dui map .`, then `dui open`. Cards show the source declaration and stay unverified. Select a card to operate its observed switches in the inspector. Mapping needs Node 26 and Swift 6 or Kotlin 2 with a JDK. Opening the saved map only needs the viewer. The archive stores the source SHA-256, layout primitives and observed transitions. The viewer redraws those primitives as HTML text and controls and says so. This is not the native iOS or Android screen. Show a native screen on the card by attaching a simulator or device recording with `dui map attach`.
 
 Each card is scoped to its project, source file and qualified entry. A missing source or unsupported call leaves a reason on its card. Opening the archive from the corresponding local project also checks the current declarations and source digests. Run `dui map .` again after changes. Previews contribute zero native capture attempts or verifications. A native recording uses the existing `dui map attach` workflow with the exact snapshot and screen IDs.
 

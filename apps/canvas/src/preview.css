@@ -2656,6 +2656,7 @@ h2 {
   margin: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+  cursor: pointer;
   transition: background-color 120ms ease;
 }
 .preview-switch::before {
@@ -2670,20 +2671,15 @@ h2 {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
   transition: transform 120ms ease;
 }
-.preview-switch:checked,
-.preview-switch[data-checked="true"] {
+.preview-switch:checked {
   background: var(--primary);
 }
-.preview-switch:checked::before,
-.preview-switch[data-checked="true"]::before {
+.preview-switch:checked::before {
   transform: translateX(1rem);
 }
 .preview-switch:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-}
-input.preview-switch {
-  cursor: pointer;
 }
 @media (prefers-reduced-motion: reduce) {
   .preview-switch,
@@ -2698,15 +2694,15 @@ input.preview-switch {
   gap: 0;
   margin-bottom: var(--space-2);
 }
-.source-preview-snapshot {
-  gap: 0;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  color: var(--foreground);
-  overflow-wrap: anywhere;
+.source-preview-note {
+  margin: 0 0 var(--space-2);
+  color: var(--muted-foreground);
+  font-size: var(--text-meta);
 }
-.source-preview-snapshot.preview-column .preview-toggle {
-  min-height: 2.25rem;
+.source-preview-schematic {
+  padding: var(--space-1) var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
 }
 .source-preview-reason {
   margin: 0;

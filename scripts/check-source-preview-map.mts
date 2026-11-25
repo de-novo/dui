@@ -215,16 +215,17 @@ async function exerciseCard({
       document.querySelectorAll<HTMLElement>(mobile ? ".mobile-deck-card" : ".react-flow__node"),
     ).find((el) => (el.dataset.screenId || el.dataset.id) === id),
   );
-  const snapshot = card.querySelector(".source-preview-snapshot");
-  if (status === "ready" ? !snapshot?.textContent?.includes(title + " off") : snapshot)
-    throw Error("Wrong card snapshot for " + source);
-  if (card.querySelector("input")) throw Error("Card snapshot created a control");
+  // A portable preview is not a native screen; the card must not draw it.
+  if (card.querySelector(".preview-switch, input") || card.textContent?.includes(title + " off"))
+    throw Error("Card drew a portable preview for " + source);
   (mobile ? card.querySelector("button")! : card).click();
   const panel = await until(() => document.querySelector(".source-preview-panel"));
   if (!document.querySelector(".inspector")?.textContent?.includes(source))
     throw Error("Wrong source");
   if (status === "ready") {
     const controls = () => Array.from(panel.querySelectorAll<HTMLInputElement>('[role="switch"]'));
+    if (!panel.querySelector(".source-preview-note")?.textContent)
+      throw Error("Missing not-native disclaimer");
     if (controls().length !== 2 || !panel.textContent?.includes(title + " off"))
       throw Error("Wrong initial component");
     controls()[0]!.click();

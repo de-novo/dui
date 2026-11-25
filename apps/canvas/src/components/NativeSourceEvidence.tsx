@@ -1,9 +1,11 @@
 import type { NativeSource } from "../data/overview";
 import type { SourcePreview } from "../data/sourcePreview";
 import { useI18n } from "../i18n/LocaleContext";
-import { SourcePreviewSnapshot } from "./SourcePreviewPanel";
 
-/** Map card body for a declaration without a capture: its preview snapshot, if any, then its evidence. */
+/**
+ * Map card body for a declaration without a capture. A portable preview is not a native
+ * screen, so the card never draws it; the inspector shows it with that disclaimer.
+ */
 export function SourceCardBody({
   source,
   preview,
@@ -12,11 +14,9 @@ export function SourceCardBody({
   preview?: SourcePreview;
 }) {
   const { t } = useI18n();
-  const frame = preview?.status === "ready" ? preview.frames[0] : undefined;
   return (
     <>
-      {frame && <SourcePreviewSnapshot items={frame.items} />}
-      <NativeSourceEvidence source={source} sourceOnly preview={Boolean(frame)} />
+      <NativeSourceEvidence source={source} sourceOnly />
       {preview && preview.status !== "ready" && (
         <p className="source-preview-reason">
           <strong>{t.previewStatus[preview.status]}</strong> · <code>{preview.reason}</code>
@@ -29,17 +29,15 @@ export function SourceCardBody({
 export function NativeSourceEvidence({
   source,
   sourceOnly,
-  preview = false,
 }: {
   source: NativeSource;
   sourceOnly: boolean;
-  preview?: boolean;
 }) {
   const { t } = useI18n();
   return (
     <div className="native-source-evidence">
       <span>
-        {preview ? t.sourcePreview : t.sourceDeclaration}
+        {t.sourceDeclaration}
         {sourceOnly && (
           <>
             {" "}
