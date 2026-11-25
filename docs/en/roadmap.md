@@ -86,6 +86,9 @@ node scripts/source-preview.mts fixtures/source-preview/Settings.swift Settings 
 node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Settings compose.html
 ```
 
+<a id="swiftui-screen-discovery"></a>
+**SwiftUI screen discovery (decided, not built).** `dui map` will find SwiftUI screens in an Xcode or SwiftPM app on macOS by joining the build's index store with swift-syntax ([decision](architecture.md#4-finalized-decisions-2026-11-20)). Rules: an `App` scene root (`WindowGroup`, `DocumentGroup`) is the entry; `NavigationLink`, `.navigationDestination` (matched by value type) and `TabView` children are screens; `.sheet`, `.fullScreenCover` and `.popover` content are overlays. A destination chosen at runtime is marked dynamic with its condition or reported as a limitation. A card's path is `Target/File.swift#TypeName`. UIKit `UIViewController` subclasses are listed without edges in v1. Native images come from simulator recordings through `dui map attach` and stay unverified. Linux reports a project-level limitation. The upstream fixture is [home-assistant/iOS](https://github.com/home-assistant/iOS) (Apache-2.0), pinned to a commit; [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire) (MIT) follows for UIKit edges.
+
 ## Multi-surface architecture & evolution
 
 dui targets four surfaces—**Web**, **Desktop App**, **Mobile App (Android & iOS)**, and **TUI**—using one shared architecture designed to be equally effortless for **both humans and AI agents**, built on **objective rendering evidence** with pluggable design-system conformance:

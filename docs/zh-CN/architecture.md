@@ -163,6 +163,7 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 | 版本跟踪机器人 | Renovate，**仅作为外部服务**。它在同一个 PR 中更新 依赖目录（npm fixture 的精确版本）和 lockfile。绝不打包进 dui。提高支持基线仍只在 dui 主版本发布时进行 | 它能跟踪 `stacks.toml` 这类自定义文件。Renovate 是 AGPL-3.0，因此其代码绝不随 dui 发布 |
 | 黄金渲染用 Chromium | 黄金 CI 固定一个**精确的稳定版构建**。普通运行记录所用的 Chromium 版本 | 区分浏览器变化和应用变化。黄金运行还固定 OS、字体、时钟、随机数和动画；更新 PR 审查差异 |
 | salsa | 推迟到性能分析表明与变更无关的重复计算是主要瓶颈时（例如在 MCP 编辑循环中）。先用内容哈希缓存，键为阶段输入加工具和规则包版本 | 核心是纯的，所以以后可以加入增量查询而无需重写 |
+| SwiftUI 屏幕发现（2026-11-25 决定，尚未实现） | `adapters/native-map/swift` 中的 Swift 包（像 Dart 工具一样缓存）按源码位置结合官方构建的**索引库**与 **swift-syntax** 调用结构。dui 将所选 scheme 以 `COMPILER_INDEX_STORE_ENABLE=YES` 构建到自己的 DerivedData（iOS 模拟器），不修改项目。按[路线图规则](roadmap.md#swiftui-screen-discovery)输出声明而非截图 | 类型和调用目标来自编译器，连接来自代码自身结构。仅用 swift-syntax 会猜测类型，仅用索引无法区分跳转目标与标签，逐点 SourceKit 请求在批量处理时慢且不稳定。两个库均为 Apache-2.0 |
 
 ## 5. Monorepo 布局
 

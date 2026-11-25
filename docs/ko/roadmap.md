@@ -86,6 +86,9 @@ node scripts/source-preview.mts fixtures/source-preview/Settings.swift Settings 
 node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Settings compose.html
 ```
 
+<a id="swiftui-screen-discovery"></a>
+**SwiftUI 화면 탐색 (결정됨, 미구현).** `dui map`은 macOS에서 Xcode 또는 SwiftPM 앱의 빌드 인덱스 스토어와 swift-syntax를 결합해 SwiftUI 화면을 찾는다([결정](architecture.md#4-확정된-결정-2026-11-20)). 규칙: `App`의 씬 루트(`WindowGroup`, `DocumentGroup`)가 진입 화면이다. `NavigationLink`, `.navigationDestination`(값 타입으로 대응), `TabView` 자식은 화면이고, `.sheet`, `.fullScreenCover`, `.popover` 내용은 오버레이다. 실행 중에 정해지는 이동 대상은 조건과 함께 동적으로 표시하거나 제약으로 보고한다. 카드 경로는 `Target/File.swift#TypeName`이다. v1에서 UIKit `UIViewController` 하위 클래스는 연결 없이 목록에만 올린다. 실제 화면은 시뮬레이터 녹화를 `dui map attach`로 연결하며 미검증으로 남는다. Linux에서는 프로젝트 수준 제약으로 보고한다. 업스트림 픽스처는 커밋으로 고정한 [home-assistant/iOS](https://github.com/home-assistant/iOS)(Apache-2.0)이며, UIKit 연결은 [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)(MIT)로 이어 간다.
+
 ## 멀티 서피스 아키텍처와 진화 방향
 
 dui는 **Web**, **Desktop App**, **Mobile App(Android · iOS)**, **TUI** 4대 영역을 하나의 공통 아키텍처로 지원하며, **객관적 렌더 증거**와 **플러그인 기반 디자인 시스템 검증**으로 사람과 AI 모두가 빠르게 리뷰할 수 있도록 설계한다:
