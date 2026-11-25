@@ -712,3 +712,49 @@ dialog::backdrop {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.native-example {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.native-preview {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  padding: 12px;
+  border-radius: var(--radius);
+}
+
+.native-preview img {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: 360px;
+  object-fit: contain;
+}
+
+.native-proof {
+  display: inline-block;
+  width: fit-content;
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+#ios-examples > .native-proof {
+  margin-top: 12px;
+}
+
+.native-example .native-proof {
+  margin-top: 8px;
+}
+
+.native-preview span {
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
