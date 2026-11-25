@@ -87,7 +87,7 @@ node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Sett
 ```
 
 <a id="swiftui-screen-discovery"></a>
-**SwiftUI 屏幕发现（已决定，尚未实现）。** `dui map` 将在 macOS 上结合 Xcode 或 SwiftPM 应用构建产生的索引库与 swift-syntax 来发现 SwiftUI 屏幕（[决定](architecture.md#4-已确定的决定2026-11-20)）。规则：`App` 的场景根（`WindowGroup`、`DocumentGroup`）为入口；`NavigationLink`、`.navigationDestination`（按值类型匹配）和 `TabView` 子视图为屏幕；`.sheet`、`.fullScreenCover`、`.popover` 内容为浮层。运行时才确定的跳转目标标为动态并附条件，或报告为限制。卡片路径为 `Target/File.swift#TypeName`。v1 中 UIKit `UIViewController` 子类只列出、不连线。原生画面来自经 `dui map attach` 关联的模拟器录制，保持未验证。Linux 上报告项目级限制。上游 fixture 为固定到某个提交的 [home-assistant/iOS](https://github.com/home-assistant/iOS)（Apache-2.0），UIKit 连线随后用 [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)（MIT）。
+**SwiftUI 屏幕发现（实验性）。** `dui map` 在 macOS 上结合 Xcode 或 SwiftPM 应用构建产生的索引库与 swift-syntax 来发现 SwiftUI 屏幕（[决定](architecture.md#4-已确定的决定2026-11-20)）。规则：`App` 的场景根（`WindowGroup`、`DocumentGroup`）为入口；`NavigationLink`、`.navigationDestination`（按值类型匹配）和 `TabView` 子视图为屏幕；`.sheet`、`.fullScreenCover`、`.popover` 内容为浮层。UIKit 通过 `UIHostingController(rootView:)` 显示的 SwiftUI 视图也是屏幕。`NavigationStack`、`NavigationView`、`Group` 包装和修饰符链会被穿透。运行时才确定的跳转目标标为动态并附条件，或报告为限制。卡片路径为 `Target/File.swift#TypeName`。v1 中 UIKit `UIViewController` 子类只列出、不连线。项目有多个 scheme 时在 `dui.json` 中设置 `"scheme"`。检查：`npm run check:swift-map`。原生画面来自经 `dui map attach` 关联的模拟器录制，保持未验证。Linux 上报告项目级限制。上游 fixture 为固定到某个提交的 [home-assistant/iOS](https://github.com/home-assistant/iOS)（Apache-2.0），UIKit 连线随后用 [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)（MIT）。
 
 ## 多平台架构与演进路线
 
