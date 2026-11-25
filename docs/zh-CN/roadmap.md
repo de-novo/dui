@@ -14,7 +14,7 @@
 **这不是**
 
 - 一个拥有独立文件格式的设计工具。
-- 先覆盖所有平台。React Native、Flutter、iOS、Android，以及从 URL 映射任意本地应用（[#236](https://github.com/de-novo/dui/issues/236)、[#237](https://github.com/de-novo/dui/issues/237)）都靠后，除非它们直接服务这一目标。
+- 同时支持所有平台。优先完善实现上述目标所需的捕获和编辑能力。
 
 **当前重点。** 先闭环：从代码生成地图，再把 UI 修改写回同一份代码（v0.3.0 规划的基于代码的画布）。更广的平台支持和打包工作可以稍后进行。
 
@@ -63,7 +63,7 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 
 ## 后续里程碑
 
-除非直接服务上述目标，新平台和打包工作都靠后。这包括 React Native、Flutter、iOS、Android、从 URL 映射本地应用（[#236](https://github.com/de-novo/dui/issues/236)、[#237](https://github.com/de-novo/dui/issues/237)），以及同类后续议题（[#239](https://github.com/de-novo/dui/issues/239)、[#240](https://github.com/de-novo/dui/issues/240)）。预编译二进制和 Homebrew（[#176](https://github.com/de-novo/dui/issues/176)）等打包工作等到产品稳定后再做。符合目标的下一步，是把 UI 修改写回代码（v0.3.0）。
+当前已有本地网页 URL 捕获、原生路由发现及部分运行时的界面捕获，各项范围见[能力表](supported-frameworks.md)。后续平台和打包工作根据上述目标安排。预编译二进制和 Homebrew（[#176](https://github.com/de-novo/dui/issues/176)）等打包工作等到产品稳定后再做。符合目标的下一步，是把 UI 修改写回代码（v0.3.0）。
 
 | 版本 | 目标 |
 | --- | --- |

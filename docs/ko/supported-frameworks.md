@@ -1,125 +1,26 @@
 [English](../en/supported-frameworks.md) | [简体中文](../zh-CN/supported-frameworks.md) | 한국어
 
-# 지원 프레임워크
+# dui가 분석하고 렌더링할 수 있는 범위
 
-아래 우선순위 1–3의 38개 스택은 모두 공식 지원 대상이다. 우선순위는 구현 순서일 뿐 지원 수준이 아니다. "아직 미지원"의 11개 스택은 지금은 `미지원`이고, 각각 이유와 추가 조건을 적었다.
+타입을 알아낼 때 dui는 프로젝트의 공식 컴파일러에 질의한다. 화면 지도를 만들 때는 플랫폼 렌더러로 실행 중인 앱을 관찰할 수도 있다. 한 프로젝트에서 두 경로를 함께 쓸 수 있다. [아키텍처](architecture.md) · [화면 지도 명세](web-viewer.md)
 
-버전은 2026-11-20(KST)에 각 행에 링크한 공식 출처로 확인했다. 확인하지 못한 것은 `미확인`으로 표시했다. 버전 규칙: [설계: 지원 버전](design-v0.md#지원-버전-현재-최신-안정-메이저만).
+| 작업 | 입력과 결과 | 검증 근거 |
+|---|---|---|
+| 타입이 있는 UI 상태 추출 | `dui scan`은 프로젝트의 TypeScript 프로그램을 읽는다. 규칙은 특정 심볼을 찾아 컴파일러가 제공하는 타입으로 상태 슬롯, 경로 매개변수 등의 정보를 추출한다. | [추출기](../../adapters/typescript/facts.mts) · [규칙 검사](../../scripts/check-p2-rules.mts) |
+| 웹에서 이동 가능한 페이지 탐색 | `dui map`에 로컬 URL(`--url`)이나 정적 빌드(`--build-dir`)를 넘기면 Chromium이 동일 출처 링크를 따라가며 지정한 너비로 페이지를 캡처한다. 실행 중인 Angular 앱에는 URL을 쓸 수 있다. Vue Router, SvelteKit, Astro, Preact는 빌드한 예제 앱으로 정적 빌드 경로를 검사한다. | [URL 검사](../../scripts/check-map-url.mts) · [빌드한 앱 검사](../../scripts/check-web-frameworks.mts) |
+| 네이티브 화면 선언 탐색 | `dui map`은 프로젝트의 TypeScript 도구로 React Navigation과 Expo Router 선언을, Dart 분석기로 Flutter 경로를 읽는다. 카드마다 소스 위치를 표시한다. 기기 없이 실행할 수 있으며 이 단계의 캡처 시도는 0건이다. | [탐색 어댑터](../../adapters/native-map) · [오픈소스 앱 검사](../../scripts/check-native-map.mts) |
+| 네이티브 컴포넌트 소스 미리보기 | 미리보기 도구는 제한된 UI 기본 요소를 제공하고 `swiftc` 또는 `kotlinc`로 SwiftUI·Compose 컴포넌트를 컴파일한다. 관찰한 상태를 조작할 수 있는 HTML로 내보낸다. 처리할 수 없는 호출이 있으면 내보내기에 실패한다. | [내보내기 도구](../../scripts/source-preview.mts) · [상호작용 검사](../../scripts/check-source-preview.mts) |
+| 네이티브 모바일 UI 캡처 | Android는 연결한 기기나 에뮬레이터를, iOS는 macOS의 시뮬레이터에 설치한 앱을 사용한다. 촬영한 PNG를 소스 카드에 연결하려면 `dui map attach`를 쓴다. 가져온 칸은 미검증(`unverified`)으로 남고 검증 커버리지는 늘지 않는다. 캡처에 필요한 실행 환경이 없으면 해당 칸을 렌더 불가(`unrenderable`)로 표시하고 이유를 기록한다. | [Compose 에뮬레이터 검사](../../scripts/check-compose.mts) · [iOS 시뮬레이터 검사](../../.github/workflows/ios-simulator.yml) · [캡처 연결 검사](../../scripts/check-native-map-recordings.mts) |
+| 데스크톱·터미널 UI 캡처 | GPUI 예제는 선언된 상태를 렌더링하고 요소 트리를 기록한다. Electron 호스트는 Chromium으로 웹 렌더러의 콘텐츠를 캡처하며 IPC 목을 지정할 수 있다. 가상 터미널에서 명령을 실행하면 문자 격자와 PNG를 얻는다. | [GPUI](../../scripts/check-gpui.mts) · [Electron](../../scripts/check-electron.mts) · [터미널](../../scripts/check-tui.mts) |
 
-실행 중인 로컬 웹 앱은 공통 Chromium 경로를 사용하는 `dui map . --url http://localhost:4200/`로 지도화할 수 있다. 아래 프레임워크 지원 표는 컴파일러 연동 범위를 다룬다. React Navigation, Expo Router, Flutter는 소스에서 라우트 선언을 찾아 지도를 생성할 수도 있다. [화면 지도 계약](web-viewer.md)을 참고한다.
+## 라이브러리 규칙의 역할
 
-빌드 디렉터리 검사에서는 Vue Router, SvelteKit, Astro, Preact 앱을 빌드하고 `dui map . --build-dir dist`로 링크된 페이지를 두 화면 폭에서 검증한다.
+예를 들어 TypeScript 규칙은 Zustand의 `create`를 스토어로, Zod의 `object`를 스키마로 인식한다. 각 호출의 타입은 컴파일러가 제공한다. 패키지의 설치 여부만으로는 화면이 어떤 상태를 사용하는지 알 수 없다. 인식하는 패키지와 심볼은 기본 규칙에서 확인할 수 있으며 프로젝트별 규칙은 `rulePacks`로 추가한다. [기본 규칙](../../rules/web.json) · [매니페스트 명세](../reference.md)
 
-## 적용한 원칙
+웹 캡처의 범위는 브라우저가 도달할 수 있는 페이지로 정해진다. 템플릿 언어에 대한 규칙이 없어도 페이지를 지도에 표시할 수 있다. 숨은 경로를 찾거나 컴포넌트 입력을 읽거나 타입을 바탕으로 상태를 계획하려면 각 작업에 맞는 소스 근거가 필요하다. 로그인이 필요하거나 들어오는 링크가 없는 페이지는 세션이나 진입점을 지정해야 할 수 있다. [화면 지도 명세](web-viewer.md)
 
-1. **공식 컴파일러만.** 타입 정보는 프로젝트가 이미 쓰는 컴파일러(`tsc`, `rustc`, `swiftc`, `kotlinc`, `dart`)에서 얻는다.
-2. **컴파일러·호스트 기준선만 하드 게이트 (`>=` 기준선).** 하드 버전 검사는 dui가 API를 직접 호출하는 컴파일러와 호스트/UI 런타임(`tsc`, `vite` 7+, `react` 18+, `next` 16+)에만 적용한다. 더 새로운 안정 메이저는 항상 지원한다. 선언형 룰팩 대상 라이브러리(라우터·스토어·폼·스키마·헤드리스 UI 킷)는 공식 컴파일러 타입으로 분석하며 라이브러리 버전 차이로 스캔을 중단하지 않는다.
-3. **타입 언어만.**
-4. **렌더 한계를 명시한다.** 애플 대상은 렌더에 Mac이 필요하다. 분석은 되지만 렌더가 안 되는 스택은 해당 셀을 `렌더 불가`로 보고한다.
-5. **AI 네이티브.** AI가 CLI와 MCP 서버를 다루고, 사람은 캔버스만 본다.
+## 컴파일러와 호스트 요구 사항
 
-## 요약
+설계 기준은 공식 TypeScript 7이다. 현재 CLI에는 공식 안정판 6.x 프로젝트용 호환 경로도 있다. `dui check-ts PROJECT`로 프로젝트의 컴파일러를 확인한다. TypeScript 스캔은 설치된 React·React DOM의 안정판 18+와 Vite 7+를 검사하고, Next 호스트에서 Next.js가 설치되어 있으면 16+를 검사한다. 라이브러리 규칙은 버전에 따라 진단 메모를 남기고 스캔을 계속할 수 있다. [컴파일러 검사](../../crates/dui/src/main.rs) · [스캔 버전 검사](../../adapters/typescript/facts.mts)
 
-| 우선순위 | 개수 | 스택 |
-|---|---:|---|
-| 우선순위 1 (MVP) | 8 | TypeScript, Node.js, React, Vite, TanStack Router, TanStack Query, zod, Chromium (Chrome stable) |
-| 우선순위 2 | 15 | Rust, GPUI (`gpui-pre`), gpui-component / gpui-kit, Zustand, Redux Toolkit, Jotai, XState, React Hook Form, valibot, Next.js, React Router, TanStack Start, Electron, Radix UI, shadcn/ui |
-| 우선순위 3 | 15 | Solid, SolidStart, Preact, Rspack / Rsbuild, Tauri, Dioxus, Leptos, egui, Iced, React Native, Expo, Flutter / Dart, SwiftUI / Swift, Jetpack Compose / Kotlin, Compose Multiplatform |
-| 아직 미지원 | 11 | Vue, Nuxt, Svelte, SvelteKit, Astro, Angular, Qwik, Remix, Turbopack, Slint, Playwright |
-
-## 우선순위 1 (MVP)
-
-| 스택 | 분야 | 지원 메이저 | 최신 안정판(확인됨) | 출시일 | 출처 | dui가 지원하는 이유 | 참고 | 열린 질문 |
-|---|---|---|---|---|---|---|---|---|
-| **TypeScript** | 언어/런타임 | 7.x | 7.0.2 | 2026-07-08 | [www.npmjs.com](https://www.npmjs.com/package/typescript) | 주력 타입 언어. 공식 `tsc` 7이 dui에 필요한 타입 정보를 준다. | TS 어댑터가 쓰는 7.1(sync API)은 아직 beta. | — |
-| **Node.js** | 언어/런타임 | 26.x | 26.13.1 (LTS) | 2026-11-10 | [nodejs.org](https://nodejs.org/en/about/previous-releases) | TS 사이드카와 사용자 dev 서버를 실행한다. | — | — |
-| **React** | 웹 UI | 19.x | 19.3.1 | 2026-10-14 | [www.npmjs.com](https://www.npmjs.com/package/react) | 가장 흔한 타입 UI 스택. 첫 렌더 대상. | — | — |
-| **Vite** | 번들러/dev 서버 | 7.x / 8.x | 8.3.8 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/vite) | dui가 주입된 dev 빌드를 띄워야 한다. Vite는 흔한 React dev 서버. | Vite 7에서는 Oxc `parseSync`가 없을 때 프로젝트의 공식 TypeScript AST 파서로 폴백한다. | — |
-| **TanStack Router** | 라우터 | 1.x | 1.170.46 | 2026-10-22 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-router) | 타입 라우트에서 화면 목록을 바로 얻는다. | — | — |
-| **TanStack Query** | 상태/데이터 | 5.x | 5.108.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-query) | 서버 상태(로딩/에러/빈 값)가 상태 셀의 핵심. | — | — |
-| **zod** | 상태/데이터 | 4.x | 4.6.7 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/zod) | 스키마에서 실제적인 샘플 데이터와 값 범위를 얻는다. | — | — |
-| **Chromium (Chrome stable)** | 렌더/테스트 인프라 | 고정 안 함 | 158.0.8127.36 | 2026-11-17 | [chromiumdash.appspot.com](https://chromiumdash.appspot.com/releases?platform=Linux) | CDP로 웹 화면을 렌더하는 headless 대상. | — | — |
-
-## 우선순위 2
-
-| 스택 | 분야 | 지원 메이저 | 최신 안정판(확인됨) | 출시일 | 출처 | dui가 지원하는 이유 | 참고 | 열린 질문 |
-|---|---|---|---|---|---|---|---|---|
-| **Rust** | 언어/런타임 | edition 2024 | 1.100.0 (toolchain) | 2026-11-12 | [github.com](https://github.com/rust-lang/rust/releases) | 두 번째 공식 컴파일러 언어(`rustc` + rust-analyzer). | edition 2024 안에서 최소 toolchain이 아직 미정. | 예 |
-| **GPUI (`gpui-pre`)** | Rust UI | 0.3.x | 0.3.13 | 2026-11-16 | [crates.io](https://crates.io/crates/gpui-pre) | 웹 다음으로 계획된 네이티브 렌더 대상. | 1.0 이전: 0.x 마이너마다 깨질 수 있다. | — |
-| **gpui-component / gpui-kit** | UI 킷 | 0.10.x | 0.10.0 | 2026-11-16 | [crates.io](https://crates.io/crates/gpui-component) | GPUI의 주요 컴포넌트 킷. 상태가 이 위젯을 통해 드러난다. | crate 이름이 두 개(`gpui-component`, `gpui-kit`), 둘 다 0.10.0, 같은 저장소. | — |
-| **Zustand** | 상태/데이터 | 5.x | 5.1.0 | 2026-11-06 | [www.npmjs.com](https://www.npmjs.com/package/zustand) | 흔한 클라이언트 스토어. 스토어 모양이 UI 상태를 정한다. | — | — |
-| **Redux Toolkit** | 상태/데이터 | 2.x | 2.15.0 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/@reduxjs/toolkit) | 타입 slice가 상태를 명시적으로 나열한다. | — | — |
-| **Jotai** | 상태/데이터 | 3.x | 3.0.2 | 2026-11-09 | [www.npmjs.com](https://www.npmjs.com/package/jotai) | atom 단위 상태. React 앱에서 흔하다. | 새 메이저 3.0.0이 2026-09-08 출시. | — |
-| **XState** | 상태/데이터 | 5.x | 5.33.4 | 2026-11-07 | [www.npmjs.com](https://www.npmjs.com/package/xstate) | 상태 머신은 정의상 모든 상태를 나열한다. | — | — |
-| **React Hook Form** | 상태/데이터 | 7.x | 7.92.0 | 2026-11-11 | [www.npmjs.com](https://www.npmjs.com/package/react-hook-form) | 폼 검증/제출 중/에러 상태. | — | — |
-| **valibot** | 상태/데이터 | 1.x | 1.5.0 | 2026-09-09 | [www.npmjs.com](https://www.npmjs.com/package/valibot) | 샘플 데이터에서 zod와 같은 역할. | — | — |
-| **Next.js** | 메타 프레임워크 | 16.x | 16.4.6 | 2026-11-09 | [www.npmjs.com](https://www.npmjs.com/package/next) | 가장 많이 쓰는 React 메타 프레임워크. | Server Components는 서버에서 렌더된다. 그곳에 상태를 주입하는 방법은 미확인. | 예 |
-| **React Router** | 메타 프레임워크 | 7.x / 8.x | 8.5.2 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/react-router) | 흔한 라우터. framework 모드가 Remix의 후속. | 새 메이저 8.0.0이 2026-06-17 출시. 7.x도 동일한 선언형 라우터·검색 파라미터 API를 공유한다. | — |
-| **TanStack Start** | 메타 프레임워크 | 1.x | 1.169.7 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/@tanstack/react-start) | MVP에 있는 TanStack Router 위에 있다. | — | — |
-| **Electron** | 데스크톱 셸 | 45.x | 45.4.1 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/electron) | UI가 웹인 데스크톱 앱. 같은 Chromium 경로로 렌더. | 대략 8주마다 새 메이저라 기준이 자주 바뀐다. | 예 |
-| **Radix UI** | UI 킷 | 1.x | 1.8.1 | 2026-10-12 | [www.npmjs.com](https://www.npmjs.com/package/radix-ui) | 많은 React 킷의 기반 headless 원시 컴포넌트. 열림/닫힘 상태. | — | — |
-| **shadcn/ui** | UI 킷 | 4.x (CLI) | 4.23.0 | 2026-10-27 | [www.npmjs.com](https://www.npmjs.com/package/shadcn) | 매우 흔한 React 컴포넌트 출처. 코드가 사용자 저장소에 있다. | 저장소에 복사되는 코드라 런타임 라이브러리가 아니다. ‘지원’이 문서뿐일 수 있다. | 예 |
-
-## 우선순위 3
-
-| 스택 | 분야 | 지원 메이저 | 최신 안정판(확인됨) | 출시일 | 출처 | dui가 지원하는 이유 | 참고 | 열린 질문 |
-|---|---|---|---|---|---|---|---|---|
-| **Solid** | 웹 UI | 2.x | 2.0.3 | 2026-11-19 | [www.npmjs.com](https://www.npmjs.com/package/solid-js) | 타입 JSX. 세밀한 signal. | 메이저 2.0.0이 2026-11-17 출시. 생태계가 뒤처질 수 있다. | — |
-| **SolidStart** | 메타 프레임워크 | 2.x | 2.2.3 | 2026-11-16 | [www.npmjs.com](https://www.npmjs.com/package/@solidjs/start) | Solid의 메타 프레임워크. | npm license 필드가 비어 있다(라이선스 미확인). | — |
-| **Preact** | 웹 UI | 11.x | 11.2.0 | 2026-11-06 | [www.npmjs.com](https://www.npmjs.com/package/preact) | React 호환 API. React 작업 대부분이 이어진다. | — | — |
-| **Rspack / Rsbuild** | 번들러/dev 서버 | 2.x | 2.3.3 | 2026-11-17 | [www.npmjs.com](https://www.npmjs.com/package/@rspack/core) | webpack 계열 프로젝트를 위한 두 번째 dev 서버 경로. | dev 서버가 늘 때마다 유지할 주입 경로가 늘어난다. | — |
-| **Tauri** | 데스크톱 셸 | 2.x | 2.12.7 (crate) / 2.12.5 (@tauri-apps/api) | 2026-11-18 | [crates.io](https://crates.io/crates/tauri) | Rust + 웹 데스크톱. Rust 코어와 잘 맞는다. | OS webview(macOS/Linux는 WebKit)를 쓰고 Chromium이 아니다. 렌더 일치 여부 미확인. | — |
-| **Dioxus** | Rust UI | 0.7.x | 0.7.10 | 2026-07-30 | [crates.io](https://crates.io/crates/dioxus) | 웹/데스크톱 대상 Rust UI. | 1.0 이전. | — |
-| **Leptos** | Rust UI | 0.8.x | 0.8.23 | 2026-10-31 | [crates.io](https://crates.io/crates/leptos) | Rust 웹 UI. Chromium에서 렌더. | 1.0 이전. | — |
-| **egui** | Rust UI | 0.37.x | 0.37.0 | 2026-10-15 | [crates.io](https://crates.io/crates/egui) | 다운로드가 가장 많은 Rust 즉시 모드 UI. | 즉시 모드라 상태가 컴포넌트 트리에 없다. 상태 찾기 방식이 달라야 할 수 있다. | 예 |
-| **Iced** | Rust UI | 0.14.x | 0.14.0 | 2025-12-07 | [crates.io](https://crates.io/crates/iced) | Elm 스타일 Rust UI. 메시지가 상태를 나열한다. | 2025-12-07 이후 새 안정판이 없다. | 예 |
-| **React Native** | 모바일/네이티브 | 0.88.x | 0.88.1 | 2026-10-27 | [www.npmjs.com](https://www.npmjs.com/package/react-native) | 모바일 React. React 분석을 재사용. | 아직 0.x라 ‘메이저’를 0.minor로 봐야 한다. 시뮬레이터 필요(iOS는 Mac 필요). | 예 |
-| **Expo** | 모바일/네이티브 | 58.x | 58.0.26 | 2026-11-17 | [www.npmjs.com](https://www.npmjs.com/package/expo) | React Native 앱을 시작하는 가장 흔한 방법. | React Native와 같은 렌더 제약. | 예 |
-| **Flutter / Dart** | 모바일/네이티브 | Flutter 3.x / Dart 3.x | Flutter 3.50.0 (Dart 3.14.0); Dart SDK 3.14.1 | Flutter 2026-11-11; Dart 2026-11-17 | [docs.flutter.dev](https://docs.flutter.dev/release/archive) | 타입 언어, 공식 컴파일러(Dart). 모바일 비중이 크다. | 새 Dart 언어 어댑터가 필요. headless 렌더 경로 미확인. | 예 |
-| **SwiftUI / Swift** | 모바일/네이티브 | Swift 6.x | 6.4.2 | 2026-10-30 | [github.com](https://github.com/swiftlang/swift/releases) | 공식 컴파일러 `swiftc` + SourceKit-LSP. 애플 네이티브 UI. | 렌더에는 Mac(Xcode/시뮬레이터)이 필요. 타입 분석은 다른 곳에서도 가능할 수 있다. | 예 |
-| **Jetpack Compose / Kotlin** | 모바일/네이티브 | Kotlin 2.x; Compose UI 1.x | Kotlin 2.4.21; Compose UI 1.13.0 (BOM 2026.11.01) | Kotlin 2026-10-08; Compose: `미확인` | [developer.android.com](https://developer.android.com/jetpack/androidx/releases/compose-ui) | 공식 컴파일러 `kotlinc`. 안드로이드 네이티브 UI. | Kotlin 어댑터와 Android/JVM 렌더 경로가 필요. | 예 |
-| **Compose Multiplatform** | 모바일/네이티브 | 1.x | 1.12.2 | 2026-10-15 | [github.com](https://github.com/JetBrains/compose-multiplatform/releases) | 같은 Kotlin 어댑터. 데스크톱 대상은 JVM에서 렌더. | 위 Kotlin 결정에 달려 있다. | 예 |
-
-## 아직 미지원
-
-**규칙:** 이 표의 스택은 막힌 점이 풀리는 즉시 추가한다. 예를 들어 공식 도구가 TypeScript 7을 받아들일 때다. 그 전까지 dui는 스캔 전에 `미지원`(이유)으로 거절한다.
-
-Vue, Nuxt, Svelte, SvelteKit, Astro, Angular: 공식 타입 검사 도구가 아직 TypeScript 7을 받지 않는다(npm peer 범위, 2026-11-20 확인).
-
-| 스택 | 분야 | 최신 메이저 | 최신 안정판(확인됨) | 출시일 | 출처 | 막힌 점 | 이유 | 추가 시점 |
-|---|---|---|---|---|---|---|---|---|
-| **Vue** | 웹 UI | 3.x | 3.5.45 | 2026-11-05 | [www.npmjs.com](https://www.npmjs.com/package/vue) | TS 7 도구 | 템플릿 타입 검사가 `vue-tsc`를 거친다. TS 7 지원 미확인이라 TS 7+ 원칙과 충돌. | 공식 도구가 TypeScript 7을 받아들일 때. |
-| **Nuxt** | 메타 프레임워크 | 4.x | 4.6.4 | 2026-11-02 | [www.npmjs.com](https://www.npmjs.com/package/nuxt) | TS 7 도구 | Vue 기반이라 Vue 상태를 따른다. | Vue가 추가될 때. |
-| **Svelte** | 웹 UI | 5.x | 5.58.0 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/svelte) | TS 7 도구 | `svelte-check` 4.7.8의 TS peer가 ^5 \|\| ^6이라 7이 아니다. | 공식 도구가 TypeScript 7을 받아들일 때. |
-| **SvelteKit** | 메타 프레임워크 | 3.x | 3.4.0 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/@sveltejs/kit) | TS 7 도구 | TS peer가 ^6.0.0이라 7이 아니다. | 공식 도구가 TypeScript 7을 받아들일 때. |
-| **Astro** | 메타 프레임워크 | 7.x | 7.4.13 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/astro) | TS 7 도구 | `@astrojs/check`의 TS peer가 ^5 \|\| ^6이라 7이 아니다. | 공식 도구가 TypeScript 7을 받아들일 때. |
-| **Angular** | 웹 UI | 22.x | 22.3.0 | 2026-11-18 | [www.npmjs.com](https://www.npmjs.com/package/@angular/core) | TS 7 도구 | `@angular/compiler-cli` 22.3.0이 TS >=6.0 <6.1을 요구해 TS 7+와 충돌. | 공식 도구가 TypeScript 7을 받아들일 때. |
-| **Qwik** | 웹 UI | 1.x (v2 in RC) | 1.20.4 | 2026-11-09 | [www.npmjs.com](https://www.npmjs.com/package/@builder.io/qwik) | 메이저가 아직 RC | v2(`@qwik.dev/core`)가 2.0.0-rc.5. 지금 1.x를 지원하면 기준이 곧 낡는다. | v2가 안정판이 될 때(열린 질문). |
-| **Remix** | 메타 프레임워크 | 2.x (legacy) | 2.17.5 (@remix-run/react) | 2026-06-01 | [www.npmjs.com](https://www.npmjs.com/package/@remix-run/react) | 레거시 | 레거시 라인. React Router로 커버. | 계획 없음: React Router로 커버. |
-| **Turbopack** | 번들러/dev 서버 | Next.js에 포함 | 단독 패키지 없음(next 16.4.6에 포함) | 2026-11-09 | [www.npmjs.com](https://www.npmjs.com/package/next) | 단독 패키지 없음 | 따로 추적할 버전이 없다. | 계획 없음: Next.js로 커버. |
-| **Slint** | Rust UI | 1.x | 1.19.0 | 2026-11-16 | [crates.io](https://crates.io/crates/slint) | 라이선스 | 자체 마크업 언어라 별도 어댑터 필요. 라이선스가 GPL-3.0 또는 Slint 자체 라이선스. | 열린 질문(라이선스, 별도 어댑터). |
-| **Playwright** | 렌더/테스트 인프라 | 1.x | 1.65.1 | 2026-11-13 | [www.npmjs.com](https://www.npmjs.com/package/playwright) | 의존성 아님 | 사용자가 dui 상태를 테스트로 재생하길 원할 때만 의미가 있다. | 열린 질문(상태를 테스트로 재생). |
-
-## 주시할 dui 자체 의존성
-
-캔버스 라이브러리 `@xyflow/react`에 새 메이저가 나왔다: 13.0.0이 2026-11-16, 최신 13.0.2가 2026-11-17([npm](https://www.npmjs.com/package/@xyflow/react)). 이것은 dui 자신의 UI이고, 지원 대상 사용자 스택이 아니다.
-
-## 열린 질문
-
-아직 정하지 않았다. 잊지 않도록 여기 적어 둔다.
-
-- **Rust**: edition 2024 안에서 최소 toolchain이 아직 미정.
-- **Next.js**: Server Components는 서버에서 렌더된다. 그곳에 상태를 주입하는 방법은 미확인.
-- **Electron**: 대략 8주마다 새 메이저라 기준이 자주 바뀐다.
-- **shadcn/ui**: 저장소에 복사되는 코드라 런타임 라이브러리가 아니다. ‘지원’이 문서뿐일 수 있다.
-- **egui**: 즉시 모드라 상태가 컴포넌트 트리에 없다. 상태 찾기 방식이 달라야 할 수 있다.
-- **Iced**: 2025-12-07 이후 새 안정판이 없다.
-- **React Native**: 아직 0.x라 ‘메이저’를 0.minor로 봐야 한다. 시뮬레이터 필요(iOS는 Mac 필요).
-- **Expo**: React Native와 같은 렌더 제약.
-- **Flutter / Dart**: 새 Dart 언어 어댑터가 필요. headless 렌더 경로 미확인.
-- **SwiftUI / Swift**: 렌더에는 Mac(Xcode/시뮬레이터)이 필요. 타입 분석은 다른 곳에서도 가능할 수 있다.
-- **Jetpack Compose / Kotlin**: Kotlin 어댑터와 Android/JVM 렌더 경로가 필요.
-- **Compose Multiplatform**: 위 Kotlin 결정에 달려 있다.
-- **Qwik**: v2(`@qwik.dev/core`)가 2.0.0-rc.5. 지금 1.x를 지원하면 기준이 곧 낡는다.
-- **Slint**: 자체 마크업 언어라 별도 어댑터 필요. 라이선스가 GPL-3.0 또는 Slint 자체 라이선스.
-- **Playwright**: 사용자가 dui 상태를 테스트로 재생하길 원할 때만 의미가 있다.
+`dui toolchains`는 설치된 `tsc`, `rustc`, `go`, `swiftc`, `kotlinc`, `dart`의 버전을 확인한다. 이 검사에 성공하면 해당 도구를 사용할 수 있다는 뜻이다. 타입 정보 추출, 화면 탐색, 렌더링의 검증 근거는 위 표에서 각각 확인할 수 있다. 예정된 작업은 로드맵에서 관리한다. [도구 설치 검사](../../crates/dui-app/src/compiler_oracle.rs) · [로드맵](roadmap.md)

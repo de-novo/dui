@@ -6,21 +6,20 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 
 **목표.** 지금은 기획 문서, 피그마 디자인, 코드로 원천이 나뉘어 있다. dui는 개발과 UI 작업의 원천을 코드 하나로 합친다. 화면 지도는 코드에서 만들어지고, UI를 고치면 같은 코드로 돌아간다.
 
-[제품 로드맵](docs/ko/roadmap.md) · [변경 이력](docs/ko/changelog.md) · [전체 지원 스택 표](docs/ko/supported-frameworks.md)
+[제품 로드맵](docs/ko/roadmap.md) · [변경 이력](docs/ko/changelog.md) · [분석·렌더링 지원 범위](docs/ko/supported-frameworks.md)
 
 ## 분석 가능한 항목
 
-### 지원 스택 및 프레임워크
+### 분석과 캡처 방식
 
-| 분류 | 현재 지원 | 예정 |
-| --- | --- | --- |
-| 언어 · 컴파일러 | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| 웹 (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` — 모든 HTML/JS 앱), React 18 / 19+, Vite 7 / 8+, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
-| 데스크톱 앱 | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
-| 모바일 앱 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` 룰팩) | 공식 컴파일러 진단 (`dui toolchains`); SwiftUI / Compose / Flutter 어댑터 예정 ([지원 프레임워크](docs/ko/supported-frameworks.md)) |
-| 터미널 UI (TUI) | Universal TUI (`pty` + VT100 셀 그리드 → `RenderNodeSnapshot` + 모노스페이스 PNG), Ink 5 (`tsc` 룰팩) | Ratatui (`rustc`), Bubble Tea (`go`) 심층 상태 계획 |
-| 라우팅 · URL 상태 | TanStack Router 1, TanStack Start 1, React Router 7 / 8, Next.js App Router (`app/**/page.tsx`), 표준 Web `URLSearchParams` | Android 인텐트/딥링크 컴파일러 심층 분석 |
-| 상태 · 폼 · 스키마 | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1, Radix UI 1 / shadcn/ui 4 | — |
+dui는 프로젝트의 공식 컴파일러에서 타입을 읽는다. 라이브러리 규칙은 코드에서 특정 API 호출을 식별한다. 실행 화면은 플랫폼별 렌더러로 캡처한다.
+
+| 확인할 내용 | 방법 |
+| --- | --- |
+| 타입이 있는 상태 슬롯과 경로 매개변수 | `dui scan`이 프로젝트의 TypeScript 컴파일러와 해당 심볼 규칙을 사용한다. |
+| 너비별로 이동 가능한 웹 화면 | `dui map`에 로컬 URL이나 정적 빌드를 넘긴다. Chromium이 프레임워크에 관계없이 동일 출처 링크를 따라간다. |
+| 코드에 선언된 네이티브 화면 | React Navigation, Expo Router, Flutter 프로젝트에서 `dui map`을 실행한다. 각 카드에서 화면의 선언 위치를 확인할 수 있다. |
+| 렌더링된 UI | 설정한 웹·모바일·데스크톱·터미널 호스트에서 캡처한다. 일부 SwiftUI·Compose 컴포넌트는 조작 가능한 HTML 미리보기로도 내보낼 수 있다. |
 
 ### 분석 및 검증 기능
 
@@ -110,7 +109,7 @@ dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구
 
 ## 내 앱 캡처하기
 
-1. 앱의 `package.json`과 `tsconfig.json`이 있는 폴더에서 터미널을 연다. 평소 쓰는 패키지 매니저로 앱 의존성을 설치한다. 현재 웹 캡처는 Vite 7·8과 프로젝트에 설치된 공식 TypeScript 6.x 또는 7.x를 지원한다. React 앱은 19.x를 사용한다.
+1. 이 Vite 예제에서는 `package.json`과 `tsconfig.json`이 있는 앱 폴더에서 의존성을 설치한다. `dui check-ts .`로 프로젝트의 공식 TypeScript 컴파일러를 확인한다. [컴파일러와 호스트 요구 사항](docs/ko/supported-frameworks.md#컴파일러와-호스트-요구-사항)
 2. 같은 폴더에 `dui.json`을 만든다. 아래 설정은 첫 화면(`/`)을 375px와 1280px로 캡처한다. `main article`은 **내 화면의 콘텐츠가 준비되면 나타나는 요소**의 CSS 선택자로 바꾼다. 예를 들어 설정 폼이 뜨면 준비된 화면은 `main form`을 쓴다.
 
 ```json
@@ -154,7 +153,7 @@ AI에 이렇게 요청하면 된다. “dui 저장소에서 npmgraph 예제를 �
 
 - [캡처 레퍼런스](docs/ko/reference.md) — 경로와 목데이터를 설정하고, 검증률을 해석하고, CLI·MCP로 실행을 자동화한다.
 - [기여 가이드 · English](CONTRIBUTING.md) — 변경할 크레이트와 규칙 팩의 위치, 검증 명령을 확인한다.
-- [설계](docs/ko/design-v0.md) · [아키텍처](docs/ko/architecture.md) · [지원 예정 스택](docs/ko/supported-frameworks.md)
+- [설계](docs/ko/design-v0.md) · [아키텍처](docs/ko/architecture.md) · [분석·렌더링 지원 범위](docs/ko/supported-frameworks.md)
 
 ## 라이선스
 

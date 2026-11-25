@@ -6,21 +6,20 @@ dui 通过项目官方编译器读取类型，自动生成模拟数据并在真�
 
 **目标。** 如今策划文档、Figma 设计和代码是分散的事实来源。dui 让代码本身成为开发与 UI 工作的单一事实来源：界面地图由代码生成，UI 修改再写回同一份代码。
 
-[产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md) · [完整支持栈列表](docs/zh-CN/supported-frameworks.md)
+[产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md) · [分析与渲染范围](docs/zh-CN/supported-frameworks.md)
 
 ## 可分析范围
 
-### 支持的技术栈与框架
+### 分析与捕获方式
 
-| 类别 | 当前已支持 | 计划支持 |
-| --- | --- | --- |
-| 语言与编译器 | TypeScript 7.x / 6.x (`tsc`)、Rust edition 2024 (`rustc`) | Swift 6、Dart 3、Kotlin 2、Go |
-| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` 支持任意 HTML/JS 应用)、React 18 / 19+、Vite 7 / 8+、Nitro SSR、Next.js 16 (`host: "next"`)、Chromium (CDP) | Preact 11、Solid 2、SolidStart 2、Rspack / Rsbuild 2 |
-| 桌面应用 | GPUI (`gpui-pre` 0.3.x、`gpui-kit` / `gpui-component` 0.10.x，Metal + AccessKit `renderTree`)、Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2、Dioxus 0.7、Leptos 0.8、egui 0.37、Iced 0.14 |
-| 移动应用 (Android & iOS) | Android (`adb` `screencap` + `uiautomator`)、iOS (`xcrun simctl` + XCUI)、React Native 0.88 / Expo Router 5 (`tsc` 规则包) | 官方工具链探测 (`dui toolchains`)；SwiftUI / Compose / Flutter 适配器规划中（见[支持框架](docs/zh-CN/supported-frameworks.md)） |
-| 终端 UI (TUI) | Universal TUI (`pty` + VT100 单元网格 → `RenderNodeSnapshot` + 等宽 PNG)、Ink 5 (`tsc` 规则包) | Ratatui (`rustc`)、Bubble Tea (`go`) 深度状态计划 |
-| 路由与 URL 状态 | TanStack Router 1、TanStack Start 1、React Router 7 / 8、Next.js App Router (`app/**/page.tsx`)、标准 Web `URLSearchParams` | Android Intent 与深度链接编译器分析 |
-| 状态、表单与模式 | React `useState`、TanStack Query 5、Zustand 5、Redux Toolkit 2、Jotai 3、XState 5、React Hook Form 7、zod 4、valibot 1、Radix UI 1 / shadcn/ui 4 | — |
+dui 从项目的官方编译器读取类型。库规则识别程序中的特定 API 调用。运行画面由各平台的渲染器捕获。
+
+| 要查看的内容 | 方法 |
+| --- | --- |
+| 有类型的状态槽和路由参数 | `dui scan` 使用项目的 TypeScript 编译器及匹配符号的规则。 |
+| 不同宽度下可访问的网页 | 向 `dui map` 提供本地 URL 或静态构建目录。Chromium 可跨框架沿同源链接访问页面。 |
+| 源码中声明的原生界面 | 在 React Navigation、Expo Router 或 Flutter 项目中运行 `dui map`。每张卡片指向相应的声明。 |
+| 渲染后的 UI | 在配置的 Web、移动、桌面或终端宿主上捕获。部分 SwiftUI 和 Compose 组件也可导出为可交互的 HTML 预览。 |
 
 ### 分析与验证能力
 
@@ -108,7 +107,7 @@ dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，
 
 ## 捕获自己的应用
 
-1. 在应用的 `package.json` 和 `tsconfig.json` 所在目录打开终端，用项目的包管理器安装依赖。网页捕获支持 Vite 7 / 8 和项目中安装的官方 TypeScript 6.x 或 7.x 编译器。React 项目使用 React 19。
+1. 对于此 Vite 示例，在包含 `package.json` 和 `tsconfig.json` 的应用目录中安装依赖。用 `dui check-ts .` 检查项目的官方 TypeScript 编译器。[编译器与宿主要求](docs/zh-CN/supported-frameworks.md#编译器与宿主要求)
 2. 在此目录创建 `dui.json`。下面的配置以 375px 和 1280px 两种宽度捕获首页。将 `main article` 换成页面内容加载完成后才出现的元素的 CSS 选择器，例如设置页的 `main form`。
 
 ```json
@@ -150,7 +149,7 @@ npmgraph 是一个使用 MIT 许可证的 npm 依赖查看器。示例从一个�
 
 - [捕获参考（英文）](docs/reference.md) — 配置路由与模拟数据、解读覆盖率以及通过 CLI / MCP 自动化运行。
 - [贡献指南](CONTRIBUTING.md) — 了解 crate 边界、规则包扩展与自动化检查。
-- [设计文档](docs/zh-CN/design-v0.md) · [架构](docs/zh-CN/architecture.md) · [支持栈列表](docs/zh-CN/supported-frameworks.md)
+- [设计文档](docs/zh-CN/design-v0.md) · [架构](docs/zh-CN/architecture.md) · [分析与渲染范围](docs/zh-CN/supported-frameworks.md)
 
 ## 许可证
 

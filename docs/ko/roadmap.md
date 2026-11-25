@@ -14,7 +14,7 @@
 **목표가 아닌 것**
 
 - 자체 파일 형식을 가진 독립 디자인 도구가 되는 것.
-- 모든 플랫폼을 먼저 지원하는 것. React Native, Flutter, iOS, Android, URL로 임의의 로컬 앱을 지도에 올리는 작업([#236](https://github.com/de-novo/dui/issues/236), [#237](https://github.com/de-novo/dui/issues/237))은 이 목표에 직접 도움이 되지 않으면 뒤로 미룬다.
+- 모든 플랫폼을 한꺼번에 지원하는 것. 이 목표에 필요한 캡처와 편집 기능을 우선한다.
 
 **지금 집중할 일.** 코드를 기준으로 지도를 만들고, UI를 고친 결과를 같은 코드로 되돌리는 루프를 닫는다(v0.3.0에서 계획한 코드 기반 캔버스). 더 넓은 플랫폼 지원과 패키징은 그다음에 한다.
 
@@ -63,7 +63,7 @@ M0 검수 화면의 다섯 상태를 375·768·1280px에서 검증해 서로 다
 
 ## 이후 단계
 
-위의 목표에 직접 도움이 되지 않으면 새 플랫폼과 패키징은 뒤로 미룬다. React Native, Flutter, iOS, Android, URL로 로컬 앱을 지도에 올리는 작업([#236](https://github.com/de-novo/dui/issues/236), [#237](https://github.com/de-novo/dui/issues/237)), 그리고 같은 방향의 후속 이슈([#239](https://github.com/de-novo/dui/issues/239), [#240](https://github.com/de-novo/dui/issues/240))가 여기에 해당한다. 미리 빌드한 바이너리와 Homebrew([#176](https://github.com/de-novo/dui/issues/176))는 제품이 안정된 뒤에 한다. 목표에 해당하는 다음 단계는 UI 수정을 코드로 되돌리는 일(v0.3.0)이다.
+현재 로컬 웹 URL 캡처, 네이티브 화면 선언 탐색, 일부 런타임에서의 실제 캡처를 제공한다. 각각의 범위는 [지원 범위 표](supported-frameworks.md)에 정리한다. 추가 플랫폼과 패키징은 위 목표에 따라 우선순위를 정한다. 미리 빌드한 바이너리와 Homebrew([#176](https://github.com/de-novo/dui/issues/176))는 제품이 안정된 뒤에 한다. 목표에 해당하는 다음 단계는 UI 수정을 코드로 되돌리는 일(v0.3.0)이다.
 
 | 버전 | 목표 |
 | --- | --- |

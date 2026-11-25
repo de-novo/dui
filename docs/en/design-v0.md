@@ -24,7 +24,7 @@ Every component below is designed for this split: anything a person would "run" 
 
 **dui is an official-compiler-dependent project.**
 
-- Only each language's **official compiler / toolchain** is supported: TypeScript → `tsc` from Microsoft's `typescript` package, **7.0+ only**; Rust → `rustc` (Cargo) with rust-analyzer for type queries; later Swift → `swiftc` + SourceKit-LSP; Kotlin → `kotlinc`.
+- For typed analysis use the project's official language toolchain. The TypeScript design target is Microsoft’s `tsc` 7. For the compiler versions accepted by the current CLI, see [analysis and rendering support](supported-frameworks.md).
 - Unofficial or alternative compilers / toolchains are **`unsupported`**.
 - dui uses the official compiler already in the user's project (exact version). It **does not reimplement type checking**.
 - Details: [Tech stack](#tech-stack-decided-2026-11-19).
@@ -229,7 +229,7 @@ Measured as a number, not a feeling. The denominator is defined explicitly.
   - Render branches: conditional render branches (conditional JSX, ternaries, early returns, `match` arms) inside components reachable from the screen root. Branches with no effect on what is drawn (logging, etc.) are removed by exclusion rules.
   - Because the analyzer builds the denominator itself, "branches missing from the denominator" are measured separately: compare with the full branch list from runtime coverage tools (V8 coverage / istanbul; for Rust, the `cargo llvm-cov` family).
 - **Unrenderable cells** (see "Rendering limits") are **excluded from the denominator** but always reported as a separate count with reasons. So coverage = `verified` cells ÷ renderable cells.
-- **Unsupported** projects / modules (older than the current latest stable major, or non-official compilers; see Tech stack) are rejected before scanning and are not measured at all.
+- A project or module that the selected analysis adapter rejects for an incompatible compiler or host runtime is `unsupported` and excluded from coverage.
 - **Numerator** = the number of `verified` cells in the denominator.
 - **Report**: renderable coverage % per screen and per kind + a list of unverified cells (with reasons) + the unrenderable count (with reasons). E.g. `review 97.8% (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths; unrenderable 2 (system-ui)`.
 - **Condition for 99%**: our code (obora, pippip) follows a rule to gather screen state in one place with types, reducers, or state machines. That keeps the sequence-state denominator accurate.
@@ -344,7 +344,7 @@ dui does **not** embed Whiteboard: it vendors Code-OSS (heavy to bundle) and sen
 | **M3 sequence states** | Extract event → state-change rules, expand, verify by CDP replay, mark edges `verified` | Sequence states such as "after approving the last page" on the review screen generated and verified automatically |
 | **M4 canvas** | React Flow canvas (rows = states, columns = widths, edges = transitions, unverified and unrenderable marks); the AI agent opens it via CLI / MCP (`dui open`), humans only view it | All 3 obora screens laid out |
 | **M5 obora 99% attempt** | 99% target for the 3 screens, apply the explicit-state rule, Figma export | Coverage report per screen |
-| M6 and later | All of pippip, Electron (obora-desktop), then the remaining stacks in [Supported frameworks](supported-frameworks.md) priority order | — |
+| M6 and later | All of pippip, Electron (obora-desktop), then additional compiler and platform integrations as prioritized in the [roadmap](roadmap.md) | — |
 
 ## 14. Risks and open questions
 
@@ -431,23 +431,6 @@ Principle:
 
 ### Supported versions: current latest stable major only
 
-**Rule (decided 2026-11-20)**: for each stack, dui supports **only the current latest stable major version** (as of November 2026) and anything newer. Newer versions are always supported. Older majors are rejected up front by `dui scan` as **`unsupported` (reason)**: this is not `unrenderable`, is not a cell status, and is excluded from coverage (§8). Unofficial compilers are `unsupported` the same way. The baseline is only raised in a **future dui major release**.
+The version policy targets the current stable major of each official compiler or host runtime that dui invokes directly. Raising that baseline is a dui major-release decision. The TypeScript design target is 7. The CLI also has a compatibility path for projects using official stable TypeScript 6.x. A required toolchain that the selected adapter rejects gives the project status `unsupported` and is excluded from coverage (§8).
 
-Checked 2026-11-20 against official sources (npm registry, crates.io, GitHub releases, nodejs.org):
-
-| Stack | Supported baseline | Latest stable (date, source) | Unsupported |
-|---|---|---|---|
-| TypeScript | **7.x** (7.0+) | 7.0.2 (2026-07-08, npm `latest`; 7.1.0 is still beta) | 6.x and older |
-| React | **19.x** (19.0+) | 19.3.1 (2026-10-14, npm `latest`) | 18.x and older |
-| Node.js (runs the TS sidecar, from the project) | **26.x** | 26.13.1 (2026-11-10, LTS "Lithium"; nodejs.org; 26.0.0: 2026-05-05; 27 is only alpha) | 25.x and older |
-| Rust | **edition 2024** | Latest edition per the [Edition Guide](https://doc.rust-lang.org/edition-guide/); latest toolchain 1.100.0 (2026-11-12, GitHub release) | edition 2021 and older |
-| GPUI (`gpui-pre`) | **0.3.x** | 0.3.13 (2026-11-16, crates.io) | 0.2.x and older |
-
-Notes:
-- **Rust** has no major release after 1.0, so the edition is used as the "major". Whether to also require a minimum toolchain version is an open decision (`unconfirmed`).
-- **`gpui-pre`** is a 0.x crate. Under Cargo's semver rules a 0.x minor bump is breaking, so 0.3 is treated as the major line.
-- **TypeScript**: the type API dui uses (`typescript/sync`) arrives in 7.1, which is still beta. Until 7.1 is stable, the TS adapter's API path is `unconfirmed`.
-- **Chromium**: not pinned in v0. Which browser binary dui drives over CDP is `unconfirmed`.
-- obora (the M0 target) will move to TS 7.
-
-**Supported frameworks**: the full list of supported stacks (38, in priority order), the 11 not supported yet, and the condition for adding each is in [Supported frameworks](supported-frameworks.md). It follows the rule above: one baseline per stack, the current latest stable major.
+Library rules operate on the symbols and types the compiler resolves. Adding a router, store or schema rule extends the facts dui can extract from a project. Library release numbers describe fixture coverage and may produce diagnostic notes during a scan. Platform capture has its own requirements and can run independently of typed analysis. [Current capabilities and checks](supported-frameworks.md)

@@ -6,21 +6,20 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 
 **Goal.** Today planning documents, Figma designs, and code are separate sources of truth. dui makes the code itself the single source of truth for development and UI work: the screen map is generated from the code, and UI edits go back into the same code.
 
-[Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md) · [Full stack matrix](docs/en/supported-frameworks.md)
+[Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md) · [Analysis and rendering support](docs/en/supported-frameworks.md)
 
 ## What dui analyzes
 
-### Supported stacks & frameworks
+### Analysis and capture paths
 
-| Category | Supported now | Planned |
-| --- | --- | --- |
-| Languages & compilers | TypeScript 7.x / 6.x (`tsc`), Rust edition 2024 (`rustc`) | Swift 6, Dart 3, Kotlin 2, Go |
-| Web (Level 1 & Level 2) | Universal Web (`static` / `url` / `command` for any HTML/JS app), React 18 / 19+, Vite 7 / 8+, Nitro SSR, Next.js 16 (`host: "next"`), Chromium (CDP) | Preact 11, Solid 2, SolidStart 2, Rspack / Rsbuild 2 |
-| Desktop App | GPUI (`gpui-pre` 0.3.x, `gpui-kit` / `gpui-component` 0.10.x, Metal + AccessKit `renderTree`), Electron 45 (`host: "electron"` + `ipcMocks`) | Tauri 2, Dioxus 0.7, Leptos 0.8, egui 0.37, Iced 0.14 |
-| Mobile App (Android & iOS) | Android (`adb` `screencap` + `uiautomator`), iOS (`xcrun simctl` + XCUI), React Native 0.88 / Expo Router 5 (`tsc` rules) | Native compiler probes (`dui toolchains`); SwiftUI / Compose / Flutter adapters planned (see [supported-frameworks](docs/en/supported-frameworks.md)) |
-| Terminal UI (TUI) | Universal TUI (`pty` + VT100 cell grid -> `RenderNodeSnapshot` + monospace PNG), Ink 5 (`tsc` rules) | Ratatui (`rustc`), Bubble Tea (`go`) deep state plans |
-| Routing & URL state | TanStack Router 1, TanStack Start 1, React Router 7 / 8, Next.js App Router (`app/**/page.tsx`), standard Web `URLSearchParams` | Android intents & deep links compiler analysis |
-| State, forms & schemas | React `useState`, TanStack Query 5, Zustand 5, Redux Toolkit 2, Jotai 3, XState 5, React Hook Form 7, zod 4, valibot 1, Radix UI 1 / shadcn/ui 4 | — |
+dui reads types from the project's official compiler. Library rules identify specific API calls in that program. Runtime capture uses the renderer for each platform.
+
+| To see | Use |
+| --- | --- |
+| Typed state slots and route parameters | `dui scan` with the project's TypeScript compiler and matching symbol rules. |
+| Reachable web screens at different widths | `dui map` with a local URL or static build. Chromium follows same-origin links across frameworks. |
+| Declared native screens | `dui map` on a React Navigation, Expo Router or Flutter project. Each card points to its declaration. |
+| Rendered UI | Capture on the configured web, mobile, desktop or terminal host. Selected SwiftUI and Compose components can also be exported as interactive HTML previews. |
 
 ### Analysis & verification capabilities
 
@@ -110,7 +109,7 @@ An optional project-local `dui.json` can supply `appRoot`, mock responses, a sta
 
 ## Use your own app
 
-1. Open a terminal in the app directory containing `package.json` and `tsconfig.json`. Install the app’s dependencies with its usual package manager. Web capture supports Vite 7 or 8 and the project’s official TypeScript 6.x or 7.x compiler. React apps use React 19.
+1. For this Vite example, open the app directory containing `package.json` and `tsconfig.json` and install its dependencies. Use `dui check-ts .` to check the project’s official TypeScript compiler. [Compiler and host requirements](docs/en/supported-frameworks.md#compiler-and-host-requirements)
 2. Create `dui.json` in that directory. This example captures `/` at two widths. Replace `main article` with a CSS selector that appears when **your screen’s content is ready**. For a settings page, that might be `main form`.
 
 ```json
@@ -152,7 +151,7 @@ Capture npmgraph, an MIT-licensed npm dependency viewer, from a single entry URL
 
 - [Capture reference](docs/reference.md) — configure routes and mocks, read coverage, and automate runs with CLI or MCP.
 - [Contributing](CONTRIBUTING.md) — find the relevant crate, change a rule, and run the checks.
-- [Design](docs/en/design-v0.md) · [Architecture](docs/en/architecture.md) · [Planned stack support](docs/en/supported-frameworks.md)
+- [Design](docs/en/design-v0.md) · [Architecture](docs/en/architecture.md) · [Analysis and rendering support](docs/en/supported-frameworks.md)
 
 ## License
 

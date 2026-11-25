@@ -164,7 +164,7 @@ Order mistakes are compile errors:
 
 ## 5. Monorepo layout
 
-The target layout is a **polyglot monorepo**: a Cargo workspace for Rust, a pnpm workspace for the TypeScript parts, plus data, fixtures, docs, and tooling. `stacks.toml` is the single source of truth for supported stacks.
+The target layout is a **polyglot monorepo**: a Cargo workspace for Rust, a pnpm workspace for the TypeScript parts, plus data, fixtures, docs, and tooling. In this proposed layout, `stacks.toml` would describe adapter and rule-pack mappings. The [current capability table](supported-frameworks.md) links to the implementation and checks in this repository.
 
 For the current npm packages, edit [dependency-catalog.json](../../dependency-catalog.json) and run `npm run deps:sync`. CI runs `npm run deps:check` to check manifests and lockfiles. Rust crates inherit dependency requirements from the root `[workspace.dependencies]`. The catalog controls dui’s own dependencies and fixtures. Support baselines are a separate release decision.
 
