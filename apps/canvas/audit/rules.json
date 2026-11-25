@@ -1,0 +1,9 @@
+{
+  "localPath": [
+    "^/(tmp|private|var|Users|home|runner)/",
+    "^[A-Za-z]:\\\\",
+    "DerivedData/",
+    "SourcePackages/checkouts/"
+  ],
+  "tapTarget": { "maxViewportWidth": 430, "minSize": 24 }
+}

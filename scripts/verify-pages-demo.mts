@@ -10,8 +10,10 @@
  *   at both mobile (390px) and desktop (1440px)
  * - Mobile `site/demo/` renders the MobileScreenDeck cards (`.mobile-deck-card`)
  */
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 
 import { withChromiumPage, type ChromiumPage } from "./chromium-page.mts";
@@ -82,7 +84,17 @@ function verifyArchives(): Array<{
         Array.isArray(node.sourcePreview.scene?.frames) &&
         node.sourcePreview.scene.frames.length >= 2,
     ).length;
-    if (populated < 2 && readyPreviews < 2) {
+    const nativeDeclarations = (graph.nodes ?? []).filter(
+      (node) => (node as { nativeSource?: unknown }).nativeSource,
+    ).length;
+    if (run.key === "home-assistant-ios") {
+      const shots = cells.filter((cell) => cell.scenario === "ios" && cell.status === "unverified");
+      if (nativeDeclarations < 200 || shots.length < 1 || shots.length !== cells.length)
+        throw new Error(
+          `home-assistant-ios: expected 200+ declarations and unverified iOS captures, got ${nativeDeclarations} and ${cells.length} cells`,
+        );
+    }
+    if (populated < 2 && readyPreviews < 2 && nativeDeclarations < 2) {
       throw new Error(
         `Self-dogfood gate failed: ${run.key} has only ${populated}/${cells.length} populated cells and ${readyPreviews} ready source previews (blank capture detected)`,
       );
@@ -613,6 +625,71 @@ async function verifyRenderedPages(
   });
 }
 
+/**
+ * Self-dogfood: map every published demo page and the site with dui itself, then run the
+ * project-owned viewer design audit (apps/canvas/audit) on that capture.
+ */
+// Run dui without blocking this process: its own static server must keep answering dui's browser.
+function dui(binary: string, args: string[], env: NodeJS.ProcessEnv) {
+  return new Promise<{ status: number; stdout: string; stderr: string }>((resolve, reject) => {
+    execFile(
+      binary,
+      args,
+      { encoding: "utf8", env, maxBuffer: 64 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        const status = error ? (typeof error.code === "number" ? error.code : -1) : 0;
+        if (error && status === -1) reject(error);
+        else resolve({ status, stdout, stderr });
+      },
+    );
+  });
+}
+
+async function dogfoodAudit(port: number, keys: string[]) {
+  const binary = [process.env.DUI_BIN, "target/release/dui", "target/debug/dui"]
+    .filter((candidate): candidate is string => Boolean(candidate))
+    .map((candidate) => path.resolve(root, candidate))
+    .find((candidate) => fs.existsSync(candidate));
+  if (!binary) throw new Error("Build dui before verifying Pages: the self-audit runs it");
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "dui-dogfood-home-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "dui-dogfood-"));
+  const env = { ...process.env, HOME: home };
+  const failures: string[] = [];
+  let cells = 0;
+  try {
+    for (const key of keys) {
+      const url = `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(key)}`;
+      const mapped = await dui(binary, ["map", project, "--url", url], env);
+      if (mapped.status !== 0 && !mapped.stdout.trim())
+        throw new Error(`dui map failed for ${key}: ${mapped.stderr}`);
+      const run = JSON.parse(mapped.stdout);
+      cells += run.coverage.attempted;
+      if (run.coverage.verified !== run.coverage.attempted)
+        failures.push(`${key}: ${run.coverage.verified}/${run.coverage.attempted} cells verified`);
+      const audit = await dui(
+        binary,
+        ["audit", run.output, "--design", path.join(root, "apps/canvas/audit/dui.json")],
+        env,
+      );
+      if (audit.status === 5) {
+        const report = JSON.parse(audit.stdout).designAudit;
+        for (const finding of report.findings)
+          failures.push(
+            `${key} ${finding.cell.path} @${finding.cell.width}: ${finding.rule} ${finding.nodeId} (${finding.measured})`,
+          );
+        for (const reason of report.unverified ?? []) failures.push(`${key}: unverified ${reason}`);
+      } else if (audit.status !== 0) {
+        throw new Error(`dui audit failed for ${key}: ${audit.stderr || audit.stdout}`);
+      }
+    }
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(project, { recursive: true, force: true });
+  }
+  if (failures.length) throw new Error("dui self-audit:\n" + failures.slice(0, 40).join("\n"));
+  return { pages: keys.length, cells };
+}
+
 async function main() {
   const { server, port } = await startStaticServer();
   try {
@@ -631,7 +708,13 @@ async function main() {
       throw new Error("The published /install must serve scripts/install byte for byte");
     }
     const rendered = await verifyRenderedPages(port, archiveSummary);
-    console.log(JSON.stringify({ status: "ok", archives: archiveSummary, rendered }, null, 2));
+    const dogfood = await dogfoodAudit(
+      port,
+      archiveSummary.map((archive) => archive.key),
+    );
+    console.log(
+      JSON.stringify({ status: "ok", archives: archiveSummary, rendered, dogfood }, null, 2),
+    );
   } finally {
     server.close();
   }

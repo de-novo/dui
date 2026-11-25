@@ -1,0 +1,21 @@
+{
+  "repository": "https://github.com/home-assistant/iOS",
+  "commit": "5c5ad97555a58f818bbd557021b8d18d8225950e",
+  "scheme": "App-Debug",
+  "xcode": "Xcode 26.6",
+  "device": "iPhone 17",
+  "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-26-5",
+  "declarations": 212,
+  "captures": [
+    {
+      "name": "OnboardingWelcomeView",
+      "source": "Sources/App/Onboarding/Steps/Welcome/OnboardingWelcomeView.swift",
+      "witness": "Home Assistant Companion App",
+      "imageWidth": 1206,
+      "imageHeight": 2622,
+      "scale": 3.0,
+      "imageSha256": "b90865e701345b860b4c1a93cc0c63a98feda99b6ee82d444762237e2563b27d"
+    }
+  ],
+  "workflowRun": "https://github.com/de-novo/dui/actions/runs/45657497439"
+}

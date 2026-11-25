@@ -9,6 +9,7 @@ on:
       - "examples/**"
       - "fixtures/source-preview/**"
       - "fixtures/source-preview-native/recordings/**"
+      - "fixtures/home-assistant-ios/**"
       - "apps/canvas/**"
       - "scripts/build-pages-demo.mts"
       - "scripts/verify-pages-demo.mts"

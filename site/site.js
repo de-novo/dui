@@ -99,11 +99,11 @@
         "dui 2D Inline Diff highlighting element-level changes on the map alongside Before, After, and Pixel difference overlays in the inspector",
       tabDiffCaption:
         "2D Inline Diff: Compare captures directly on the map with element-level change highlights, pixel-difference overlays, and screen verification evidence.",
-      tabSourcePreview: "SwiftUI & Compose",
+      tabSourcePreview: "SwiftUI · Home Assistant",
       tabSourcePreviewAlt:
-        "dui map with two source cards showing native captures: Settings.swift on an iPhone 17 simulator and Settings.kt on an Android 15 emulator",
+        "dui map of home-assistant/iOS with the real onboarding screen captured on an iPhone simulator and its SwiftUI source declaration in the inspector",
       tabSourcePreviewCaption:
-        "Native SwiftUI & Compose: the same Settings component built with Apple SwiftUI and Jetpack Compose, captured on an iPhone simulator and an Android emulator, and attached to its source cards. Device recordings stay Unverified.",
+        "home-assistant/iOS 2026.9.2: dui read 212 SwiftUI screens from the compiler's index store. The onboarding screen was captured on an iPhone simulator and attached to its source card, marked Unverified.",
       tabDesktopOverview: "macOS Desktop",
       tabDesktopOverviewAlt:
         "dui native GPUI macOS desktop viewer with transparent TitleBar, 11-screen full-page map, screen search, and gutter edges",
@@ -192,11 +192,11 @@
         "지도 카드 위 요소 단위 변경 강조와 인스펙터의 이전·이후·픽셀 차이 오버레이를 함께 보여 주는 2D 인라인 Diff",
       tabDiffCaption:
         "2D 인라인 Diff: 지도 위에서 이전·이후 캡처를 바로 비교하고, 요소 단위 변경 표시·픽셀 차이 오버레이·화면 검증 근거를 함께 확인합니다.",
-      tabSourcePreview: "SwiftUI · Compose",
+      tabSourcePreview: "SwiftUI · Home Assistant",
       tabSourcePreviewAlt:
-        "iPhone 17 시뮬레이터의 Settings.swift와 Android 15 에뮬레이터의 Settings.kt 실제 캡처를 보여 주는 두 소스 카드의 dui 지도",
+        "iPhone 시뮬레이터에서 찍은 실제 온보딩 화면과 인스펙터의 SwiftUI 소스 선언을 보여 주는 home-assistant/iOS의 dui 지도",
       tabSourcePreviewCaption:
-        "네이티브 SwiftUI·Compose: 같은 Settings 컴포넌트를 Apple SwiftUI와 Jetpack Compose로 빌드해 iPhone 시뮬레이터와 Android 에뮬레이터에서 캡처하고 소스 카드에 연결했습니다. 기기 녹화는 미검증으로 표시됩니다.",
+        "home-assistant/iOS 2026.9.2: dui가 컴파일러 인덱스 스토어에서 SwiftUI 화면 212개를 읽었습니다. 온보딩 화면은 iPhone 시뮬레이터에서 찍어 소스 카드에 붙였고, 미검증으로 표시됩니다.",
       tabDesktopOverview: "macOS 데스크톱",
       tabDesktopOverviewAlt:
         "투명 TitleBar, 11개 전체 페이지 지도, 화면 검색, 거터 연결선을 갖춘 네이티브 GPUI macOS 데스크톱 뷰어",
@@ -285,11 +285,11 @@
         "在界面地图卡片上高亮元素级变更，并在检查器中并排展示变更前、变更后与像素差异叠加层的 dui 2D 内联差异视图",
       tabDiffCaption:
         "2D 内联差异：直接在界面地图上对比两次捕获，高亮元素级变更，并查看像素差异叠加层与页面验证依据。",
-      tabSourcePreview: "SwiftUI 与 Compose",
+      tabSourcePreview: "SwiftUI · Home Assistant",
       tabSourcePreviewAlt:
-        "dui 地图中的两张源码卡片，显示 iPhone 17 模拟器上的 Settings.swift 与 Android 15 模拟器上的 Settings.kt 真实截图",
+        "home-assistant/iOS 的 dui 地图：在 iPhone 模拟器上截取的真实引导界面，检查器中显示其 SwiftUI 源码声明",
       tabSourcePreviewCaption:
-        "原生 SwiftUI 与 Compose：同一个 Settings 组件分别用 Apple SwiftUI 和 Jetpack Compose 构建，在 iPhone 模拟器与 Android 模拟器上截图并关联到源码卡片。设备录制保持未验证。",
+        "home-assistant/iOS 2026.9.2：dui 从编译器索引库读取了 212 个 SwiftUI 界面。引导界面在 iPhone 模拟器上截图并关联到源码卡片，标记为未验证。",
       tabDesktopOverview: "macOS 桌面端",
       tabDesktopOverviewAlt:
         "带有透明 TitleBar、11 个整页界面地图、界面搜索与避让通道连线的原生 GPUI macOS 桌面查看器",
