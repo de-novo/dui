@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 26
-      - run: cargo build --locked --bin dui
+      - run: npm ci && npm ci --prefix apps/canvas && cargo build --locked --bin dui
       - name: Map the SwiftUI rule fixture from its index store
         run: node scripts/check-swift-map.mts
 
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 26
-      - run: cargo build --locked --bin dui
+      - run: npm ci && npm ci --prefix apps/canvas && cargo build --locked --bin dui
       - name: Map home-assistant/iOS
         env:
           HOME_MAP: ${{ runner.temp }}/home
