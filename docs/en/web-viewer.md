@@ -37,6 +37,8 @@ When a recorder has opened a native route, save its PNG and write the following 
 
 Run `dui map attach SOURCE_RUN recordings.json` against the original local source archive, then open the new output with `dui open`. Each attached card keeps its source location and shows the recorded image. The archive records the PNG dimensions, runtime and observed route. An imported image is marked `unverified` because its association comes from the recorder. Automated coverage counts stay at zero. Use one capture per declaration, runtime and width in a recording set.
 
+For iOS evidence, install the app’s simulator build on an iPhone simulator and capture a route after checking that its expected content is visible. Record the logical width, PNG dimensions, route and app revision. The simulator checks use public sample data. A standard run verifies the images on the runner. Explicitly requested fixture exports contain PNGs and expire after one day.
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.

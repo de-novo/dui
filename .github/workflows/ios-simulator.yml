@@ -1,0 +1,51 @@
+name: Compass on iOS Simulator
+on:
+  pull_request:
+    paths:
+      - "fixtures/compass-ios/**"
+      - "scripts/check-compass-ios.py"
+      - "scripts/ios_simulator.py"
+      - "scripts/check-ios-screenshot.swift"
+      - ".github/workflows/ios-simulator.yml"
+  workflow_dispatch:
+    inputs:
+      export_fixture_pngs:
+        description: "Share the seven Compass fixture PNGs as a one-day artifact"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: "true"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: flutter/samples
+          ref: a5bccd247163b1017d2eb9320cf3b94a95ccfb5e
+          path: .samples
+          persist-credentials: false
+      - name: Install Flutter 3.50.1
+        run: |
+          git clone --quiet --depth 1 --branch 3.50.1 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = ae9b586f34a8443573f82ef57c3bf914a908cbf7
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Capture the seven sample screens
+        run: python3 scripts/check-compass-ios.py .samples "$RUNNER_TEMP/dui-ios-recordings"
+      - name: Share fixture screenshots for one day
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.export_fixture_pngs) ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.body, '<!-- export-ios-fixture-pngs -->'))
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compass-ios-fixture-pngs
+          path: ${{ runner.temp }}/dui-ios-recordings/*.png
+          retention-days: 1
+          if-no-files-found: error
