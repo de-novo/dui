@@ -130,6 +130,24 @@ function startStaticServer(): Promise<{ server: http.Server; port: number }> {
 // follows the current gutter, font, language and action count.
 async function checkContentPage() {
   if (location.pathname === "/index.html") {
+    const showcaseTabs = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("[data-showcase-tab]"),
+    );
+    const showcaseImg = document.querySelector<HTMLImageElement>("[data-showcase-img]");
+    if (showcaseTabs.length > 0 && showcaseImg) {
+      const activeTab =
+        showcaseTabs.find((tab) => tab.getAttribute("aria-selected") === "true") ??
+        showcaseTabs[0]!;
+      for (const tab of showcaseTabs) {
+        tab.click();
+        showcaseImg.loading = "eager";
+        await showcaseImg.decode();
+        if (showcaseImg.naturalWidth === 0) {
+          throw Error(`Broken showcase image for tab: ${tab.textContent?.trim()}`);
+        }
+      }
+      activeTab.click();
+    }
     const previews = document.querySelectorAll<HTMLAnchorElement>("#ios-examples .native-preview");
     if (!previews.length) throw Error("Missing native example previews");
     for (const preview of previews) {

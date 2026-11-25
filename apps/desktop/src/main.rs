@@ -3090,19 +3090,18 @@ impl DuiDesktopView {
                         .text_color(p.muted_foreground),
                 );
             }
-            if !node.attributes.is_empty() {
+            let visible_attrs: Vec<_> = node
+                .attributes
+                .iter()
+                .filter(|(k, _)| !k.starts_with("data-dui-"))
+                .take(4)
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect();
+            if !visible_attrs.is_empty() {
                 props_col = props_col.child(
-                    Label::new(format!(
-                        "{attr_label}: {}",
-                        node.attributes
-                            .iter()
-                            .take(4)
-                            .map(|(k, v)| format!("{k}={v}"))
-                            .collect::<Vec<_>>()
-                            .join(" · ")
-                    ))
-                    .text_xs()
-                    .text_color(p.foreground),
+                    Label::new(format!("{attr_label}: {}", visible_attrs.join(" · ")))
+                        .text_xs()
+                        .text_color(p.foreground),
                 );
             }
 
@@ -3379,8 +3378,12 @@ impl DuiDesktopView {
                                             .text_color(p.muted_foreground),
                                     )
                                     .when_some(screen.native_source.as_ref(), |header, origin| {
+                                        let location = match origin.line {
+                                            Some(line) => format!("{}:{line}", origin.source),
+                                            None => origin.source.clone(),
+                                        };
                                         header.child(
-                                            Label::new(format!("{}:{}", origin.source, origin.line))
+                                            Label::new(location)
                                                 .text_xs()
                                                 .text_color(p.muted_foreground),
                                         )

@@ -94,8 +94,9 @@
             aria-selected="true"
             data-showcase-tab
             data-src="./assets/canvas-overview.png"
-            data-alt="dui 2D Web Canvas showing 42 full-page screens and modal child nodes with obstacle-free gutter edges"
-            data-caption="2D Web Canvas (dui open): Full-page true-aspect screens, auto-discovered modal/drawer child nodes, and obstacle-free gutter routing."
+            data-alt-key="tabOverviewAlt"
+            data-caption-key="tabOverviewCaption"
+            data-i18n="tabOverview"
           >
             2D Screen Map
           </button>
@@ -106,10 +107,37 @@
             aria-selected="false"
             data-showcase-tab
             data-src="./assets/canvas-inspector.png"
-            data-alt="dui Element Inspector displaying box model, computed oklch styles, and highlighted verified edge to a drawer overlay"
-            data-caption="Modal &amp; Element Inspector: Auto-captured Theme Settings drawer with DevTools box model, computed styles, and rendered element tree."
+            data-alt-key="tabInspectorAlt"
+            data-caption-key="tabInspectorCaption"
+            data-i18n="tabInspector"
           >
-            Modal + Element Inspector
+            Modal + Inspector
+          </button>
+          <button
+            class="tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-showcase-tab
+            data-src="./assets/canvas-diff.png"
+            data-alt-key="tabDiffAlt"
+            data-caption-key="tabDiffCaption"
+            data-i18n="tabDiff"
+          >
+            2D Inline Diff
+          </button>
+          <button
+            class="tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-showcase-tab
+            data-src="./assets/canvas-source-preview.png"
+            data-alt-key="tabSourcePreviewAlt"
+            data-caption-key="tabSourcePreviewCaption"
+            data-i18n="tabSourcePreview"
+          >
+            SwiftUI &amp; Compose
           </button>
           <button
             class="tab-btn"
@@ -118,10 +146,11 @@
             aria-selected="false"
             data-showcase-tab
             data-src="./assets/desktop-overview.png"
-            data-alt="dui native GPUI macOS desktop viewer with transparent TitleBar and 39-screen overview map"
-            data-caption="Native GPUI Desktop (dui desktop): macOS transparent TitleBar, full-bleed Metal canvas, cursor-anchored continuous zoom, and gutter edges."
+            data-alt-key="tabDesktopOverviewAlt"
+            data-caption-key="tabDesktopOverviewCaption"
+            data-i18n="tabDesktopOverview"
           >
-            Native macOS Desktop
+            macOS Desktop
           </button>
           <button
             class="tab-btn"
@@ -130,8 +159,9 @@
             aria-selected="false"
             data-showcase-tab
             data-src="./assets/desktop-inspector.png"
-            data-alt="dui native GPUI desktop viewer showing selected screen with floating glass Element Inspector and box model"
-            data-caption="Floating Glass Inspector: Clicking any card highlights connected routes and opens the box-model inspector without shifting canvas coordinates."
+            data-alt-key="tabDesktopInspectorAlt"
+            data-caption-key="tabDesktopInspectorCaption"
+            data-i18n="tabDesktopInspector"
           >
             Desktop Inspector
           </button>
@@ -141,12 +171,14 @@
           <img
             data-showcase-img
             src="./assets/canvas-overview.png"
-            alt="dui 2D Web Canvas showing 42 full-page screens and modal child nodes with obstacle-free gutter edges"
+            width="3200"
+            height="2000"
+            alt="dui 2D Web Canvas showing 11 full-page dashboard screens and a Preferences modal child node with obstacle-free gutter edges"
           />
         </div>
         <p class="showcase-caption" data-showcase-caption>
           2D Web Canvas (dui open): Full-page true-aspect screens, auto-discovered modal/drawer
-          child nodes, and obstacle-free gutter routing.
+          child nodes, quick search, minimap, and obstacle-free gutter routing.
         </p>
       </section>
 
