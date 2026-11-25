@@ -19,7 +19,7 @@ import { verifyMapControls } from "./verify-map-controls.mts";
 import { verifyViewerThemes, viewerViewports } from "./verify-viewer-themes.mts";
 
 const root = process.cwd();
-const siteDir = path.join(root, "site");
+const siteDir = path.resolve(root, process.env.DUI_SITE_DIR || "site");
 const demoDir = path.join(siteDir, "demo");
 const archiveDir = path.join(demoDir, "archive");
 

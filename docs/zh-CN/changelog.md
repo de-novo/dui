@@ -5,11 +5,12 @@
 本文件记录项目的所有重要变更。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
-## [Unreleased]
-
-## [v0.2.0] - 2026-11-23
+## [Unreleased] — v0.2.0
 
 ### Added
+
+- 从本地 URL 或静态构建产物绘制网页地图，从原生源码发现路由并关联模拟器截图。 ([#238](https://github.com/de-novo/dui/pull/238), [#241](https://github.com/de-novo/dui/pull/241), [#243](https://github.com/de-novo/dui/pull/243)).
+- 检查捕获依据，重试失败的格子，并在 PR 中比较界面。 ([#199](https://github.com/de-novo/dui/pull/199), [#201](https://github.com/de-novo/dui/pull/201), [#205](https://github.com/de-novo/dui/pull/205)).
 
 - 全页完整高度捕获（含嵌套应用滚动容器展开）及 Web 画布与 GPUI 桌面端真实宽高比卡片布局 ([#148](https://github.com/de-novo/dui/pull/148), [#150](https://github.com/de-novo/dui/pull/150))。
 - 框架无关的 WAI-ARIA 导航展开、官方编译器路由注册表读取（`routeTree.gen.ts` `FileRoutesByTo`、React Router 生成类型）、零配置 `dui scan .` 及 Vite / Next.js / 静态 HTML 自动检测 `dui map .` ([#150](https://github.com/de-novo/dui/pull/150), [#154](https://github.com/de-novo/dui/pull/154))。
@@ -24,6 +25,8 @@
 - 注册查看器 UI 设计与评审技能（`anti-ui-slop`、`web-design-guidelines`） ([#132](https://github.com/de-novo/dui/pull/132))。
 
 ### Changed
+
+- CLI 区分开发构建和稳定发行版，网站显示安装程序默认选择的版本。
 
 - 简化 `dui map` / `dui run` CLI 默认行为，通过不可变 PNG 缓存与移除逐卡片 GPU 模糊显著提升画布首屏渲染速度 ([#144](https://github.com/de-novo/dui/pull/144), [#145](https://github.com/de-novo/dui/pull/145), [#152](https://github.com/de-novo/dui/pull/152))。
 - 将生态/规则包库版本从硬性工具链门禁中解耦：硬性 `>=` 基线校验仅适用于核心编译器、宿主与 UI 运行时（`tsc`、`vite` 7+、`react` 18+、`host: "next"` 时的 `next` 16+），始终接受更新的稳定主版本，并对规则包库版本差异以非致命 `versionNotes` 报告而不中断扫描 ([#136](https://github.com/de-novo/dui/pull/136))。
@@ -153,8 +156,7 @@
 - 官方 TypeScript 6/7 编译器分析、类型化 GET 自动模拟、Vite 宿主与多宽度 Chromium CDP 捕获。
 - 按项目、分支与工作树组织在 `~/.dui/` 下的本地归档与源码安装器。
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.2.0...HEAD
-[v0.2.0]: https://github.com/de-novo/dui/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.1.0...HEAD
 [v0.1.0]: https://github.com/de-novo/dui/releases/tag/v0.1.0
 [v0.0.9]: https://github.com/de-novo/dui/compare/v0.0.8...v0.0.9
 [v0.0.8]: https://github.com/de-novo/dui/compare/v0.0.7...v0.0.8

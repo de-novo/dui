@@ -5,11 +5,12 @@
 이 프로젝트의 주요 변경 사항을 기록합니다.
 형식은 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)를 따르며, 버전은 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)을 준수합니다.
 
-## [Unreleased]
-
-## [v0.2.0] - 2026-11-23
+## [Unreleased] — v0.2.0
 
 ### Added
+
+- 로컬 URL이나 정적 빌드로 웹 화면을 탐색하고 네이티브 소스에서 경로를 찾아 시뮬레이터 캡처를 연결할 수 있다. ([#238](https://github.com/de-novo/dui/pull/238), [#241](https://github.com/de-novo/dui/pull/241), [#243](https://github.com/de-novo/dui/pull/243)).
+- 캡처 근거를 검사하고 실패한 칸을 다시 검증하며 PR에서 화면을 비교할 수 있다. ([#199](https://github.com/de-novo/dui/pull/199), [#201](https://github.com/de-novo/dui/pull/201), [#205](https://github.com/de-novo/dui/pull/205)).
 
 - 중첩 스크롤 셸을 포함한 풀페이지 전체 높이 캡처 및 웹 캔버스·GPUI 데스크톱 실제 비율 카드 배치 ([#148](https://github.com/de-novo/dui/pull/148), [#150](https://github.com/de-novo/dui/pull/150)).
 - WAI-ARIA 네비게이션 메뉴 펼침, 공식 컴파일러 라우트 레지스트리 조회(`routeTree.gen.ts` `FileRoutesByTo`, React Router 생성 타입), zero-config `dui scan .`, Vite·Next.js·정적 HTML 자동 감지 `dui map .` ([#150](https://github.com/de-novo/dui/pull/150), [#154](https://github.com/de-novo/dui/pull/154)).
@@ -24,6 +25,8 @@
 - 뷰어 UI 설계·검수용 에이전트 스킬(`anti-ui-slop`, `web-design-guidelines`) 등록 ([#132](https://github.com/de-novo/dui/pull/132)).
 
 ### Changed
+
+- CLI에서 개발 빌드와 안정 릴리스를 구분하고 홈페이지에는 설치기가 기본으로 선택하는 버전을 표시한다.
 
 - `dui map` / `dui run` CLI 기본값 단순화, 불변 PNG 캐시 및 카드별 GPU 블러 제거로 캔버스 즉시 렌더링 개선 ([#144](https://github.com/de-novo/dui/pull/144), [#145](https://github.com/de-novo/dui/pull/145), [#152](https://github.com/de-novo/dui/pull/152)).
 - 생태계·룰팩 라이브러리를 하드 버전 게이트에서 분리: 하드 `>=` 기준선 검사는 핵심 컴파일러·호스트·UI 런타임(`tsc`, `vite` 7+, `react` 18+, `host: "next"` 시 `next` 16+)에만 적용하고, 더 새로운 안정 메이저는 항상 허용하며 룰팩 라이브러리 버전 차이는 스캔 중단 없이 비치명적 `versionNotes`로 기록 ([#136](https://github.com/de-novo/dui/pull/136)).
@@ -153,8 +156,7 @@
 - 공식 TypeScript 6/7 컴파일러 분석, 타입드 GET 자동 목, Vite 호스트 및 다폭 Chromium CDP 캡처.
 - 프로젝트·브랜치·워크트리별 `~/.dui/` 로컬 아카이빙 및 소스 설치기.
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.2.0...HEAD
-[v0.2.0]: https://github.com/de-novo/dui/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.1.0...HEAD
 [v0.1.0]: https://github.com/de-novo/dui/releases/tag/v0.1.0
 [v0.0.9]: https://github.com/de-novo/dui/compare/v0.0.8...v0.0.9
 [v0.0.8]: https://github.com/de-novo/dui/compare/v0.0.7...v0.0.8

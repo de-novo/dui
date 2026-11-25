@@ -56,7 +56,7 @@
       navExamples: "Examples",
       navArch: "Architecture",
       navCli: "CLI & MCP",
-      eyebrow: "v0.2.0 · Rust 2024 · Fact-only UI verification",
+      eyebrow: "Rust 2024 · Fact-only UI verification",
       heroTitle: "Make the code the single source of truth for development and UI.",
       heroLead:
         "Today planning documents, Figma designs, and code drift apart. dui generates the screen map from the code, and UI edits go back into the same code.",
@@ -104,7 +104,7 @@
       navExamples: "예제",
       navArch: "아키텍처",
       navCli: "CLI · MCP",
-      eyebrow: "v0.2.0 · Rust 2024 · 객관적 UI 검증 시스템",
+      eyebrow: "Rust 2024 · 객관적 UI 검증 시스템",
       heroTitle: "개발과 UI의 원천을 코드 하나로 합친다.",
       heroLead:
         "지금은 기획 문서, 피그마 디자인, 코드로 원천이 나뉘어 있습니다. dui는 화면 지도를 코드에서 만들고, UI를 고치면 같은 코드로 돌려보냅니다.",
@@ -152,7 +152,7 @@
       navExamples: "示例",
       navArch: "架构",
       navCli: "CLI 与 MCP",
-      eyebrow: "v0.2.0 · Rust 2024 · 基于客观事实的 UI 验证",
+      eyebrow: "Rust 2024 · 基于客观事实的 UI 验证",
       heroTitle: "让代码成为开发与 UI 的单一事实来源。",
       heroLead:
         "今天，策划文档、Figma 设计和代码各自为政。dui 从代码生成界面地图，UI 修改再写回同一份代码。",

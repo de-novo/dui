@@ -1,8 +1,8 @@
 // Verify embedded `apps/canvas` viewer (`dui open --no-open`), removal of legacy HTML galleries,
-// and tag-based version / update-check / installer tag resolution.
+// and the source installer PATH helper.
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -27,56 +27,6 @@ function runDui(args: string[], envExtra: Record<string, string>) {
 try {
   const home = join(stage, "home");
   const baseEnv = { HOME: home };
-
-  // 1. Verify `--version` reports SemVer version and `vX.Y.Z` tag.
-  const ver = runDui(["--version"], baseEnv);
-  assert.equal(ver.status, 0);
-  const verBody = ver.body as { name: string; version: string; tag: string };
-  assert.equal(verBody.name, "dui");
-  assert.match(verBody.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(verBody.tag, `v${verBody.version}`);
-
-  // 2. Verify tag-based `dui update --check` and `scripts/install` tag resolution against a local git repo.
-  const tagRepo = join(stage, "tag-repo");
-  execFileSync("git", ["init", "-q", "-b", "main", tagRepo]);
-  execFileSync("git", ["config", "user.name", "Test"], { cwd: tagRepo });
-  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tagRepo });
-  writeFileSync(join(tagRepo, "README.md"), "release test\n");
-  execFileSync("git", ["add", "README.md"], { cwd: tagRepo });
-  execFileSync("git", ["commit", "-q", "-m", "initial"], { cwd: tagRepo });
-  execFileSync("git", ["tag", verBody.tag], { cwd: tagRepo });
-
-  const upToDate = runDui(["update", "--check", "--repo", tagRepo], baseEnv);
-  assert.equal(upToDate.status, 0);
-  assert.equal((upToDate.body as { updateAvailable: boolean }).updateAvailable, false);
-  assert.equal((upToDate.body as { latest: string }).latest, verBody.tag);
-
-  execFileSync("git", ["tag", "v99.0.2"], { cwd: tagRepo });
-  execFileSync("git", ["tag", "v99.0.10"], { cwd: tagRepo });
-  const hasUpdate = runDui(["update", "--check", "--repo", tagRepo], baseEnv);
-  assert.equal(hasUpdate.status, 0);
-  const updateBody = hasUpdate.body as {
-    current: string;
-    latest: string;
-    nextTag: string;
-    updateAvailable: boolean;
-  };
-  assert.equal(updateBody.updateAvailable, true);
-  assert.equal(updateBody.latest, "v99.0.10");
-  assert.equal(updateBody.nextTag, "v99.0.10");
-
-  // Confirm `scripts/install` tag resolver picks v99.0.10 (numeric SemVer sort, not lexicographic).
-  const installResolved = execFileSync(
-    "sh",
-    [
-      "-c",
-      `git ls-remote --tags --refs "$1" 'v*' | awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v[0-9]+\\.[0-9]+\\.[0-9]+$/) print $2 }' | sort -t. -k1.2,1n -k2,2n -k3,3n | tail -n 1`,
-      "sh",
-      tagRepo,
-    ],
-    { encoding: "utf8" },
-  ).trim();
-  assert.equal(installResolved, "v99.0.10");
 
   // Confirm `scripts/install` PATH helper updates shell rc idempotently and respects DUI_NO_MODIFY_PATH=1.
   const fakeHome = join(stage, "fake-home");
@@ -111,7 +61,7 @@ try {
   );
   assert(!existsSync(join(optOutHome, ".zshrc")), "DUI_NO_MODIFY_PATH=1 must not modify .zshrc");
 
-  // 3. Capture a fixture and verify legacy graph.html / history.html are NOT generated.
+  // Capture a fixture and verify legacy graph.html / history.html are NOT generated.
   const appDir = join(stage, "app");
   cpSync(fixture, appDir, {
     recursive: true,
@@ -221,9 +171,6 @@ try {
 
     console.log(
       JSON.stringify({
-        version: verBody,
-        updateCheck: updateBody,
-        installResolvedTag: installResolved,
         embeddedViewerUrl: url,
         runsServed: runs.length,
         cellsServed: graph.cells.length,

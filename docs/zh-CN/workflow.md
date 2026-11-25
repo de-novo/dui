@@ -156,6 +156,8 @@ flowchart LR
 | 标签（tag） | nightly tag 无需批准。候选版和正式版 tag 需要维护者批准 |
 | 发布说明 | 由该 milestone 中合并的 PR 生成。过去的 CHANGELOG 条目和 Releases 从不修改 |
 
+网站和源码安装程序选择公开的最高稳定标签，无稳定标签时使用 `main`。发行标签必须与该提交的 Cargo 工作区版本一致。无标签检出的版本为 `X.Y.Z-dev+<commit>`，其 `tag` 为 null；源码归档的版本为 `X.Y.Z-dev`。开发构建可以更新到同版本的稳定标签。三个语言版本的变更日志都将待发布内容记录在 `## [Unreleased] — vX.Y.Z` 下。发布经批准的标签后，将这些条目移到带日期的版本标题下并更新 Unreleased 比较链接。
+
 ## 6. Projects 看板
 
 仓库只有一个看板。进度状态只放在它的 `Status` 字段中。
