@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NativeSourceEvidence } from "../../components/NativeSourceEvidence";
+import { SourceCardBody } from "../../components/NativeSourceEvidence";
 import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -139,7 +139,7 @@ export function CaptureCard({
             }}
           />
         ) : sourceCard ? (
-          <NativeSourceEvidence source={sourceCard} sourceOnly />
+          <SourceCardBody source={sourceCard} preview={screen.sourcePreview} />
         ) : (
           <div className="missing-frame-copy">
             <span>{cell ? "Missing image" : "No capture at this width"}</span>

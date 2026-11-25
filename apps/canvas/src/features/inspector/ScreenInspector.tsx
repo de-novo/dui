@@ -138,7 +138,7 @@ export function ScreenInspector({
             cell={{ state: cell.state, width: cell.width }}
           />
         )}
-      {screen?.nativeSource && (
+      {screen?.nativeSource && !screen.sourcePreview && (
         <NativeSourceEvidence
           source={screen.nativeSource}
           sourceOnly={rawScreenCells.length === 0}

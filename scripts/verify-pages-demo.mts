@@ -555,6 +555,9 @@ async function verifyRenderedPages(
           expression: `(async () => {
             const cards = Array.from(document.querySelectorAll(${JSON.stringify(vp.mobile ? ".mobile-deck-card" : ".react-flow__node")}));
             if (cards.length < 2) throw Error("Expected SwiftUI & Compose source preview cards");
+            if (!cards.every((card) => card.querySelector(".source-preview-snapshot .preview-switch"))) {
+              throw Error("Source preview cards did not show their first frame");
+            }
             const hit = ${vp.mobile} ? cards[0].querySelector("button") : cards[0];
             hit.click();
             const deadline = performance.now() + 8000;
