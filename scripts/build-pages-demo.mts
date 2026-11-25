@@ -349,7 +349,11 @@ function exportRunToArchive(
       ((scene as Record<string, unknown>).frames as unknown[]).length >= 2
     );
   }).length;
-  if (populated < 2 && readyPreviews < 2) {
+  // A source map from a native discovery adapter is evidence on its own: declarations with sources.
+  const nativeDeclarations = nodes.filter(
+    (n) => n && typeof n === "object" && (n as Record<string, unknown>).nativeSource,
+  ).length;
+  if (populated < 2 && readyPreviews < 2 && nativeDeclarations < 2) {
     throw new Error(
       `Refusing blank capture for ${path.basename(dest)}: only ${populated}/${cells.length} cells had >=10 rendered DOM nodes and ${readyPreviews} ready source previews`,
     );
@@ -736,6 +740,39 @@ async function main() {
         project: "SwiftUI & Compose (native captures)",
         branch: "Apache-2.0 · Swift 6 + Kotlin 2",
         version: "iPhone simulator + Android emulator",
+        diffWith: [],
+        liveAvailable: false,
+      });
+    }
+
+    if (!filterSet || filterSet.has("home-assistant-ios")) {
+      // Mapped and captured on macOS by the "SwiftUI screen discovery" workflow; see
+      // fixtures/home-assistant-ios/provenance.json.
+      const fixture = path.join(root, "fixtures/home-assistant-ios");
+      const provenance = JSON.parse(fs.readFileSync(path.join(fixture, "provenance.json"), "utf8"));
+      for (const capture of provenance.captures as Array<{ imageSha256: string }>) {
+        const matches = fs
+          .readdirSync(fixture)
+          .filter((name) => name.endsWith(".png"))
+          .filter(
+            (name) =>
+              createHash("sha256")
+                .update(fs.readFileSync(path.join(fixture, name)))
+                .digest("hex") === capture.imageSha256,
+          );
+        if (matches.length !== 1)
+          throw new Error("home-assistant-ios capture does not match provenance");
+      }
+      exportRunToArchive(fixture, path.join(archiveDir, "home-assistant-ios"), tmpHome, fixture);
+      console.log(
+        `[pages-demo] exported home-assistant-ios: ${provenance.declarations} SwiftUI declarations`,
+      );
+      runs.push({
+        key: "home-assistant-ios",
+        projectId: "oss-home-assistant-ios",
+        project: "home-assistant/iOS (SwiftUI)",
+        branch: `Apache-2.0 · ${String(provenance.commit).slice(0, 7)}`,
+        version: "Index store map + simulator capture",
         diffWith: [],
         liveAvailable: false,
       });

@@ -538,6 +538,15 @@ dialog::backdrop {
   gap: 10px;
 }
 
+/* Standalone links keep a 24 px target on phones (WCAG 2.2 SC 2.5.8). */
+.oss-repo,
+.site-footer a,
+.standalone-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
 .oss-repo {
   font-size: 12.5px;
   color: var(--muted);
@@ -737,7 +746,9 @@ dialog::backdrop {
 }
 
 .native-proof {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   width: fit-content;
   color: var(--muted);
   font-size: 14px;

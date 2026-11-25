@@ -1,0 +1,1 @@
+{ "designSpec": "./rules.json", "plugins": ["./viewer-check.mjs"] }
