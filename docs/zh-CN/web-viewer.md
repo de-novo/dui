@@ -110,7 +110,7 @@ GitHub 的 **Compare base and head captures** 检查在 PR 打开或更新时运
 
 依次运行 `dui map .` 和 `dui open`。卡片显示源码声明并保持未验证。选择卡片即可在检查器中操作观测到的开关。生成地图需要 Node 26 以及 Swift 6 或 Kotlin 2/JDK。打开已保存的地图只需要查看器。归档保存源文件 SHA-256、布局元素及观测到的状态转换。查看器将这些数据以 HTML 文本和控件重新绘制并加以说明。这并非真实的 iOS 或 Android 界面。要在卡片上显示真实界面，请用 `dui map attach` 关联模拟器或设备录制。
 
-卡片标识由项目、源文件和限定入口名决定。缺少源文件或遇到不支持的调用时，对应卡片会显示原因。从相应的本地项目打开归档时还会检查当前声明和源文件摘要。更改后再次运行 `dui map .`。源码预览的原生捕获尝试数和验证数均为零。通过 `dui map attach` 关联原生录制时须指定匹配的快照 ID 和屏幕 ID。
+卡片标识由项目、源文件和限定入口名决定。缺少源文件或遇到不支持的调用时，对应卡片会显示原因。从相应的本地项目打开归档时还会检查当前声明和源文件摘要。更改后再次运行 `dui map .`。源码预览的原生捕获尝试数和验证数均为零。通过 `dui map attach` 关联原生录制时须指定匹配的快照 ID 和屏幕 ID。所选宽度下没有截图的原生源码卡片会按录制本身的宽度显示该录制。仓库中的示例即是如此。**Source preview native captures** 工作流不加修改地用 SwiftUI 构建 `fixtures/source-preview/Settings.swift`，用 Jetpack Compose 构建 `Settings.kt`，并在 iPhone 模拟器和 Android 模拟器上截图。每张图片连同源文件、宿主与图片 SHA-256、设备、操作系统和工作流运行记录保存在 `fixtures/source-preview-native/recordings/`。Pages 演示会关联这些截图；若截图后源文件发生变化则构建失败。
 
 ## 2. 模块与依赖
 

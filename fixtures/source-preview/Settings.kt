@@ -10,8 +10,8 @@ import androidx.compose.runtime.*
     var notifications by remember { mutableStateOf(false) }
     var reminders by remember { mutableStateOf(true) }
     Column {
-        Row { Text("Notifications"); Switch(notifications) { notifications = it } }
-        Row { Text("Reminders"); Switch(reminders) { reminders = it } }
+        Row { Text("Notifications"); Switch(checked = notifications, onCheckedChange = { notifications = it }) }
+        Row { Text("Reminders"); Switch(checked = reminders, onCheckedChange = { reminders = it }) }
         Text(if (notifications) "Notifications on" else "Notifications off")
     }
 }

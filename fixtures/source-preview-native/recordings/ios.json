@@ -1,0 +1,21 @@
+{
+  "runtime": "ios",
+  "source": "ios/Settings.swift",
+  "entry": "Settings",
+  "fixture": "fixtures/source-preview/Settings.swift",
+  "sourceSha256": "9509f1ac1bd78d8eced8ea3a6b1df49f5925087722d42fc9ac0b776e16f26619",
+  "host": "fixtures/source-preview-native/ios/Host.swift",
+  "hostSha256": "a0060043397118cc5256571b2d4dff860667b9f4d2f3f80f87a5e7af6616a3ab",
+  "image": "ios.png",
+  "imageWidth": 1206,
+  "imageHeight": 2622,
+  "imageSha256": "1bfc3b33ca9a186927b3c2812eeb606cc46d1e88bda4a51eed2b28ee046971c9",
+  "width": 402,
+  "scale": 3,
+  "device": "iPhone 17",
+  "os": "iOS 26.5",
+  "toolchain": "Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)",
+  "witness": "Notifications off",
+  "commit": "83f66478a7d16b2488ad3f429addbda8fd4257fc",
+  "workflowRun": "https://github.com/de-novo/dui/actions/runs/45599382177"
+}

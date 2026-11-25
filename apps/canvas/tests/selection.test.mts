@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ScreenMap } from "../src/data/overview.ts";
 import {
+  cardCell,
   parseSelection,
   resolveCell,
   screenConnections,
@@ -80,4 +81,18 @@ test("resolves screen connections and selected cell deterministically", () => {
   assert.equal(incoming.length, 1);
   assert.equal(incoming[0].direction, "incoming");
   assert.equal(incoming[0].screen.id, "route:/?q=demo");
+});
+
+test("a native declaration without a capture at the selected width keeps its recorded width", () => {
+  const nativeSource = { source: "ios/Settings.swift", name: "Settings" };
+  const ios = {
+    id: "ios",
+    path: "ios/Settings.swift#Settings",
+    nativeSource,
+    cells: [{ path: "ios", width: 402, status: "unverified", scenario: "ios", image: "ios.png" }],
+  } as unknown as ScreenMap["screens"][number];
+  assert.equal(cardCell(ios, 411)?.image, "ios.png");
+  assert.equal(resolveCell(ios, 411, null).cell?.width, 402);
+  // Web screens keep the strict width match.
+  assert.equal(cardCell({ ...ios, nativeSource: undefined }, 411), undefined);
 });

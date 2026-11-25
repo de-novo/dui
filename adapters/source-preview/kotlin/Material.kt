@@ -8,7 +8,13 @@ import java.util.Base64
     Preview.lines.add("text\t" + Base64.getEncoder().encodeToString(text.toByteArray(Charsets.UTF_8)))
 }
 
-@Composable fun Switch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+// Material 3 ends with `interactionSource`, so a trailing lambda does not bind to
+// onCheckedChange there. Mirror that so code real Compose rejects is rejected here too.
+@Composable fun Switch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    @Suppress("UNUSED_PARAMETER") interactionSource: Nothing? = null,
+) {
     Preview.lines.add("switch\t" + (if (checked) "1" else "0") + "\t")
     Preview.actions.add { onCheckedChange(!checked) }
 }

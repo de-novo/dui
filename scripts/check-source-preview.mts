@@ -87,6 +87,17 @@ try {
       }
       writeFileSync(file, original.replace('"Notifications off"', "unsupportedNativeCall()"));
       assert.throws(() => exportPreview(file, entry), /unsupportedNativeCall/);
+      if (ext === "kt") {
+        // Material 3 binds a trailing lambda to interactionSource, so real Compose rejects this.
+        writeFileSync(
+          file,
+          original.replace(
+            "Switch(checked = notifications, onCheckedChange = { notifications = it })",
+            "Switch(notifications) { notifications = it }",
+          ),
+        );
+        assert.throws(() => exportPreview(file, entry), /onCheckedChange/);
+      }
       console.log(
         ext +
           ": source edits, independent and shared state, offline interaction and unsupported call passed",

@@ -169,7 +169,11 @@ export function MobileScreenDeck({
                   </div>
                 )}
                 {src && (
-                  <div className="mobile-deck-frame">
+                  <div
+                    className={
+                      "mobile-deck-frame" + (screen.nativeSource ? " mobile-deck-frame-whole" : "")
+                    }
+                  >
                     <img src={src} alt={routeName(screen.path)} loading="lazy" />
                   </div>
                 )}

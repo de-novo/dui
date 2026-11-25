@@ -1,0 +1,10 @@
+{
+  "host": "android",
+  "activity": "sh.dui.sourcepreview/.HostActivity",
+  "package": "sh.dui.sourcepreview",
+  "path": "/settings",
+  "widths": [
+    1080
+  ],
+  "height": 1920
+}

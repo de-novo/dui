@@ -2528,6 +2528,20 @@ h2 {
     object-position: top;
   }
 
+  /* A device recording is one whole phone screen; show all of it instead of the top. */
+  .mobile-deck-frame-whole {
+    max-height: none;
+  }
+  .mobile-deck-frame-whole::after {
+    content: none;
+  }
+  .mobile-deck-frame-whole img {
+    width: auto;
+    max-width: 100%;
+    max-height: min(70dvh, 560px);
+    margin-inline: auto;
+  }
+
   .mobile-deck-links {
     display: flex;
     align-items: center;

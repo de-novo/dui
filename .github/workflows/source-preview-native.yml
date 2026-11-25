@@ -1,0 +1,82 @@
+name: Source preview native captures
+on:
+  pull_request:
+    paths:
+      - "fixtures/source-preview/**"
+      - "fixtures/source-preview-native/ios/**"
+      - "fixtures/source-preview-native/android/**"
+      - "scripts/capture-source-preview-*"
+      - "scripts/ios_simulator.py"
+      - "scripts/check-ios-screenshot.swift"
+      - ".github/workflows/source-preview-native.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  DUI_CAPTURE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build Settings.swift with SwiftUI and capture it on an iPhone simulator
+        run: python3 scripts/capture-source-preview-ios.py "$RUNNER_TEMP/capture"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: source-preview-native-ios
+          path: |
+            ${{ runner.temp }}/capture/ios.png
+            ${{ runner.temp }}/capture/ios.json
+            ${{ runner.temp }}/capture/debug.png
+          retention-days: 7
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - name: Build dui and the Compose host APK
+        run: |
+          npm ci
+          npm ci --prefix apps/canvas
+          cargo build --locked
+          JAVA_HOME="$JAVA_HOME_21_X64" gradle --no-daemon -p fixtures/source-preview-native/android assembleDebug
+      - name: Capture Settings.kt on an Android emulator
+        env:
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/dui-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          image="system-images;android-35;google_apis;x86_64"
+          sdkmanager "$image"
+          echo no | avdmanager create avd --name dui-source-preview --package "$image" --device pixel_2
+          sudo chmod a+rw /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -avd dui-source-preview -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          timeout 300 bash -c 'until [ "$(adb -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = 1 ]; do kill -0 "$1" || exit 1; sleep 2; done' _ "$emulator_pid" || { tail -100 "$RUNNER_TEMP/emulator.log"; exit 1; }
+          adb -s "$ANDROID_SERIAL" shell input keyevent KEYCODE_WAKEUP
+          adb -s "$ANDROID_SERIAL" shell wm dismiss-keyguard
+          adb -s "$ANDROID_SERIAL" install fixtures/source-preview-native/android/build/outputs/apk/debug/*.apk
+          node scripts/capture-source-preview-android.mts "$RUNNER_TEMP/capture"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source-preview-native-android
+          path: |
+            ${{ runner.temp }}/capture/android.png
+            ${{ runner.temp }}/capture/android.json
+          retention-days: 7
+          if-no-files-found: error

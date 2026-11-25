@@ -58,14 +58,31 @@ export function stateKeyFor(cells: Cell[], index: number): string {
     : "cell:" + index;
 }
 
+/**
+ * The width a screen is shown at. A native source declaration is recorded once per runtime at
+ * its device's own width, so with no capture at the selected width it keeps its recorded width.
+ */
+export function screenWidth(screen: Screen | undefined, width: number): number {
+  const cells = screen?.entries ?? screen?.cells ?? [];
+  if (!screen?.nativeSource || cells.some((c) => c.width === width)) return width;
+  return cells.find((c) => c.image)?.width ?? width;
+}
+
+/** The capture a map card shows for a screen at the selected width. */
+export function cardCell(screen: Screen, width: number): Cell | undefined {
+  const shown = screenWidth(screen, width);
+  return (screen.entries ?? screen.cells).find((c) => c.width === shown);
+}
+
 export function resolveCell(
   screen: Screen | undefined,
   width: number,
   state: string | null,
   locale: string | null = null,
 ): { cells: Cell[]; cell: Cell | undefined } {
+  const shown = screenWidth(screen, width);
   const cells =
-    screen?.cells.filter((c) => c.width === width && (locale === null || c.locale === locale)) ??
+    screen?.cells.filter((c) => c.width === shown && (locale === null || c.locale === locale)) ??
     [];
   const cell =
     state === null ? cells[0] : cells.find((_, index) => stateKeyFor(cells, index) === state);
