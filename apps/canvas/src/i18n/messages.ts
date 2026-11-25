@@ -59,6 +59,11 @@ export type Messages = {
   overview: string;
   backToOverview: string;
   backToArchive: string;
+  responsivePreview: string;
+  viewport: string;
+  constraint: string;
+  height: string;
+  applyLayout: string;
   openLive: string;
   closeLiveSession: string;
   liveControls: string;
@@ -217,6 +222,11 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     overview: "Overview",
     backToOverview: "Back to overview",
     backToArchive: "Back to archive",
+    responsivePreview: "Responsive preview",
+    viewport: "Viewport",
+    constraint: "Resize target",
+    height: "Height",
+    applyLayout: "Apply",
     openLive: "Open live",
     closeLiveSession: "Close live session",
     liveControls: "Live state controls",
@@ -383,6 +393,11 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     overview: "概览",
     backToOverview: "返回概览",
     backToArchive: "返回归档",
+    responsivePreview: "响应式预览",
+    viewport: "视口",
+    constraint: "调整大小的对象",
+    height: "高度",
+    applyLayout: "应用",
     openLive: "打开实时会话",
     closeLiveSession: "关闭实时会话",
     liveControls: "实时状态控制",
@@ -547,6 +562,11 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     overview: "개요",
     backToOverview: "개요로 돌아가기",
     backToArchive: "아카이브로 돌아가기",
+    responsivePreview: "반응형 미리보기",
+    viewport: "화면 영역",
+    constraint: "크기 조절 대상",
+    height: "높이",
+    applyLayout: "적용",
     openLive: "라이브 열기",
     closeLiveSession: "라이브 세션 닫기",
     liveControls: "라이브 상태 조작",

@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
+import { ResponsivePreview } from "./ResponsivePreview";
 import { NativeSourceEvidence } from "../../components/NativeSourceEvidence";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
 import { Button } from "../../components/ui/button";
@@ -126,6 +127,16 @@ export function ScreenInspector({
         </Button>
       </div>
 
+      {run.responsiveAvailable &&
+        !screen?.nativeSource &&
+        cell?.state &&
+        cell.scenario !== "live" && (
+          <ResponsivePreview
+            key={JSON.stringify([run.key, cell.state, cell.width])}
+            run={run.key}
+            cell={{ state: cell.state, width: cell.width }}
+          />
+        )}
       {screen?.nativeSource && (
         <NativeSourceEvidence
           source={screen.nativeSource}

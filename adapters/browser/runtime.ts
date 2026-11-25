@@ -276,7 +276,7 @@ declare var __duiProbe: {
       ),
     );
   }
-  function collectRenderTree(scopeRoot?: Element | null) {
+  function collectRenderTree(scopeRoot?: Element | null, measureText = false) {
     const interesting = new Set([
       "h1",
       "h2",
@@ -563,7 +563,17 @@ declare var __duiProbe: {
           style.alignItems = cs.alignItems;
         }
       }
+      const textLines = new Set<number>();
+      if (measureText) {
+        const range = document.createRange();
+        for (const child of el.childNodes) {
+          if (child.nodeType !== Node.TEXT_NODE || !child.textContent?.trim()) continue;
+          range.selectNodeContents(child);
+          for (const rect of range.getClientRects()) textLines.add(rect.top);
+        }
+      }
       nodes.push({
+        ...(measureText ? { textLines: textLines.size } : {}),
         id,
         tag,
         ...(role ? { role } : {}),
@@ -719,8 +729,128 @@ declare var __duiProbe: {
     root.style.setProperty(property, "stable", "important");
     restoreGutter = () => root.style.setProperty(property, value, priority);
   }
+  const liveIds = new WeakMap<HTMLElement, number>();
+  let nextLiveId = 1;
+  function liveContainers() {
+    return Array.from(document.querySelectorAll<HTMLElement>("*")).filter(
+      (el) =>
+        el instanceof HTMLElement &&
+        el.getClientRects().length > 0 &&
+        getComputedStyle(el)
+          .containerType.split(/\s+/)
+          .some((type) => type === "size" || type === "inline-size"),
+    );
+  }
+  function liveId(el: HTMLElement) {
+    const existing = liveIds.get(el);
+    if (existing !== undefined) return existing;
+    const id = nextLiveId++;
+    liveIds.set(el, id);
+    return id;
+  }
+  function liveFields() {
+    return Array.from(
+      document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        "input, textarea, select",
+      ),
+    ).filter(
+      (el) =>
+        !el.disabled &&
+        el.getClientRects().length &&
+        (el instanceof HTMLSelectElement
+          ? !el.multiple
+          : !el.readOnly &&
+            (el instanceof HTMLTextAreaElement || ["text", "search"].includes(el.type))),
+    );
+  }
+  function prepareLiveField(id: number, value: string) {
+    const field = liveFields().find((el) => liveId(el) === id);
+    if (!field) return "field-unavailable";
+    if (field instanceof HTMLSelectElement) {
+      if (
+        !Array.from(field.options).some(
+          (option) => option.value === value && !option.matches(":disabled"),
+        )
+      )
+        return "option-unavailable";
+      field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+      return "selected";
+    }
+    field.focus();
+    field.select();
+    return document.activeElement === field ? "focused" : "field-unavailable";
+  }
+  async function liveLayout(target?: number, width?: number, height?: number) {
+    if (target !== undefined) {
+      const el = liveContainers().find((node) => liveId(node) === target);
+      if (!el) return { error: "container-unavailable" };
+      if (width !== undefined) el.style.setProperty("width", width + "px", "important");
+      if (height !== undefined) el.style.setProperty("height", height + "px", "important");
+    }
+    await new Promise<void>((done) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => done())),
+    );
+    const root = document.documentElement;
+    return {
+      width: innerWidth,
+      height: innerHeight,
+      path: location.pathname + location.search + location.hash,
+      scrollWidth: root.scrollWidth,
+      scrollHeight: root.scrollHeight,
+      fields: liveFields().map((el) => ({
+        id: liveId(el),
+        label:
+          el.labels?.[0]?.textContent?.trim() ||
+          el.getAttribute("aria-label") ||
+          el.name ||
+          el.id ||
+          el.tagName.toLowerCase(),
+        value: el.value,
+        ...(el instanceof HTMLSelectElement
+          ? {
+              options: Array.from(el.options).map((option) => ({
+                value: option.value,
+                label: option.label,
+                disabled: option.matches(":disabled"),
+              })),
+            }
+          : {}),
+      })),
+      containers: liveContainers().map((el) => ({
+        id: liveId(el),
+        label:
+          el.id ||
+          getComputedStyle(el).containerName.replace(/^none$/, "") ||
+          el.tagName.toLowerCase(),
+        width: parseFloat(getComputedStyle(el).width),
+        height: parseFloat(getComputedStyle(el).height),
+      })),
+      renderTree: collectRenderTree(null, true),
+    };
+  }
   Object.assign(globalThis, {
     __duiRuntime: {
+      liveLayout,
+      prepareLiveField,
+      containerStyle(id: number, axis: string) {
+        const el = liveContainers().find((node) => liveId(node) === id);
+        return el
+          ? {
+              id,
+              axis,
+              value: el.style.getPropertyValue(axis),
+              priority: el.style.getPropertyPriority(axis),
+            }
+          : null;
+      },
+      restoreContainerStyle(style: { id: number; axis: string; value: string; priority: string }) {
+        const el = liveContainers().find((node) => liveId(node) === style.id);
+        if (!el) return false;
+        el.style.setProperty(style.axis, style.value, style.priority);
+        return true;
+      },
       setCaptureGutter,
       install,
       visibleText,

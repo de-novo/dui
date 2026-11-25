@@ -1,3 +1,5 @@
+mod layout;
+mod sampling;
 use super::{field, invalid};
 use crate::{
     Reply, analysis,
@@ -102,6 +104,7 @@ impl Drop for GpuiProcess {
 }
 
 struct WebBackend {
+    viewport_width: u64,
     browser: Browser,
     _host: RunningHost,
     page: String,
@@ -160,6 +163,10 @@ impl Session {
         let archived_manifest = directory.join("manifest.json");
         let manifest = if request.get("manifest").is_some() {
             Path::new(field(request, "manifest")?)
+        } else if request["webLayoutOnly"] == true {
+            // Only start code and configuration from the chosen local project.
+            crate::screen_map::discover(project, &generated)?;
+            &generated
         } else if archived_manifest.is_file() {
             &archived_manifest
         } else {
@@ -171,6 +178,12 @@ impl Session {
         }
 
         let mut spec = read(manifest)?;
+        if request["webLayoutOnly"] == true
+            && (gpui::is_gpui_manifest(&spec)
+                || !matches!(spec["host"].as_str(), None | Some("vite")))
+        {
+            return Err(invalid("resize-unavailable"));
+        }
         if gpui::is_gpui_manifest(&spec) {
             let toolchain = gpui::select_toolchain();
             let binary = gpui::build_fixture(project, toolchain.as_deref())?;
@@ -190,6 +203,7 @@ impl Session {
                 "compiler": gpui::rustc_version(toolchain.as_deref()),
                 "versions": gpui::lockfile_versions(project),
                 "renderer": format!("gpui-kit/{render_path}"),
+                "resizeTargets":[],
                 "renderPath": render_path,
                 "elementTreeAvailable": init_reply["elementTreeAvailable"],
             });
@@ -255,9 +269,10 @@ impl Session {
         {
             return Err(invalid("cell-not-ready"));
         }
-        let environment = json!({"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"compiler":analysis["compiler"],"versions":analysis["versions"],"renderer":browser.version().map_err(io)?["product"]});
+        let environment = json!({"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"compiler":analysis["compiler"],"versions":analysis["versions"],"resizeTargets":["viewport","css-query-container"],"renderer":browser.version().map_err(io)?["product"]});
         let mut session = Self {
             backend: Backend::Web(Box::new(WebBackend {
+                viewport_width: u64::from(width),
                 browser,
                 _host: host,
                 page,
@@ -430,7 +445,10 @@ impl Session {
         if op == "frame" {
             return self.frame();
         }
-        if !matches!(op, "set" | "reset" | "save") {
+        if op == "layout" {
+            return self.layout(None);
+        }
+        if !matches!(op, "set" | "reset" | "save" | "resize" | "fill" | "sample") {
             return Err(invalid("unknown-operation"));
         }
         let key = field(r, "requestId")?;
@@ -438,6 +456,22 @@ impl Session {
             Decision::Replay(result) => return result.clone(),
             Decision::Reject("request-id-reused") => return Err(invalid("request-id-reused")),
             Decision::Reject(reason) => Err(invalid(reason)),
+            Decision::Write { revision } if op == "sample" => {
+                self.sample_layout(r).map(|mut body| {
+                    self.revision = revision;
+                    body["revision"] = json!(revision);
+                    body
+                })
+            }
+            Decision::Write { revision } if matches!(op, "resize" | "fill") => (if op == "resize" {
+                self.layout(Some(r))
+            } else {
+                self.fill(r)
+            })
+            .map(|layout| {
+                self.revision = revision;
+                json!({"session":self.id,"cell":self.cell,"revision":revision,"layout":layout})
+            }),
             Decision::Write { .. } if op == "save" => self.save(),
             Decision::Write { revision } => self.edit(op, r, revision).map(|mut body| {
                 body["launches"] = super::launches();
@@ -545,6 +579,9 @@ impl Session {
             .cloned()
             .ok_or_else(|| invalid("no-edited-revision"))?;
 
+        if result["revision"] != self.revision {
+            return Err(invalid("no-state-assertion-for-revision"));
+        }
         match &mut self.backend {
             Backend::Gpui { process } => {
                 let target = self
@@ -636,14 +673,15 @@ impl Session {
             }
             Backend::Web(web) => {
                 let facts = web.facts.clone();
+                let viewport_width = web.viewport_width;
                 let selector = result["evidence"].get("selector").filter(|v| v.is_string());
                 let sample = match selector {
                     Some(selector) => format!(
-                        "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,visibleText:globalThis.__duiRuntime.visibleText({selector}),path:location.pathname+location.search+location.hash,width:innerWidth}}) : null",
+                        "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,visibleText:globalThis.__duiRuntime.visibleText({selector}),path:location.pathname+location.search+location.hash,width:innerWidth,height:innerHeight}}) : null",
                         json!(self.id)
                     ),
                     None => format!(
-                        "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,path:location.pathname+location.search+location.hash,width:innerWidth}}) : null",
+                        "globalThis.__duiLivePage==={} ? ({{instances:globalThis.__duiProbe.instances,path:location.pathname+location.search+location.hash,width:innerWidth,height:innerHeight}}) : null",
                         json!(self.id)
                     ),
                 };
@@ -669,8 +707,7 @@ impl Session {
                 let value = observation["instances"][slot][instance].get("value");
                 let reason = if before != observation {
                     Some("changed-during-capture")
-                } else if observation["path"] != self.path
-                    || observation["width"] != self.cell["width"]
+                } else if observation["path"] != self.path || observation["width"] != viewport_width
                 {
                     Some("cell-mismatch")
                 } else if result["status"] != "verified" {
@@ -710,7 +747,7 @@ impl Session {
                         "evidence": result["evidence"],
                     }),
                 };
-                let cell = json!({"path":self.path,"scenario":"live","state":state,"width":self.cell["width"],"planIndex":0,
+                let cell = json!({"path":self.path,"scenario":"live","state":state,"width":observation["width"],"height":observation["height"],"planIndex":0,
                     "status":if reason.is_some(){"unverified"}else{"verified"},"reason":reason,"image":filename,"imageSha256":digest,"observation":observation,
                     "assertion":assertion});
                 let report = json!({"path":self.path,"live":{"sourceRun":self.source_run,"sourceCell":self.cell,"revision":self.revision,"edits":self.edits,"environment":self.environment},
@@ -732,7 +769,7 @@ impl Session {
                     "project": published["snapshot"]["projectId"],
                     "run": published["snapshot"]["id"],
                     "output": published["output"],
-                    "cell": { "state": state, "width": self.cell["width"] },
+                    "cell": { "state": state, "width": observation["width"] },
                     "revision": self.revision,
                     "status": cell["status"],
                     "reason": reason,

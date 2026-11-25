@@ -184,6 +184,12 @@ editResult = {session, cell, instance, slot, revision, observedValue, status, re
 
 在固定版本的 React inspect 夹具上交替编辑 30 次，从所有者进程接受请求到验证状态值及可见文本，**p50 为 111.4 ms**，**p95 为 112.9 ms**。在 Apple M1 Pro、Darwin 25.5.0、Node 26.13.0、TypeScript 7.0.2 和 Chrome 157.0.8103.79 上，打开新会话耗时 **1.72 s**。冷启动构建一次主机并启动一次浏览器，热编辑期间两项均为零。依次运行 `npm ci`、`npm ci --prefix fixtures/replay` 和 `npm run check:inspect` 可复现。每次运行均输出环境和夹具哈希。
 
+### 调整已挂载网页的尺寸
+
+在已安装依赖的本地 Vite 项目中运行 `dui map .`，然后在同一目录运行 `dui open`。选择地图卡片并打开 **响应式预览**。用 CSS 像素设置宽度或高度后点击 **应用**。选择 CSS 查询容器可单独调整其尺寸约束。显示的文本输入框和单选下拉菜单可编辑已挂载页面的值。每一帧都来自 Chromium 完成布局后的画面。关闭对话框即结束会话。仅有归档的卡片保留原始尺寸和来源。原生适配器不提供此网页功能。
+
+CLI 与 MCP 实时会话使用相同的测量方式。向已打开的会话发送带原始单元格的 `layout` 可读取视口尺寸、滚动范围、容器 ID 和观测到的元素树。`resize` 接受一个或两个轴，以及可选的 `container` ID。`sample` 接受 `axis`、整数 `min` 和 `max`（1–4096 CSS 像素），以及 2–32 次观测的 `budget`。修改请求使用当前 `expectedRevision` 和新的 `requestId`。采样会恢复原有尺寸约束，返回实测坐标、元素可见性、文本行数或兄弟元素对齐的变化以及未采样区间。证据范围限于采样帧和渲染器返回的元素。源归档及已验证覆盖率保持不变。
+
 ## 5. 模式与验收
 
 | 模式 | 验收结果 |

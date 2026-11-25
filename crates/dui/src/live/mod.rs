@@ -1,5 +1,7 @@
 //! One loopback owner per open cell. Only its local clients receive the session ID.
 mod session;
+pub(crate) const MAX_LAYOUT_SIZE: u64 = 4096;
+pub(crate) const MAX_LAYOUT_SAMPLES: u64 = 32;
 use crate::{
     Reply, analysis, failure,
     replay::{io, read},
