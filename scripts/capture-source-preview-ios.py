@@ -55,18 +55,20 @@ def build_app(temp):
     }
     (app / "Info.plist").write_bytes(plistlib.dumps(plist))
     subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
-    return app, read("xcrun", "swiftc", "--version").splitlines()[0]
+    version = read("xcrun", "swiftc", "--version", stderr=subprocess.STDOUT)
+    return app, next(line for line in version.splitlines() if "Swift version" in line).strip()
 
 
-def wait_for_screen(log):
-    deadline = time.monotonic() + 60
+def wait_for_screen(udid, debug):
+    data = Path(read("xcrun", "simctl", "get_app_container", udid, BUNDLE_ID, "data"))
+    report = data / "Documents/dui-screen.json"
+    deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
-        if log.exists():
-            for line in log.read_text().splitlines():
-                if line.startswith("DUI_SCREEN "):
-                    return json.loads(line[len("DUI_SCREEN "):])
+        if report.exists():
+            return json.loads(report.read_text())
         time.sleep(0.5)
-    raise TimeoutError("The host app did not report its screen")
+    subprocess.run(["xcrun", "simctl", "io", udid, "screenshot", "--type=png", str(debug)], check=False)
+    raise TimeoutError(f"The host app did not report its screen; see {debug.name}")
 
 
 def main():
@@ -83,10 +85,8 @@ def main():
                         "-o", str(checker)], check=True)
         with fresh_iphone("source-preview") as phone:
             subprocess.run(["xcrun", "simctl", "install", phone.udid, str(app)], check=True)
-            log = temp / "stdout.log"
-            subprocess.run(["xcrun", "simctl", "launch", f"--stdout={log}", phone.udid, BUNDLE_ID],
-                           check=True)
-            screen = wait_for_screen(log)
+            subprocess.run(["xcrun", "simctl", "launch", phone.udid, BUNDLE_ID], check=True)
+            screen = wait_for_screen(phone.udid, output / "debug.png")
             # Let the first frame settle before reading pixels.
             time.sleep(2)
             image = output / "ios.png"

@@ -12,15 +12,16 @@ struct DuiSourcePreviewHost: App {
     }
 }
 
-/// Prints the logical screen size once the component is on screen, for the capture script.
+/// Writes the logical screen size to Documents/dui-screen.json once the component is on screen.
 private func reportScreen() {
     DispatchQueue.main.async {
         guard let screen = UIApplication.shared.connectedScenes
-            .compactMap({ ($0 as? UIWindowScene)?.screen }).first
+            .compactMap({ ($0 as? UIWindowScene)?.screen }).first,
+            let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         else { return }
-        print(
-            "DUI_SCREEN {\"width\":\(screen.bounds.width),\"height\":\(screen.bounds.height),\"scale\":\(screen.scale)}"
-        )
-        fflush(stdout)
+        let report = ["width": screen.bounds.width, "height": screen.bounds.height, "scale": screen.scale]
+        if let data = try? JSONSerialization.data(withJSONObject: report) {
+            try? data.write(to: documents.appendingPathComponent("dui-screen.json"))
+        }
     }
 }

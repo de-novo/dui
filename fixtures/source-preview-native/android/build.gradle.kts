@@ -27,7 +27,7 @@ android {
     }
     buildFeatures { compose = true }
     // Compile fixtures/source-preview/Settings.kt unchanged; the .swift file there is ignored.
-    sourceSets.getByName("main").java.srcDir("../../source-preview")
+    sourceSets.getByName("main").kotlin.srcDir("../../source-preview")
 }
 
 dependencies {

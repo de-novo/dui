@@ -23,11 +23,13 @@ jobs:
       - name: Build Settings.swift with SwiftUI and capture it on an iPhone simulator
         run: python3 scripts/capture-source-preview-ios.py "$RUNNER_TEMP/capture"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: source-preview-native-ios
           path: |
             ${{ runner.temp }}/capture/ios.png
             ${{ runner.temp }}/capture/ios.json
+            ${{ runner.temp }}/capture/debug.png
           retention-days: 7
           if-no-files-found: error
 
