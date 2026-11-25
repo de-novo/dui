@@ -16,6 +16,8 @@ use std::{
     time::Duration,
 };
 
+mod responsive;
+
 mod canvas_assets {
     include!(concat!(env!("OUT_DIR"), "/canvas_assets.rs"));
 }
@@ -27,6 +29,8 @@ struct ArchiveEntry {
 }
 
 struct ViewerState {
+    responsive_sessions: BTreeSet<String>,
+    live_project: Option<PathBuf>,
     cli_paths: Vec<PathBuf>,
     extra_saved_paths: BTreeSet<PathBuf>,
     diff_overlay_dirs: BTreeMap<String, PathBuf>,
@@ -202,6 +206,7 @@ fn list_archives(state: &ViewerState) -> Vec<ArchiveEntry> {
                 "branch": branch,
                 "version": version,
                 "liveAvailable": project_path.is_some(),
+                "responsiveAvailable": responsive::available(state, project_path.as_deref(), &root),
             });
             ArchiveEntry { root, run }
         })
@@ -469,6 +474,28 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
     let path = percent_decode(raw_path);
     let query = parse_query(raw_query);
 
+    if path == "/api/responsive" {
+        let host = headers.get("host").map(String::as_str).unwrap_or_default();
+        let loopback = stream.local_addr().is_ok_and(|addr| {
+            host == addr.to_string() || host == format!("localhost:{}", addr.port())
+        });
+        if method != "POST"
+            || !loopback
+            || headers.get("origin") != Some(&format!("http://{host}"))
+            || headers.get("content-type").map(String::as_str) != Some("application/json")
+        {
+            send_json(&mut stream, 403, &json!({"reason":"forbidden-origin"}));
+            return;
+        }
+        let result = serde_json::from_slice(&body_bytes)
+            .map_err(|_| failure(2, "invalid-json"))
+            .and_then(|body| responsive::command(&state, &body));
+        match result {
+            Ok(body) => send_json(&mut stream, 200, &body),
+            Err((code, body)) => send_json(&mut stream, if code == 2 { 400 } else { 500 }, &body),
+        }
+        return;
+    }
     if let Some(archive_name) = path.strip_prefix("/archive/") {
         if method != "GET" {
             send_response(&mut stream, 405, "text/plain", "no-store", b"");
@@ -1002,6 +1029,10 @@ pub fn serve(run_dirs: Vec<PathBuf>, port: u16, open_browser: bool) -> Reply {
     }
 
     let state = Arc::new(Mutex::new(ViewerState {
+        responsive_sessions: BTreeSet::new(),
+        live_project: std::env::current_dir()
+            .ok()
+            .and_then(|p| p.canonicalize().ok()),
         cli_paths: run_dirs,
         extra_saved_paths: BTreeSet::new(),
         diff_overlay_dirs: BTreeMap::new(),

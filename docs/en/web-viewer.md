@@ -184,6 +184,12 @@ Use a unique request ID per edit. Retry the same payload after a lost reply. For
 
 On the pinned React inspect fixture, 30 alternating edits took **111.4 ms p50** and **112.9 ms p95** from owner acceptance to verified value and visible text. Opening a fresh session took **1.72 s** on an Apple M1 Pro, Darwin 25.5.0, Node 26.13.0, TypeScript 7.0.2 and Chrome 157.0.8103.79. Cold startup built one host and launched one browser. Both warm counts were zero. Reproduce with `npm ci`, `npm ci --prefix fixtures/replay` and `npm run check:inspect`. Each run prints its environment and fixture hashes.
 
+### Resize a mounted web screen
+
+Run `dui map .` and then `dui open` from the same local Vite project with its dependencies installed. Select a map card and choose **Responsive preview**. Change width or height in CSS pixels and press **Apply**. Choose a CSS query container to change just its own sizing constraint. Use the displayed text fields and single-select menus to edit the mounted page. Each frame comes from Chromium after layout. Closing the dialog ends the session. Archive-only cards keep their recorded dimensions and provenance. Native adapters do not advertise this web capability.
+
+CLI and MCP live sessions expose the same measurements. Send `layout` with the open session and its original cell to read viewport dimensions, scroll extents, container IDs and the observed element tree. Send `resize` with either or both axes and an optional `container` ID. Send `sample` with `axis`, integer `min` and `max` (1–4096 CSS pixels), and a `budget` of 2–32 observations. Mutations use the current `expectedRevision` and a fresh `requestId`. Sampling restores the original constraint and reports measured geometry, observed changes in visible elements, text lines or sibling alignment, and unsampled intervals. Evidence covers the sampled frames and the elements returned by the renderer. These operations leave the source archive and verified coverage unchanged.
+
 ## 5. Patterns and acceptance
 
 | Pattern | Acceptance check |

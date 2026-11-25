@@ -27,15 +27,17 @@ fn recheck_tool() -> Value {
 fn live_tool() -> Value {
     json!({
         "name":"live",
-        "description":"Open one archived cell, inspect its running controls, set/reset one value with a visible text assertion, save the revision, or close the session. Open requires project, run, cell and requestId; manifest is optional for map captures. Edits require session, cell, slot, instance, expectedRevision, requestId and expect.",
+        "description":"Open one archived cell, inspect its running controls, set/reset one value with a visible text assertion, measure and resize a mounted web viewport or CSS query container, sample a size interval, fill a web text field, save the revision, or close the session. Open requires project, run, cell and requestId; manifest is optional for map captures. Edits require session, cell, slot, instance, expectedRevision, requestId and expect.",
         "inputSchema":{
             "type":"object","required":["op"],"additionalProperties":false,
             "properties":{
-                "op":{"enum":["open","inspect","frame","set","reset","save","close"]},
+                "op":{"enum":["open","inspect","frame","layout","resize","sample","fill","set","reset","save","close"]},
                 "project":{"type":"string"},"manifest":{"type":"string"},"run":{"type":"string"},
                 "session":{"type":"string"},"requestId":{"type":"string"},
                 "cell":{"type":"object","required":["state","width"],"properties":{"state":{"type":"string"},"width":{"type":"integer","minimum":1}}},
                 "expectedRevision":{"type":"integer","minimum":0},
+                "axis":{"enum":["width","height"]},"min":{"type":"integer","minimum":1},"max":{"type":"integer","maximum":crate::live::MAX_LAYOUT_SIZE},"budget":{"type":"integer","minimum":2,"maximum":crate::live::MAX_LAYOUT_SAMPLES},
+                "width":{"type":"integer","minimum":1,"maximum":crate::live::MAX_LAYOUT_SIZE},"height":{"type":"integer","minimum":1,"maximum":crate::live::MAX_LAYOUT_SIZE},"container":{"type":"integer","minimum":1},"field":{"type":"integer","minimum":1},"text":{"type":"string"},
                 "slot":{"type":"string"},"instance":{"type":"string"},"value":{},
                 "expect":{"type":"object","properties":{"selector":{"type":"string"},"text":{"type":"string"},"label":{"type":"string"},"checked":{"type":"boolean"}}}
             }

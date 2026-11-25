@@ -2575,3 +2575,34 @@ h2 {
   fill: none;
   stroke: currentColor;
 }
+
+.responsive-dialog {
+  width: min(56rem, calc(100% - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+.responsive-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+}
+.responsive-dialog[data-slot="dialog-content"] label {
+  margin: 0;
+  min-width: 0;
+}
+.responsive-dialog :is(input, select) {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.375rem 0.5rem;
+}
+.responsive-dialog input[type="number"] {
+  width: 7rem;
+}
+.responsive-frame {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}

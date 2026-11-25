@@ -280,6 +280,32 @@ try {
           c.slot === first.slot && c.instance === first.instance && c.value === true,
       ),
     );
+    const resized = live({
+      ...target,
+      op: "resize",
+      width: base.width + 13,
+      expectedRevision: saved.revision,
+      requestId: "resize-after-save",
+    });
+    live(
+      { ...save, requestId: "save-without-state-assertion", expectedRevision: resized.revision },
+      "mcp",
+      "no-state-assertion-for-revision",
+    );
+    const edited = live({
+      ...change,
+      requestId: "state-at-new-width",
+      expectedRevision: resized.revision,
+    });
+    const updated = live({
+      ...save,
+      requestId: "save-new-width",
+      expectedRevision: edited.revision,
+    });
+    assert.equal(updated.cell.width, resized.layout.width);
+    const resizedReport = JSON.parse(readFileSync(join(updated.output, "report.json"), "utf8"));
+    assert.deepEqual(resizedReport.live.sourceCell, base);
+    assert.equal(resizedReport.cells[0].height, resized.layout.height);
   } finally {
     live({ ...target, op: "close" });
   }
