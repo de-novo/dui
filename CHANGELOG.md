@@ -5,11 +5,12 @@ English | [한국어](docs/ko/changelog.md) | [简体中文](docs/zh-CN/changelo
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-## [v0.2.0] - 2026-11-23
+## [Unreleased] — v0.2.0
 
 ### Added
+
+- Map reachable web pages from a local URL or static build, discover native routes from source, and attach simulator recordings. ([#238](https://github.com/de-novo/dui/pull/238), [#241](https://github.com/de-novo/dui/pull/241), [#243](https://github.com/de-novo/dui/pull/243)).
+- Check capture evidence, retry failed cells, and compare captured screens in pull requests. ([#199](https://github.com/de-novo/dui/pull/199), [#201](https://github.com/de-novo/dui/pull/201), [#205](https://github.com/de-novo/dui/pull/205)).
 
 - Full-page screen capture (expanding nested app-shell scroll containers) with true-aspect card layout on both Web Canvas and GPUI Desktop ([#148](https://github.com/de-novo/dui/pull/148), [#150](https://github.com/de-novo/dui/pull/150)).
 - Framework-agnostic WAI-ARIA navigation disclosure expansion, official compiler route-registry lookup (`routeTree.gen.ts` `FileRoutesByTo`, React Router generated types), zero-config `dui scan .`, and multi-host `dui map .` auto-detection for Vite, Next.js, and static HTML apps ([#150](https://github.com/de-novo/dui/pull/150), [#154](https://github.com/de-novo/dui/pull/154)).
@@ -24,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Viewer UI Design/Review agent skills (`anti-ui-slop`, `web-design-guidelines`) alongside `shadcn/ui` ([#132](https://github.com/de-novo/dui/pull/132)).
 
 ### Changed
+
+- Distinguish development builds from stable releases in the CLI and show the installer’s default ref on the website.
 
 - Simplified `dui map` / `dui run` CLI defaults, accelerated canvas card rendering with immutable PNG caching and removal of per-card GPU backdrop blur ([#144](https://github.com/de-novo/dui/pull/144), [#145](https://github.com/de-novo/dui/pull/145), [#152](https://github.com/de-novo/dui/pull/152)).
 - Decoupled ecosystem / rule-pack library versions from hard toolchain gates: hard `>=` baseline checks apply only to core compiler/host/UI runtime layers (`tsc`, `vite` 7+, `react` 18+, `next` 16+ when `host: "next"`), while newer majors are always accepted and rule-pack libraries emit non-fatal `versionNotes` instead of aborting scans ([#136](https://github.com/de-novo/dui/pull/136)).
@@ -153,8 +156,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Official TypeScript 6/7 compiler analysis, typed GET auto-mocks, Vite host, and Chromium CDP capture across viewport widths.
 - Local capture archiving under `~/.dui/` grouped by project, branch, and worktree, plus the source installer.
 
-[Unreleased]: https://github.com/de-novo/dui/compare/v0.2.0...HEAD
-[v0.2.0]: https://github.com/de-novo/dui/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/de-novo/dui/compare/v0.1.0...HEAD
 [v0.1.0]: https://github.com/de-novo/dui/releases/tag/v0.1.0
 [v0.0.9]: https://github.com/de-novo/dui/compare/v0.0.8...v0.0.9
 [v0.0.8]: https://github.com/de-novo/dui/compare/v0.0.7...v0.0.8

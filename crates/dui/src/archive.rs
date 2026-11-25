@@ -249,6 +249,7 @@ pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -
     metadata["projectName"] = json!(project_name(&directory, repo)?);
     metadata["id"] = json!(snapshot);
     metadata["timestampMs"] = json!(stamp as u64);
+    metadata["duiVersion"] = json!(crate::update::VERSION);
     analysis::store(&staged.join("snapshot.json"), &metadata)?;
     fs::rename(&staged, &out).map_err(io)?;
     let (mut store, _) = crate::sqlite_store::SqliteStore::open(&home).map_err(io)?;
@@ -460,7 +461,10 @@ pub(crate) fn import_run(
             os: report["os"].as_str().unwrap_or_default().to_owned(),
             compiler: report["compiler"].as_str().map(str::to_owned),
             renderer: report["browser"]["product"].as_str().map(str::to_owned),
-            dui_version: env!("CARGO_PKG_VERSION").to_owned(),
+            dui_version: snapshot["duiVersion"]
+                .as_str()
+                .unwrap_or(env!("CARGO_PKG_VERSION"))
+                .to_owned(),
             versions,
         },
         source_files,

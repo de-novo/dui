@@ -47,50 +47,83 @@ fn mime_for(path: &str) -> &'static str {
     }
 }
 
-fn resolve_version_tag(root: &Path) -> String {
-    if let Ok(explicit) = env::var("DUI_VERSION")
-        && !explicit.trim().is_empty()
-    {
-        let trimmed = explicit.trim();
-        return if trimmed.starts_with('v') {
-            trimmed.to_owned()
-        } else {
-            format!("v{trimmed}")
-        };
-    }
-    let exact = Command::new("git")
-        .args(["describe", "--tags", "--exact-match", "HEAD"])
+fn git(root: &Path, args: &[&str]) -> Option<String> {
+    let out = Command::new("git")
         .current_dir(root)
+        .args(args)
         .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .filter(|t| t.starts_with('v'));
-    if let Some(tag) = exact {
-        return tag;
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+fn build_version(root: &Path) -> String {
+    let base = env!("CARGO_PKG_VERSION");
+    let expected = format!("v{base}");
+    let requested = env::var("DUI_VERSION").unwrap_or_default();
+    // An archive nested inside another checkout must not inherit its tags.
+    let checkout = root.join(".git").exists();
+    if checkout {
+        let mut paths = vec![
+            "HEAD".to_owned(),
+            "refs/tags".to_owned(),
+            "packed-refs".to_owned(),
+        ];
+        if let Some(branch) = git(root, &["symbolic-ref", "-q", "HEAD"]) {
+            paths.push(branch);
+        }
+        for name in paths {
+            if let Some(path) = git(
+                root,
+                &["rev-parse", "--path-format=absolute", "--git-path", &name],
+            ) {
+                let path = Path::new(&path);
+                // A packed branch has no loose ref yet. Its next commit creates one.
+                let watch = path.ancestors().find(|candidate| candidate.exists());
+                if let Some(watch) = watch
+                    && (watch == path || name.starts_with("refs/"))
+                {
+                    println!("cargo:rerun-if-changed={}", watch.display());
+                }
+            }
+        }
+        let tags = git(root, &["tag", "--points-at", "HEAD"]).expect("read Git tags at HEAD");
+        let mut release = false;
+        for tag in tags.lines().filter(|tag| {
+            tag.starts_with('v') && dui_core::version::SemVerTag::parse(tag).is_some()
+        }) {
+            assert_eq!(
+                tag, expected,
+                "release tag must match the Cargo workspace version"
+            );
+            release = true;
+        }
+        if release {
+            assert!(
+                requested.is_empty() || requested == expected || requested == base,
+                "DUI_VERSION must match the release tag"
+            );
+            return base.to_owned();
+        }
     }
-    let nearest = Command::new("git")
-        .args([
-            "describe",
-            "--tags",
-            "--match",
-            "v[0-9]*.[0-9]*.[0-9]*",
-            "--abbrev=0",
-        ])
-        .current_dir(root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .filter(|t| t.starts_with('v'));
-    nearest.unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
+    assert!(
+        requested.is_empty(),
+        "DUI_VERSION requires a matching stable tag at HEAD"
+    );
+    if checkout {
+        let sha = git(root, &["rev-parse", "--short=12", "HEAD"]).expect("read build revision");
+        format!("{base}-dev+{sha}")
+    } else {
+        format!("{base}-dev")
+    }
 }
 
 fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     println!("cargo:rerun-if-env-changed=DUI_VERSION");
-    println!("cargo:rustc-env=DUI_VERSION={}", resolve_version_tag(&root));
+    println!("cargo:rustc-env=DUI_VERSION={}", build_version(&root));
 
     for path in [
         "adapters",

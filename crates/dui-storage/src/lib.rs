@@ -383,7 +383,10 @@ impl SqliteStore {
                 os: report["os"].as_str().unwrap_or_default().to_owned(),
                 compiler: report["compiler"].as_str().map(str::to_owned),
                 renderer: report["browser"]["product"].as_str().map(str::to_owned),
-                dui_version: env!("CARGO_PKG_VERSION").to_owned(),
+                dui_version: snapshot["duiVersion"]
+                    .as_str()
+                    .unwrap_or(env!("CARGO_PKG_VERSION"))
+                    .to_owned(),
                 versions,
             },
             source_files,

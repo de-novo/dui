@@ -154,6 +154,8 @@ One milestone = one version. Names are `vX.Y.Z` only. The description gives the 
 | Tags | Nightly tags need no approval. Release candidate and release tags need maintainer approval |
 | Release notes | Built from the PRs merged in that milestone. Past CHANGELOG entries and Releases are never edited |
 
+The website and source installer use the highest published stable tag, or `main` when there are no stable tags. An exact release tag must match the Cargo workspace version. An untagged checkout reports `X.Y.Z-dev+<commit>` and a null `tag`; a source archive reports `X.Y.Z-dev`. Update checks compare against stable tags and offer the matching stable version for a development build. Keep pending notes under `## [Unreleased] — vX.Y.Z` in all three changelogs. When the approved tag is published, move those notes to its dated release heading and update the Unreleased comparison link.
+
 ## 6. Projects board
 
 One board for the repo. Progress state lives only in its `Status` field.

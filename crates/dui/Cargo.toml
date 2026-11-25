@@ -17,3 +17,6 @@ png.workspace = true
 rusqlite.workspace = true
 tempfile.workspace = true
 sha2.workspace = true
+
+[build-dependencies]
+dui-core.workspace = true

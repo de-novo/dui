@@ -51,10 +51,12 @@ prepare_node() {
 }
 
 resolve_latest_tag() {
-    git ls-remote --tags --refs "$1" 'v*' 2>/dev/null |
-        awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/) print $2 }' |
-        sort -t. -k1.2,1n -k2,2n -k3,3n |
-        tail -n 1
+    tag_refs=$(git ls-remote --tags --refs "$1" 'v*') || return 1
+    latest=$(printf '%s\n' "$tag_refs" |
+        awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/) print $2 }' |
+        LC_ALL=C sort -t. -k1.2,1n -k2,2n -k3,3n |
+        tail -n 1)
+    printf '%s\n' "${latest:-main}"
 }
 
 append_path_line() {
@@ -136,6 +138,8 @@ ensure_on_path() {
 }
 
 main() {
+    repo_url=${DUI_REPO_URL:-"https://github.com/de-novo/dui.git"}
+    if [ "${1:-}" = --print-ref ]; then resolve_latest_tag "$repo_url"; return; fi
     case $(uname -s) in Darwin|Linux) ;; *) fail "source installation supports macOS and Linux" ;; esac
     for tool in git curl cc; do
         command -v "$tool" >/dev/null 2>&1 || fail "install $tool before running the installer"
@@ -144,16 +148,11 @@ main() {
     case $dest in /*) ;; *) dest=$PWD/$dest ;; esac
     [ ! -d "$dest/dui" ] || fail "installation path is a directory: $dest/dui"
 
-    repo_url=${DUI_REPO_URL:-"https://github.com/de-novo/dui.git"}
     requested_tag=${DUI_TAG:-"${1:-}"}
     if [ -n "$requested_tag" ]; then
         ref=$requested_tag
     else
-        ref=$(resolve_latest_tag "$repo_url" || true)
-        if [ -z "$ref" ]; then
-            printf '%s\n' 'dui: no release tags found; building main' >&2
-            ref=main
-        fi
+        ref=$(resolve_latest_tag "$repo_url") || fail "unable to read release tags"
     fi
 
     work=$(mktemp -d "${TMPDIR:-/tmp}/dui-source.XXXXXXXX")
@@ -171,9 +170,6 @@ main() {
     npm ci --prefix apps/canvas
     host=$(rustc -vV | sed -n 's/^host: //p')
     [ -n "$host" ] || fail "could not determine the Rust host target"
-    case $ref in
-        v[0-9]*.[0-9]*.[0-9]*) export DUI_VERSION="$ref" ;;
-    esac
     cargo build --locked --release --bin dui --target "$host" --target-dir "$work/build"
     binary="$work/build/$host/release/dui"
     "$binary" --version

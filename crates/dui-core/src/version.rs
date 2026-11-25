@@ -15,6 +15,13 @@ impl SemVerTag {
     pub fn parse(raw: &str) -> Option<Self> {
         let trimmed = raw.trim();
         let body = trimmed.strip_prefix('v').unwrap_or(trimmed);
+        if !body.split('.').all(|part| {
+            !part.is_empty()
+                && part.bytes().all(|b| b.is_ascii_digit())
+                && (part == "0" || !part.starts_with('0'))
+        }) {
+            return None;
+        }
         let mut parts = body.split('.');
         let major = parts.next()?.parse::<u64>().ok()?;
         let minor = parts.next()?.parse::<u64>().ok()?;

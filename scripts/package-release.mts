@@ -37,7 +37,9 @@ if (!cli) throw new Error("dui package missing from Cargo workspace");
 execFileSync("cargo", ["build", "--release", "--locked", "--bin", cli.name, "--target", host], {
   stdio: "inherit",
 });
-const name = `dui-${cli.version}-${host}`;
+const binary = join(metadata.target_directory, host, "release", "dui");
+const { version }: { version: string } = JSON.parse(output(binary, ["--version"]));
+const name = `dui-${version}-${host}`;
 const filename = name + ".tar.gz";
 const out = join(metadata.target_directory, "dist");
 mkdirSync(out, { recursive: true });
@@ -45,7 +47,7 @@ const stage = mkdtempSync(join(out, ".package-"));
 try {
   const dir = join(stage, name);
   mkdirSync(dir);
-  copyFileSync(join(metadata.target_directory, host, "release", "dui"), join(dir, "dui"));
+  copyFileSync(binary, join(dir, "dui"));
   copyFileSync("LICENSE", join(dir, "LICENSE"));
   copyFileSync("docs/binary-install.md", join(dir, "README.md"));
 
@@ -80,7 +82,7 @@ try {
   });
   const digest = createHash("sha256").update(readFileSync(archive)).digest("hex");
   writeFileSync(archive + ".sha256", digest + "  " + filename + "\n");
-  const installer = readFileSync("scripts/install.sh.in", "utf8").replace("@VERSION@", cli.version);
+  const installer = readFileSync("scripts/install.sh.in", "utf8").replace("@VERSION@", version);
   writeFileSync(join(stage, "install.sh"), installer, { mode: 0o755 });
   renameSync(archive, join(out, filename));
   renameSync(archive + ".sha256", join(out, filename + ".sha256"));

@@ -1,70 +1,73 @@
+// Validate the workspace, lockfiles and release notes. CI also supplies public tags.
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-const root = process.cwd();
-const SEMVER_RE = /^\d+\.\d+\.\d+$/;
-
-function readCargoVersion(relPath: string): string {
-  const text = fs.readFileSync(path.join(root, relPath), "utf8");
-  const match = text.match(/^version\s*=\s*"([^"]+)"/m);
-  assert.ok(match, `${relPath} is missing a version field`);
-  return match[1];
-}
-
-function readLatestChangelogVersion(relPath: string): string {
-  const text = fs.readFileSync(path.join(root, relPath), "utf8");
-  const match = text.match(/^## \[v([^\]]+)\]/m);
-  assert.ok(match, `${relPath} is missing a '## [vX.Y.Z]' release heading`);
-  return match[1];
-}
-
-const workspaceVersion = readCargoVersion("Cargo.toml");
-assert.match(
-  workspaceVersion,
-  SEMVER_RE,
-  `Cargo.toml version '${workspaceVersion}' must be strict SemVer (X.Y.Z)`,
-);
-
-const desktopVersion = readCargoVersion("apps/desktop/Cargo.toml");
-assert.equal(
-  desktopVersion,
-  workspaceVersion,
-  `apps/desktop/Cargo.toml (${desktopVersion}) must match Cargo.toml (${workspaceVersion})`,
-);
-
-for (const changelog of ["CHANGELOG.md", "docs/ko/changelog.md", "docs/zh-CN/changelog.md"]) {
-  const latest = readLatestChangelogVersion(changelog);
-  assert.equal(
-    latest,
-    workspaceVersion,
-    `${changelog} latest release (v${latest}) must match Cargo.toml (v${workspaceVersion})`,
+function packages(manifest: string): { name: string; version: string }[] {
+  const metadata = JSON.parse(
+    execFileSync(
+      "cargo",
+      ["metadata", "--no-deps", "--locked", "--format-version", "1", "--manifest-path", manifest],
+      { encoding: "utf8" },
+    ),
+  );
+  return metadata.packages.filter((pkg: { id: string }) =>
+    metadata.workspace_members.includes(pkg.id),
   );
 }
 
-const cargoLock = fs.readFileSync(path.join(root, "Cargo.lock"), "utf8");
-for (const pkg of ["dui", "dui-core", "dui-ports", "dui-storage", "dui-app"]) {
-  const pkgRe = new RegExp(`name = "${pkg}"\\nversion = "([^"]+)"`);
-  const match = cargoLock.match(pkgRe);
-  assert.ok(match, `Cargo.lock missing package '${pkg}'`);
-  assert.equal(
-    match[1],
-    workspaceVersion,
-    `Cargo.lock ${pkg} (${match[1]}) must match Cargo.toml (${workspaceVersion})`,
-  );
+const workspace = packages("Cargo.toml");
+const version = workspace.find((pkg) => pkg.name === "dui")!.version;
+const stable = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+assert.match(version, stable);
+const desktop = packages("apps/desktop/Cargo.toml");
+for (const [file, members] of [
+  ["Cargo.lock", workspace],
+  ["apps/desktop/Cargo.lock", desktop],
+] as const) {
+  const blocks = readFileSync(file, "utf8").split("[[package]]").slice(1);
+  for (const pkg of members) {
+    assert.equal(pkg.version, version, pkg.name);
+    const block = blocks.find(
+      (entry) => entry.includes(`\nname = "${pkg.name}"\n`) && !entry.includes("\nsource = "),
+    );
+    assert.ok(block?.includes(`\nversion = "${version}"\n`), `${file}: ${pkg.name}`);
+  }
 }
 
+const notes = ["CHANGELOG.md", "docs/ko/changelog.md", "docs/zh-CN/changelog.md"];
+let previousHeadings: string[] | undefined;
+const latest = process.argv.includes("--published")
+  ? execFileSync("sh", [resolve("scripts/install"), "--print-ref"], { encoding: "utf8" }).trim()
+  : undefined;
+for (const file of notes) {
+  const contents = readFileSync(file, "utf8");
+  const headings = contents.match(/^## \[.*$/gm) ?? [];
+  if (previousHeadings) assert.deepEqual(headings, previousHeadings, file);
+  previousHeadings = headings;
+  const pending = headings[0] === `## [Unreleased] — v${version}`;
+  const released = headings[1]?.match(/^## \[(v[^\]]+)\] - \d{4}-\d{2}-\d{2}$/)?.[1];
+  assert.ok(released && stable.test(released.slice(1)), `${file}: missing latest dated release`);
+  assert.ok(
+    pending || (headings[0] === "## [Unreleased]" && released === `v${version}`),
+    `${file}: workspace version must match the pending or released version`,
+  );
+  assert.ok(
+    contents
+      .split("\n")
+      .some(
+        (line) => line.startsWith("[Unreleased]: ") && line.endsWith(`/compare/${released}...HEAD`),
+      ),
+    `${file}: Unreleased comparison`,
+  );
+  if (latest !== undefined) {
+    assert.ok(
+      latest === released || (pending && latest === `v${version}`),
+      `${file}: latest install ref ${latest} disagrees with ${released}`,
+    );
+  }
+}
 console.log(
-  JSON.stringify({
-    status: "ok",
-    version: workspaceVersion,
-    checked: [
-      "Cargo.toml",
-      "Cargo.lock",
-      "apps/desktop/Cargo.toml",
-      "CHANGELOG.md",
-      "docs/ko/changelog.md",
-      "docs/zh-CN/changelog.md",
-    ],
-  }),
+  JSON.stringify({ version, crates: [...workspace, ...desktop].map((pkg) => pkg.name), notes }),
 );

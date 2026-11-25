@@ -471,8 +471,8 @@ fn run() -> Reply {
     {
         return Ok(json!({
             "name": "dui",
-            "version": update::current_version_string(),
-            "tag": update::current_tag(),
+            "version": update::VERSION,
+            "tag": update::release_tag(),
         }));
     }
     if let [cmd, tail @ ..] = args.as_slice()
