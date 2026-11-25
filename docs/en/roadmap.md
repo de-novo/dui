@@ -14,7 +14,7 @@ Today, the sources of truth for making a product are split across planning docum
 **What this is not**
 
 - A standalone design tool with its own file format.
-- Supporting every platform first. React Native, Flutter, iOS, Android, and mapping an arbitrary local app from a URL ([#236](https://github.com/de-novo/dui/issues/236), [#237](https://github.com/de-novo/dui/issues/237)) come later, unless they directly serve this goal.
+- Support for every platform at once. The priority is to deepen the capture and editing paths needed for this goal.
 
 **Current focus.** Close the loop: generate the map from code, and write UI edits back into that code (the code-based canvas work planned for v0.3.0). Broader platform coverage and packaging can wait.
 
@@ -63,7 +63,7 @@ Implementation · [#5](https://github.com/de-novo/dui/issues/5) · [#6](https://
 
 ## Later milestones
 
-New surfaces and packaging stay later unless they serve the goal above. That includes React Native, Flutter, iOS, Android, mapping a local app from a URL ([#236](https://github.com/de-novo/dui/issues/236), [#237](https://github.com/de-novo/dui/issues/237)), and follow-ups such as [#239](https://github.com/de-novo/dui/issues/239) and [#240](https://github.com/de-novo/dui/issues/240). Prebuilt binaries and Homebrew ([#176](https://github.com/de-novo/dui/issues/176)) wait until the product is stable. The next step that does serve the goal is writing UI edits back into the code (v0.3.0).
+Existing paths include local web URLs, native route discovery and captures on selected runtimes. The [capability table](supported-frameworks.md) records their scope. Additional platforms and packaging follow the goal above. Prebuilt binaries and Homebrew ([#176](https://github.com/de-novo/dui/issues/176)) wait until the product is stable. The next step that does serve the goal is writing UI edits back into the code (v0.3.0).
 
 | Version | Outcome |
 | --- | --- |

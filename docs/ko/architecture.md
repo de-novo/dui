@@ -166,7 +166,7 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 
 ## 5. 모노레포 구조
 
-목표 구조는 **여러 언어 모노레포**다: Rust는 Cargo workspace, TypeScript 부분은 pnpm workspace, 그리고 데이터·픽스처·문서·도구. 지원 스택의 단일 원천은 `stacks.toml`이다.
+목표 구조는 **여러 언어 모노레포**다: Rust는 Cargo workspace, TypeScript 부분은 pnpm workspace, 그리고 데이터·픽스처·문서·도구. 이 구조안에서 `stacks.toml`은 어댑터와 규칙 팩의 대응 관계를 기술할 예정이다. [현재 지원 범위 표](supported-frameworks.md)에서 저장소의 구현과 검사를 확인할 수 있다.
 
 현재 npm 패키지의 버전은 [dependency-catalog.json](../../dependency-catalog.json)에서 수정하고 `npm run deps:sync`로 반영한다. CI는 `npm run deps:check`로 매니페스트와 잠금 파일을 검사한다. Rust 크레이트는 루트의 `[workspace.dependencies]`에서 버전 조건을 상속한다. 카탈로그는 dui 자체와 픽스처의 의존성을 관리한다. 지원 기준선은 릴리스에서 별도로 결정한다.
 

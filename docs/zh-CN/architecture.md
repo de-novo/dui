@@ -166,7 +166,7 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 
 ## 5. Monorepo 布局
 
-目标布局是一个**多语言 monorepo**：Rust 用 Cargo 工作区，TypeScript 部分用 pnpm 工作区，另有数据、fixture、文档和工具。`stacks.toml` 是受支持技术栈的唯一事实来源。
+目标布局是一个**多语言 monorepo**：Rust 用 Cargo 工作区，TypeScript 部分用 pnpm 工作区，另有数据、fixture、文档和工具。在此规划中，`stacks.toml` 将记录适配器与规则包的映射。[当前能力表](supported-frameworks.md)链接到仓库中的实现和检查。
 
 当前 npm 包的版本在 [dependency-catalog.json](../../dependency-catalog.json) 中修改，然后运行 `npm run deps:sync`。CI 运行 `npm run deps:check` 检查清单和锁文件。Rust crate 从根目录的 `[workspace.dependencies]` 继承版本要求。该目录管理 dui 自身及测试项目的依赖。支持基线在发布时单独确定。
 

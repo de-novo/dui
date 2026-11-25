@@ -6,7 +6,7 @@
     <title>Architecture — dui</title>
     <meta
       name="description"
-      content="Functional Core + Imperative Shell architecture, 5-crate Cargo workspace boundaries, and honest multi-surface support matrix."
+      content="dui’s five-crate Cargo workspace, dependency boundaries, and compiler analysis and rendering capabilities by platform."
     />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -105,52 +105,58 @@
       </section>
 
       <section class="section">
-        <h2>Verified Surface Support Matrix</h2>
-        <p class="section-sub">
-          Every entry reflects what actually ships and passes automated checks today.
+        <h2 data-i18n="supportHeading">Analysis and rendering by platform</h2>
+        <p class="section-sub" data-i18n="supportIntro">
+          dui reads types through the project’s official compiler. Rules recognize individual API
+          calls. Each platform supplies its own evidence of what appeared on screen.
         </p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Surface</th>
-                <th>Supported Today</th>
-                <th>Planned</th>
+                <th data-i18n="supportSurface">Surface</th>
+                <th data-i18n="supportInput">What dui reads</th>
+                <th data-i18n="supportResult">What you can see</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>Web</strong></td>
-                <td>
-                  Universal Web (<code>static</code> / <code>url</code> / <code>command</code>),
-                  Vite 7 / 8+, React 18 / 19+, Next.js 16, Nitro SSR, Chromium CDP
+                <td><strong data-i18n="supportWeb">Web</strong></td>
+                <td data-i18n="supportWebInput">
+                  A local URL or static build. A TypeScript scan can also extract typed state
+                  from recognized calls.
                 </td>
-                <td>Preact, Solid, Rspack / Rsbuild</td>
+                <td data-i18n="supportWebResult">Reachable pages captured in Chromium at the requested widths.</td>
               </tr>
               <tr>
-                <td><strong>Desktop</strong></td>
-                <td>
-                  GPUI (Metal + AccessKit <code>renderTree</code>), Electron 45
-                  (<code>ipcMocks</code>)
+                <td><strong data-i18n="supportDesktop">Desktop</strong></td>
+                <td data-i18n="supportDesktopInput">
+                  Declared GPUI states or Electron web renderer content with optional IPC mocks.
                 </td>
-                <td>Tauri 2, Dioxus, egui, Iced</td>
+                <td data-i18n="supportDesktopResult">GPUI state captures and element trees, or Electron renderer pages in Chromium.</td>
               </tr>
               <tr>
-                <td><strong>Mobile</strong></td>
-                <td>
-                  Android (<code>adb screencap</code> + <code>uiautomator</code>), iOS Simulator
-                  (<code>xcrun simctl</code> + XCUI), React Native / Expo <code>tsc</code> rules
+                <td><strong data-i18n="supportMobile">Mobile</strong></td>
+                <td data-i18n="supportMobileInput">
+                  React Navigation, Expo Router and Flutter route declarations. Native captures
+                  need an Android device or emulator, or an iOS Simulator.
                 </td>
-                <td>Native SwiftUI, Jetpack Compose, Flutter adapters</td>
+                <td data-i18n="supportMobileResult">
+                  Source cards with file locations, optionally linked to recordings. Selected
+                  SwiftUI and Compose components also export as interactive HTML previews.
+                </td>
               </tr>
               <tr>
-                <td><strong>Terminal (TUI)</strong></td>
-                <td>Universal PTY + VT100 cell grid PNG &amp; scene tree, Ink 5 rules</td>
-                <td>Ratatui, Bubble Tea compiler state plans</td>
+                <td><strong data-i18n="supportTerminal">Terminal (TUI)</strong></td>
+                <td data-i18n="supportTerminalInput">Output from a command running in a pseudoterminal.</td>
+                <td data-i18n="supportTerminalResult">A terminal cell grid and its PNG at the configured sizes.</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p>
+          <a href="https://github.com/de-novo/dui/blob/main/docs/en/supported-frameworks.md" data-i18n="supportEvidence">Analysis and rendering checks</a>
+        </p>
       </section>
     </main>
 
