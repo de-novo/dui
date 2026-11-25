@@ -12,8 +12,9 @@ on:
 permissions:
   contents: read
 env:
-  # Pinned upstream fixture (Apache-2.0). See docs/en/roadmap.md#swiftui-screen-discovery.
-  HA_IOS_COMMIT: 9cc4b40b9b45e24b7757db541949a3f43bf1648e
+  # Pinned upstream fixture (Apache-2.0): release 2026.9.2, the last one before the iOS 27 SDK,
+  # so it builds with the runner's Xcode 26. See docs/en/roadmap.md#swiftui-screen-discovery.
+  HA_IOS_COMMIT: 5c5ad97555a58f818bbd557021b8d18d8225950e
 jobs:
   fixture:
     runs-on: macos-26
@@ -30,7 +31,7 @@ jobs:
         run: node scripts/check-swift-map.mts
 
   home-assistant:
-    runs-on: xcode-27
+    runs-on: macos-26
     timeout-minutes: 100
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -66,7 +67,7 @@ jobs:
             require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
             require("fs").copyFileSync(run.output + "/graph.json", process.argv[2]);
             if (limits.some((l) => l.startsWith("xcodebuild"))) process.exit(1);
-            if (names.length < 20) process.exit(1);
+            if (names.length < 250 || !names.includes("OnboardingWelcomeView")) process.exit(1);
             if (run.coverage.attempted !== 0) process.exit(1);
           ' "$RUNNER_TEMP/ha-map.json" "$RUNNER_TEMP/ha-graph.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

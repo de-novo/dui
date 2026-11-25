@@ -40,6 +40,8 @@ try {
     .sort();
   const file = "Sources/SwiftUIMapFixture";
   assert.deepEqual(screens, [
+    `SwiftUIMapFixture/Flows.swift#DoneView ${file}/Flows.swift 43 dynamic: finished`,
+    `SwiftUIMapFixture/Flows.swift#IntroView ${file}/Flows.swift 39 dynamic: !(finished)`,
     `SwiftUIMapFixture/HomeView.swift#HomeView ${file}/HomeView.swift 5 static`,
     `SwiftUIMapFixture/LegacyViewController.swift#LegacyViewController ${file}/LegacyViewController.swift 5 static`,
     `SwiftUIMapFixture/RootView.swift#RootView ${file}/RootView.swift 3 static`,
