@@ -29,6 +29,12 @@ import {
   indexScreenDiffs,
 } from "./model/canvasDiff";
 import { type CaptureDiff, decodeCaptureDiff } from "./model/diff";
+import {
+  availableDiffPairs,
+  comparableRunsFor,
+  formatDiffCompareLabel,
+  formatShowcaseRunLabel,
+} from "./model/runLabels";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 
 const CaptureDiffView = lazy(() =>
@@ -55,7 +61,9 @@ function MapView({
 }) {
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
+  const topBarRef = useRef<HTMLDivElement>(null);
   const [railInset, setRailInset] = useState<number>();
+  const [topInset, setTopInset] = useState(0);
   const { t } = useI18n();
   const [search, setSearch] = useState(location.search);
   const selection = parseSelection(search, archive);
@@ -102,9 +110,10 @@ function MapView({
 
   const staticDemo = isStaticArchiveMode();
   const otherRuns = useMemo(
-    () => runs.filter((r) => r.key !== run.key && r.projectId === run.projectId),
-    [runs, run.key, run.projectId],
+    () => comparableRunsFor(run, runs, staticDemo),
+    [run, runs, staticDemo],
   );
+  const canOpenDiffView = staticDemo ? otherRuns.length > 0 : runs.length >= 2;
   const wantPixelOverlay = diffVisualMode === "overlay";
   const activePairKey = compareBeforeKey ? `${compareBeforeKey}::${run.key}` : "";
   const activeDiff =
@@ -203,6 +212,12 @@ function MapView({
   const showDetails = view === "details" && selectedId !== null;
   const showOverview = !showDetails;
   const showMobileDeck = isMobile && mobileView === "deck";
+  const showTopBar = Boolean(
+    showAuditPill ||
+    otherRuns.length > 0 ||
+    (staticDemo && runs.length > 1) ||
+    (isMobile && mobileView === "map"),
+  );
 
   useLayoutEffect(() => {
     const area = mapArea.current;
@@ -215,6 +230,25 @@ function MapView({
     observer.observe(layer);
     return () => observer.disconnect();
   }, [showMobileDeck]);
+
+  useLayoutEffect(() => {
+    const area = mapArea.current;
+    const bar = topBarRef.current;
+    if (!area || !bar || showMobileDeck) {
+      setTopInset(0);
+      return;
+    }
+    const measure = () => {
+      const barRect = bar.getBoundingClientRect();
+      const areaRect = area.getBoundingClientRect();
+      setTopInset(barRect.height > 0 ? Math.max(0, barRect.bottom - areaRect.top) : 0);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, [showTopBar, showMobileDeck, compareBeforeKey, activeDiff]);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const searchOrigin = useRef<HTMLElement | null>(null);
@@ -296,6 +330,7 @@ function MapView({
                     }
                     openSearch={openSearch}
                     railInset={railInset}
+                    topInset={topInset}
                     archive={visibleArchive}
                     width={width}
                     mode={mode}
@@ -317,14 +352,11 @@ function MapView({
           </div>
         )}
 
-        {(showAuditPill ||
-          otherRuns.length > 0 ||
-          (staticDemo && runs.length > 1) ||
-          (isMobile && mobileView === "map")) && (
-          <div className="map-top-bar">
+        {showTopBar && (
+          <div className="map-top-bar" ref={topBarRef}>
             {isMobile && mobileView === "map" && (
               <div className="mobile-map-return glass-panel">
-                <div className="mobile-view-switch" role="tablist" aria-label="Mobile view mode">
+                <div className="mobile-view-switch" role="tablist" aria-label={t.mobileViewMode}>
                   <button
                     type="button"
                     role="tab"
@@ -360,12 +392,12 @@ function MapView({
             {staticDemo && runs.length > 1 && (
               <section
                 className="canvas-diff-bar glass-panel showcase-project-bar"
-                aria-label="Showcase projects"
+                aria-label={t.showcaseProjects}
               >
                 <label className="canvas-diff-select-wrap">
-                  <span>Project</span>
+                  <span>{t.project}</span>
                   <select
-                    aria-label="Showcase project"
+                    aria-label={t.project}
                     value={run.key}
                     onChange={(e) => {
                       location.href = `./?run=${encodeURIComponent(e.target.value)}`;
@@ -373,7 +405,7 @@ function MapView({
                   >
                     {runs.map((candidate) => (
                       <option key={candidate.key} value={candidate.key}>
-                        {candidate.project} · {candidate.branch ?? candidate.version}
+                        {formatShowcaseRunLabel(candidate, runs)}
                       </option>
                     ))}
                   </select>
@@ -408,8 +440,7 @@ function MapView({
                     <option value="">{t.canvasDiffOff}</option>
                     {otherRuns.map((candidate) => (
                       <option key={candidate.key} value={candidate.key}>
-                        {candidate.project} · {candidate.branch ?? "—"} ·{" "}
-                        {candidate.version.slice(-6)}
+                        {formatDiffCompareLabel(candidate, otherRuns)}
                       </option>
                     ))}
                   </select>
@@ -468,12 +499,12 @@ function MapView({
         )}
 
         {showOverview && screen && (
-          <section className="preserved-selection glass-panel" aria-label="Selected screen">
+          <section className="preserved-selection glass-panel" aria-label={t.selectedScreenLabel}>
             <span className="preserved-label">
-              Selected: <code>{routeName(screen.path)}</code>
+              {t.selectedScreenLabel}: <code>{routeName(screen.path)}</code>
             </span>
             <Button variant="outline" size="sm" onClick={() => update({ view: null })}>
-              Inspect screen
+              {t.inspectScreen}
             </Button>
           </section>
         )}
@@ -611,7 +642,7 @@ function MapView({
               </div>
             </fieldset>
           )}
-          {runs.length >= 2 && (
+          {canOpenDiffView && (
             <Button
               variant="outline"
               onClick={() => {
@@ -658,8 +689,14 @@ function Viewer({
 
   const params = new URLSearchParams(search);
   const isDiffView = params.get("view") === "diff";
-  const diffBefore = params.get("before") ?? (runs.length >= 2 ? runs[1]?.key : runs[0]?.key) ?? "";
-  const diffAfter = params.get("after") ?? run?.key ?? runs[0]?.key ?? "";
+  const staticDemo = isStaticArchiveMode();
+  const diffPairs = useMemo(() => availableDiffPairs(runs, staticDemo), [runs, staticDemo]);
+  const defaultPair =
+    diffPairs.find((p) => p.after.key === run?.key) ??
+    diffPairs[0] ??
+    (runs.length >= 2 ? { before: runs[1]!, after: run ?? runs[0]! } : undefined);
+  const diffBefore = params.get("before") ?? defaultPair?.before.key ?? "";
+  const diffAfter = params.get("after") ?? defaultPair?.after.key ?? "";
 
   function openDiff(beforeKey = diffBefore, afterKey = diffAfter) {
     const next = withSearchChanges(location.href, {

@@ -286,9 +286,23 @@ function exportRunToArchive(
       Array.isArray((c as Record<string, unknown>).renderTree) &&
       ((c as Record<string, unknown>).renderTree as unknown[]).length >= 10,
   ).length;
-  if (populated < 2) {
+  const nodes = Array.isArray(enriched.nodes) ? enriched.nodes : [];
+  const readyPreviews = nodes.filter((n) => {
+    if (!n || typeof n !== "object") return false;
+    const preview = (n as Record<string, unknown>).sourcePreview;
+    if (!preview || typeof preview !== "object") return false;
+    const scene = (preview as Record<string, unknown>).scene;
+    return (
+      (preview as Record<string, unknown>).status === "ready" &&
+      scene &&
+      typeof scene === "object" &&
+      Array.isArray((scene as Record<string, unknown>).frames) &&
+      ((scene as Record<string, unknown>).frames as unknown[]).length >= 2
+    );
+  }).length;
+  if (populated < 2 && readyPreviews < 2) {
     throw new Error(
-      `Refusing blank capture for ${path.basename(dest)}: only ${populated}/${cells.length} cells had >=10 rendered DOM nodes`,
+      `Refusing blank capture for ${path.basename(dest)}: only ${populated}/${cells.length} cells had >=10 rendered DOM nodes and ${readyPreviews} ready source previews`,
     );
   }
   return { cells: cells.length, verified };
@@ -473,6 +487,7 @@ async function main() {
             project: spec.project,
             branch: spec.branch,
             version: spec.version,
+            diffWith: [],
             liveAvailable: false,
           };
         }),
@@ -524,8 +539,8 @@ async function main() {
         "",
       );
       baseHtml = baseHtml.replace(
-        "Render every screen, state, modal, and width from real code.",
-        "Deterministic UI review from your real compiler.",
+        '<h1 data-i18n="heroTitle">Make the code the single source of truth for development and UI.</h1>',
+        "<h1>Deterministic UI review from your real compiler.</h1>",
       );
       fs.writeFileSync(baseIndexPath, baseHtml);
 
@@ -556,6 +571,8 @@ async function main() {
         );
         if (diffRes.stdout.trim()) {
           const diffJson = JSON.parse(diffRes.stdout) as Record<string, unknown>;
+          diffJson.beforeRunKey = "dui-site-baseline";
+          diffJson.afterRunKey = "dui-site";
           const normalizeOverlay = (entry: unknown) => {
             if (!entry || typeof entry !== "object") return;
             const obj = entry as Record<string, unknown>;
@@ -567,6 +584,14 @@ async function main() {
           for (const key of ["changed", "added", "removed", "unchanged"]) {
             const arr = diffJson[key];
             if (Array.isArray(arr)) arr.forEach(normalizeOverlay);
+          }
+          if (Array.isArray(diffJson.screens)) {
+            for (const screen of diffJson.screens) {
+              if (screen && typeof screen === "object") {
+                const screenCells = (screen as Record<string, unknown>).cells;
+                if (Array.isArray(screenCells)) screenCells.forEach(normalizeOverlay);
+              }
+            }
           }
           fs.writeFileSync(
             path.join(diffsDir, "dui-site-baseline__dui-site.json"),
@@ -581,6 +606,7 @@ async function main() {
           project: "de-novo/dui (dui.sh)",
           branch: "Apache-2.0 · Zero-dep HTML",
           version: "Current capture",
+          diffWith: ["dui-site-baseline"],
           liveAvailable: false,
         });
         runs.push({
@@ -589,6 +615,7 @@ async function main() {
           project: "de-novo/dui (dui.sh)",
           branch: "Apache-2.0 · Zero-dep HTML",
           version: "Baseline capture",
+          diffWith: [],
           liveAvailable: false,
         });
       } else {
@@ -597,10 +624,69 @@ async function main() {
           projectId: "oss-dui-site",
           project: "de-novo/dui (dui.sh)",
           branch: "Apache-2.0 · Zero-dep HTML",
-          version: "Self-dogfooded · 2 modals",
+          version: "Self-dogfooded · 1 modal",
           liveAvailable: false,
         });
       }
+    }
+
+    if (!filterSet || filterSet.has("native-source-preview")) {
+      console.log("[pages-demo] compiling SwiftUI & Compose portable source preview showcase...");
+      const previewProjectDir = path.join(tmpHome, "native-source-preview");
+      fs.mkdirSync(path.join(previewProjectDir, "ios"), { recursive: true });
+      fs.mkdirSync(path.join(previewProjectDir, "android"), { recursive: true });
+      fs.copyFileSync(
+        path.join(root, "fixtures/source-preview/Settings.swift"),
+        path.join(previewProjectDir, "ios/Settings.swift"),
+      );
+      fs.copyFileSync(
+        path.join(root, "fixtures/source-preview/Settings.kt"),
+        path.join(previewProjectDir, "android/Settings.kt"),
+      );
+      fs.writeFileSync(
+        path.join(previewProjectDir, "dui.json"),
+        JSON.stringify(
+          {
+            sourcePreviews: [
+              { source: "ios/Settings.swift", entry: "Settings" },
+              { source: "android/Settings.kt", entry: "example.Settings" },
+            ],
+          },
+          null,
+          2,
+        ),
+      );
+      const previewHome = path.join(tmpHome, "home-native-source-preview");
+      fs.mkdirSync(previewHome, { recursive: true });
+      const previewEnv: NodeJS.ProcessEnv = { ...process.env, HOME: previewHome };
+      delete previewEnv.ANDROID_HOME;
+      delete previewEnv.ANDROID_SDK_ROOT;
+      const previewRes = await runCommandAsync(binary, ["map", previewProjectDir], {
+        env: previewEnv,
+        timeoutMs: 180_000,
+      });
+      const previewParsed = JSON.parse(previewRes.stdout) as { output?: string };
+      if (!previewParsed.output) {
+        throw new Error(
+          `Failed compiling native source preview showcase: ${previewRes.stderr || previewRes.stdout}`,
+        );
+      }
+      exportRunToArchive(
+        previewParsed.output,
+        path.join(archiveDir, "native-source-preview"),
+        previewHome,
+        root,
+      );
+      console.log("[pages-demo] exported native-source-preview: SwiftUI + Compose");
+      runs.push({
+        key: "native-source-preview",
+        projectId: "oss-native-source-preview",
+        project: "SwiftUI & Compose (Source Preview)",
+        branch: "Apache-2.0 · Swift 6 + Kotlin 2",
+        version: "Interactive source map",
+        diffWith: [],
+        liveAvailable: false,
+      });
     }
 
     fs.writeFileSync(path.join(archiveDir, "runs.json"), JSON.stringify(runs, null, 2));

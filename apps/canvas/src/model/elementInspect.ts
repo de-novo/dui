@@ -18,6 +18,22 @@ export type BoxModelRects = {
   content: Rect;
 };
 
+/** Pick the first visible element inside the capture viewport, falling back to `nodes[0]`. */
+export function pickInitialNode(nodes: RenderNode[], viewportWidth: number): RenderNode | null {
+  if (nodes.length === 0) return null;
+  const visible = nodes.find((node) => {
+    const r = node.rect;
+    return (
+      r.width > 0 &&
+      r.height > 0 &&
+      r.y >= 0 &&
+      r.x + r.width > 0 &&
+      r.x < Math.max(1, viewportWidth)
+    );
+  });
+  return visible ?? nodes[0] ?? null;
+}
+
 /** Pick the deepest (smallest area) rendered element containing `(x, y)` in capture coordinates. */
 export function pickNodeAtPoint(nodes: RenderNode[], x: number, y: number): RenderNode | null {
   let best: RenderNode | null = null;

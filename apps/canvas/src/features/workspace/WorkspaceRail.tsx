@@ -10,6 +10,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useState } from "react";
+import { isStaticArchiveMode } from "../../data/archiveUrls";
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 import { UI_LOCALE_OPTIONS, type UiLocale } from "../../i18n/messages";
@@ -35,14 +36,24 @@ export function WorkspaceRail({ run, open }: { run?: Run; open: () => void }) {
   }
   const ThemeIcon = { system: Monitor, light: Sun, dark: Moon }[theme];
   const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  const staticDemo = isStaticArchiveMode();
   return (
     <nav className={"rail" + (collapsed ? " collapsed" : "")} aria-label={t.workspace}>
-      <strong className="wordmark" aria-label="dui">
-        dui
-        <span className="brand-period" aria-hidden="true">
-          .
-        </span>
-      </strong>
+      {staticDemo ? (
+        <a className="wordmark wordmark-link" href="../" aria-label={t.homeLink} title={t.homeLink}>
+          dui
+          <span className="brand-period" aria-hidden="true">
+            .
+          </span>
+        </a>
+      ) : (
+        <strong className="wordmark" aria-label="dui">
+          dui
+          <span className="brand-period" aria-hidden="true">
+            .
+          </span>
+        </strong>
+      )}
       <button
         type="button"
         aria-label={t.selectWorkspace}

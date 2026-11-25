@@ -7,6 +7,7 @@ import { useI18n } from "../../i18n/LocaleContext";
 import {
   boxModelOverlayRects,
   computeSpacingGuides,
+  pickInitialNode,
   pickNodeAtPoint,
 } from "../../model/elementInspect";
 
@@ -33,7 +34,10 @@ export function ElementInspector({
 }) {
   const { t } = useI18n();
   const nodes = useMemo(() => cell.renderTree ?? [], [cell.renderTree]);
-  const [localSelectedId, setLocalSelectedId] = useState<string | null>(() => nodes[0]?.id ?? null);
+  const defaultNode = useMemo(() => pickInitialNode(nodes, cell.width), [nodes, cell.width]);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(
+    () => defaultNode?.id ?? null,
+  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -41,8 +45,8 @@ export function ElementInspector({
   const change = report?.changes[changeIndex];
   const activeSelectedId = externalSelectedId ?? localSelectedId;
   const selected = useMemo(
-    () => nodes.find((n) => n.id === activeSelectedId) ?? nodes[0] ?? null,
-    [nodes, activeSelectedId],
+    () => nodes.find((n) => n.id === activeSelectedId) ?? defaultNode,
+    [nodes, activeSelectedId, defaultNode],
   );
   const hovered = useMemo(
     () => (hoveredId ? (nodes.find((n) => n.id === hoveredId) ?? null) : null),

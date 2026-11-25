@@ -70,6 +70,20 @@
       ossTitle: "Browse 6 trending open-source apps live in dui",
       ossSub:
         "Every project below is a real MIT-licensed open-source app captured with dui map across mobile (375px) and desktop (1280px). Click any card to inspect its 2D canvas, navigation edges, modals, and box model.",
+      btnTrySourcePreview: "SwiftUI & Compose Preview →",
+      btnTryDiff: "Try 2D Inline Diff →",
+      btnOpenAllCanvas: "Open Canvas Demo →",
+      workflowTitle: "Zero-config workflow in three commands",
+      workflowSub:
+        "Works out of the box on Vite, Next.js App Router, and plain static HTML apps without writing a config file.",
+      step1Title: "Auto-discover routes & modals",
+      step2Title: "Review on Web or GPUI Desktop",
+      step3Title: "Diff branches & drive from AI",
+      factTitle: "Fact-only core. Zero guessed evidence.",
+      factSub:
+        "dui never invents screenshots or forces hardcoded aesthetic opinions onto diverse design systems.",
+      factStatesTitle: "Honest verification states",
+      factConformanceTitle: "Pluggable design conformance (v0.3.0)",
     },
     ko: {
       releaseGuide: "릴리스 문서",
@@ -119,6 +133,20 @@
       ossTitle: "최신 오픈소스 6개 프로젝트를 dui 캔버스에서 그대로 둘러보기",
       ossSub:
         "아래 6개는 MIT 라이선스를 확인한 실제 오픈소스 앱을 dui map으로 모바일(375px)·데스크톱(1280px) 캡처한 결과입니다. 카드를 누르면 2D 캔버스·연결선·모달·박스 모델을 바로 탐색하고 워크스페이스에서 프로젝트를 전환할 수 있습니다.",
+      btnTrySourcePreview: "SwiftUI·Compose 미리보기 →",
+      btnTryDiff: "2D 인라인 Diff 보기 →",
+      btnOpenAllCanvas: "캔버스 데모 열기 →",
+      workflowTitle: "세 줄 명령으로 끝나는 무설정 워크플로우",
+      workflowSub:
+        "설정 파일 없이도 Vite, Next.js App Router, 정적 HTML 앱을 바로 탐색하고 캡처합니다.",
+      step1Title: "경로와 모달 자동 탐색",
+      step2Title: "웹·GPUI 데스크톱에서 검토",
+      step3Title: "브랜치 Diff와 AI MCP 연동",
+      factTitle: "사실만 기록하는 코어. 추측 없는 검증.",
+      factSub:
+        "dui는 스크린샷을 꾸며내지 않으며, 특정 디자인 기준을 강제하지 않습니다.",
+      factStatesTitle: "정직한 검증 상태",
+      factConformanceTitle: "플러그인형 디자인 적합성 (v0.3.0)",
     },
     "zh-CN": {
       releaseGuide: "发布版文档",
@@ -168,6 +196,20 @@
       ossTitle: "在 dui 画布中实时浏览 6 个热门开源项目",
       ossSub:
         "以下 6 个项目均已核验 MIT 许可证，由 dui map 在 375px 与 1280px 下真实捕获。点击任意卡片即可在 2D 画布中查看页面、导航连线、模态框与盒模型，并在工作区中切换项目。",
+      btnTrySourcePreview: "SwiftUI 与 Compose 预览 →",
+      btnTryDiff: "体验 2D 内联差异 →",
+      btnOpenAllCanvas: "打开画布演示 →",
+      workflowTitle: "三条命令完成零配置工作流",
+      workflowSub:
+        "无需编写配置文件，即可直接支持 Vite、Next.js App Router 和纯静态 HTML 应用。",
+      step1Title: "自动发现路由与弹窗",
+      step2Title: "在 Web 或 GPUI 桌面端评审",
+      step3Title: "分支对比与 AI MCP 驱动",
+      factTitle: "只记录事实的核心，不臆造证据。",
+      factSub:
+        "dui 不会虚构截图，也不向不同的设计系统强加硬编码审美规则。",
+      factStatesTitle: "诚实的验证状态",
+      factConformanceTitle: "可插拔设计规范校验 (v0.3.0)",
     },
   };
 

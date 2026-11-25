@@ -16,7 +16,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
   return (
     <form action={isStaticArchiveMode() ? "./" : "/"} method="get" className="work-picker">
       <label>
-        Project
+        {t.project}
         <select
           value={run.projectId}
           onChange={(e) => setKey(runs.find((r) => r.projectId === e.target.value)!.key)}
@@ -29,7 +29,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
         </select>
       </label>
       <label>
-        Branch
+        {t.branch}
         <select
           value={branches.indexOf(run.branch)}
           onChange={(e) =>
@@ -38,13 +38,13 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
         >
           {branches.map((branch, i) => (
             <option key={i} value={i}>
-              {branch ?? "Branch not recorded"}
+              {branch ?? t.branchNotRecorded}
             </option>
           ))}
         </select>
       </label>
       <label>
-        Version
+        {t.version}
         <select name="run" value={key} onChange={(e) => setKey(e.target.value)}>
           {versions.map((r) => (
             <option key={r.key} value={r.key}>
@@ -54,7 +54,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
         </select>
       </label>
       <Button type="submit" variant="default">
-        Open workspace
+        {t.openWorkspace}
       </Button>
     </form>
   );

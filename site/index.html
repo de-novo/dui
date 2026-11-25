@@ -207,14 +207,28 @@
           <div class="cta-row" style="margin-top: 0">
             <a
               class="btn"
+              href="https://dui.sh/demo/?run=native-source-preview"
+              data-demo-run="native-source-preview"
+              data-i18n="btnTrySourcePreview"
+            >
+              SwiftUI &amp; Compose Preview →
+            </a>
+            <a
+              class="btn"
               href="https://dui.sh/demo/?run=dui-site&amp;compare=dui-site-baseline"
               data-demo-run="dui-site"
               data-demo-compare="dui-site-baseline"
+              data-i18n="btnTryDiff"
             >
               Try 2D Inline Diff →
             </a>
-            <a class="btn btn-primary" href="https://dui.sh/demo/" data-demo-link>
-              Open all 7 in Canvas →
+            <a
+              class="btn btn-primary"
+              href="https://dui.sh/demo/"
+              data-demo-link
+              data-i18n="btnOpenAllCanvas"
+            >
+              Open Canvas Demo →
             </a>
           </div>
         </div>
@@ -389,15 +403,15 @@
       </section>
 
       <section class="section">
-        <h2>Zero-config workflow in three commands</h2>
-        <p class="section-sub">
+        <h2 data-i18n="workflowTitle">Zero-config workflow in three commands</h2>
+        <p class="section-sub" data-i18n="workflowSub">
           Works out of the box on Vite, Next.js App Router, and plain static HTML apps without
           writing a config file.
         </p>
         <div class="grid-3">
           <article class="card">
             <span class="step-num">01 / CAPTURE</span>
-            <h3>Auto-discover routes &amp; modals</h3>
+            <h3 data-i18n="step1Title">Auto-discover routes &amp; modals</h3>
             <p>
               Expands WAI-ARIA navigation menus, reads official router registries when present, and
               captures full-page screenshots plus native/ARIA dialogs at 375px and 1280px.
@@ -406,7 +420,7 @@
           </article>
           <article class="card">
             <span class="step-num">02 / INSPECT</span>
-            <h3>Review on Web or GPUI Desktop</h3>
+            <h3 data-i18n="step2Title">Review on Web or GPUI Desktop</h3>
             <p>
               Inspect every screen's rendered DOM tree, box model (margin, border, padding, gap),
               computed colors, and anchored review comments on a single 2D map.
@@ -416,7 +430,7 @@ dui desktop</code></pre>
           </article>
           <article class="card">
             <span class="step-num">03 / DIFF &amp; MCP</span>
-            <h3>Diff branches &amp; drive from AI</h3>
+            <h3 data-i18n="step3Title">Diff branches &amp; drive from AI</h3>
             <p>
               Compare against <code>main</code> with element-level render diffs and lazy pixel
               overlays, or connect AI coding agents directly over MCP stdio.
@@ -428,14 +442,14 @@ dui mcp</code></pre>
       </section>
 
       <section class="section">
-        <h2>Fact-only core. Zero guessed evidence.</h2>
-        <p class="section-sub">
+        <h2 data-i18n="factTitle">Fact-only core. Zero guessed evidence.</h2>
+        <p class="section-sub" data-i18n="factSub">
           dui never invents screenshots or forces hardcoded aesthetic opinions onto diverse design
           systems.
         </p>
         <div class="grid-2">
           <article class="card">
-            <h3>Honest verification states</h3>
+            <h3 data-i18n="factStatesTitle">Honest verification states</h3>
             <p>
               Every cell is explicitly marked <code>verified</code>, <code>unverified</code> (with
               exact cause like <code>http-error</code>), or <code>unrenderable</code> when a
@@ -443,7 +457,7 @@ dui mcp</code></pre>
             </p>
           </article>
           <article class="card">
-            <h3>Pluggable design conformance (v0.3.0)</h3>
+            <h3 data-i18n="factConformanceTitle">Pluggable design conformance (v0.3.0)</h3>
             <p>
               The development build removes hardcoded universal design lints. Upcoming v0.3.0 introduces
               opt-in <code>DESIGN.md</code>, W3C Design Tokens, and custom audit plugins so teams

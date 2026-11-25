@@ -10,6 +10,7 @@ import {
 import type { Run } from "../../data/run";
 import { useI18n } from "../../i18n/LocaleContext";
 import { decodeCaptureDiff, type CaptureDiff, type CellDiffEntry } from "../../model/diff";
+import { availableDiffPairs, formatShowcaseRunLabel } from "../../model/runLabels";
 
 function archiveImageUrl(name: string, runKey: string) {
   return archiveFileUrl(name, runKey);
@@ -27,9 +28,8 @@ function overlayImageUrl(beforeKey: string, afterKey: string, file: string) {
   );
 }
 
-function formatRunLabel(run: Run) {
-  const parts = [run.project, run.branch, run.version].filter(Boolean);
-  return parts.length ? parts.join(" · ") : run.key.slice(0, 12);
+function formatRunLabel(run: Run, runs: readonly Run[]) {
+  return formatShowcaseRunLabel(run, runs) || run.key.slice(0, 12);
 }
 
 function DiffCellCard({
@@ -226,6 +226,26 @@ export function CaptureDiffView({
   const loading = result.pairKey !== pairKey;
   const diff = loading ? null : result.diff;
   const error = loading ? null : result.error;
+  const staticMode = isStaticArchiveMode();
+  const staticPairs = staticMode ? availableDiffPairs(runs, true) : [];
+  const beforeOptions =
+    staticPairs.length > 0
+      ? Array.from(new Map(staticPairs.map((p) => [p.before.key, p.before])).values())
+      : runs;
+  const afterOptions =
+    staticPairs.length > 0
+      ? Array.from(
+          new Map(
+            staticPairs
+              .filter((p) => p.before.key === beforeKey)
+              .map((p) => [p.after.key, p.after]),
+          ).values(),
+        )
+      : runs;
+  const visibleAfterOptions =
+    afterOptions.length > 0
+      ? afterOptions
+      : Array.from(new Map(staticPairs.map((p) => [p.after.key, p.after])).values());
 
   return (
     <section className="diff-workspace" aria-label={t.diffTitle}>
@@ -247,11 +267,23 @@ export function CaptureDiffView({
             <select
               aria-label={t.beforeCapture}
               value={beforeKey}
-              onChange={(e) => onSelectPair(e.target.value, afterKey)}
+              onChange={(e) => {
+                const nextBefore = e.target.value;
+                if (staticPairs.length > 0) {
+                  const match = staticPairs.find(
+                    (p) => p.before.key === nextBefore && p.after.key === afterKey,
+                  );
+                  const fallbackAfter = staticPairs.find((p) => p.before.key === nextBefore)?.after
+                    .key;
+                  onSelectPair(nextBefore, match ? afterKey : (fallbackAfter ?? afterKey));
+                } else {
+                  onSelectPair(nextBefore, afterKey);
+                }
+              }}
             >
-              {runs.map((r) => (
+              {beforeOptions.map((r) => (
                 <option key={r.key} value={r.key}>
-                  {formatRunLabel(r)}
+                  {formatRunLabel(r, runs)}
                 </option>
               ))}
             </select>
@@ -261,11 +293,23 @@ export function CaptureDiffView({
             <select
               aria-label={t.afterCapture}
               value={afterKey}
-              onChange={(e) => onSelectPair(beforeKey, e.target.value)}
+              onChange={(e) => {
+                const nextAfter = e.target.value;
+                if (staticPairs.length > 0) {
+                  const match = staticPairs.find(
+                    (p) => p.before.key === beforeKey && p.after.key === nextAfter,
+                  );
+                  const fallbackBefore = staticPairs.find((p) => p.after.key === nextAfter)?.before
+                    .key;
+                  onSelectPair(match ? beforeKey : (fallbackBefore ?? beforeKey), nextAfter);
+                } else {
+                  onSelectPair(beforeKey, nextAfter);
+                }
+              }}
             >
-              {runs.map((r) => (
+              {visibleAfterOptions.map((r) => (
                 <option key={r.key} value={r.key}>
-                  {formatRunLabel(r)}
+                  {formatRunLabel(r, runs)}
                 </option>
               ))}
             </select>
@@ -310,8 +354,8 @@ export function CaptureDiffView({
                   <DiffCellCard
                     key={`${cell.path}:${cell.state}:${cell.width}:${cell.locale ?? ""}`}
                     cell={cell}
-                    beforeKey={diff.beforeRunKey}
-                    afterKey={diff.afterRunKey}
+                    beforeKey={diff.beforeRunKey || beforeKey}
+                    afterKey={diff.afterRunKey || afterKey}
                   />
                 ))}
               </div>
