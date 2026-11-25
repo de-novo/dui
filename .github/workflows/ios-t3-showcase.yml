@@ -6,6 +6,7 @@ on:
       - scripts/check-ios-t3-showcase.py
       - scripts/check-ios-screenshot.swift
       - scripts/check-t3-showcase-ocr.py
+      - scripts/check-t3-showcase-pairing.py
   workflow_dispatch:
     inputs:
       export_fixture_pngs:
@@ -52,6 +53,8 @@ jobs:
               - --filter=@t3tools/mobile...
               - --filter=@t3tools/scripts...
               - --filter=t3...
+      - name: Verify fresh fixture links on launch and retry
+        run: python3 scripts/check-t3-showcase-pairing.py "$RUNNER_TEMP/t3code"
       - name: Capture the thread and review on an iPhone simulator
         run: python3 scripts/check-ios-t3-showcase.py "$RUNNER_TEMP/t3code" "$RUNNER_TEMP/t3-ios-pngs"
       - name: Share the approved fixture screenshots for one day

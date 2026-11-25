@@ -12,7 +12,6 @@ import sys
 import tempfile
 import time
 import uuid
-from urllib.parse import urlencode, urlsplit
 
 
 REVISION = "f274d47150dfe0df5ed96bb27cb490a023e75500"
@@ -92,11 +91,9 @@ def install_route_observer(source):
     if (evidence !== duiPreviousObservation) {
       try {
         const name = scene === "thread" || scene === "review" ? scene : "startup";
-        for (const key of [name, "current"]) {
-          const file = new DuiFile(DuiPaths.document, "dui-showcase-" + key + ".json");
-          file.create({ overwrite: true });
-          file.writeSync(evidence);
-        }
+        const file = new DuiFile(DuiPaths.document, "dui-showcase-" + name + ".json");
+        file.create({ overwrite: true });
+        file.writeSync(evidence);
         duiPreviousObservation = evidence;
       } catch {}
     }
@@ -137,55 +134,6 @@ def observe_startup(udid, temporary, device_data):
             print("App crash:", crash.get("exception", {}).get("type"), crash.get("termination", {}).get("namespace"))
         except (ValueError, IndexError):
             pass
-
-
-def confirm_fixture_route(udid, scene):
-    """Navigate normally when the multi-environment showcase has not staged its other two servers."""
-    if scene not in ("thread", "review"):
-        raise ValueError("Unexpected fixture scene")
-    temporary = Path(os.environ["TMPDIR"])
-    base, = temporary.glob("t3-mobile-showcase-*/environments/moonbase-terminal")
-    environment = uuid.UUID((base / "userdata/environment-id").read_text().strip())
-    path = f"/threads/{environment}/remote-command-center" + ("/review" if scene == "review" else "")
-    simctl = ["xcrun", "simctl"]
-    bundle = "com.t3tools.t3code"
-    container = Path(output(*simctl, "get_app_container", udid, bundle, "data"))
-    current = container / "Documents/dui-showcase-current.json"
-    if scene == "thread":
-        # Pair precisely the server that owns both routes, using a new one-time
-        # credential issued after boot and installation. It stays inside the runner.
-        endpoint = (temporary / "dui-moonbase-origin").read_text()
-        if urlsplit(endpoint).hostname != "127.0.0.1":
-            raise ValueError("The showcase fixture must use loopback")
-        issued = subprocess.check_output(["node", "apps/server/src/bin.ts", "auth", "pairing", "create",
-                                          "--base-dir", base, "--json"],
-                                         env=dict(os.environ, NO_COLOR="1"), text=True)
-        credential = json.loads(issued[issued.index("{"):issued.rindex("}") + 1])["credential"]
-        pairing = endpoint + "/#" + urlencode({"token": credential})
-        current.unlink(missing_ok=True)
-        launch = subprocess.run([*simctl, "launch", "--terminate-running-process", udid, bundle,
-                                 "--showcasePairingUrl", json.dumps([pairing]), "--showcaseScene", scene,
-                                 "--showcaseTheme", "t3-code", "--showcaseOrientation", "portrait"],
-                                capture_output=True)
-        if launch.returncode:
-            raise RuntimeError("Failed to launch the app with the local Moonbase fixture")
-    (container / "Library/Caches/T3ShowcaseScene").write_text(scene)
-    deadline = time.monotonic() + 140
-    last_open = 0
-    while time.monotonic() < deadline:
-        try:
-            state = json.loads(current.read_text())
-        except (ValueError, FileNotFoundError):
-            state = {}
-        if state.get("hasShowcaseThread") and state["themeApplied"] and state["orientationSettled"]:
-            if state["path"] == path and state["scene"] == scene and (scene == "thread" or state["drawn"] == "review"):
-                print(f"Verified native fixture deep link: {scene}", flush=True)
-                return
-            if time.monotonic() - last_open > 8:
-                subprocess.run([*simctl, "openurl", udid, "t3code://" + path.lstrip("/")], check=True)
-                last_open = time.monotonic()
-        time.sleep(1)
-    raise RuntimeError(f"The app did not observe the seeded {scene} route and native content")
 
 
 def visible_fixture(image, scene):
@@ -233,6 +181,36 @@ def capture_visible_content(udid, scene, image):
     raise RuntimeError(f"The iOS {scene} fixture text check failed after {readable} OCR-readable frames")
 
 
+def prepare_ios_launches(harness, helper):
+    # Keep the upstream credential issuer and the environment/port mapping. Issue all
+    # links after simctl install, including fresh links for the launch after a timeout.
+    start = harness.index("async function captureIos(")
+    end = harness.index("function androidSdkTool(", start)
+    ios = harness[start:end]
+    edits = (
+        ("pairingUrls: ReadonlyArray<string>", "issuePairingUrls: () => Promise<ReadonlyArray<string>>"),
+        ("JSON.stringify(pairingUrls)", "JSON.stringify(await issuePairingUrls())"),
+        ("await finalizeCapture(destination, capture.device);",
+         "await finalizeCapture(destination, capture.device);\n"
+         f'    await runCommand("python3", [{helper}, "--capture-visible-content", simulator.udid, scene, destination]);'),
+    )
+    for before, after in edits:
+        if ios.count(before) != 1:
+            raise ValueError(f"The pinned iOS capture hook changed: {before}")
+        ios = ios.replace(before, after)
+    harness = harness[:start] + ios + harness[end:]
+    edits = (
+        ("const pairingUrls = await Promise.all(", "const issuePairingUrls = () => Promise.all("),
+        ("pairingUrls,\n          (cleanup) => iosCleanups", "issuePairingUrls,\n          (cleanup) => iosCleanups"),
+        ("pairingUrls,\n          (cleanup) => androidCleanups", "await issuePairingUrls(),\n          (cleanup) => androidCleanups"),
+    )
+    for before, after in edits:
+        if harness.count(before) != 1:
+            raise ValueError(f"The pinned showcase fixture hook changed: {before}")
+        harness = harness.replace(before, after)
+    return harness
+
+
 def run_capture(source, temporary, udid, device_data):
     pnpm_version = json.loads((source / "package.json").read_text())["packageManager"].split("@")[1]
     pnpm_dir = Path.home() / ".vite-plus/package_manager/pnpm" / pnpm_version / "pnpm/bin"
@@ -251,21 +229,7 @@ def run_capture(source, temporary, udid, device_data):
     helper = json.dumps(str(Path(__file__).resolve()))
     inspect = f'await runCommand("python3", [{helper}, "--check-simulator-keychain", IOS_APP_PATH], {{ env: MOBILE_BUILD_ENV }});'
     harness = harness.replace(product_hook, inspect + "\n  " + product_hook)
-    credentials = "      if (capture.device.platform === \"ios\") {"
-    timeout = '  throw new Error(`iOS showcase scene'
-    if harness.count(credentials) != 1 or harness.count(timeout) != 1:
-        raise ValueError("The pinned showcase capture hooks changed")
-    record_origin = 'await NodeFSP.writeFile(NodePath.join(NodeOS.tmpdir(), "dui-moonbase-origin"), new URL(pairingUrls[0]).origin);'
-    harness = harness.replace(credentials, credentials + "\n        " + record_origin)
-    fallback = f'  await runCommand("python3", [{helper}, "--confirm-fixture-route", udid, scene]);'
-    harness = re.sub(r"^  throw new Error\(`iOS showcase scene[^\n]+$", lambda _: fallback, harness, flags=re.M)
-    ios_start, ios_end = harness.index("async function captureIos("), harness.index("function androidSdkTool(")
-    ios_capture = harness[ios_start:ios_end]
-    finished = "await finalizeCapture(destination, capture.device);"
-    if ios_capture.count(finished) != 1:
-        raise ValueError("The pinned iOS screenshot step changed")
-    witness = f'await runCommand("python3", [{helper}, "--capture-visible-content", simulator.udid, scene, destination]);'
-    harness = harness[:ios_start] + ios_capture.replace(finished, finished + "\n    " + witness) + harness[ios_end:]
+    harness = prepare_ios_launches(harness, helper)
     driver.write_text(harness.replace('"Debug"', '"Release"').replace("Debug-iphonesimulator", "Release-iphonesimulator"))
     install_route_observer(source)
     log = temporary / "showcase.log"
@@ -294,7 +258,6 @@ def run_capture(source, temporary, udid, device_data):
                         pass
             time.sleep(1)
     log_text = log.read_text(errors="replace")
-    direct = {scene for scene, *_ in SCENES if f"Verified native fixture deep link: {scene}" in log_text}
     if "Simulator Keychain ready via local ad-hoc identity" in log_text:
         print("Simulator Keychain ready via local ad-hoc identity", flush=True)
     if process.returncode:
@@ -306,7 +269,7 @@ def run_capture(source, temporary, udid, device_data):
         raise RuntimeError(f"T3 Code showcase exited with {process.returncode}")
     if environment is None:
         raise RuntimeError("The Moonbase Terminal fixture did not report its environment ID")
-    return f"/threads/{environment}/remote-command-center", direct
+    return f"/threads/{environment}/remote-command-center"
 
 
 def main():
@@ -334,10 +297,9 @@ def main():
             checker = temporary / "check-screenshot"
             subprocess.run(["xcrun", "swiftc", Path(__file__).with_name("check-ios-screenshot.swift"),
                             "-o", checker], check=True)
-            thread_path, direct = run_capture(source, temporary, udid, device_data)
+            thread_path = run_capture(source, temporary, udid, device_data)
             screenshots = source / "artifacts/app-store/screenshots/apple/iphone-6.9/light/t3-code"
             summary = [f"T3 Code `{REVISION}` · {DEVICE} · iOS {runtime} · {scale:g}×",
-                       f"Native fixture deep links used: {', '.join(sorted(direct)) or 'none'}.",
                        "", "| File | Registration | Fixture route | Screen ID | Points | Pixels | SHA-256 |",
                        "|---|---|---|---|---|---|---|"]
             hashes = set()
@@ -346,7 +308,7 @@ def main():
                 observation, = device_data.glob(f"Containers/Data/Application/*/Documents/dui-showcase-{scene}.json")
                 observed = json.loads(observation.read_text())
                 if (observed["path"] != thread_path + suffix or observed["scene"] != scene or
-                    not (observed["hasShowcaseThread"] if scene in direct else observed["hasFixture"])):
+                    not observed["hasFixture"]):
                     raise ValueError(f"Native navigation did not confirm {name}")
                 image = screenshots / f"{scene}.png"
                 width, height = map(int, output(checker, image).split())
@@ -371,8 +333,6 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--check-simulator-keychain":
         prepare_simulator_keychain(Path(sys.argv[2]).resolve())
-    elif len(sys.argv) == 4 and sys.argv[1] == "--confirm-fixture-route":
-        confirm_fixture_route(sys.argv[2], sys.argv[3])
     elif len(sys.argv) == 5 and sys.argv[1] == "--capture-visible-content":
         capture_visible_content(sys.argv[2], sys.argv[3], Path(sys.argv[4]))
     else:
