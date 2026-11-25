@@ -113,7 +113,23 @@ function startStaticServer(): Promise<{ server: http.Server; port: number }> {
 
 // Runs in Chromium after navigation. Compare the rendered boxes so the test
 // follows the current gutter, font, language and action count.
-function checkContentPage() {
+async function checkContentPage() {
+  if (location.pathname === "/index.html") {
+    const previews = document.querySelectorAll<HTMLAnchorElement>("#ios-examples .native-preview");
+    if (!previews.length) throw Error("Missing native example previews");
+    for (const preview of previews) {
+      const image = preview.querySelector("img")!;
+      image.loading = "eager";
+      await image.decode();
+      if (
+        image.currentSrc !== preview.href ||
+        image.naturalWidth !== Number(image.getAttribute("width")) ||
+        image.naturalHeight !== Number(image.getAttribute("height"))
+      ) {
+        throw Error(`Native example does not open its full-resolution capture: ${preview.href}`);
+      }
+    }
+  }
   const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
   const language = document.querySelector<HTMLSelectElement>("[data-lang-select]")!;
   const original = language.value;
@@ -357,6 +373,7 @@ async function verifyRenderedPages(port: number, firstRunKey?: string) {
       if (!c.verifyThemes) {
         const layout = await call("Runtime.evaluate", {
           expression: `(${checkContentPage.toString()})()`,
+          awaitPromise: true,
         });
         if (layout.exceptionDetails) throw Error(JSON.stringify(layout.exceptionDetails));
       }

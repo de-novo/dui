@@ -23,6 +23,17 @@
 
   const i18n = {
     en: {
+      openOriginal: "Open original",
+      t3ThreadAlt: "T3 Code thread with a user request and the assistant’s test results",
+      orcaHomeAlt: "Orca connection steps and the Pair desktop button",
+      compassBookingAlt: "Compass booking details for an Alaska trip",
+      iosExamples: "iOS screen examples",
+      iosExamplesSub: "Captured on iPhone simulators. Select a screen to open the full-resolution image.",
+      t3Thread: "Thread conversation",
+      orcaHome: "Connect your desktop",
+      compassBooking: "Alaska itinerary",
+      captureRun: "View capture run",
+      captureSources: "Sources and licenses",
       navOverview: "Overview",
       navExamples: "Examples",
       navArch: "Architecture",
@@ -42,6 +53,17 @@
         "Every project below is a real MIT-licensed open-source app captured with dui map across mobile (375px) and desktop (1280px). Click any card to inspect its 2D canvas, navigation edges, modals, and box model.",
     },
     ko: {
+      openOriginal: "원본 보기",
+      t3ThreadAlt: "사용자 요청과 테스트 결과를 보여 주는 T3 Code 대화",
+      orcaHomeAlt: "연결 단계와 데스크톱 페어링 버튼이 보이는 Orca 홈",
+      compassBookingAlt: "알래스카 여행의 예약 정보가 보이는 Compass 화면",
+      iosExamples: "iOS 화면 예시",
+      iosExamplesSub: "iPhone 시뮬레이터에서 캡처했습니다. 화면을 선택하면 원본 크기로 열립니다.",
+      t3Thread: "스레드 대화",
+      orcaHome: "데스크톱 연결",
+      compassBooking: "알래스카 여행 일정",
+      captureRun: "캡처 실행 기록",
+      captureSources: "출처 및 라이선스",
       navOverview: "개요",
       navExamples: "예제",
       navArch: "아키텍처",
@@ -61,6 +83,17 @@
         "아래 6개는 MIT 라이선스를 확인한 실제 오픈소스 앱을 dui map으로 모바일(375px)·데스크톱(1280px) 캡처한 결과입니다. 카드를 누르면 2D 캔버스·연결선·모달·박스 모델을 바로 탐색하고 워크스페이스에서 프로젝트를 전환할 수 있습니다.",
     },
     "zh-CN": {
+      openOriginal: "查看原图",
+      t3ThreadAlt: "T3 Code 会话中的用户请求和测试结果",
+      orcaHomeAlt: "Orca 的连接步骤和桌面配对按钮",
+      compassBookingAlt: "Compass 中的阿拉斯加行程预订详情",
+      iosExamples: "iOS 界面示例",
+      iosExamplesSub: "这些画面来自 iPhone 模拟器。选择一个界面即可查看原始尺寸的图像。",
+      t3Thread: "会话消息",
+      orcaHome: "连接桌面端",
+      compassBooking: "阿拉斯加行程",
+      captureRun: "查看采集记录",
+      captureSources: "来源与许可证",
       navOverview: "概览",
       navExamples: "示例",
       navArch: "架构",
@@ -88,6 +121,10 @@
     for (const el of document.querySelectorAll("[data-i18n]")) {
       const key = el.getAttribute("data-i18n");
       if (key && dict[key]) el.textContent = dict[key];
+    }
+    for (const image of document.querySelectorAll("img[data-i18n-alt]")) {
+      const alt = dict[image.dataset.i18nAlt];
+      if (alt) image.alt = alt;
     }
     if (langSelect && langSelect.value !== lang) langSelect.value = lang;
   };
