@@ -49,6 +49,7 @@ jobs:
           npm run build --prefix apps/canvas
           cargo build --release --locked
           npm run build:pages-demo
+          npm run check:version -- --published
           node scripts/stage-pages.mts target/pages
           DUI_SITE_DIR=target/pages npm run verify:pages-demo
       - name: Configure Pages

@@ -45,7 +45,7 @@ fn live_tool() -> Value {
 fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
     match r["method"].as_str() {
         Some("initialize") => Ok(
-            json!({"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"dui","version":env!("CARGO_PKG_VERSION")}}),
+            json!({"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"dui","version":crate::update::VERSION}}),
         ),
         Some("ping") => Ok(json!({})),
         Some("tools/list") => Ok(

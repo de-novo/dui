@@ -31,6 +31,10 @@ with tempfile.TemporaryDirectory(prefix="dui-versions-") as temp:
         cli = Path(env["CARGO_TARGET_DIR"]) / "debug/dui"
         actual = json.loads(run(cli, "--version"))
         assert actual == {"name": "dui", "version": version, "tag": tag}, actual
+        initialize = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
+        reply = subprocess.check_output([cli, "mcp"], cwd=repo, env=env, text=True,
+                                        input=json.dumps(initialize) + "\n")
+        assert json.loads(reply)["result"]["serverInfo"]["version"] == version
         check = json.loads(run(cli, "update", "--check"))
         assert check["current"] == f"v{version}" and check["latest"] == latest, check
         assert check["updateAvailable"] == update, check

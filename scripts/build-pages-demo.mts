@@ -580,7 +580,7 @@ async function main() {
           projectId: "oss-dui-site",
           project: "de-novo/dui (dui.sh)",
           branch: "Apache-2.0 · Zero-dep HTML",
-          version: "v0.2.0-current (Compare diff!)",
+          version: "Current capture",
           liveAvailable: false,
         });
         runs.push({
@@ -588,7 +588,7 @@ async function main() {
           projectId: "oss-dui-site",
           project: "de-novo/dui (dui.sh)",
           branch: "Apache-2.0 · Zero-dep HTML",
-          version: "v0.2.0-baseline",
+          version: "Baseline capture",
           liveAvailable: false,
         });
       } else {
