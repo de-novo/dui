@@ -1,6 +1,7 @@
 // Run trusted source locally. The exported preview contains only observed UI and transitions.
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -100,7 +101,8 @@ function escape(text: string) {
     .replaceAll('"', "&quot;");
 }
 
-type Frame = { key: string; html: string; controls: number };
+type Token = ["row" | "column" | "end"] | ["text", string] | ["switch", boolean, string];
+type Frame = { tokens: Token[]; key: string; html: string; controls: number };
 function readFrame(output: string): Frame {
   const [header, ...records] = output.replace(/\r?\n$/, "").split(/\r?\n/);
   const match = /^state\t([01]*)$/.exec(header);
@@ -108,13 +110,16 @@ function readFrame(output: string): Frame {
   const stack: { kind: string; parts: string[]; switches: number; text: boolean }[] = [
     { kind: "root", parts: [], switches: 0, text: false },
   ];
+  const tokens: Token[] = [];
   let controls = 0;
   for (const record of records) {
     const [kind, a, b] = record.split("\t");
     const top = stack.at(-1)!;
-    if (kind === "row" || kind === "column")
+    if (kind === "row" || kind === "column") {
+      tokens.push([kind]);
       stack.push({ kind, parts: [], switches: 0, text: false });
-    else if (kind === "end" && stack.length > 1) {
+    } else if (kind === "end" && stack.length > 1) {
+      tokens.push(["end"]);
       stack.pop();
       const tag =
         top.kind === "row" && top.switches === 1 && top.text && top.parts.length === 2
@@ -126,10 +131,13 @@ function readFrame(output: string): Frame {
           "<" + tag + ' class="' + top.kind + '">' + top.parts.join("") + "</" + tag + ">",
         );
     } else if (kind === "text") {
+      tokens.push(["text", Buffer.from(a, "base64").toString("utf8")]);
       top.text = true;
       top.parts.push("<span>" + escape(Buffer.from(a, "base64").toString("utf8")) + "</span>");
     } else if (kind === "switch" && (a === "0" || a === "1")) {
-      const label = escape(Buffer.from(b ?? "", "base64").toString("utf8"));
+      const text = Buffer.from(b ?? "", "base64").toString("utf8");
+      tokens.push(["switch", a === "1", text]);
+      const label = escape(text);
       const input =
         '<input type="checkbox" role="switch" data-control="' +
         controls++ +
@@ -141,13 +149,17 @@ function readFrame(output: string): Frame {
     } else throw Error("Unsupported preview output: " + kind);
   }
   if (stack.length !== 1) throw Error("Incomplete layout");
-  return { key: match[1], html: stack[0].parts.join(""), controls };
+  return { tokens, key: match[1], html: stack[0].parts.join(""), controls };
 }
 
 export function exportPreview(source: string, entry: string) {
   const tmp = mkdtempSync(join(tmpdir(), "dui-source-preview-"));
   try {
-    const host = compile(resolve(source), entry, tmp);
+    const bytes = readFileSync(source);
+    const input = join(tmp, "source", basename(source));
+    mkdirSync(join(tmp, "source"));
+    writeFileSync(input, bytes);
+    const host = compile(input, entry, tmp);
     function observe(path: number[]) {
       return readFrame(run(host.command, [...host.args, ...path.map(String)], tmp, 10000));
     }
@@ -177,6 +189,12 @@ export function exportPreview(source: string, entry: string) {
       .join("\n");
     const transitions = JSON.stringify(states.map((s) => s.next));
     return {
+      scene: {
+        version: 1,
+        entry,
+        sourceSha256: createHash("sha256").update(bytes).digest("hex"),
+        frames: states.map(({ frame, next }) => ({ tokens: frame.tokens, next })),
+      },
       states: states.length,
       html: `<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -206,10 +224,10 @@ render();
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const [source, entry, out, ...rest] = process.argv.slice(2);
-    if (!source || !entry || !out || rest.length || extname(out) !== ".html")
-      throw Error("Usage: node scripts/source-preview.mts SOURCE ENTRY OUTPUT.html");
+    if (!source || !entry || !out || rest.length || ![".html", ".json"].includes(extname(out)))
+      throw Error("Usage: node scripts/source-preview.mts SOURCE ENTRY OUTPUT.html|OUTPUT.json");
     const preview = exportPreview(source, entry);
-    writeFileSync(out, preview.html);
+    writeFileSync(out, extname(out) === ".json" ? JSON.stringify(preview.scene) : preview.html);
     console.log(
       JSON.stringify({ source, entry, output: out, states: preview.states, nativeVerified: false }),
     );

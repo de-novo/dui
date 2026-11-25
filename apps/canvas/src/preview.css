@@ -2606,3 +2606,24 @@ h2 {
   max-width: 100%;
   height: auto;
 }
+
+.source-preview-panel .preview-column,
+.source-preview-panel .preview-row,
+.source-preview-panel label {
+  display: flex;
+  gap: var(--space-2);
+}
+.source-preview-panel .preview-column {
+  flex-direction: column;
+}
+.source-preview-panel .preview-row,
+.source-preview-panel label {
+  align-items: center;
+}
+.source-preview-panel label {
+  margin: 0;
+}
+.source-preview-panel {
+  accent-color: var(--primary);
+  overflow-wrap: anywhere;
+}

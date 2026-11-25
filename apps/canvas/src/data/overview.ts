@@ -1,3 +1,4 @@
+import { decodeSourcePreview, type SourcePreview } from "./sourcePreview.ts";
 export type LocaleOverflow = {
   selector: string;
   text: string;
@@ -108,13 +109,15 @@ export type ScreenOrigin =
 export type NativeSource = {
   name: string;
   source: string;
-  line: number;
+  line?: number;
+  projectScope?: string;
   dynamic?: boolean;
   condition?: string;
 };
 
 export type Screen = {
   nativeSource?: NativeSource;
+  sourcePreview?: SourcePreview;
   id: string;
   path: string;
   cells: Cell[];
@@ -157,9 +160,8 @@ function decodeNativeSource(raw: unknown): NativeSource | undefined {
     !raw.name ||
     typeof raw.source !== "string" ||
     !raw.source ||
-    typeof raw.line !== "number" ||
-    !Number.isSafeInteger(raw.line) ||
-    raw.line < 1 ||
+    ((raw.line !== undefined || typeof raw.projectScope !== "string") &&
+      (typeof raw.line !== "number" || !Number.isSafeInteger(raw.line) || raw.line < 1)) ||
     (raw.dynamic !== undefined && typeof raw.dynamic !== "boolean") ||
     (raw.condition !== undefined && typeof raw.condition !== "string")
   )
@@ -167,7 +169,8 @@ function decodeNativeSource(raw: unknown): NativeSource | undefined {
   return {
     name: raw.name,
     source: raw.source,
-    line: raw.line,
+    line: typeof raw.line === "number" ? raw.line : undefined,
+    projectScope: typeof raw.projectScope === "string" ? raw.projectScope : undefined,
     dynamic: raw.dynamic,
     condition: raw.condition,
   };
@@ -304,6 +307,12 @@ export function decodeOverview(raw: unknown): ScreenMap {
       discoveredFrom: decodeOrigin(node.discoveredFrom),
       nativeSource: decodeNativeSource(node.nativeSource),
     };
+    if (screen.nativeSource?.projectScope || node.sourcePreview !== undefined)
+      screen.sourcePreview = decodeSourcePreview(
+        node.sourcePreview,
+        screen.nativeSource?.name ?? "",
+        screen.id,
+      );
     byPath.set(screen.path, screen);
     screens.push(screen);
   }

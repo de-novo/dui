@@ -11,9 +11,11 @@ use std::{
     process::{Command, Output},
 };
 
+pub(crate) mod previews;
 type Error = (u8, Value);
 
 pub(crate) enum Adapter {
+    Declared,
     JavaScript,
     Dart,
 }
@@ -48,10 +50,12 @@ pub(crate) fn target(project: &Path) -> Result<Option<(PathBuf, Adapter)>, Error
             return Ok(Some((app, Adapter::JavaScript)));
         }
     }
-    Ok(app
-        .join("pubspec.yaml")
-        .is_file()
-        .then_some((app, Adapter::Dart)))
+    if app.join("pubspec.yaml").is_file() {
+        return Ok(Some((app, Adapter::Dart)));
+    }
+    Ok(profile
+        .get("sourcePreviews")
+        .map(|_| (project.to_owned(), Adapter::Declared)))
 }
 
 #[derive(Deserialize)]
@@ -86,6 +90,12 @@ fn output(command: &mut Command, operation: &str) -> Result<Output, Error> {
 impl Adapter {
     pub(crate) fn discover(&self, app: &Path) -> Result<Inventory, Error> {
         let result = match self {
+            Self::Declared => {
+                return Ok(Inventory {
+                    screens: vec![],
+                    limitations: vec![],
+                });
+            }
             Self::JavaScript => {
                 let temp = tempfile::tempdir().map_err(io)?;
                 let script = temp.path().canonicalize().map_err(io)?.join("discover.mjs");
@@ -174,7 +184,7 @@ fn dart_tool() -> Result<PathBuf, Error> {
 }
 
 impl Inventory {
-    pub(crate) fn archive(&self, out: &Path) -> Reply {
+    pub(crate) fn archive(&self, out: &Path, project: &Path) -> Reply {
         fs::create_dir_all(out).map_err(io)?;
         let mut nodes = Vec::new();
         let mut sources = BTreeSet::new();
@@ -191,8 +201,17 @@ impl Inventory {
             if !ids.insert(screen.id().clone()) {
                 continue;
             }
-            sources.insert(&source.source);
+            sources.insert(source.source.clone());
             nodes.push(json!({"id":screen.id(), "kind":"screen", "label":screen.path(), "nativeSource":source}));
+        }
+        for node in previews::nodes(project)? {
+            sources.insert(
+                node["nativeSource"]["source"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+            );
+            nodes.push(node);
         }
         let discovery =
             json!({"kind":"native-source", "declared":nodes.len(), "limitations":self.limitations});

@@ -188,7 +188,14 @@ impl Run {
 pub struct NativeSource {
     pub name: String,
     pub source: String,
-    pub line: std::num::NonZeroU32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<std::num::NonZeroU32>,
+    #[serde(
+        default,
+        rename = "projectScope",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub project_scope: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub condition: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

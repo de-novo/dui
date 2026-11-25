@@ -5,6 +5,7 @@ use dui_core::storage::{RunFilter, RunRepository};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     fs,
     io::{BufRead, BufReader, Read, Write},
@@ -37,7 +38,7 @@ struct ViewerState {
     run_roots: BTreeMap<String, PathBuf>,
     default_run_key: Option<String>,
     archive_images: BTreeMap<String, Arc<BTreeSet<String>>>,
-    archive_graphs: BTreeMap<String, Arc<Vec<u8>>>,
+    archive_graphs: BTreeMap<String, Arc<ArchiveGraph>>,
     audit_cache: BTreeMap<String, Value>,
 }
 
@@ -226,7 +227,25 @@ fn read_png_dimensions(path: &Path) -> Option<(u32, u32)> {
     (width > 0 && height > 0).then_some((width, height))
 }
 
-fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
+enum ArchiveGraph {
+    Static(Vec<u8>),
+    SourcePreviews(Value),
+}
+
+impl ArchiveGraph {
+    fn response(&self) -> serde_json::Result<Cow<'_, [u8]>> {
+        match self {
+            Self::Static(bytes) => Ok(Cow::Borrowed(bytes)),
+            Self::SourcePreviews(saved) => {
+                let mut graph = saved.clone();
+                crate::native_map::previews::check_local_sources(&mut graph);
+                serde_json::to_vec(&graph).map(Cow::Owned)
+            }
+        }
+    }
+}
+
+fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String> {
     let mut graph: Value =
         serde_json::from_slice(&fs::read(root.join("graph.json")).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -304,7 +323,15 @@ fn open_archive(root: &Path) -> Result<(Vec<u8>, BTreeSet<String>), String> {
     if let Some(obj) = graph.as_object_mut() {
         obj.insert("cells".into(), Value::Array(cells));
     }
-    let body = serde_json::to_vec(&graph).map_err(|e| e.to_string())?;
+    let body = if graph["nodes"].as_array().is_some_and(|nodes| {
+        nodes
+            .iter()
+            .any(|n| n["sourcePreview"]["status"] == "ready")
+    }) {
+        ArchiveGraph::SourcePreviews(graph)
+    } else {
+        ArchiveGraph::Static(serde_json::to_vec(&graph).map_err(|e| e.to_string())?)
+    };
     Ok((body, images))
 }
 
@@ -529,7 +556,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         struct ResolvedArchive {
             run_key: String,
             root: PathBuf,
-            cached_graph: Option<Arc<Vec<u8>>>,
+            cached_graph: Option<Arc<ArchiveGraph>>,
             cached_images: Option<Arc<BTreeSet<String>>>,
         }
         let requested_key = query.get("run").map(String::as_str);
@@ -595,7 +622,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             return;
         };
 
-        let (graph_bytes, images) = match (cached_graph, cached_images) {
+        let (graph, images) = match (cached_graph, cached_images) {
             (Some(g), Some(imgs)) => (g, imgs),
             _ => {
                 let Ok((g, imgs)) = open_archive(&root) else {
@@ -613,6 +640,10 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         };
 
         if archive_name == "graph.json" {
+            let Ok(graph_bytes) = graph.response() else {
+                send_response(&mut stream, 500, "text/plain", "no-store", b"");
+                return;
+            };
             send_response(
                 &mut stream,
                 200,
