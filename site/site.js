@@ -23,6 +23,7 @@
 
   const i18n = {
     en: {
+      releaseGuide: "Release documentation",
       supportHeading: "Analysis and rendering by platform",
       supportIntro: "dui reads types through the project’s official compiler. Rules recognize individual API calls. Each platform supplies its own evidence of what appeared on screen.",
       supportSurface: "Surface",
@@ -71,6 +72,7 @@
         "Every project below is a real MIT-licensed open-source app captured with dui map across mobile (375px) and desktop (1280px). Click any card to inspect its 2D canvas, navigation edges, modals, and box model.",
     },
     ko: {
+      releaseGuide: "릴리스 문서",
       supportHeading: "플랫폼별 분석과 렌더링",
       supportIntro: "dui는 프로젝트의 공식 컴파일러에서 타입을 읽고, 규칙으로 개별 API 호출을 식별합니다. 화면에 나타난 결과는 각 플랫폼에서 관찰합니다.",
       supportSurface: "플랫폼",
@@ -119,6 +121,7 @@
         "아래 6개는 MIT 라이선스를 확인한 실제 오픈소스 앱을 dui map으로 모바일(375px)·데스크톱(1280px) 캡처한 결과입니다. 카드를 누르면 2D 캔버스·연결선·모달·박스 모델을 바로 탐색하고 워크스페이스에서 프로젝트를 전환할 수 있습니다.",
     },
     "zh-CN": {
+      releaseGuide: "发布版文档",
       supportHeading: "各平台的分析与渲染",
       supportIntro: "dui 通过项目的官方编译器读取类型，通过规则识别具体的 API 调用。界面上实际显示的内容由各平台提供证据。",
       supportSurface: "平台",
@@ -179,6 +182,10 @@
     for (const image of document.querySelectorAll("img[data-i18n-alt]")) {
       const alt = dict[image.dataset.i18nAlt];
       if (alt) image.alt = alt;
+    }
+    for (const guide of document.querySelectorAll("[data-quickstart-guide], [data-install-guide]")) {
+      const filename = lang === "en" ? "README.md" : `README.${lang}.md`;
+      guide.href = new URL(filename + guide.hash, guide.href).href;
     }
     if (langSelect && langSelect.value !== lang) langSelect.value = lang;
   };

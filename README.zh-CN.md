@@ -8,6 +8,8 @@ dui 通过项目官方编译器读取类型，自动生成模拟数据并在真�
 
 [产品路线图](docs/zh-CN/roadmap.md) · [变更日志](docs/zh-CN/changelog.md) · [分析与渲染范围](docs/zh-CN/supported-frameworks.md)
 
+以下能力表描述 `main` 开发版。使用默认安装版本时，请从[首次捕获](#first-run)开始。
+
 ## 可分析范围
 
 ### 分析与捕获方式
@@ -36,7 +38,7 @@ dui 从项目的官方编译器读取类型。库规则识别程序中的特定 
 
 ## 安装
 
-在 macOS 或 Linux 上运行以下命令，按最新 SemVer 发布标签（`vX.Y.Z`，无标签时回退到 `main`）拉取仓库并在本机编译安装。可通过 `DUI_TAG=v0.0.1` 指定特定标签。
+在 macOS 或 Linux 上运行以下命令，按最新 SemVer 发布标签（`vX.Y.Z`，无标签时回退到 `main`）拉取仓库并在本机编译安装。要固定版本，可在安装程序的环境变量 `DUI_TAG` 中指定[已发布的标签](https://github.com/de-novo/dui/tags)。
 
 ```sh
 curl -fsSL https://dui.sh/install | sh
@@ -49,30 +51,37 @@ curl -fsSL https://dui.sh/install | sh
 ```sh
 dui --version
 dui update --check
-dui update
 ```
 
-**捕获网页时**需要 Node.js 22+ LTS（22 / 24 / 26）、Chromium 或 Google Chrome，以及目标应用的依赖。
+<a id="first-run"></a>
 
-## 快速开始与常用命令
+## 使用默认安装版本捕获第一个界面
 
-运行 `dui --help` 可随时查看按功能分组的完整命令指南。大多数项目只需 **4 条命令**：
+安装 Node.js 26、Chrome 或 Chromium 以及 Vite 应用的依赖。[验证用的应用](fixtures/toggle)使用 Vite 8 和 React 19。在应用根目录的 `dui.json` 中，将 `readySelector` 设为目标界面就绪后可见的元素。例如，正文中包含页面标题的应用可以使用以下配置。
 
+<!-- quickstart:manifest -->
+```json
+{ "readySelector": "main h1" }
+```
+
+<!-- quickstart:first-run -->
 ```sh
-# 1. 从路由或链接自动发现界面并捕获（自动合并项目根目录的 dui.json）
-dui map
+dui --version
+dui map .
+dui open --no-open
+```
 
-# 2. （可选）捕获需登录应用的浏览器会话（支持表单 / MFA / OAuth）
-dui auth login http://localhost:5173/login --out auth-state.json
+第一条命令显示安装版本，第二条命令捕获界面并在 `output` 中给出结果目录。打开最后一条命令输出的本地 URL 即可查看捕获，按 Ctrl+C 关闭查看器。如果捕获的退出码为 5，请查看结果目录中 `report.json` 记录的失败原因。
 
-# 3. 在 2D 画布或原生桌面查看器中审阅
-dui open
-dui desktop
+## `main` 开发版 CLI
 
-# 4. 分支对比生成 PR Markdown 摘要，并检查覆盖率
-dui diff --base main --markdown
-dui diff --base main --regressions-only --markdown
-dui audit <run-dir>
+运行 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh` 安装开发版。以下示例和命令表适用于开发版。网站也提供[默认安装版本的发布文档](https://dui.sh/?lang=zh-CN#release-guide)。
+
+如果静态站点已构建到 `dist/`，在项目根目录运行以下命令，再用上面的查看器命令打开结果。
+
+<!-- quickstart:static -->
+```sh
+dui map . --build-dir dist
 ```
 
 ### `dui map` 与 `dui run` 的区别
@@ -99,7 +108,7 @@ dui audit <run-dir>
 ~/.local/bin/dui map .
 ```
 
-dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，则从 `/` 开始，跟随入口页面的同源链接一层。每个地址按 375 和 1280 像素两种宽度捕获。运行 `dui open`（或 `dui open <output>`）打开内置界面地图查看器。MCP 提供相同的 `map(project)` 操作。
+dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，则从 `/` 开始，在探索限额内沿可访问的同源链接继续探索。每个地址按 375 和 1280 像素两种宽度捕获。运行 `dui open`（或 `dui open <output>`）打开内置界面地图查看器。MCP 提供相同的 `map(project)` 操作。
 
 打开已捕获的单元格，在同一个 Chromium 会话中修改和恢复布尔值或枚举值。[CLI 和 MCP 示例](docs/zh-CN/web-viewer.md#通过-cli-或-mcp-使用实时会话)
 
@@ -126,7 +135,7 @@ dui 查找带页面组件的 TanStack 文件路由。若未找到具体路径，
 
 4. 运行 `~/.local/bin/dui open` 打开本地历史视图。选择项目，然后从按分支和工作树分组的列表中选择两次捕获，并排查看相同状态和宽度的截图。每次捕获都记录提交和工作树是否有未提交的更改。退出码为 5 时，可从结果中的 `output` 路径打开 `report.json` 查看原因。
 
-**更多页面。** 加入 `"routeSelector": "nav a[href]"` 可收集起始页上匹配的同源链接，深度为一层。用 `scenarios` 指定更深的路由或需要不同就绪条件的页面。
+**更多页面。** 加入 `"routeSelector": "nav a[href]"` 可递归访问匹配的同源链接。用 `scenarios` 指定无链接指向的路由或需要不同就绪条件的页面。
 
 **模拟数据。** 对于访问同源固定路径且响应类型受支持的 GET 请求，dui 会根据类型生成 JSON。打开 `facts.json`，在 `autoMocks.generated` 中查看生成的数据，在 `autoMocks.unresolved` 中查看无法生成的项。 [路由与模拟数据配置（英文）](docs/reference.md)
 
