@@ -68,7 +68,7 @@ jobs:
             require("fs").copyFileSync(run.output + "/graph.json", process.argv[2]);
             if (limits.some((l) => l.startsWith("xcodebuild"))) process.exit(1);
             if (names.length < 200 || !names.includes("OnboardingWelcomeView")) process.exit(1);
-            // Declarations come from the project's own sources, never dependency checkouts.
+            // Declarations come only from project sources, never dependency checkouts.
             if (graph.nodes.some((n) => n.nativeSource.source.startsWith("/"))) process.exit(1);
             if (run.coverage.attempted !== 0) process.exit(1);
           ' "$RUNNER_TEMP/ha-map.json" "$RUNNER_TEMP/ha-graph.json"
