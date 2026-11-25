@@ -1,5 +1,5 @@
 import { ArrowRight, Search, Layers, Map as MapIcon } from "lucide-react";
-import { DiscoveryLimitations, NativeSourceEvidence } from "../../components/NativeSourceEvidence";
+import { DiscoveryLimitations, SourceCardBody } from "../../components/NativeSourceEvidence";
 import { Button } from "../../components/ui/button";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -164,7 +164,9 @@ export function MobileScreenDeck({
                 </div>
 
                 {screen.nativeSource && !cell && !src && (
-                  <NativeSourceEvidence source={screen.nativeSource} sourceOnly />
+                  <div className="source-frame">
+                    <SourceCardBody source={screen.nativeSource} preview={screen.sourcePreview} />
+                  </div>
                 )}
                 {src && (
                   <div className="mobile-deck-frame">

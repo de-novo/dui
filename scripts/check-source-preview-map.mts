@@ -215,9 +215,13 @@ async function exerciseCard({
       document.querySelectorAll<HTMLElement>(mobile ? ".mobile-deck-card" : ".react-flow__node"),
     ).find((el) => (el.dataset.screenId || el.dataset.id) === id),
   );
+  const snapshot = card.querySelector(".source-preview-snapshot");
+  if (status === "ready" ? !snapshot?.textContent?.includes(title + " off") : snapshot)
+    throw Error("Wrong card snapshot for " + source);
+  if (card.querySelector("input")) throw Error("Card snapshot created a control");
   (mobile ? card.querySelector("button")! : card).click();
   const panel = await until(() => document.querySelector(".source-preview-panel"));
-  if (!document.querySelector(".inspector .native-source-evidence")?.textContent?.includes(source))
+  if (!document.querySelector(".inspector")?.textContent?.includes(source))
     throw Error("Wrong source");
   if (status === "ready") {
     const controls = () => Array.from(panel.querySelectorAll<HTMLInputElement>('[role="switch"]'));

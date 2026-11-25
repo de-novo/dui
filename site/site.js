@@ -101,9 +101,9 @@
         "2D Inline Diff: Compare captures directly on the map with element-level change highlights, pixel-difference overlays, and screen verification evidence.",
       tabSourcePreview: "SwiftUI & Compose",
       tabSourcePreviewAlt:
-        "dui source map with compiled SwiftUI and Compose component cards and interactive switches in the inspector",
+        "dui source map whose compiled SwiftUI and Compose cards show their first observed frame, with the switches operated in the inspector",
       tabSourcePreviewCaption:
-        "Portable Source Preview: Compile self-contained SwiftUI and Compose entries with their official toolchains and operate observed switches directly on the map.",
+        "Portable Source Preview: Compile self-contained SwiftUI and Compose entries with their official toolchains. Each card shows the first observed frame; operate its switches in the inspector.",
       tabDesktopOverview: "macOS Desktop",
       tabDesktopOverviewAlt:
         "dui native GPUI macOS desktop viewer with transparent TitleBar, 11-screen full-page map, screen search, and gutter edges",
@@ -196,7 +196,7 @@
       tabSourcePreviewAlt:
         "공식 컴파일러로 빌드한 SwiftUI·Compose 컴포넌트 카드와 인스펙터의 조작 가능한 스위치를 보여 주는 소스 지도",
       tabSourcePreviewCaption:
-        "포터블 소스 미리보기: SwiftUI·Compose 컴포넌트를 공식 툴체인으로 컴파일해, 관찰된 스위치를 지도 카드에서 바로 조작합니다.",
+        "포터블 소스 미리보기: SwiftUI·Compose 컴포넌트를 공식 툴체인으로 컴파일합니다. 카드에는 관찰된 첫 화면이 보이고, 스위치는 인스펙터에서 조작합니다.",
       tabDesktopOverview: "macOS 데스크톱",
       tabDesktopOverviewAlt:
         "투명 TitleBar, 11개 전체 페이지 지도, 화면 검색, 거터 연결선을 갖춘 네이티브 GPUI macOS 데스크톱 뷰어",
@@ -289,7 +289,7 @@
       tabSourcePreviewAlt:
         "展示经官方工具链编译的 SwiftUI 与 Compose 组件卡片及检查器内可交互开关的 dui 源码地图",
       tabSourcePreviewCaption:
-        "便携式源码预览：使用官方工具链编译自包含的 SwiftUI 与 Compose 组件，在界面地图卡片上直接操作已观测到的开关。",
+        "便携式源码预览：使用官方工具链编译自包含的 SwiftUI 与 Compose 组件。卡片显示观测到的首个画面，开关在检查器中操作。",
       tabDesktopOverview: "macOS 桌面端",
       tabDesktopOverviewAlt:
         "带有透明 TitleBar、11 个整页界面地图、界面搜索与避让通道连线的原生 GPUI macOS 桌面查看器",
