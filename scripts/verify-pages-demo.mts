@@ -555,8 +555,8 @@ async function verifyRenderedPages(
           expression: `(async () => {
             const cards = Array.from(document.querySelectorAll(${JSON.stringify(vp.mobile ? ".mobile-deck-card" : ".react-flow__node")}));
             if (cards.length < 2) throw Error("Expected SwiftUI & Compose source preview cards");
-            if (!cards.every((card) => card.querySelector(".source-preview-snapshot .preview-switch"))) {
-              throw Error("Source preview cards did not show their first frame");
+            if (cards.some((card) => card.querySelector(".preview-switch"))) {
+              throw Error("A map card drew a portable preview as if it were a screen");
             }
             const hit = ${vp.mobile} ? cards[0].querySelector("button") : cards[0];
             hit.click();
@@ -568,6 +568,9 @@ async function verifyRenderedPages(
               await new Promise(requestAnimationFrame);
             }
             if (!sw) throw Error("Source preview switches did not appear");
+            if (!document.querySelector(".source-preview-panel .source-preview-note")?.textContent) {
+              throw Error("Source preview is missing its not-native disclaimer");
+            }
             const before = sw.checked;
             sw.click();
             await new Promise(requestAnimationFrame);

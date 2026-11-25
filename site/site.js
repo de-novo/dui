@@ -70,7 +70,7 @@
       ossTitle: "Browse 6 trending open-source apps live in dui",
       ossSub:
         "Every project below is a real MIT-licensed open-source app captured with dui map across mobile (375px) and desktop (1280px). Click any card to inspect its 2D canvas, navigation edges, modals, and box model.",
-      btnTrySourcePreview: "SwiftUI & Compose Preview →",
+      btnTrySourcePreview: "SwiftUI & Compose source map →",
       btnTryDiff: "Try 2D Inline Diff →",
       btnOpenAllCanvas: "Open Canvas Demo →",
       workflowTitle: "Zero-config workflow in three commands",
@@ -99,11 +99,6 @@
         "dui 2D Inline Diff highlighting element-level changes on the map alongside Before, After, and Pixel difference overlays in the inspector",
       tabDiffCaption:
         "2D Inline Diff: Compare captures directly on the map with element-level change highlights, pixel-difference overlays, and screen verification evidence.",
-      tabSourcePreview: "SwiftUI & Compose",
-      tabSourcePreviewAlt:
-        "dui source map whose compiled SwiftUI and Compose cards show their first observed frame, with the switches operated in the inspector",
-      tabSourcePreviewCaption:
-        "Portable Source Preview: Compile self-contained SwiftUI and Compose entries with their official toolchains. Each card shows the first observed frame; operate its switches in the inspector.",
       tabDesktopOverview: "macOS Desktop",
       tabDesktopOverviewAlt:
         "dui native GPUI macOS desktop viewer with transparent TitleBar, 11-screen full-page map, screen search, and gutter edges",
@@ -163,7 +158,7 @@
       ossTitle: "최신 오픈소스 6개 프로젝트를 dui 캔버스에서 그대로 둘러보기",
       ossSub:
         "아래 6개는 MIT 라이선스를 확인한 실제 오픈소스 앱을 dui map으로 모바일(375px)·데스크톱(1280px) 캡처한 결과입니다. 카드를 누르면 2D 캔버스·연결선·모달·박스 모델을 바로 탐색하고 워크스페이스에서 프로젝트를 전환할 수 있습니다.",
-      btnTrySourcePreview: "SwiftUI·Compose 미리보기 →",
+      btnTrySourcePreview: "SwiftUI·Compose 소스 지도 →",
       btnTryDiff: "2D 인라인 Diff 보기 →",
       btnOpenAllCanvas: "캔버스 데모 열기 →",
       workflowTitle: "세 줄 명령으로 끝나는 무설정 워크플로우",
@@ -192,11 +187,6 @@
         "지도 카드 위 요소 단위 변경 강조와 인스펙터의 이전·이후·픽셀 차이 오버레이를 함께 보여 주는 2D 인라인 Diff",
       tabDiffCaption:
         "2D 인라인 Diff: 지도 위에서 이전·이후 캡처를 바로 비교하고, 요소 단위 변경 표시·픽셀 차이 오버레이·화면 검증 근거를 함께 확인합니다.",
-      tabSourcePreview: "SwiftUI · Compose",
-      tabSourcePreviewAlt:
-        "공식 컴파일러로 빌드한 SwiftUI·Compose 컴포넌트 카드와 인스펙터의 조작 가능한 스위치를 보여 주는 소스 지도",
-      tabSourcePreviewCaption:
-        "포터블 소스 미리보기: SwiftUI·Compose 컴포넌트를 공식 툴체인으로 컴파일합니다. 카드에는 관찰된 첫 화면이 보이고, 스위치는 인스펙터에서 조작합니다.",
       tabDesktopOverview: "macOS 데스크톱",
       tabDesktopOverviewAlt:
         "투명 TitleBar, 11개 전체 페이지 지도, 화면 검색, 거터 연결선을 갖춘 네이티브 GPUI macOS 데스크톱 뷰어",
@@ -256,7 +246,7 @@
       ossTitle: "在 dui 画布中实时浏览 6 个热门开源项目",
       ossSub:
         "以下 6 个项目均已核验 MIT 许可证，由 dui map 在 375px 与 1280px 下真实捕获。点击任意卡片即可在 2D 画布中查看页面、导航连线、模态框与盒模型，并在工作区中切换项目。",
-      btnTrySourcePreview: "SwiftUI 与 Compose 预览 →",
+      btnTrySourcePreview: "SwiftUI 与 Compose 源码地图 →",
       btnTryDiff: "体验 2D 内联差异 →",
       btnOpenAllCanvas: "打开画布演示 →",
       workflowTitle: "三条命令完成零配置工作流",
@@ -285,11 +275,6 @@
         "在界面地图卡片上高亮元素级变更，并在检查器中并排展示变更前、变更后与像素差异叠加层的 dui 2D 内联差异视图",
       tabDiffCaption:
         "2D 内联差异：直接在界面地图上对比两次捕获，高亮元素级变更，并查看像素差异叠加层与页面验证依据。",
-      tabSourcePreview: "SwiftUI 与 Compose",
-      tabSourcePreviewAlt:
-        "展示经官方工具链编译的 SwiftUI 与 Compose 组件卡片及检查器内可交互开关的 dui 源码地图",
-      tabSourcePreviewCaption:
-        "便携式源码预览：使用官方工具链编译自包含的 SwiftUI 与 Compose 组件。卡片显示观测到的首个画面，开关在检查器中操作。",
       tabDesktopOverview: "macOS 桌面端",
       tabDesktopOverviewAlt:
         "带有透明 TitleBar、11 个整页界面地图、界面搜索与避让通道连线的原生 GPUI macOS 桌面查看器",

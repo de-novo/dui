@@ -116,6 +116,7 @@ export type Messages = {
   verified: string;
   unverified: string;
   sourcePreview: string;
+  sourcePreviewNotNative: string;
   previewSwitch: (number: number) => string;
   previewStatus: Record<"missing" | "stale" | "unsupported", string>;
   sourceDeclaration: string;
@@ -293,6 +294,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     verified: "Verified",
     unverified: "Unverified",
     sourcePreview: "Source preview",
+    sourcePreviewNotNative:
+      "Redrawn in HTML from portable layout primitives. Not the native iOS or Android screen.",
     previewSwitch: (number) => "Switch " + number,
     previewStatus: {
       missing: "Source missing",
@@ -482,6 +485,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     verified: "已验证",
     unverified: "未验证",
     sourcePreview: "源码预览",
+    sourcePreviewNotNative: "依据可移植布局元素以 HTML 重新绘制，并非真实的 iOS 或 Android 界面。",
     previewSwitch: (number) => "开关 " + number,
     previewStatus: { missing: "源文件缺失", stale: "源码已更改", unsupported: "无法预览" },
     sourceDeclaration: "源码声明",
@@ -665,6 +669,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     verified: "검증됨",
     unverified: "미검증",
     sourcePreview: "소스 미리보기",
+    sourcePreviewNotNative:
+      "이식 가능한 레이아웃 요소를 HTML로 다시 그린 것입니다. 실제 iOS·Android 화면이 아닙니다.",
     previewSwitch: (number) => "스위치 " + number,
     previewStatus: { missing: "소스 없음", stale: "소스 변경됨", unsupported: "미리보기 불가" },
     sourceDeclaration: "소스 선언",

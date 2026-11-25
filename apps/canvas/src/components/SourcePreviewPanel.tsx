@@ -13,17 +13,9 @@ function Toggle({
   label: string;
   checked: boolean;
   control: number;
-  activate?: Activate;
+  activate: Activate;
 }) {
   const { t } = useI18n();
-  // Map cards are read-only snapshots inside a clickable card; only the inspector operates them.
-  if (!activate)
-    return (
-      <span className="preview-toggle">
-        <span>{label}</span>
-        <span className="preview-switch" data-checked={checked ? "true" : "false"} />
-      </span>
-    );
   return (
     <label className="preview-toggle">
       <span>{label}</span>
@@ -40,7 +32,7 @@ function Toggle({
   );
 }
 
-function Contents({ items, activate }: { items: PreviewItem[]; activate?: Activate }) {
+function Contents({ items, activate }: { items: PreviewItem[]; activate: Activate }) {
   return items.map((item, i) => {
     if (item.kind === "text") return <span key={i}>{item.text}</span>;
     if (item.kind === "switch") return <Toggle key={i} {...item} activate={activate} />;
@@ -57,15 +49,6 @@ function Contents({ items, activate }: { items: PreviewItem[]; activate?: Activa
   });
 }
 
-/** The first observed frame, drawn without controls for map cards. */
-export function SourcePreviewSnapshot({ items }: { items: PreviewItem[] }) {
-  return (
-    <div className="source-preview-snapshot preview-column" aria-hidden="true">
-      <Contents items={items} />
-    </div>
-  );
-}
-
 export function SourcePreviewPanel({ preview }: { preview: SourcePreview }) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
@@ -80,7 +63,8 @@ export function SourcePreviewPanel({ preview }: { preview: SourcePreview }) {
       </h3>
       {preview.status === "ready" && frame ? (
         <>
-          <div className="preview-column">
+          <p className="source-preview-note">{t.sourcePreviewNotNative}</p>
+          <div className="preview-column source-preview-schematic">
             <Contents items={frame.items} activate={(id) => setIndex(frame.next[id]!)} />
           </div>
           <small>
