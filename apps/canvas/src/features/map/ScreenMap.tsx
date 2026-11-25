@@ -18,6 +18,7 @@ import { useI18n } from "../../i18n/LocaleContext";
 import { MapGuideOptions } from "./MapCardGuides";
 import { CaptureCard } from "./CaptureCard";
 import { clearLane, layoutMap } from "./layout";
+import { cardCell } from "../../model/selection";
 import {
   Background,
   BaseEdge,
@@ -181,7 +182,7 @@ function ZoomOneToOneButton({
 }
 
 function Card({ data }: NodeProps<CardNode>) {
-  const cell = (data.screen.entries ?? data.screen.cells).find((c) => c.width === data.width);
+  const cell = cardCell(data.screen, data.width);
   return (
     <>
       {Object.values(Position).map((position) => (

@@ -8,6 +8,7 @@
  *   OSS_CACHE_DIR=/tmp/oss-showcase npm run build:pages-demo
  */
 import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -241,6 +242,54 @@ function ensureRepo(spec: OssShowcaseSpec, cacheRoot: string): string {
     throw new Error(`Refusing non-MIT showcase repo ${spec.project}`);
   }
   return dir;
+}
+
+/**
+ * Attach the committed iOS simulator and Android emulator captures of the source preview
+ * fixture. Fails when a fixture changed after its capture, so a stale image is never shown.
+ */
+function attachNativeRecordings(sourceRun: string, env: NodeJS.ProcessEnv, tmpHome: string) {
+  const recordings = path.join(root, "fixtures/source-preview-native/recordings");
+  const sha256 = (file: string) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+  const graph = JSON.parse(fs.readFileSync(path.join(sourceRun, "graph.json"), "utf8")) as {
+    nodes: Array<{ id: string; label: string; nativeSource?: { source: string } }>;
+  };
+  const snapshot = JSON.parse(fs.readFileSync(path.join(sourceRun, "snapshot.json"), "utf8"));
+  const manifestDir = fs.mkdtempSync(path.join(tmpHome, "native-recordings-"));
+  const captures = ["ios", "android"].map((runtime) => {
+    const record = JSON.parse(fs.readFileSync(path.join(recordings, runtime + ".json"), "utf8"));
+    const image = path.join(recordings, record.image);
+    if (sha256(path.join(root, record.fixture)) !== record.sourceSha256)
+      throw new Error(
+        `${record.fixture} changed after its ${runtime} capture. Run the "Source preview native captures" workflow and commit its ${runtime}.png and ${runtime}.json.`,
+      );
+    if (sha256(path.join(root, record.host)) !== record.hostSha256)
+      throw new Error(`${record.host} changed after its ${runtime} capture.`);
+    if (sha256(image) !== record.imageSha256)
+      throw new Error(`${record.image} does not match its recorded SHA-256.`);
+    const node = graph.nodes.find((n) => n.nativeSource?.source === record.source);
+    if (!node) throw new Error(`No source card for ${record.source}`);
+    fs.copyFileSync(image, path.join(manifestDir, record.image));
+    return {
+      screenId: node.id,
+      runtime,
+      observedPath: node.label,
+      width: record.width,
+      image: record.image,
+    };
+  });
+  const manifest = path.join(manifestDir, "recordings.json");
+  fs.writeFileSync(manifest, JSON.stringify({ sourceSnapshot: snapshot.id, captures }));
+  const result = spawnSync(binary, ["map", "attach", sourceRun, manifest], {
+    encoding: "utf8",
+    env,
+  });
+  if (result.status !== 0)
+    throw new Error(`dui map attach failed: ${result.stderr || result.stdout}`);
+  const run = JSON.parse(result.stdout) as { output: string; cells: Array<{ status: string }> };
+  if (run.cells.length !== 2 || run.cells.some((cell) => cell.status !== "unverified"))
+    throw new Error("Native recordings must stay unverified: " + result.stdout);
+  return run.output;
 }
 
 function exportRunToArchive(
@@ -671,19 +720,22 @@ async function main() {
           `Failed compiling native source preview showcase: ${previewRes.stderr || previewRes.stdout}`,
         );
       }
+      const attached = attachNativeRecordings(previewParsed.output, previewEnv, tmpHome);
       exportRunToArchive(
-        previewParsed.output,
+        attached,
         path.join(archiveDir, "native-source-preview"),
         previewHome,
         root,
       );
-      console.log("[pages-demo] exported native-source-preview: SwiftUI + Compose");
+      console.log(
+        "[pages-demo] exported native-source-preview: SwiftUI + Compose with native captures",
+      );
       runs.push({
         key: "native-source-preview",
         projectId: "oss-native-source-preview",
-        project: "SwiftUI & Compose (Source Preview)",
+        project: "SwiftUI & Compose (native captures)",
         branch: "Apache-2.0 · Swift 6 + Kotlin 2",
-        version: "Interactive source map",
+        version: "iPhone simulator + Android emulator",
         diffWith: [],
         liveAvailable: false,
       });

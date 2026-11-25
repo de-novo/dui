@@ -8,6 +8,7 @@ on:
       - "site/**"
       - "examples/**"
       - "fixtures/source-preview/**"
+      - "fixtures/source-preview-native/recordings/**"
       - "apps/canvas/**"
       - "scripts/build-pages-demo.mts"
       - "scripts/verify-pages-demo.mts"

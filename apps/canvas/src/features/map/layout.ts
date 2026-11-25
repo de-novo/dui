@@ -1,4 +1,5 @@
 import type { Screen, ScreenMap } from "../../data/overview";
+import { cardCell } from "../../model/selection.ts";
 
 type Link = ScreenMap["links"][number];
 type Point = { x: number; y: number };
@@ -24,7 +25,7 @@ export function nodeMetrics(captureWidth: number): NodeMetrics {
 }
 
 export function screenFrameHeight(screen: Screen, width: number, metrics: NodeMetrics): number {
-  const entry = (screen.entries ?? screen.cells).find((c) => c.width === width);
+  const entry = cardCell(screen, width);
   // Pages archives may store PNG dimensions only on the detailed capture.
   const cell =
     entry?.image && !(entry.imageWidth && entry.imageHeight)

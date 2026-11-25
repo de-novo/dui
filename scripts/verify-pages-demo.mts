@@ -53,9 +53,17 @@ function verifyArchives(): Array<{
         renderTree?: unknown[];
         width?: number;
         path?: string;
+        scenario?: string;
+        status?: string;
       }>;
     };
     const cells = graph.cells ?? [];
+    if (run.key === "native-source-preview") {
+      // An attached recording keeps its runtime as the cell scenario.
+      const runtimes = cells.map((cell) => `${cell.scenario}:${cell.status}`).sort();
+      if (runtimes.join() !== "android:unverified,ios:unverified")
+        throw new Error("Expected unverified iOS and Android captures, got " + runtimes.join());
+    }
     let populated = 0;
     for (const cell of cells) {
       if (cell.image) {
@@ -557,6 +565,14 @@ async function verifyRenderedPages(
             if (cards.length < 2) throw Error("Expected SwiftUI & Compose source preview cards");
             if (cards.some((card) => card.querySelector(".preview-switch"))) {
               throw Error("A map card drew a portable preview as if it were a screen");
+            }
+            // Each card shows its attached native simulator or emulator capture.
+            for (const card of cards) {
+              const img = card.querySelector("img");
+              if (!img) throw Error("Source card is missing its native capture");
+              img.loading = "eager";
+              await img.decode();
+              if (img.naturalWidth === 0) throw Error("Native capture did not decode");
             }
             const hit = ${vp.mobile} ? cards[0].querySelector("button") : cards[0];
             hit.click();

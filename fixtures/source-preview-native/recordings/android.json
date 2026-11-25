@@ -1,0 +1,21 @@
+{
+  "runtime": "android",
+  "source": "android/Settings.kt",
+  "entry": "example.Settings",
+  "fixture": "fixtures/source-preview/Settings.kt",
+  "sourceSha256": "ebe4c29c6277142896f1bd05ed4ddec083ce8e11d15e8f1fdd7aa485dde86fd6",
+  "host": "fixtures/source-preview-native/android/src/main/java/sh/dui/sourcepreview/HostActivity.kt",
+  "hostSha256": "b9074ddb4d21a0e2fed15a1c62848877b816ac05e4b033da8ca8bb15a88f8bf6",
+  "image": "android.png",
+  "imageWidth": 1080,
+  "imageHeight": 1920,
+  "imageSha256": "85ee4aa55d8c8ae95816d6d1abdae5b88ee05a06c4e50bb40735c689059478b9",
+  "width": 411,
+  "scale": 2.625,
+  "device": "sdk_gphone64_x86_64 emulator",
+  "os": "Android 15 (API 35)",
+  "toolchain": "Kotlin 2.4.21, Compose BOM 2026.11.01, Material 3",
+  "witness": "Notifications off",
+  "commit": "83f66478a7d16b2488ad3f429addbda8fd4257fc",
+  "workflowRun": "https://github.com/de-novo/dui/actions/runs/45599382177"
+}
