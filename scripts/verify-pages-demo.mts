@@ -23,7 +23,12 @@ const siteDir = path.resolve(root, process.env.DUI_SITE_DIR || "site");
 const demoDir = path.join(siteDir, "demo");
 const archiveDir = path.join(demoDir, "archive");
 
-function verifyArchives(): Array<{ key: string; cells: number; populated: number }> {
+function verifyArchives(): Array<{
+  key: string;
+  cells: number;
+  populated: number;
+  readyPreviews: number;
+}> {
   const runsPath = path.join(archiveDir, "runs.json");
   if (!fs.existsSync(runsPath)) {
     throw new Error(`Missing ${runsPath}; run npm run build:pages-demo first`);
@@ -31,7 +36,8 @@ function verifyArchives(): Array<{ key: string; cells: number; populated: number
   const runs = JSON.parse(fs.readFileSync(runsPath, "utf8")) as Array<{ key: string }>;
   if (runs.length === 0) throw new Error("runs.json is empty");
 
-  const summary: Array<{ key: string; cells: number; populated: number }> = [];
+  const summary: Array<{ key: string; cells: number; populated: number; readyPreviews: number }> =
+    [];
   for (const run of runs) {
     const dir = path.join(archiveDir, run.key);
     const graphPath = path.join(dir, "graph.json");
@@ -39,6 +45,9 @@ function verifyArchives(): Array<{ key: string; cells: number; populated: number
       throw new Error(`Missing graph.json for ${run.key}`);
     }
     const graph = JSON.parse(fs.readFileSync(graphPath, "utf8")) as {
+      nodes?: Array<{
+        sourcePreview?: { status?: string; scene?: { frames?: unknown[] } };
+      }>;
       cells?: Array<{
         image?: string | null;
         renderTree?: unknown[];
@@ -59,12 +68,18 @@ function verifyArchives(): Array<{ key: string; cells: number; populated: number
         populated += 1;
       }
     }
-    if (populated < 2) {
+    const readyPreviews = (graph.nodes ?? []).filter(
+      (node) =>
+        node.sourcePreview?.status === "ready" &&
+        Array.isArray(node.sourcePreview.scene?.frames) &&
+        node.sourcePreview.scene.frames.length >= 2,
+    ).length;
+    if (populated < 2 && readyPreviews < 2) {
       throw new Error(
-        `Self-dogfood gate failed: ${run.key} has only ${populated}/${cells.length} populated cells (blank capture detected)`,
+        `Self-dogfood gate failed: ${run.key} has only ${populated}/${cells.length} populated cells and ${readyPreviews} ready source previews (blank capture detected)`,
       );
     }
-    summary.push({ key: run.key, cells: cells.length, populated });
+    summary.push({ key: run.key, cells: cells.length, populated, readyPreviews });
   }
   return summary;
 }
@@ -253,7 +268,15 @@ async function contentWidths(page: ChromiumPage, url: string) {
   return [...widths].sort((a, b) => a - b);
 }
 
-async function verifyRenderedPages(port: number, firstRunKey?: string) {
+async function verifyRenderedPages(
+  port: number,
+  archives: Array<{ key: string; populated: number; readyPreviews: number }> = [],
+) {
+  const firstRunKey = archives.find((a) => a.populated >= 2)?.key;
+  const hasDuiDiff =
+    archives.some((a) => a.key === "dui-site") &&
+    archives.some((a) => a.key === "dui-site-baseline");
+  const hasSourcePreview = archives.some((a) => a.key === "native-source-preview");
   return withChromiumPage(async (page) => {
     const { call } = page;
     const widths = await contentWidths(page, `http://127.0.0.1:${port}/index.html`);
@@ -432,6 +455,120 @@ async function verifyRenderedPages(port: number, firstRunKey?: string) {
     }
     const demo = checks.find((check) => check.verifyThemes);
     if (demo) results.push({ mapControls: await verifyMapControls(page, demo.url) });
+
+    if (hasDuiDiff) {
+      await call("Emulation.setDeviceMetricsOverride", {
+        width: 1440,
+        height: 920,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      // 1. Inline diff: top bar clearance, unique project labels, no truncated compare labels.
+      await call("Page.navigate", {
+        url: `http://127.0.0.1:${port}/demo/?run=dui-site&compare=dui-site-baseline`,
+      });
+      await new Promise((r) => setTimeout(r, 1500));
+      const inlineDiffCheck = await call("Runtime.evaluate", {
+        expression: `(async () => {
+          for (let i = 0; i < 6; i++) await new Promise(requestAnimationFrame);
+          const projectSelect = document.querySelector(".showcase-project-bar select");
+          const projectLabels = projectSelect ? Array.from(projectSelect.options).map(o => o.text) : [];
+          if (new Set(projectLabels).size !== projectLabels.length) {
+            throw Error("Duplicate labels in showcase project switcher: " + projectLabels.join(", "));
+          }
+          const compareSelect = document.querySelector('.canvas-diff-bar:not(.showcase-project-bar) select');
+          const compareLabels = compareSelect ? Array.from(compareSelect.options).map(o => o.text) : [];
+          if (compareLabels.some(label => /\\bapture\\b/.test(label))) {
+            throw Error("Truncated compare label found: " + compareLabels.join(", "));
+          }
+          const topBar = document.querySelector(".map-top-bar")?.getBoundingClientRect();
+          const cards = Array.from(document.querySelectorAll(".react-flow__node .screen-card")).map(c => c.getBoundingClientRect());
+          if (topBar && cards.some(card => card.left < topBar.right && topBar.left < card.right && card.top < topBar.bottom && topBar.top < card.bottom)) {
+            throw Error("Floating map-top-bar overlaps a fitted screen card in inline diff mode");
+          }
+          return { projectLabels: projectLabels.length, compareLabels };
+        })()`,
+        awaitPromise: true,
+        returnByValue: true,
+      });
+      if (inlineDiffCheck.exceptionDetails) {
+        throw new Error(JSON.stringify(inlineDiffCheck.exceptionDetails));
+      }
+      results.push({ inlineDiff: (inlineDiffCheck.result as { value: unknown }).value });
+
+      // 2. Full CaptureDiffView: zero broken before/after/overlay images.
+      await call("Page.navigate", {
+        url: `http://127.0.0.1:${port}/demo/?run=dui-site&view=diff&before=dui-site-baseline&after=dui-site`,
+      });
+      await new Promise((r) => setTimeout(r, 1500));
+      const fullDiffCheck = await call("Runtime.evaluate", {
+        expression: `(async () => {
+          const imgs = Array.from(document.querySelectorAll(".diff-workspace img"));
+          if (imgs.length < 3) throw Error("Expected before, after, and overlay images in CaptureDiffView");
+          for (const img of imgs) {
+            img.loading = "eager";
+            await img.decode();
+            if (img.naturalWidth === 0) throw Error("Broken CaptureDiffView image: " + img.src);
+          }
+          return { diffImages: imgs.length };
+        })()`,
+        awaitPromise: true,
+        returnByValue: true,
+      });
+      if (fullDiffCheck.exceptionDetails) {
+        throw new Error(JSON.stringify(fullDiffCheck.exceptionDetails));
+      }
+      results.push({ fullDiff: (fullDiffCheck.result as { value: unknown }).value });
+    }
+
+    if (hasSourcePreview) {
+      for (const vp of viewerViewports) {
+        await call("Emulation.setDeviceMetricsOverride", {
+          width: vp.width,
+          height: vp.height,
+          deviceScaleFactor: vp.mobile ? 2 : 1,
+          mobile: vp.mobile,
+        });
+        await call("Page.navigate", {
+          url: `http://127.0.0.1:${port}/demo/?run=native-source-preview`,
+        });
+        await new Promise((r) => setTimeout(r, 1500));
+        const previewCheck = await call("Runtime.evaluate", {
+          expression: `(async () => {
+            const cards = Array.from(document.querySelectorAll(${JSON.stringify(vp.mobile ? ".mobile-deck-card" : ".react-flow__node")}));
+            if (cards.length < 2) throw Error("Expected SwiftUI & Compose source preview cards");
+            const hit = ${vp.mobile} ? cards[0].querySelector("button") : cards[0];
+            hit.click();
+            const deadline = performance.now() + 8000;
+            let sw = null;
+            while (performance.now() < deadline) {
+              sw = document.querySelector('.source-preview-panel [role="switch"]');
+              if (sw) break;
+              await new Promise(requestAnimationFrame);
+            }
+            if (!sw) throw Error("Source preview switches did not appear");
+            const before = sw.checked;
+            sw.click();
+            await new Promise(requestAnimationFrame);
+            if (sw.checked === before) throw Error("Source preview switch did not toggle");
+            if (document.documentElement.scrollWidth > window.innerWidth + 1) {
+              throw Error("Horizontal overflow on native source preview");
+            }
+            return { cards: cards.length, toggled: true };
+          })()`,
+          awaitPromise: true,
+          returnByValue: true,
+        });
+        if (previewCheck.exceptionDetails) {
+          throw new Error(JSON.stringify(previewCheck.exceptionDetails));
+        }
+        results.push({
+          name: vp.mobile ? "source-preview-mobile" : "source-preview-desktop",
+          ...(previewCheck.result as { value?: Record<string, unknown> }).value,
+        });
+      }
+    }
+
     return results;
   });
 }
@@ -453,7 +590,7 @@ async function main() {
     ) {
       throw new Error("The published /install must serve scripts/install byte for byte");
     }
-    const rendered = await verifyRenderedPages(port, archiveSummary[0]!.key);
+    const rendered = await verifyRenderedPages(port, archiveSummary);
     console.log(JSON.stringify({ status: "ok", archives: archiveSummary, rendered }, null, 2));
   } finally {
     server.close();

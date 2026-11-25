@@ -7,6 +7,7 @@ on:
     paths:
       - "site/**"
       - "examples/**"
+      - "fixtures/source-preview/**"
       - "apps/canvas/**"
       - "scripts/build-pages-demo.mts"
       - "scripts/verify-pages-demo.mts"
@@ -26,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -45,6 +46,7 @@ jobs:
           npm ci --prefix apps/canvas
       - name: Build dui binary and 6-project interactive canvas demo
         run: |
+          unset ANDROID_HOME ANDROID_SDK_ROOT
           export DUI_CHROMIUM="$(command -v google-chrome)"
           npm run build --prefix apps/canvas
           cargo build --release --locked

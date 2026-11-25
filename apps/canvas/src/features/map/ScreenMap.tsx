@@ -124,6 +124,7 @@ function ZoomOneToOneButton({
   cardWidth: number;
   frameHeight: number;
 }) {
+  const { t } = useI18n();
   const { setCenter, zoomTo, zoomIn, zoomOut, fitView } = useReactFlow();
 
   const jumpOneToOne = () => {
@@ -171,8 +172,8 @@ function ZoomOneToOneButton({
   return (
     <ControlButton
       onClick={jumpOneToOne}
-      title="Zoom to 1:1 actual capture size (0)"
-      aria-label="Zoom to 1:1 actual capture size"
+      title={`${t.zoomOneToOne} (0)`}
+      aria-label={t.zoomOneToOne}
     >
       <span className="zoom-1x-label">1:1</span>
     </ControlButton>
@@ -345,6 +346,7 @@ export function ScreenMap({
   mapOptions,
   openSearch,
   railInset,
+  topInset = 0,
   archive,
   width,
   mode,
@@ -364,6 +366,7 @@ export function ScreenMap({
   mapOptions: ReactNode;
   openSearch: () => void;
   railInset: number;
+  topInset?: number;
   archive: Archive;
   width: number;
   mode: string;
@@ -595,10 +598,15 @@ export function ScreenMap({
 
   const fitOptions = useMemo<FitViewOptions>(
     () => ({
-      padding: { left: `${railInset + 18}px`, right: "18px", top: "48px", bottom: "18px" },
+      padding: {
+        left: `${railInset + 18}px`,
+        right: "18px",
+        top: `${Math.max(48, Math.ceil(topInset) + 18)}px`,
+        bottom: "18px",
+      },
       minZoom: minMapZoom,
     }),
-    [railInset],
+    [railInset, topInset],
   );
 
   return (

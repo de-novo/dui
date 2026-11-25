@@ -4,6 +4,7 @@ import type { RenderNode } from "../src/data/overview.ts";
 import {
   boxModelOverlayRects,
   computeSpacingGuides,
+  pickInitialNode,
   pickNodeAtPoint,
 } from "../src/model/elementInspect.ts";
 
@@ -68,4 +69,17 @@ test("computeSpacingGuides measures peer gap and container insets", () => {
   const leftGuide = insetGuides.find((g) => g.axis === "x" && g.x1 === 16);
   assert.equal(topGuide?.distance, 16);
   assert.equal(leftGuide?.distance, 16);
+});
+
+test("pickInitialNode skips offscreen skip-links and selects first visible element", () => {
+  const skipLink: RenderNode = {
+    id: "a#0",
+    tag: "a",
+    text: "Skip to content",
+    rect: { x: 176, y: -208, width: 105, height: 36 },
+    style: {},
+  };
+  assert.equal(pickInitialNode([skipLink, card, heading], 1280)?.id, "section#0");
+  assert.equal(pickInitialNode([skipLink], 1280)?.id, "a#0");
+  assert.equal(pickInitialNode([], 1280), null);
 });

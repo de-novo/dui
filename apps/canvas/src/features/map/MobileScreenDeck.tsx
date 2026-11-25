@@ -59,7 +59,7 @@ export function MobileScreenDeck({
   return (
     <div className="mobile-deck" aria-label={t.screenMap}>
       <div className="mobile-deck-toolbar glass-panel">
-        <div className="mobile-view-switch" role="tablist" aria-label="Mobile view mode">
+        <div className="mobile-view-switch" role="tablist" aria-label={t.mobileViewMode}>
           <button
             type="button"
             role="tab"
@@ -148,7 +148,11 @@ export function MobileScreenDeck({
                   <span className="mobile-deck-meta">
                     {screenDiff && (
                       <span className={`mobile-diff-tag kind-${screenDiff.kind}`}>
-                        {screenDiff.kind}
+                        {screenDiff.kind === "added"
+                          ? t.diffAdded
+                          : screenDiff.kind === "removed"
+                            ? t.diffRemoved
+                            : t.diffChanged}
                       </span>
                     )}
                     {cell?.width

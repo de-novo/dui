@@ -26,6 +26,17 @@ export function normalizeUiLocale(raw: string | null | undefined): UiLocale {
 export type Messages = {
   workspace: string;
   selectWorkspace: string;
+  project: string;
+  branch: string;
+  branchNotRecorded: string;
+  version: string;
+  openWorkspace: string;
+  showcaseProjects: string;
+  homeLink: string;
+  selectedScreenLabel: string;
+  inspectScreen: string;
+  zoomOneToOne: string;
+  mobileViewMode: string;
   noSavedMaps: string;
   archiveLoadFailed: string;
   workspaceUnavailable: string;
@@ -192,6 +203,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
   en: {
     workspace: "Workspace",
     selectWorkspace: "Select workspace",
+    project: "Project",
+    branch: "Branch",
+    branchNotRecorded: "Branch not recorded",
+    version: "Version",
+    openWorkspace: "Open workspace",
+    showcaseProjects: "Showcase projects",
+    homeLink: "Back to dui.sh",
+    selectedScreenLabel: "Selected",
+    inspectScreen: "Inspect screen",
+    zoomOneToOne: "Zoom to 1:1 actual capture size",
+    mobileViewMode: "Mobile view mode",
     noSavedMaps: "No saved screen maps.",
     archiveLoadFailed: "Could not load the archive.",
     workspaceUnavailable: "This workspace is unavailable.",
@@ -370,6 +392,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
   "zh-CN": {
     workspace: "工作区",
     selectWorkspace: "选择工作区",
+    project: "项目",
+    branch: "分支",
+    branchNotRecorded: "未记录分支",
+    version: "版本",
+    openWorkspace: "打开工作区",
+    showcaseProjects: "演示项目",
+    homeLink: "返回 dui.sh",
+    selectedScreenLabel: "已选择",
+    inspectScreen: "检查界面",
+    zoomOneToOne: "缩放到 1:1 实际捕获尺寸",
+    mobileViewMode: "移动端视图模式",
     noSavedMaps: "暂无已保存的界面地图。",
     archiveLoadFailed: "无法加载归档数据。",
     workspaceUnavailable: "该工作区不可用。",
@@ -542,6 +575,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
   ko: {
     workspace: "워크스페이스",
     selectWorkspace: "워크스페이스 선택",
+    project: "프로젝트",
+    branch: "브랜치",
+    branchNotRecorded: "브랜치 미기록",
+    version: "버전",
+    openWorkspace: "워크스페이스 열기",
+    showcaseProjects: "쇼케이스 프로젝트",
+    homeLink: "dui.sh로 돌아가기",
+    selectedScreenLabel: "선택됨",
+    inspectScreen: "화면 검사",
+    zoomOneToOne: "1:1 실제 캡처 크기로 확대",
+    mobileViewMode: "모바일 보기 모드",
     noSavedMaps: "저장된 화면 지도가 없습니다.",
     archiveLoadFailed: "아카이브를 불러올 수 없습니다.",
     workspaceUnavailable: "이 워크스페이스를 사용할 수 없습니다.",
