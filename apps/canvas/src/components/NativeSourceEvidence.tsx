@@ -24,7 +24,8 @@ export function NativeSourceEvidence({
         )}
       </span>
       <code>
-        {source.source}:{source.line}
+        {source.source}
+        {source.line === undefined ? "" : ":" + source.line}
       </code>
       {source.dynamic && <span>{t.dynamicRoute}</span>}
       {source.condition && (

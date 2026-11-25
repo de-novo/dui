@@ -104,6 +104,9 @@ export type Messages = {
   noCaptureAtWidth: string;
   verified: string;
   unverified: string;
+  sourcePreview: string;
+  previewSwitch: (number: number) => string;
+  previewStatus: Record<"missing" | "stale" | "unsupported", string>;
   sourceDeclaration: string;
   dynamicRoute: string;
   discoveryLimitations: string;
@@ -267,6 +270,13 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "No capture at this width",
     verified: "Verified",
     unverified: "Unverified",
+    sourcePreview: "Source preview",
+    previewSwitch: (number) => "Switch " + number,
+    previewStatus: {
+      missing: "Source missing",
+      stale: "Source changed",
+      unsupported: "Preview unavailable",
+    },
     sourceDeclaration: "Source declaration",
     dynamicRoute: "Dynamic route",
     discoveryLimitations: "Discovery limitations",
@@ -438,6 +448,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "此宽度暂无截图",
     verified: "已验证",
     unverified: "未验证",
+    sourcePreview: "源码预览",
+    previewSwitch: (number) => "开关 " + number,
+    previewStatus: { missing: "源文件缺失", stale: "源码已更改", unsupported: "无法预览" },
     sourceDeclaration: "源码声明",
     dynamicRoute: "动态路由",
     discoveryLimitations: "识别限制",
@@ -607,6 +620,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "이 폭의 캡처가 없습니다",
     verified: "검증됨",
     unverified: "미검증",
+    sourcePreview: "소스 미리보기",
+    previewSwitch: (number) => "스위치 " + number,
+    previewStatus: { missing: "소스 없음", stale: "소스 변경됨", unsupported: "미리보기 불가" },
     sourceDeclaration: "소스 선언",
     dynamicRoute: "동적 경로",
     discoveryLimitations: "화면 탐색의 제약",

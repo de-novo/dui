@@ -93,6 +93,25 @@ GitHub 的 **Compare base and head captures** 检查在 PR 打开或更新时运
 
 在实际查看器中检查 375 和 1280 px 下两种主题的总览和选中界面。确认可以访问所有相邻界面，箭头方向与归档相符，截图保留原色，关闭详情后键盘焦点复原。
 
+<a id="portable-source-map"></a>
+
+### 在地图中查看组件源码预览
+
+在可信本地项目的 `dui.json` 中声明可独立编译的 SwiftUI 或 Compose 源文件及入口。路径相对于该文件。
+
+```json
+{
+  "sourcePreviews": [
+    { "source": "ios/Settings.swift", "entry": "Settings" },
+    { "source": "android/Settings.kt", "entry": "example.Settings" }
+  ]
+}
+```
+
+依次运行 `dui map .` 和 `dui open`，选择卡片即可操作观测到的开关。生成地图需要 Node 26 以及 Swift 6 或 Kotlin 2/JDK。打开已保存的地图只需要查看器。归档保存源文件 SHA-256、布局元素及观测到的状态转换。查看器将这些数据呈现为文本和控件。
+
+卡片标识由项目、源文件和限定入口名决定。缺少源文件或遇到不支持的调用时，对应卡片会显示原因。从相应的本地项目打开归档时还会检查当前声明和源文件摘要。更改后再次运行 `dui map .`。源码预览的原生捕获尝试数和验证数均为零。通过 `dui map attach` 关联原生录制时须指定匹配的快照 ID 和屏幕 ID。
+
 ## 2. 模块与依赖
 
 ```text

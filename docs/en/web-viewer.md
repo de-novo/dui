@@ -93,6 +93,25 @@ Apply the saved theme before the first viewer paint. With the system setting, fo
 
 Check the actual viewer at 375 and 1280 px in both themes. Inspect an overview and a selected screen. Confirm all connected screens remain reachable, arrow directions match the archive, image colors are intact and keyboard focus returns on close.
 
+<a id="portable-source-map"></a>
+
+### Review a portable component on the map
+
+In a trusted local project, declare self-contained SwiftUI or Compose source entries in `dui.json`. Paths are relative to that file.
+
+```json
+{
+  "sourcePreviews": [
+    { "source": "ios/Settings.swift", "entry": "Settings" },
+    { "source": "android/Settings.kt", "entry": "example.Settings" }
+  ]
+}
+```
+
+Run `dui map .`, then `dui open`. Select a card to operate its observed switches. Mapping needs Node 26 and Swift 6 or Kotlin 2 with a JDK. Opening the saved map only needs the viewer. The archive stores the source SHA-256, layout primitives and observed transitions. The viewer interprets those primitives as text and controls.
+
+Each card is scoped to its project, source file and qualified entry. A missing source or unsupported call leaves a reason on its card. Opening the archive from the corresponding local project also checks the current declarations and source digests. Run `dui map .` again after changes. Previews contribute zero native capture attempts or verifications. A native recording uses the existing `dui map attach` workflow with the exact snapshot and screen IDs.
+
 ## 2. Modules and dependencies
 
 ```text

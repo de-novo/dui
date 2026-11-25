@@ -17,7 +17,8 @@ pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> R
         && let Some((app, adapter)) = crate::native_map::target(&project)?
     {
         let inventory = adapter.discover(&app)?;
-        return archive::publish(archive::provenance(&app)?, |out| inventory.archive(out));
+        let provenance = archive::provenance(&app)?;
+        return archive::publish(provenance, |out| inventory.archive(out, &project));
     }
     let work = tempfile::tempdir().map_err(io)?;
     let manifest = work.path().join("map.json");
