@@ -233,7 +233,7 @@ struct Scan {
     /// body produces. The index resolves the declaration; its body is read with the same rules.
     mutating func follow(_ expr: ExprSyntax, site: Site, dynamic: Bool, condition: String?) -> [Target]? {
         guard let symbol = site.declaration(at: expr), !following.contains(symbol.usr),
-            let definition = index.definition(of: symbol.usr),
+            let definition = index.definition(of: symbol.usr), inProject(definition),
             let target = self.site(for: URL(fileURLWithPath: definition.location.path).resolvingSymlinksInPath().path),
             let body = target.body(at: definition)
         else { return nil }
@@ -263,8 +263,13 @@ struct Scan {
         limitations.insert("\(relative(site.file)):\(line): destination \(reason).")
     }
 
+    /// Declared in the project's own sources, not in a dependency checkout or the SDK.
+    func inProject(_ definition: SymbolOccurrence) -> Bool {
+        URL(fileURLWithPath: definition.location.path).resolvingSymlinksInPath().path.hasPrefix(root + "/")
+    }
+
     mutating func add(_ usr: String, dynamic: Bool, condition: String?) {
-        guard let definition = index.definition(of: usr) else { return }
+        guard let definition = index.definition(of: usr), inProject(definition) else { return }
         let file = URL(fileURLWithPath: definition.location.path).resolvingSymlinksInPath().path
         let name = index.qualifiedName(of: definition)
         let screen = Screen(
