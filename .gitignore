@@ -9,3 +9,6 @@
 /apps/desktop/target/
 /site/demo/
 /site/install
+/adapters/native-map/swift/.build/
+/fixtures/swiftui-map/.build/
+/fixtures/swiftui-map/.swiftpm/

@@ -12,12 +12,14 @@ use std::{
 };
 
 pub(crate) mod previews;
+pub(crate) mod swift;
 type Error = (u8, Value);
 
 pub(crate) enum Adapter {
     Declared,
     JavaScript,
     Dart,
+    Swift(swift::Project),
 }
 
 pub(crate) fn target(project: &Path) -> Result<Option<(PathBuf, Adapter)>, Error> {
@@ -52,6 +54,9 @@ pub(crate) fn target(project: &Path) -> Result<Option<(PathBuf, Adapter)>, Error
     }
     if app.join("pubspec.yaml").is_file() {
         return Ok(Some((app, Adapter::Dart)));
+    }
+    if let Some(project) = swift::detect(&app, &profile)? {
+        return Ok(Some((app, Adapter::Swift(project))));
     }
     Ok(profile
         .get("sourcePreviews")
@@ -109,6 +114,7 @@ impl Adapter {
                     "discover native JavaScript routes",
                 )?
             }
+            Self::Swift(project) => return project.discover(app),
             Self::Dart => {
                 let tool = dart_tool()?;
                 output(

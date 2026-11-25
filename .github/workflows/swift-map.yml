@@ -1,0 +1,78 @@
+name: SwiftUI screen discovery
+on:
+  pull_request:
+    paths:
+      - "adapters/native-map/swift/**"
+      - "fixtures/swiftui-map/**"
+      - "crates/dui/src/native_map.rs"
+      - "crates/dui/src/native_map/**"
+      - "scripts/check-swift-map.mts"
+      - ".github/workflows/swift-map.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  # Pinned upstream fixture (Apache-2.0). See docs/en/roadmap.md#swiftui-screen-discovery.
+  HA_IOS_COMMIT: 9cc4b40b9b45e24b7757db541949a3f43bf1648e
+jobs:
+  fixture:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - run: cargo build --locked --bin dui
+      - name: Map the SwiftUI rule fixture from its index store
+        run: node scripts/check-swift-map.mts
+
+  home-assistant:
+    runs-on: xcode-27
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: home-assistant/iOS
+          ref: ${{ env.HA_IOS_COMMIT }}
+          path: .ha-ios
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+      - run: cargo build --locked --bin dui
+      - name: Map home-assistant/iOS
+        env:
+          HOME_MAP: ${{ runner.temp }}/home
+        run: |
+          mkdir -p "$HOME_MAP"
+          echo '{"scheme":"App-Debug"}' > .ha-ios/dui.json
+          HOME="$HOME_MAP" target/debug/dui map .ha-ios > "$RUNNER_TEMP/ha-map.json"
+          node -e '
+            const run = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            const graph = JSON.parse(require("fs").readFileSync(run.output + "/graph.json", "utf8"));
+            const names = graph.nodes.map((n) => n.nativeSource.name);
+            const limits = run.screenDiscovery.limitations;
+            const lines = [
+              `home-assistant/iOS @ ${process.env.HA_IOS_COMMIT.slice(0, 7)}: ${names.length} declarations, ${limits.length} limitations, ${run.coverage.attempted} captures.`,
+              "", "First limitations:", ...limits.slice(0, 10).map((l) => "- " + l),
+            ];
+            console.log(lines.join("\n"));
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+            require("fs").copyFileSync(run.output + "/graph.json", process.argv[2]);
+            if (limits.some((l) => l.startsWith("xcodebuild"))) process.exit(1);
+            if (names.length < 20) process.exit(1);
+            if (run.coverage.attempted !== 0) process.exit(1);
+          ' "$RUNNER_TEMP/ha-map.json" "$RUNNER_TEMP/ha-graph.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: home-assistant-ios-map
+          path: ${{ runner.temp }}/ha-graph.json
+          retention-days: 7
+          if-no-files-found: ignore

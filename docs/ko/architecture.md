@@ -163,7 +163,7 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 | 버전 추적 봇 | Renovate를 **외부 서비스로만** 쓴다. 의존성 카탈로그(npm 픽스처의 정확한 버전)과 lockfile을 같은 PR로 갱신한다. dui에 절대 포함하지 않는다. 지원 기준선 상향은 여전히 dui 메이저 릴리스에서만 한다 | `stacks.toml` 같은 사용자 정의 파일도 추적할 수 있다. Renovate는 AGPL-3.0이므로 그 코드는 dui와 함께 배포되지 않는다 |
 | 골든 렌더용 Chromium | 골든 CI는 **정확한 안정판 빌드**로 고정한다. 일반 실행은 쓴 Chromium 버전을 기록한다 | 브라우저 변화와 앱 변화를 구분한다. 골든 실행은 OS, 폰트, 시계, 난수, 애니메이션도 고정하고, 갱신 PR에서 차이를 검토한다 |
 | salsa | 변경과 무관한 재계산이 주 병목이라는 게 프로파일링으로 드러날 때까지(예: MCP 편집 반복) 미룬다. 먼저 단계 입력 + 도구·팩 버전을 키로 하는 내용 해시 캐시를 쓴다 | 코어가 순수하므로 나중에 다시 쓰지 않고 증분 질의를 붙일 수 있다 |
-| SwiftUI 화면 탐색 (2026-11-25 결정, 미구현) | `adapters/native-map/swift`의 Swift 패키지(Dart 도구처럼 캐시)가 공식 빌드의 **인덱스 스토어**와 **swift-syntax** 호출 구조를 소스 위치로 결합한다. dui는 선택한 스킴을 자체 DerivedData에 `COMPILER_INDEX_STORE_ENABLE=YES`로 iOS 시뮬레이터용 빌드하며 프로젝트를 수정하지 않는다. 캡처가 아닌 선언을 [로드맵 규칙](roadmap.md#swiftui-screen-discovery)에 따라 낸다 | 타입과 호출 대상은 컴파일러가, 연결은 코드 자체의 구조가 정한다. swift-syntax만으로는 타입을 추측하게 되고, 인덱스만으로는 이동 대상과 라벨을 구분할 수 없으며, 호출 지점별 SourceKit 요청은 일괄 처리에 느리고 불안정하다. 두 라이브러리 모두 Apache-2.0 |
+| SwiftUI 화면 탐색 (2026-11-25 결정) | `adapters/native-map/swift`의 Swift 패키지(Dart 도구처럼 캐시)가 공식 빌드의 **인덱스 스토어**와 **swift-syntax** 호출 구조를 소스 위치로 결합한다. dui는 선택한 스킴을 자체 DerivedData에 `COMPILER_INDEX_STORE_ENABLE=YES`로 iOS 시뮬레이터용 빌드하며 프로젝트를 수정하지 않는다. 캡처가 아닌 선언을 [로드맵 규칙](roadmap.md#swiftui-screen-discovery)에 따라 낸다 | 타입과 호출 대상은 컴파일러가, 연결은 코드 자체의 구조가 정한다. swift-syntax만으로는 타입을 추측하게 되고, 인덱스만으로는 이동 대상과 라벨을 구분할 수 없으며, 호출 지점별 SourceKit 요청은 일괄 처리에 느리고 불안정하다. 두 라이브러리 모두 Apache-2.0 |
 
 ## 5. 모노레포 구조
 
