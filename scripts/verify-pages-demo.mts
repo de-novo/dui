@@ -137,6 +137,18 @@ async function checkContentPage() {
     for (const option of language.options) {
       language.value = option.value;
       language.dispatchEvent(new Event("change", { bubbles: true }));
+      if (location.pathname === "/index.html") {
+        const ref = document.querySelector("[data-install-ref]")?.textContent?.trim();
+        const guide = document.querySelector<HTMLAnchorElement>("[data-install-guide]");
+        const quickstart = document.querySelector<HTMLAnchorElement>("[data-quickstart-guide]");
+        const file = option.value === "en" ? "README.md" : `README.${option.value}.md`;
+        if (!ref || guide?.href !== `https://github.com/de-novo/dui/blob/${ref}/${file}`) {
+          throw Error(`Release guide must match the install ref and language: ${guide?.href}`);
+        }
+        if (quickstart?.href !== `https://github.com/de-novo/dui/blob/main/${file}#first-run`) {
+          throw Error(`Quickstart must open the tested instructions: ${quickstart?.href}`);
+        }
+      }
       const content = rect("main > :first-child");
       const header = rect(".site-header");
       const brand = rect(".brand");

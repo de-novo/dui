@@ -8,6 +8,8 @@ dui captures a running web or GPUI app across UI states and viewport widths. It 
 
 [Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md) · [Analysis and rendering support](docs/en/supported-frameworks.md)
 
+The capability tables describe development on `main`. For the default installation, start with the [first capture](#first-run).
+
 ## What dui analyzes
 
 ### Analysis and capture paths
@@ -36,7 +38,7 @@ dui reads types from the project's official compiler. Library rules identify spe
 
 ## Install
 
-On macOS or Linux, run this command to clone the latest release tag (`vX.Y.Z`, falling back to `main` if no tags exist) and build dui from source. Pass a tag with `DUI_TAG=v0.0.1` to pin a specific release.
+On macOS or Linux, run this command to clone the latest release tag (`vX.Y.Z`, falling back to `main` if no tags exist) and build dui from source. To pin a release, set `DUI_TAG` to a [published tag](https://github.com/de-novo/dui/tags) in the installer’s environment.
 
 ```sh
 curl -fsSL https://dui.sh/install | sh
@@ -49,32 +51,39 @@ Check the installed tag or check for newer release tags with:
 ```sh
 dui --version
 dui update --check
-dui update
 ```
-
-**For web capture**, install Node.js 22+ LTS (22 / 24 / 26), Chromium or Google Chrome, and the target app’s dependencies.
 
 Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/binary-install.md)
 
-## Quickstart & CLI usage
+<a id="first-run"></a>
 
-Run `dui --help` anytime for the full grouped command reference. Most projects only need **four commands**:
+## First capture with the default installation
 
+Install Node.js 26, Chrome or Chromium, and the dependencies of a Vite app. The [tested app](fixtures/toggle) uses Vite 8 and React 19. In its root, set `readySelector` in `dui.json` to an element that appears when the intended screen is ready. For example, use this for an app whose main content contains its page heading.
+
+<!-- quickstart:manifest -->
+```json
+{ "readySelector": "main h1" }
+```
+
+<!-- quickstart:first-run -->
 ```sh
-# 1. Auto-discover screens from router / links and capture (reads optional dui.json)
-dui map
+dui --version
+dui map .
+dui open --no-open
+```
 
-# 2. (Optional) Capture an authenticated browser session (form / MFA / OAuth)
-dui auth login http://localhost:5173/login --out auth-state.json
+The first command reports the installed version. The second writes a capture and prints its `output` directory. Open the local URL printed by the last command to see the capture, then press Ctrl+C to stop the viewer. If capture exits with code 5, read `report.json` in the output directory for the failed checks.
 
-# 3. Inspect on the 2D canvas or native desktop viewer
-dui open
-dui desktop
+## Development CLI on `main`
 
-# 4. Compare branches and generate a PR Markdown summary / coverage audit
-dui diff --base main --markdown
-dui diff --base main --regressions-only --markdown
-dui audit <run-dir>
+To install the development build, run `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`. The following example and command reference describe that build. The website also links to the [documentation for the default release](https://dui.sh/?lang=en#release-guide).
+
+For a static site already built in `dist/`, run this command from its project root. Open the result with the viewer command above.
+
+<!-- quickstart:static -->
+```sh
+dui map . --build-dir dist
 ```
 
 ### `dui map` vs `dui run`
@@ -101,7 +110,7 @@ From an installed Vite app, run:
 ~/.local/bin/dui map .
 ```
 
-dui finds TanStack file routes with a screen component. If it finds no concrete routes, it starts at `/` and follows same-origin links from the entry page once. It captures each URL at 375 and 1280 px. Run `dui open` (or `dui open <output>`) to open the embedded screen map viewer. MCP exposes the same operation as `map(project)`.
+dui finds TanStack file routes with a screen component. If it finds no concrete routes, it starts at `/` and follows reachable same-origin links within the discovery budget. It captures each URL at 375 and 1280 px. Run `dui open` (or `dui open <output>`) to open the embedded screen map viewer. MCP exposes the same operation as `map(project)`.
 
 Inspect a captured cell and edit its boolean or enum state in a running Chromium session. [CLI and MCP examples](docs/en/web-viewer.md#run-a-live-cli-or-mcp-session)
 
@@ -128,7 +137,7 @@ An optional project-local `dui.json` can supply `appRoot`, mock responses, a sta
 
 4. Run `~/.local/bin/dui open` to open the local history viewer. Select a project and two captures to compare the same state and width side by side. Captures are grouped by branch and worktree. Each records the commit and whether the working tree had uncommitted changes. If a run exits with code 5, inspect `report.json` in the directory returned as `output`.
 
-**More screens.** Add `"routeSelector": "nav a[href]"` to collect matching same-origin links one level from the start page. Use `scenarios` for deeper routes or screens that need a different readiness selector.
+**More screens.** Add `"routeSelector": "nav a[href]"` to follow matching same-origin links recursively. Use `scenarios` for unlinked routes or screens that need a different readiness selector.
 
 **Mock data.** For supported typed GET requests to a fixed same-origin path, dui generates JSON responses from the app’s types. See `facts.json` under `autoMocks.generated` for generated values and `autoMocks.unresolved` for contracts that need a mock. [Routes and mock settings](docs/reference.md)
 

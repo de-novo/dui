@@ -47,6 +47,7 @@ with tempfile.TemporaryDirectory(prefix="dui-versions-") as temp:
         output = Path(temp) / directory
         run("node", "scripts/stage-pages.mts", str(output))
         assert run("sh", str(output / "install"), "--print-ref") == expected
+        assert f'/blob/{expected}/README.md"' in (output / "index.html").read_text()
         for page in output.glob("*.html"):
             assert f"data-install-ref>{expected}</span>" in page.read_text(), page
 

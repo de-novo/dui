@@ -1,0 +1,36 @@
+name: Documented quickstart
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.ref_type == 'tag' && 'main' || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 26
+          cache: npm
+      - name: Build the default install and the development CLI
+        run: |
+          DUI_INSTALL_DIR="$RUNNER_TEMP/dui-install" DUI_NO_MODIFY_PATH=1 sh scripts/install
+          npm ci
+          npm ci --prefix apps/canvas
+          npm ci --prefix fixtures/toggle
+          cargo build --locked --bin dui
+      - name: Run the README recipes and inspect the captured screen in Chrome
+        run: |
+          export DUI_CHROMIUM="$(command -v google-chrome)"
+          node scripts/check-quickstart.mts "$RUNNER_TEMP/dui-install/dui" target/debug/dui

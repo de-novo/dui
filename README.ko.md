@@ -8,6 +8,8 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 
 [제품 로드맵](docs/ko/roadmap.md) · [변경 이력](docs/ko/changelog.md) · [분석·렌더링 지원 범위](docs/ko/supported-frameworks.md)
 
+아래 기능 표는 `main` 개발판을 기준으로 한다. 기본 설치판은 [첫 캡처](#first-run)부터 시작한다.
+
 ## 분석 가능한 항목
 
 ### 분석과 캡처 방식
@@ -36,7 +38,7 @@ dui는 프로젝트의 공식 컴파일러에서 타입을 읽는다. 라이브�
 
 ## 설치
 
-macOS와 Linux에서는 아래 명령 하나로 최신 릴리스 태그(`vX.Y.Z`, 태그가 없으면 `main`)를 클론해 소스에서 빌드·설치한다. 특정 태그를 고정하려면 `DUI_TAG=v0.0.1`을 지정한다.
+macOS와 Linux에서는 아래 명령 하나로 최신 릴리스 태그(`vX.Y.Z`, 태그가 없으면 `main`)를 클론해 소스에서 빌드·설치한다. 특정 버전을 설치하려면 설치기의 환경 변수 `DUI_TAG`에 [공개된 태그](https://github.com/de-novo/dui/tags)를 지정한다.
 
 ```sh
 curl -fsSL https://dui.sh/install | sh
@@ -49,32 +51,39 @@ Git, curl, C 빌드 도구가 필요하다. macOS에서는 Xcode 명령줄 도�
 ```sh
 dui --version
 dui update --check
-dui update
 ```
-
-**웹 화면을 캡처할 때는** Node.js 22+ LTS (22 / 24 / 26), Chromium 또는 Google Chrome, 대상 앱의 의존성이 필요하다.
 
 설치 경로는 `DUI_INSTALL_DIR`로 바꿀 수 있다. [바이너리 설치 안내](docs/binary-install.md)
 
-## 빠른 시작 및 CLI 사용법
+<a id="first-run"></a>
 
-터미널에서 `dui --help`를 실행하면 전체 명령어를 그룹별로 확인할 수 있다. 대부분의 프로젝트는 **네 가지 명령**만으로 충분하다.
+## 기본 설치판으로 첫 화면 캡처하기
 
+Node.js 26, Chrome 또는 Chromium과 Vite 앱의 의존성을 설치한다. [검증에 사용하는 앱](fixtures/toggle)은 Vite 8과 React 19를 쓴다. 앱 루트의 `dui.json`에 원하는 화면이 준비됐을 때 보이는 요소를 `readySelector`로 지정한다. 예를 들어 본문 안에 페이지 제목이 있는 앱에서는 아래 설정을 쓸 수 있다.
+
+<!-- quickstart:manifest -->
+```json
+{ "readySelector": "main h1" }
+```
+
+<!-- quickstart:first-run -->
 ```sh
-# 1. 라우터·링크에서 화면을 자동 발견해 캡처 (프로젝트 루트 dui.json 자동 병합)
-dui map
+dui --version
+dui map .
+dui open --no-open
+```
 
-# 2. (선택) 로그인이 필요한 앱 세션 캡처 (폼·MFA·OAuth 지원)
-dui auth login http://localhost:5173/login --out auth-state.json
+첫 명령은 설치된 버전을 표시하고, 두 번째 명령은 화면을 캡처하고 결과 디렉터리를 `output`으로 출력한다. 마지막 명령이 출력한 로컬 URL을 열면 캡처를 볼 수 있다. 뷰어를 종료하려면 Ctrl+C를 누른다. 캡처 종료 코드가 5이면 결과 디렉터리의 `report.json`에서 실패 이유를 확인한다.
 
-# 3. 2D 캔버스 또는 네이티브 데스크톱 뷰어에서 확인
-dui open
-dui desktop
+## `main` 개발판 CLI
 
-# 4. 브랜치 비교 PR 마크다운 요약 및 커버리지 감사
-dui diff --base main --markdown
-dui diff --base main --regressions-only --markdown
-dui audit <run-dir>
+개발판은 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`로 설치한다. 아래 예제와 명령 표는 개발판 기준이다. 홈페이지에서 [기본 설치판의 릴리스 문서](https://dui.sh/?lang=ko#release-guide)도 열 수 있다.
+
+정적 사이트를 이미 `dist/`에 빌드했다면 프로젝트 루트에서 아래 명령을 실행한다. 결과는 위의 뷰어 명령으로 연다.
+
+<!-- quickstart:static -->
+```sh
+dui map . --build-dir dist
 ```
 
 ### `dui map` vs `dui run`
@@ -101,7 +110,7 @@ dui audit <run-dir>
 ~/.local/bin/dui map .
 ```
 
-dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구체적인 경로를 찾지 못하면 `/`에서 시작해 같은 출처의 링크를 한 단계 따라간다. 각 주소를 375px와 1280px로 캡처한다. `dui open` 또는 `dui open <output>`을 실행하면 내장 화면 지도 뷰어가 열린다. MCP에서는 `map(project)`를 호출한다.
+dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구체적인 경로를 찾지 못하면 `/`에서 시작해 탐색 한도 안에서 도달 가능한 동일 출처 링크를 따라간다. 각 주소를 375px와 1280px로 캡처한다. `dui open` 또는 `dui open <output>`을 실행하면 내장 화면 지도 뷰어가 열린다. MCP에서는 `map(project)`를 호출한다.
 
 캡처한 칸을 열어 같은 Chromium 세션에서 불리언·열거형 상태를 변경하고 복원할 수 있다. [CLI·MCP 사용 예](docs/ko/web-viewer.md#climcp에서-라이브-세션-사용)
 
@@ -128,7 +137,7 @@ dui는 화면 컴포넌트가 있는 TanStack 파일 라우트를 찾는다. 구
 
 4. `~/.local/bin/dui open`으로 로컬 기록 뷰어를 연다. 프로젝트를 고른 뒤 브랜치·워크트리별 목록에서 이전 캡처와 현재 캡처를 선택한다. 같은 상태와 폭의 스크린샷이 나란히 보인다. 각 캡처에는 커밋과 미커밋 변경 여부가 기록된다. 종료 코드가 5이면 출력의 `output` 경로에서 `report.json`을 열어 이유를 확인한다.
 
-**여러 화면을 보려면** 설정에 `"routeSelector": "nav a[href]"`를 추가한다. 시작 화면에서 이 선택자에 맞는 같은 출처 링크를 한 단계 따라간다. 더 깊은 경로나 준비 조건이 다른 화면은 `scenarios`에 추가한다.
+**여러 화면을 보려면** 설정에 `"routeSelector": "nav a[href]"`를 추가한다. 이 선택자에 맞는 동일 출처 링크를 재귀적으로 따라간다. 링크로 연결되지 않은 경로나 준비 조건이 다른 화면은 `scenarios`에 추가한다.
 
 **목데이터를 확인하려면** 결과 폴더의 `facts.json`을 연다. dui는 같은 출처의 고정 경로로 보내는 GET 요청에서 지원하는 응답 타입을 읽어 JSON을 만든다. 생성된 값은 `autoMocks.generated`, 발견했지만 생성하지 못한 항목은 `autoMocks.unresolved`에 있다. [경로와 목데이터 설정](docs/ko/reference.md)
 

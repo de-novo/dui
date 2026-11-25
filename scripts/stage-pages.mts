@@ -16,7 +16,13 @@ cpSync("site", destination, { recursive: true });
 copyFileSync("scripts/install", join(destination, "install"));
 for (const name of readdirSync(destination).filter((file) => file.endsWith(".html"))) {
   const path = join(destination, name);
-  const html = readFileSync(path, "utf8");
+  let html = readFileSync(path, "utf8");
+  if (name === "index.html") {
+    html = html.replace(
+      /(data-install-guide\s+href="[^"]+\/blob\/)main(\/README\.md")/,
+      `$1${installRef}$2`,
+    );
+  }
   const marker = "data-install-ref>main</span>";
   assert.equal(html.split(marker).length, 2, `${name} needs one default install ref`);
   writeFileSync(path, html.replace(marker, `data-install-ref>${installRef}</span>`));

@@ -2,6 +2,8 @@ English | [简体中文](../zh-CN/supported-frameworks.md) | [한국어](../ko/s
 
 # What dui can analyze and render
 
+This table describes `main`. For a default installation, use the [tested first capture](../../README.md#first-run) and check its reported version before choosing a development command.
+
 Start with the result you need. For types, dui queries the project's official compiler. For a screen map, it can also observe a running app through its platform renderer. A project can use either path or both. [Architecture](architecture.md) · [Screen map contract](web-viewer.md)
 
 | Task | Input and result | Evidence |

@@ -66,15 +66,12 @@
           >
             Open Interactive Canvas Demo
           </a>
-          <button
+          <a
             class="btn"
-            type="button"
-            aria-haspopup="dialog"
-            data-open-dialog="quickstart-dialog"
+            data-quickstart-guide
+            href="https://github.com/de-novo/dui/blob/main/README.md#first-run"
             data-i18n="btnQuickstart"
-          >
-            Quickstart guide
-          </button>
+          >Quickstart guide</a>
           <a class="btn" href="./examples.html" data-i18n="btnExamples">Explore examples</a>
           <a
             class="btn"
@@ -457,27 +454,6 @@ dui mcp</code></pre>
       </section>
     </main>
 
-    <dialog id="quickstart-dialog" aria-label="Quickstart Guide">
-      <div class="dialog-head">
-        <h2>Quickstart Guide</h2>
-        <button class="btn btn-sm" type="button" aria-label="Close" data-close-dialog>Close</button>
-      </div>
-      <p class="section-sub">
-        Install <code>dui</code> on macOS or Linux, then map any Vite, Next.js, or static HTML
-        project in seconds:
-      </p>
-      <pre class="code-block"><code># 1. Install latest release from source
-curl -fsSL https://dui.sh/install | sh
-
-# 2. Discover routes &amp; modals and capture every width
-cd your-web-app
-dui map .
-
-# 3. Open the 2D canvas or native desktop viewer
-dui open
-dui desktop</code></pre>
-    </dialog>
-
     <footer class="site-footer">
       <div class="wrap footer-inner">
         <span>dui · Apache-2.0 · Built in Rust 2024</span>
@@ -485,9 +461,7 @@ dui desktop</code></pre>
           <a href="./examples.html">Examples</a>
           <a href="./architecture.html">Architecture</a>
           <a href="./cli.html">CLI &amp; MCP</a>
-          <a href="https://github.com/de-novo/dui" target="_blank" rel="noopener noreferrer">
-            GitHub
-          </a>
+          <a id="release-guide" data-install-guide href="https://github.com/de-novo/dui/blob/main/README.md" data-i18n="releaseGuide">Release documentation</a>
         </div>
       </div>
     </footer>
