@@ -1047,6 +1047,20 @@ declare var __duiProbe: {
     return !copy.textContent?.trim();
   }
 
+  /** Resolves once the page has loaded (styles, images), its fonts are ready and two frames
+   * have painted, or after `limit` ms: the first settle sample then sees the finished page, so a
+   * page that never changes afterwards settles on the fast path. */
+  async function whenLoaded(limit: number) {
+    const loaded = (async () => {
+      if (document.readyState !== "complete")
+        await new Promise((resolve) => addEventListener("load", resolve, { once: true }));
+      await document.fonts?.ready;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    })();
+    await Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, limit))]);
+    return true;
+  }
+
   async function observe(selector: string, delayed: boolean) {
     const p = globalThis.__duiProbe;
     if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 40)));
@@ -1348,6 +1362,7 @@ declare var __duiProbe: {
       },
       semantic,
       observe,
+      whenLoaded,
       apply,
       restore,
       reference,
