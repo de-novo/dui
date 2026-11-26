@@ -48,6 +48,20 @@ http.createServer((req, res) => {
     res.end("<html><body><h1>404 Not Found</h1></body></html>");
     return;
   }
+  if (req.url === "/api/me") {
+    const ok = req.headers.authorization === "Bearer ok";
+    res.writeHead(ok ? 200 : 401, { "content-type": "application/json" });
+    res.end(JSON.stringify(ok ? { name: "Ada" } : { error: "unauthorized" }));
+    return;
+  }
+  if (req.url === "/account") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(\`<html><body><h1>Account</h1><p id="who">loading</p><script>
+      fetch("/api/me", { headers: { authorization: "Bearer " + (localStorage.token || "") } })
+        .then((r) => r.json()).then((me) => { document.getElementById("who").textContent = me.name || me.error; });
+    </script></body></html>\`);
+    return;
+  }
   if (req.url === "/server-error") {
     res.writeHead(500, { "content-type": "text/html; charset=utf-8" });
     res.end("<html><body><h1>500 Error</h1></body></html>");
@@ -89,6 +103,37 @@ http.createServer((req, res) => {
   assert.equal(notFoundCell?.reason, "http-error", "/not-found reason must be http-error");
   assert.equal(serverErrCell?.status, "unverified", "/server-error must be unverified");
   assert.equal(serverErrCell?.reason, "http-error", "/server-error reason must be http-error");
+
+  // 1b. A screen whose own API call returns 401 is not verified; a valid session, or an
+  // endpoint the manifest expects to fail, is.
+  const account = (extra: Record<string, unknown>, name: string) => {
+    const manifest = path.join(appDir, `dui-${name}.json`);
+    fs.writeFileSync(
+      manifest,
+      JSON.stringify({
+        host: "command",
+        command: [process.execPath, "serve.mjs"],
+        path: "/account",
+        widths: [375],
+        readySelector: "h1",
+        ...extra,
+      }),
+    );
+    const out = path.join(tmp, `out-${name}`);
+    const run = runDuiRaw(["run", appDir, manifest, out], duiHome);
+    const [cell] = JSON.parse(fs.readFileSync(path.join(out, "report.json"), "utf8")).cells;
+    return { status: run.status, cell };
+  };
+  const signedOut = account({}, "signed-out");
+  assert.equal(signedOut.status, 5, "a 401 API response must not exit 0");
+  assert.equal(signedOut.cell.status, "unverified");
+  assert.equal(signedOut.cell.reason, "api-error: 401 /api/me");
+  assert.deepEqual(signedOut.cell.observation.apiErrors, { "/api/me": 401 });
+  const signedIn = account({ localStorage: { token: "ok" } }, "signed-in");
+  assert.equal(signedIn.cell.status, "verified", JSON.stringify(signedIn.cell.reason));
+  assert.equal(signedIn.status, 0);
+  const expected = account({ expectedApiErrors: ["/api/*"] }, "expected-401");
+  assert.equal(expected.cell.status, "verified", JSON.stringify(expected.cell.reason));
 
   // 2. Valid 200 scenarios pass audit cleanly with 100% verified cells.
   const okManifest = path.join(appDir, "dui-ok.json");

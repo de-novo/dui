@@ -306,6 +306,10 @@ fn intent<'a>(job: &'a Job, analysis: &Value, has_branch: bool) -> Intent<'a> {
             .as_array()
             .map(Vec::as_slice)
             .unwrap_or_default(),
+        expected_api_errors: job.spec["expectedApiErrors"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_default(),
         analyzed: analysis["diagnostics"] == json!([]),
         expects_probe: has_branch,
     }

@@ -24,6 +24,7 @@
 | `scenarios` | 기본 설정에서 달라지는 값만 담은 배열. 예를 들어 `[{"path":"/settings","readySelector":"form"}]`은 폼이 준비될 때까지 기다리는 설정 화면을 추가한다. |
 | `maxNoImprovementRounds` | 선택적 수렴 가드. 연속 N개 상태에서 새 분기나 새 슬롯이 관측되지 않으면 시나리오 탐색을 종료하며, 남은 계획 칸은 분모에 `unverified (not-rendered)`로 보존한다. |
 | `requiredRequests` | 2xx 응답을 받아야 할 요청 경로. 생성한 목 응답을 지정한 요청은 실제로 그 응답을 받아야 한다. |
+| `expectedApiErrors` | 401, 403, 5xx 응답이 화면의 일부인 API 경로(또는 `prefix*`). 예를 들어 로그아웃 상태가 있다. 그 밖의 same-origin 또는 `apiBaseUrl` Fetch/XHR 응답이 이 상태 코드면 셀은 `unverified`가 되고 사유는 `api-error: STATUS PATH`다. 실패한 호출은 `observation.apiErrors`에 기록된다. |
 | `responseChecks` | JSON 응답의 지정 필드를 비교한다. 예를 들어 `{"/api/status":{"ready":true}}`로 준비 상태를 확인한다. |
 | `tsconfig` · `appRoot` | `PROJECT` 기준 경로. 분석에 쓸 설정의 기본값은 `tsconfig.json`, Vite 앱 루트의 기본값은 `.`이다. |
 | `rulePacks` | 추가 규칙 파일. 설정 파일을 기준으로 경로를 해석한다. [규칙 팩 스키마](../../rules/schema.json) |
