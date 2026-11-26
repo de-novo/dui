@@ -183,7 +183,7 @@ impl SurfaceAdapter for ElectronDesktopSurface {
         } else {
             Err(UnrenderableReason::new(
                 "no-browser",
-                "Chromium/Chrome executable not found for Electron renderer capture",
+                crate::chromium::missing_detail(),
             ))
         }
     }
@@ -200,7 +200,7 @@ impl SurfaceAdapter for ElectronDesktopSurface {
             let reply = crate::surface::unrenderable_reply(SURFACE_ELECTRON_DESKTOP, &reason);
             let _ = fs::create_dir_all(out);
             let _ = analysis::store(&out.join("report.json"), &reply);
-            return Ok(reply);
+            return Err((5, reply));
         }
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
         let exe = crate::chromium::executable();
