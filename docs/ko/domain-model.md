@@ -79,7 +79,7 @@ erDiagram
 |---|---|
 | 화면 지도 ([#7](https://github.com/de-novo/dui/issues/7)) | `RunAggregate` → `Screen`(`origin`), `State`, `Width`, `Cell`(`CellStatus`, `ImageBlob`, `Evidence`), `Edge::discovered`(`EdgeSource::Extracted`, `selector`, `observed_widths`). |
 | 라이브 캡처 저장 ([#3](https://github.com/de-novo/dui/issues/3)) | `RunKind::LiveSave { source_run, source_state, source_width, revision }`을 가진 새 불변 `RunAggregate`, `Cell` 1개, `ImageBlob`, 그리고 `live_edits`와 단언이 담긴 `Evidence`. |
-| 내용 주소 지정 캐시 ([#8](https://github.com/de-novo/dui/issues/8)) | `CacheEntry`가 `CacheKey`(`CacheInputs`)를 기존 `ImageBlob` + `Evidence` + `CellStatus`에 매핑하고, `Cell.cache()`가 `Hit` 또는 `Miss(changed)`를 기록. |
+| 내용 주소 지정 캐시 ([#8](https://github.com/de-novo/dui/issues/8)) | `CacheEntry`가 `CacheKey`(`CacheInputs`)를 기존 `ImageBlob` + `Evidence` + `CellStatus`에 매핑하고, `Cell.cache()`가 `Hit` 또는 `Miss(changed)`를 기록. 키에는 실행 중인 빌드(`dui --version`, 개발 빌드는 커밋 포함)가 들어가고, 적중한 칸의 `CellStatus`는 저장된 관찰로 현재 빌드의 검증기가 다시 판정한다. 판정이 바뀐 칸 수는 리포트의 `cache.recomputedVerdicts`에 남는다. |
 | SQLite + Drizzle 저장소 ([#10](https://github.com/de-novo/dui/issues/10)) | 5개 리포지토리 포트 뒤에 애그리게잇/산출물별 SQL 테이블을 둔다. 텍스트 ID/해시, 정수 epoch ms 시각, JSON 페이로드로 Postgres 이식성을 유지한다. 큰 PNG 바이트는 `BlobId` 키의 파일로 디스크에 저장한다. |
 | 캡처 diff ([#11](https://github.com/de-novo/dui/issues/11)) | 두 `RunAggregate`를 `Cell::diff_key()`(`screen_id`, `state_id`, `width`, `locale`)로 비교한다. `(status, image_blob, evidence_id)`가 같으면 변경 없음으로 판정한다. |
 | 다국어 캡처 ([#12](https://github.com/de-novo/dui/issues/12)) | `State.locale()`, `Cell.locale()`, `CacheInputs.locale`로 로케일 차원을 ID와 캐시 키에 포함한다. |

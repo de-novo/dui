@@ -29,6 +29,30 @@ pub(crate) fn store(path: &Path, data: &Value) -> Result<(), (u8, Value)> {
         .map_err(|e| failure(3, &e.to_string()))?;
     Ok(())
 }
+/// What a cell must show: its route, width, requested state and the manifest's conditions.
+fn verification_intent<'a>(
+    spec: &'a Value,
+    width: u32,
+    row: &'a BTreeMap<String, Value>,
+    checks: &'a Value,
+    analysis: &Value,
+    facts: &[Value],
+) -> dui_core::verification::Intent<'a> {
+    let list = |v: &'a Value| v.as_array().map(Vec::as_slice).unwrap_or_default();
+    dui_core::verification::Intent {
+        path: spec["path"].as_str().unwrap_or_default(),
+        width,
+        inputs: row,
+        assertions: list(checks),
+        required_requests: list(&spec["requiredRequests"]),
+        expected_api_errors: list(&spec["expectedApiErrors"]),
+        analyzed: analysis["diagnostics"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        expects_probe: facts.iter().any(|f| f["kind"] == "branch"),
+    }
+}
+
 /// Capture phases in `cell.timing`, in the order a capture runs them.
 const TIMING_PHASES: [&str; 5] = [
     "navigateMs",
@@ -397,6 +421,8 @@ fn execute_with_locales(
     let mut remaining = 0;
     let mut cache_hits = 0usize;
     let mut cache_misses = 0usize;
+    // Cache hits whose stored verdict differs from this build's verifier.
+    let mut recomputed_verdicts = 0usize;
     let mut seen_slots = BTreeSet::new();
     let mut rounds = Vec::new();
     let mut discovered_routes = Vec::new();
@@ -748,8 +774,27 @@ fn execute_with_locales(
                             .filter_map(Value::as_str)
                             .collect();
                         hits.extend(observed.iter().map(|s| s.to_string()));
-                        if matches!(cached_status, CellStatus::Verified) {
+                        // The stored verdict may come from an older verifier; judge the stored
+                        // observation with this build's.
+                        let corroborated: BTreeSet<String> = obs["visualWitness"]
+                            .as_object()
+                            .map(|w| w.keys().cloned().collect())
+                            .unwrap_or_default();
+                        let intent =
+                            verification_intent(&spec, *width, &row, &checks, analysis, facts);
+                        let failure = intent.failure_with(&obs, &corroborated).or_else(|| {
+                            (spec.get("screenDiscovery").is_some()
+                                && spec["hasScreenAssertion"] == false)
+                                .then_some(dui_core::verification::Failure::MissingScreenAssertion)
+                        });
+                        let reason = failure
+                            .as_ref()
+                            .map(|f| intent.describe(f, &obs, spec["readySelector"].as_str()));
+                        if reason.is_none() {
                             verified += 1;
+                        }
+                        if cached_status.reason() != reason.as_deref() {
+                            recomputed_verdicts += 1;
                         }
                         let mut cell = json!({
                             "scenario": scenario,
@@ -759,9 +804,9 @@ fn execute_with_locales(
                             "state": state_id,
                             "planIndex": index,
                             "image": image_name,
-                            "status": cached_status.kind(),
+                            "status": if reason.is_none() { "verified" } else { "unverified" },
                             "checks": checks,
-                            "reason": cached_status.reason(),
+                            "reason": reason,
                             "observation": obs,
                             "cache": CacheOutcome::Hit { key: cache_key },
                         });
@@ -901,27 +946,8 @@ fn execute_with_locales(
                                 obs_obj.insert("visualWitness".into(), json!(witness_record));
                             }
 
-                            let intent = dui_core::verification::Intent {
-                                path: spec["path"].as_str().unwrap_or_default(),
-                                width: *width,
-                                inputs: &row,
-                                assertions: checks
-                                    .as_array()
-                                    .map(Vec::as_slice)
-                                    .unwrap_or_default(),
-                                required_requests: spec["requiredRequests"]
-                                    .as_array()
-                                    .map(Vec::as_slice)
-                                    .unwrap_or_default(),
-                                expected_api_errors: spec["expectedApiErrors"]
-                                    .as_array()
-                                    .map(Vec::as_slice)
-                                    .unwrap_or_default(),
-                                analyzed: analysis["diagnostics"]
-                                    .as_array()
-                                    .is_some_and(Vec::is_empty),
-                                expects_probe: facts.iter().any(|f| f["kind"] == "branch"),
-                            };
+                            let intent =
+                                verification_intent(&spec, *width, &row, &checks, analysis, facts);
                             let reason = intent.failure_with(&obs, &corroborated).or_else(|| {
                                 (spec.get("screenDiscovery").is_some()
                                     && spec["hasScreenAssertion"] == false)
@@ -1276,6 +1302,8 @@ fn execute_with_locales(
         report["cache"] = json!({
             "hits": cache_hits,
             "misses": cache_misses,
+            "build": c.build(),
+            "recomputedVerdicts": recomputed_verdicts,
             "rendered": cache_misses,
             "forced": c.is_forced(),
         });

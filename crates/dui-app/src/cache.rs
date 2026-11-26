@@ -289,6 +289,20 @@ impl<S: AppStore> CellCache<S> {
         }
     }
 
+    /// Key entries by the running build, for example `0.2.0-dev+1e5fe29…`. Development builds
+    /// share the crate version, so without this a build with changed verification or discovery
+    /// would reuse the previous build's cells. `DUI_CACHE_VERSION` still overrides it.
+    pub fn built_by(mut self, build: &str) -> Self {
+        if env::var("DUI_CACHE_VERSION").map_or(true, |v| v.trim().is_empty()) {
+            self.dui_version = build.to_owned();
+        }
+        self
+    }
+
+    pub fn build(&self) -> &str {
+        &self.dui_version
+    }
+
     pub fn is_forced(&self) -> bool {
         self.force
     }
@@ -559,6 +573,18 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
     if let Some(overlays) = obs.get("overlays").filter(|v| v.is_array()) {
         assertions.push(json!({"__duiOverlays": overlays}));
     }
+    // Everything else the capture observed (response checks, API errors, settle evidence,
+    // dialogs, witnesses, …), so a cache hit can be judged again exactly as a fresh capture.
+    let rest: serde_json::Map<String, Value> = obs
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(key, _)| !EVIDENCE_FIELDS.contains(&key.as_str()))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    if !rest.is_empty() {
+        assertions.push(json!({"__duiObservation": rest}));
+    }
     Evidence::new(
         obs["path"].as_str().map(str::to_owned),
         obs["width"].as_u64().map(|w| w as u32),
@@ -575,8 +601,27 @@ fn observation_to_evidence(obs: &Value) -> Evidence {
     .with_screen_evidence(obs.get("screenEvidence"))
 }
 
+/// Observation fields stored in `Evidence`'s own slots or as their own assertion items.
+const EVIDENCE_FIELDS: [&str; 14] = [
+    "path",
+    "width",
+    "ready",
+    "settled",
+    "slots",
+    "hits",
+    "links",
+    "responses",
+    "assertions",
+    "screenEvidence",
+    "redirectedTo",
+    "localeAudit",
+    "renderTree",
+    "overlays",
+];
+
 fn evidence_to_observation(ev: &Evidence) -> Value {
     let mut assertions = Vec::new();
+    let mut rest = None;
     let mut locale_audit = None;
     let mut render_tree = None;
     let mut overlays = None;
@@ -590,6 +635,8 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
             redirected_to = Some(path.clone());
         } else if let Some(ov) = item.get("__duiOverlays") {
             overlays = Some(ov.clone());
+        } else if let Some(fields) = item.get("__duiObservation") {
+            rest = fields.as_object().cloned();
         } else {
             assertions.push(item.clone());
         }
@@ -626,5 +673,33 @@ fn evidence_to_observation(ev: &Evidence) -> Value {
     if let Some(ov) = overlays {
         obs["overlays"] = ov;
     }
+    // The stored fields replace the ones rebuilt above (`responseChecks` is only a stand-in
+    // for entries written before the full observation was kept).
+    for (key, value) in rest.into_iter().flatten() {
+        obs[key] = value;
+    }
     obs
+}
+
+#[cfg(test)]
+mod observation_round_trip {
+    use super::{evidence_to_observation, observation_to_evidence};
+    use serde_json::json;
+
+    #[test]
+    fn a_cached_observation_keeps_every_field_the_verifier_reads() {
+        let observed = json!({
+            "path": "/orders", "width": 375, "ready": true, "settled": false,
+            "slots": {}, "hits": [], "links": ["/"], "responses": {"/orders": 200, "/favicon.ico": 404},
+            "responseChecks": {}, "assertions": [true],
+            "apiErrors": {"/api/me": 401},
+            "unsettled": [{"node": "li#3", "change": "added"}],
+            "ignoredChanges": [{"node": "#clock", "reason": "changes every sample"}],
+            "overlaySlots": ["main.tsx#1:2:overlay"],
+            "visualWitness": {"slot": "visible-change"},
+            "renderTree": [{"id": "h1#0", "text": "Orders"}],
+        });
+        let restored = evidence_to_observation(&observation_to_evidence(&observed));
+        assert_eq!(restored, observed);
+    }
 }
