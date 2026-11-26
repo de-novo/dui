@@ -973,9 +973,15 @@ declare var __duiProbe: {
           else if (el.getAttribute("src") && !el.getAttribute("src")!.startsWith("data:"))
             el.removeAttribute("src");
         }
+        // Links resolved, but same-origin ones without the origin: the app is served on a port
+        // of its own each run, and the snapshot's name is a hash of its content.
         for (const el of scope.querySelectorAll("a[href]")) {
           try {
-            el.setAttribute("href", new URL(el.getAttribute("href")!, document.baseURI).href);
+            const url = new URL(el.getAttribute("href")!, document.baseURI);
+            el.setAttribute(
+              "href",
+              url.origin === location.origin ? url.pathname + url.search + url.hash : url.href,
+            );
           } catch {
             // Keep the href as written.
           }

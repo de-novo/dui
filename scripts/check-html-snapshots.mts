@@ -94,6 +94,7 @@ label { display: block; margin: 8px 0 }`,
 <x-badge></x-badge>
 <canvas id="c" width="80" height="40"></canvas>
 <div class="hero">Hero</div>
+<a href="orders.html?tab=open#top">Open orders</a> <a href="https://example.com/help">Help</a>
 <dialog id="d" style="width:300px;height:120px"><h2>Confirm</h2></dialog>
 <script>
 customElements.define("x-badge", class extends HTMLElement { connectedCallback() {
@@ -130,6 +131,9 @@ document.getElementById("d").show();
   assert.doesNotMatch(html, /<script|onclick=/i, "no scripts or handlers");
   assert.doesNotMatch(html, /<link[^>]+stylesheet/i, "styles are inlined, not linked");
   assert.match(html, /value="Ada"/, "input value kept");
+  // The app's port changes every run; a link to it must not change the snapshot's name.
+  assert.match(html, /href="\/orders\.html\?tab=open#top"/, "same-origin link without origin");
+  assert.match(html, /href="https:\/\/example\.com\/help"/, "other origins kept whole");
   assert.match(html, /id="agree" checked/, "checkbox state kept");
   assert.match(
     html,
