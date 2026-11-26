@@ -192,6 +192,20 @@ pub(crate) fn run_vite_web_with_facts(
     out: &Path,
     force: bool,
 ) -> Reply {
+    // Without capture no browser starts (AGENTS.md#never). The dev server serves only the app's
+    // shell, so screens come from the router and nothing is fetched.
+    if crate::html_map::HtmlLinks::wanted(spec) {
+        let mut links = crate::html_map::HtmlLinks::new(Box::new(|| Ok(None)));
+        return analysis::exercise_with_renderer(
+            Some(&mut links),
+            facts,
+            spec,
+            Some(project),
+            out,
+            None,
+            force,
+        );
+    }
     let exe = crate::chromium::executable();
     let browser_version = crate::chromium::version_tag(&exe);
     let mut lazy = LazyViteBrowser {

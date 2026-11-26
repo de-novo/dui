@@ -19,7 +19,7 @@ dui는 프로젝트의 공식 컴파일러에서 타입을 읽는다. 라이브�
 | 확인할 내용 | 방법 |
 | --- | --- |
 | 타입이 있는 상태 슬롯과 경로 매개변수 | `dui scan`이 프로젝트의 TypeScript 컴파일러와 해당 심볼 규칙을 사용한다. |
-| 너비별로 이동 가능한 웹 화면 | `dui map`에 로컬 URL이나 정적 빌드를 넘긴다. Chromium이 프레임워크에 관계없이 동일 출처 링크를 따라간다. |
+| 너비별로 이동 가능한 웹 화면 | `dui map`에 로컬 URL이나 정적 빌드를 넘긴다. dui가 서버가 보낸 HTML의 동일 출처 링크를 따라가고, `--capture`를 주면 Chromium으로 렌더링한다. |
 | 코드에 선언된 네이티브 화면 | React Navigation, Expo Router, Flutter 프로젝트에서 `dui map`을 실행한다. 각 카드에서 화면의 선언 위치를 확인할 수 있다. |
 | 렌더링된 UI | 설정한 웹·모바일·데스크톱·터미널 호스트에서 캡처한다. 일부 SwiftUI·Compose 컴포넌트는 조작 가능한 HTML 미리보기로도 내보낼 수 있다. |
 
@@ -79,7 +79,7 @@ dui open --no-open
 
 개발판은 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`로 설치한다. 아래 예제와 명령 표는 개발판 기준이다. 홈페이지에서 [기본 설치판의 릴리스 문서](https://dui.sh/?lang=ko#release-guide)도 열 수 있다.
 
-개발판의 `dui map --no-capture`는 화면·상태·폭을 캡처 없이 계획하고, `dui map`은 계획한 모든 셀을 캡처한다. [공통 화면 지도](docs/ko/web-viewer.md#공통-화면-지도)를 참고한다.
+개발판의 `dui map`은 브라우저 없이 화면·상태·폭을 계획하고, `dui map --capture`는 계획한 모든 셀을 캡처한다. [공통 화면 지도](docs/ko/web-viewer.md#공통-화면-지도)를 참고한다.
 
 정적 사이트를 이미 `dist/`에 빌드했다면 프로젝트 루트에서 아래 명령을 실행한다. 결과는 위의 뷰어 명령으로 연다.
 
@@ -92,7 +92,7 @@ dui map . --build-dir dist
 
 | 명령어 | 언제 쓰나 |
 | --- | --- |
-| `dui map [PROJECT]` | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · Next.js · 링크). 화면과 모달을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 한 번에 캡처한다. |
+| `dui map [PROJECT]` | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · Next.js · 링크). 화면을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 브라우저 없이 모든 셀을 계획한다. `--capture`는 모달까지 한 번에 캡처한다. |
 | `dui run [PROJECT] [MANIFEST]` | **명시적 매니페스트 직접 캡처.** `dui.json` 설정 그대로 실행한다(인자를 생략하면 `.` / `dui.json`을 사용하며, 명시적 `path`/`host`가 없으면 `dui map`으로 자동 발견). |
 
 | 분류 | 명령어 | 역할 |

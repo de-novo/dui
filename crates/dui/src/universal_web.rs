@@ -598,8 +598,34 @@ impl SurfaceAdapter for UniversalWebSurface {
         }
     }
 
+    fn maps_without_renderer(&self) -> bool {
+        true
+    }
+
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
+        // Without capture no browser starts (AGENTS.md#never): links are read from the HTML the
+        // app's server sends.
+        if crate::html_map::HtmlLinks::wanted(spec) {
+            let mut links = crate::html_map::HtmlLinks::new(Box::new(|| {
+                let session = UniversalWebHost
+                    .start(project, spec, &Value::Null)
+                    .map_err(|(_, v)| v.to_string())?;
+                Ok(Some((
+                    session.port(),
+                    Box::new(session) as Box<dyn std::any::Any>,
+                )))
+            }));
+            return analysis::exercise_with_renderer(
+                Some(&mut links),
+                facts,
+                spec,
+                Some(project),
+                out,
+                None,
+                force,
+            );
+        }
         let exe = crate::chromium::executable();
         let browser_version = crate::chromium::version_tag(&exe);
         let mut lazy = LazyUniversalBrowser {
