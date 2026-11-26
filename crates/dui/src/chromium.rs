@@ -304,11 +304,36 @@ fn collect_auth_session(
     Ok(bundle)
 }
 
+/// How long the live API proxy waits for an upstream response.
+const LIVE_PROXY_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Request headers the proxy never forwards: hop-by-hop headers, the original Host, and
+/// Accept-Encoding (the proxy returns bodies as received, so it asks for them uncompressed).
+fn forwardable_request_header(name: &str) -> bool {
+    !matches!(
+        name.to_ascii_lowercase().as_str(),
+        "host"
+            | "connection"
+            | "keep-alive"
+            | "content-length"
+            | "transfer-encoding"
+            | "accept-encoding"
+            | "proxy-connection"
+            | "upgrade"
+    )
+}
+
+/// Status, headers and body of a live API response.
+type LiveResponse = (u16, Vec<(String, String)>, Vec<u8>);
+
+/// Send one request to the live API and return its status, headers and body. Runs on a
+/// worker thread, so a slow endpoint never blocks the capture loop.
 fn forward_live_http(
     target_url: &str,
     method: &str,
-    extra_headers: &[(String, String)],
-) -> Result<(u16, String, Vec<u8>)> {
+    headers: &[(String, String)],
+    body: Option<&[u8]>,
+) -> std::result::Result<LiveResponse, String> {
     let stripped = target_url
         .strip_prefix("http://")
         .ok_or("live API proxy currently requires an http:// loopback or local URL")?;
@@ -321,22 +346,45 @@ fn forward_live_http(
     } else {
         format!("{authority}:80")
     };
-    let mut stream = std::net::TcpStream::connect(&addr)?;
-    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    let timed_out = |e: &std::io::Error| {
+        if matches!(
+            e.kind(),
+            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+        ) {
+            format!(
+                "timed out after {} s waiting for {method} {target_url}",
+                LIVE_PROXY_TIMEOUT.as_secs()
+            )
+        } else {
+            format!("{method} {target_url}: {e}")
+        }
+    };
+    let mut stream = std::net::TcpStream::connect(&addr).map_err(|e| timed_out(&e))?;
+    stream
+        .set_read_timeout(Some(LIVE_PROXY_TIMEOUT))
+        .and_then(|()| stream.set_write_timeout(Some(LIVE_PROXY_TIMEOUT)))
+        .map_err(|e| timed_out(&e))?;
     let mut req = format!("{method} {path} HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n");
-    for (k, v) in extra_headers {
-        req.push_str(&format!("{k}: {v}\r\n"));
+    for (k, v) in headers {
+        if forwardable_request_header(k) {
+            req.push_str(&format!("{k}: {v}\r\n"));
+        }
+    }
+    if let Some(body) = body {
+        req.push_str(&format!("Content-Length: {}\r\n", body.len()));
     }
     req.push_str("\r\n");
-    stream.write_all(req.as_bytes())?;
-    stream.flush()?;
     let mut raw = Vec::new();
-    std::io::Read::read_to_end(&mut stream, &mut raw)?;
+    stream
+        .write_all(req.as_bytes())
+        .and_then(|()| stream.write_all(body.unwrap_or_default()))
+        .and_then(|()| stream.flush())
+        .and_then(|()| std::io::Read::read_to_end(&mut stream, &mut raw).map(|_| ()))
+        .map_err(|e| timed_out(&e))?;
     let split = raw
         .windows(4)
         .position(|w| w == b"\r\n\r\n")
-        .ok_or("malformed HTTP response from live API")?;
+        .ok_or_else(|| format!("{method} {target_url}: malformed HTTP response"))?;
     let header_text = String::from_utf8_lossy(&raw[..split]);
     let mut body = raw[split + 4..].to_vec();
     let mut lines = header_text.lines();
@@ -346,24 +394,56 @@ fn forward_live_http(
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(502);
-    let mut content_type = "application/json".to_owned();
+    let mut response_headers = Vec::new();
     let mut is_chunked = false;
     for line in lines {
         if let Some((name, val)) = line.split_once(':') {
-            let lname = name.trim().to_ascii_lowercase();
-            let lval = val.trim();
-            if lname == "content-type" {
-                content_type = lval.to_owned();
-            } else if lname == "transfer-encoding" && lval.to_ascii_lowercase().contains("chunked")
-            {
-                is_chunked = true;
+            let (name, val) = (name.trim(), val.trim());
+            match name.to_ascii_lowercase().as_str() {
+                "transfer-encoding" => is_chunked |= val.to_ascii_lowercase().contains("chunked"),
+                "content-length" | "connection" | "keep-alive" => {}
+                _ => response_headers.push((name.to_owned(), val.to_owned())),
             }
         }
     }
     if is_chunked {
         body = decode_chunked(&body);
     }
-    Ok((status, content_type, body))
+    Ok((status, response_headers, body))
+}
+
+/// CDP commands are written from the capture loop and from live proxy workers.
+struct CdpWriter {
+    stream: std::sync::Mutex<UnixStream>,
+    next_id: std::sync::atomic::AtomicU64,
+}
+
+impl CdpWriter {
+    fn send(&self, session: Option<&str>, method: &str, params: Value) -> Result<u64> {
+        let id = self
+            .next_id
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            + 1;
+        let mut msg = json!({"id":id,"method":method,"params":params});
+        if let Some(session) = session {
+            msg["sessionId"] = json!(session);
+        }
+        let mut frame = serde_json::to_vec(&msg)?;
+        frame.push(0);
+        self.stream
+            .lock()
+            .map_err(|_| "CDP writer poisoned")?
+            .write_all(&frame)?;
+        Ok(id)
+    }
+}
+
+/// A finished live proxy request: the visit it belongs to, its page URL, and its status or
+/// failure.
+struct ProxyDone {
+    visit: u64,
+    url: String,
+    outcome: std::result::Result<u16, String>,
 }
 
 fn decode_chunked(input: &[u8]) -> Vec<u8> {
@@ -393,9 +473,16 @@ fn decode_chunked(input: &[u8]) -> Vec<u8> {
 
 pub struct Browser {
     child: Child,
-    stream: UnixStream,
+    cdp: std::sync::Arc<CdpWriter>,
     reader: BufReader<UnixStream>,
-    next_id: u64,
+    visit: u64,
+    proxy_done: (
+        std::sync::mpsc::Sender<ProxyDone>,
+        std::sync::mpsc::Receiver<ProxyDone>,
+    ),
+    /// Live proxy requests of this visit still waiting for the API, and the ones that failed.
+    proxy_pending: std::collections::BTreeSet<String>,
+    proxy_failures: BTreeMap<String, String>,
     mock_responses: BTreeMap<String, String>,
     generated_get: BTreeMap<String, (&'static str, String)>,
     fulfilled: std::collections::BTreeSet<String>,
@@ -460,9 +547,15 @@ impl Browser {
         BROWSER_LAUNCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(Self {
             child,
-            stream,
+            cdp: std::sync::Arc::new(CdpWriter {
+                stream: std::sync::Mutex::new(stream),
+                next_id: Default::default(),
+            }),
             reader,
-            next_id: 0,
+            visit: 0,
+            proxy_done: std::sync::mpsc::channel(),
+            proxy_pending: Default::default(),
+            proxy_failures: Default::default(),
             mock_responses: Default::default(),
             generated_get: Default::default(),
             fulfilled: Default::default(),
@@ -484,15 +577,25 @@ impl Browser {
         })
     }
     fn send(&mut self, session: Option<&str>, method: &str, params: Value) -> Result<u64> {
-        self.next_id += 1;
-        let mut msg = json!({"id":self.next_id,"method":method,"params":params});
-        if let Some(session) = session {
-            msg["sessionId"] = json!(session);
+        self.cdp.send(session, method, params)
+    }
+    /// Record live proxy requests that finished since the last check.
+    fn drain_proxy(&mut self) {
+        while let Ok(done) = self.proxy_done.1.try_recv() {
+            if done.visit != self.visit {
+                continue;
+            }
+            self.proxy_pending.remove(&done.url);
+            match done.outcome {
+                Ok(status) => {
+                    self.responses.insert(done.url.clone(), status);
+                    self.note_api_status(&done.url, status);
+                }
+                Err(reason) => {
+                    self.proxy_failures.insert(done.url, reason);
+                }
+            }
         }
-        let mut frame = serde_json::to_vec(&msg)?;
-        frame.push(0);
-        self.stream.write_all(&frame)?;
-        Ok(self.next_id)
     }
     pub(crate) fn call(
         &mut self,
@@ -502,6 +605,7 @@ impl Browser {
     ) -> Result<Value> {
         let wanted = self.send(session, method, params)?;
         loop {
+            self.drain_proxy();
             let mut bytes = Vec::new();
             if self.reader.read_until(0, &mut bytes)? == 0 {
                 return Err("Chromium disconnected".into());
@@ -616,28 +720,78 @@ impl Browser {
                     self.live_api_requests.insert(label.clone());
                     self.api_provenance.insert(label, "live-api");
                     if let Some((rewritten, _)) = proxied_target {
-                        match forward_live_http(&rewritten, http_method, &self.api_headers) {
-                            Ok((status, mime, body)) => {
-                                self.responses.insert(url.to_owned(), status);
-                                if is_api_resource {
-                                    self.note_api_status(url, status);
-                                }
-                                let reply = json!({
-                                    "requestId": p["requestId"],
-                                    "responseCode": status,
-                                    "responseHeaders": [{"name": "Content-Type", "value": mime}],
-                                    "body": STANDARD.encode(body),
-                                });
-                                self.send(session, "Fetch.fulfillRequest", reply)?;
-                            }
-                            Err(_) => {
-                                self.send(
-                                    session,
+                        // The page's own headers (including Authorization) and body go
+                        // upstream, with configured `apiHeaders` on top. A worker thread
+                        // answers the paused request, so the capture loop keeps running and
+                        // several proxied requests can be in flight.
+                        let mut headers: Vec<(String, String)> = p["request"]["headers"]
+                            .as_object()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                            .filter(|(k, _)| {
+                                !self
+                                    .api_headers
+                                    .iter()
+                                    .any(|(name, _)| name.eq_ignore_ascii_case(k))
+                            })
+                            .collect();
+                        headers.extend(self.api_headers.iter().cloned());
+                        let body: Option<Vec<u8>> = p["request"]["postDataEntries"]
+                            .as_array()
+                            .map(|entries| {
+                                entries
+                                    .iter()
+                                    .filter_map(|e| e["bytes"].as_str())
+                                    .filter_map(|b| STANDARD.decode(b).ok())
+                                    .flatten()
+                                    .collect()
+                            })
+                            .or_else(|| {
+                                p["request"]["postData"]
+                                    .as_str()
+                                    .map(|d| d.as_bytes().to_vec())
+                            });
+                        let (cdp, done, visit) =
+                            (self.cdp.clone(), self.proxy_done.0.clone(), self.visit);
+                        let (page_url, method, request_id) = (
+                            url.to_owned(),
+                            http_method.to_owned(),
+                            p["requestId"].clone(),
+                        );
+                        let session = session.map(str::to_owned);
+                        self.proxy_pending.insert(page_url.clone());
+                        std::thread::spawn(move || {
+                            let outcome =
+                                forward_live_http(&rewritten, &method, &headers, body.as_deref());
+                            let reply = match &outcome {
+                                Ok((status, response_headers, body)) => (
+                                    "Fetch.fulfillRequest",
+                                    json!({
+                                        "requestId": request_id,
+                                        "responseCode": status,
+                                        "responseHeaders": response_headers
+                                            .iter()
+                                            .map(|(name, value)| json!({"name": name, "value": value}))
+                                            .collect::<Vec<_>>(),
+                                        "body": STANDARD.encode(body),
+                                    }),
+                                ),
+                                Err(reason) => (
                                     "Fetch.failRequest",
-                                    json!({"requestId":p["requestId"],"errorReason":"ConnectionFailed"}),
-                                )?;
-                            }
-                        }
+                                    json!({
+                                        "requestId": request_id,
+                                        "errorReason": if reason.starts_with("timed out") { "TimedOut" } else { "ConnectionFailed" },
+                                    }),
+                                ),
+                            };
+                            let _ = cdp.send(session.as_deref(), reply.0, reply.1);
+                            let _ = done.send(ProxyDone {
+                                visit,
+                                url: page_url,
+                                outcome: outcome.map(|(status, _, _)| status),
+                            });
+                        });
                     } else {
                         let mut cont = json!({"requestId": p["requestId"]});
                         if !self.api_headers.is_empty() {
@@ -812,6 +966,9 @@ impl Browser {
         self.fulfilled.clear();
         self.responses.clear();
         self.api_errors.clear();
+        self.visit += 1;
+        self.proxy_pending.clear();
+        self.proxy_failures.clear();
         self.response_ids.clear();
         self.live_api_requests.clear();
         self.blocked_mutations.clear();
@@ -1458,6 +1615,21 @@ impl Browser {
                     .map(|p| (p, *s)))
                 .collect::<BTreeMap<_, _>>()
         );
+        // Live proxy requests still waiting for the API when the screen was captured, and the
+        // ones that failed (timeout or connection error), by page path.
+        self.drain_proxy();
+        let page_path = |u: &String| u.strip_prefix(&origin).unwrap_or(u).to_owned();
+        if !self.proxy_pending.is_empty() {
+            v["apiPending"] = json!(self.proxy_pending.iter().map(page_path).collect::<Vec<_>>());
+        }
+        if !self.proxy_failures.is_empty() {
+            v["apiFailures"] = json!(
+                self.proxy_failures
+                    .iter()
+                    .map(|(u, reason)| (page_path(u), reason.clone()))
+                    .collect::<BTreeMap<_, _>>()
+            );
+        }
         // Failed API calls of this screen: same-origin as a path, the live API origin as a URL.
         v["apiErrors"] = json!(
             self.api_errors
@@ -1697,9 +1869,15 @@ pub fn capture_login_session(
     BROWSER_LAUNCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let mut browser = Browser {
         child,
-        stream,
+        cdp: std::sync::Arc::new(CdpWriter {
+            stream: std::sync::Mutex::new(stream),
+            next_id: Default::default(),
+        }),
         reader,
-        next_id: 0,
+        visit: 0,
+        proxy_done: std::sync::mpsc::channel(),
+        proxy_pending: Default::default(),
+        proxy_failures: Default::default(),
         mock_responses: Default::default(),
         generated_get: Default::default(),
         fulfilled: Default::default(),

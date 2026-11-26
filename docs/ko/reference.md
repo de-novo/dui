@@ -51,6 +51,12 @@
 }
 ```
 
+## 실제 API
+
+실행 중인 API에서 데이터를 받으려면 `"apiMode": "live"`(일부 경로는 `mockResponses`를 그대로 쓰려면 `"hybrid"`)와 `apiBaseUrl`(`http://` URL 또는 `env:NAME`)을 지정한다. `apiProxyPrefix`(또는 `apiProxyPrefixes`) 아래 요청, 예를 들어 `"/api/"`는 페이지가 보낸 헤더(`Authorization`과 쿠키 포함)와 요청 본문을 그대로 담아 `apiBaseUrl`로 보낸다. `apiHeaderEnv`는 환경 변수에서 읽은 헤더를 더한다. 예: `{"Authorization": "API_TOKEN"}`. 이 헤더는 같은 이름의 페이지 헤더를 대신하며 기록에 남지 않는다. 응답은 `Set-Cookie`를 포함해 페이지로 돌아간다. 프록시 요청은 각각 별도 작업 스레드에서 처리한다. 그래서 느린 엔드포인트는 그 응답을 기다리는 화면만 늦추고, 여러 요청이 동시에 진행될 수 있다. `GET`, `HEAD`, `OPTIONS` 이외의 요청은 `allowMutations`가 `true`일 때만 보낸다.
+
+화면을 캡처할 때까지 응답을 기다리던 프록시 요청은 `observation.apiPending`에 기록된다. 실패한 요청은 이유와 함께 `observation.apiFailures`에 기록된다. 예: `timed out after 10 s waiting for GET http://127.0.0.1:8080/api/orders`.
+
 ## 결과 읽기
 
 | 출력 파일 | 확인할 내용 |

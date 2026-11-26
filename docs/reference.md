@@ -51,6 +51,12 @@ Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the ta
 }
 ```
 
+## Live API
+
+Set `"apiMode": "live"` (or `"hybrid"` to keep `mockResponses` for some paths) and `apiBaseUrl` (an `http://` URL, or `env:NAME`) to load data from a running API. Requests under `apiProxyPrefix` (or `apiProxyPrefixes`), such as `"/api/"`, are sent to `apiBaseUrl` with the page's own headers, including `Authorization` and cookies, and its request body. `apiHeaderEnv` adds headers read from environment variables, such as `{"Authorization": "API_TOKEN"}`; they replace a page header of the same name and never appear in archives. The response, including `Set-Cookie`, goes back to the page. Each proxied request runs on its own worker, so a slow endpoint delays only the screen that waits for it, and several requests can be in flight. Requests other than `GET`, `HEAD` and `OPTIONS` are blocked unless `allowMutations` is `true`.
+
+A proxied request still waiting when the screen is captured is listed in `observation.apiPending`. One that failed is listed in `observation.apiFailures` with its reason, for example `timed out after 10 s waiting for GET http://127.0.0.1:8080/api/orders`.
+
 ## Read a run
 
 | File in `OUTPUT` | What to inspect |
