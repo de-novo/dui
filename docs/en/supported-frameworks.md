@@ -26,3 +26,23 @@ Web capture has a different boundary. A page can appear on the map as soon as Ch
 The design targets official TypeScript 7. The current CLI also accepts official stable 6.x projects through a compatibility path. Run `dui check-ts PROJECT` for the project's compiler. The TypeScript scan checks stable React and React DOM 18+ and Vite 7+ when installed, and Next.js 16+ for the Next host when installed. Versions of libraries used by rules can produce a diagnostic note while the scan continues. [Compiler check](../../crates/dui/src/main.rs) · [Scan version checks](../../adapters/typescript/facts.mts)
 
 `dui toolchains` reports installed versions of `tsc`, `rustc`, `go`, `swiftc`, `kotlinc` and `dart`. A successful probe establishes tool availability. The table above links the separate checks for extracting facts, discovering screens and rendering. Future work is tracked in the roadmap. [Toolchain probe](../../crates/dui-app/src/compiler_oracle.rs) · [Roadmap](roadmap.md)
+
+
+## Language adapters (default pipeline)
+
+The table above describes `main` today. The [default pipeline](roadmap.md#default-pipeline) changes how a new language is added: one adapter maps that language's source onto the versioned model. The model, the approximate renderer, hot reload, and Figma export are reused.
+
+An adapter maps:
+
+- Layout elements onto the model's layout types
+- Declared state and data slots
+- Navigation (routers, links, destinations)
+- Style syntax onto neutral style properties (spacing, color, typography, radius, size, layout), keeping token names in a token layer
+
+Style difficulty:
+
+- Easy: Tailwind classes, SwiftUI modifiers, Compose Modifier, and inline styles map directly.
+- Medium: themes, design tokens, and CSS variables are resolved from their definition files.
+- Hard: CSS files and CSS Modules need cascade, specificity, and media queries. A lightweight, browserless CSS resolver approximates these. Runtime CSS-in-JS values are treated like slots.
+
+The default adapter path must not launch a browser or emulator, and must not use a heavy renderer as a fallback that fills cards. See [Never](architecture.md#never-default-path).
