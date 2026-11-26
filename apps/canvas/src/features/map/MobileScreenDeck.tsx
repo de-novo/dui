@@ -9,6 +9,43 @@ import {
   type ScreenCanvasDiff,
 } from "../../model/canvasDiff";
 import { routeName } from "./CaptureCard";
+import { liveCell, useLiveFrame } from "./liveFrames";
+import { useEffect, useRef, useState } from "react";
+
+/** A deck card without a capture, rendered from source once it scrolls into view. */
+function LiveDeckFrame({
+  run,
+  cell,
+  label,
+}: {
+  run: string;
+  cell: { state: string; width: number };
+  label: string;
+}) {
+  const { t } = useI18n();
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => setInView(entry!.isIntersecting));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const live = useLiveFrame(run, cell, inView);
+  return (
+    <div ref={ref} className="mobile-deck-frame" data-showing={live.frame ? "live" : undefined}>
+      {live.frame ? (
+        <img src={live.frame.src} alt={label} />
+      ) : (
+        <div className="missing-frame-copy" aria-busy={live.pending || undefined}>
+          <span>{live.error ? t.liveRenderFailed : t.liveRendering}</span>
+          {live.error && <small>{live.error}</small>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export type MobileViewMode = "deck" | "map";
 
@@ -36,7 +73,10 @@ export function MobileScreenDeck({
   onSelectMobileView,
   onSelectWidth,
   onSelectScreen,
+  liveRun,
 }: {
+  /** Render cards without a capture from source (the run's project can run). */
+  liveRun?: string;
   archive: Archive;
   width?: number;
   widths: number[];
@@ -168,6 +208,15 @@ export function MobileScreenDeck({
                     <SourceCardBody source={screen.nativeSource} preview={screen.sourcePreview} />
                   </div>
                 )}
+                {!src &&
+                  !screenDiff &&
+                  liveRun &&
+                  (() => {
+                    const live = liveCell(screen, cell, width ?? 0);
+                    return live ? (
+                      <LiveDeckFrame run={liveRun} cell={live} label={routeName(screen.path)} />
+                    ) : null;
+                  })()}
                 {src && (
                   <div
                     className={

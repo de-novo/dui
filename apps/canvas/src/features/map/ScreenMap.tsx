@@ -21,6 +21,7 @@ import { clearLane, layoutMap } from "./layout";
 import { cardCell, type EdgeStart } from "../../model/selection";
 import { anchorsTo, treeCell, type AnchorBox } from "../../model/linkAnchors";
 import { SNAPSHOT_MIN_SCREEN_WIDTH, snapshotUsable, useSnapshotFrame } from "./snapshotSlots";
+import { liveCell, useLiveFrame } from "./liveFrames";
 import {
   Background,
   BaseEdge,
@@ -62,6 +63,8 @@ type CardNode = Node<
   {
     screen: Screen;
     anchors?: CardAnchor[];
+    /** The run whose cards without a capture are rendered from source, when its project runs. */
+    liveRun?: string;
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -257,6 +260,19 @@ function Card({
     );
   });
   const granted = useSnapshotFrame(id, wanted);
+  // A card without a capture is rendered from source once it is in view.
+  const live =
+    data.liveRun && !data.screenDiff ? liveCell(data.screen, cell, data.width) : undefined;
+  const inView = useViewportStore((state) => {
+    if (!live) return false;
+    const [tx, ty, zoom] = state.transform;
+    const left = positionAbsoluteX * zoom + tx;
+    const top = positionAbsoluteY * zoom + ty;
+    const w = (width ?? data.cardWidth) * zoom;
+    const h = (height ?? data.frameHeight) * zoom;
+    return left < state.width && left + w > 0 && top < state.height && top + h > 0;
+  });
+  const liveFrame = useLiveFrame(data.liveRun, live, inView);
   return (
     <>
       {Object.values(Position).map((position) => (
@@ -281,6 +297,7 @@ function Card({
         imageUrl={data.imageUrl}
         snapshotUrl={granted && cell?.snapshot ? data.imageUrl(cell.snapshot.file) : undefined}
         overlay={data.anchors && <LinkAnchors anchors={data.anchors} selected={data.selected} />}
+        live={live ? liveFrame : undefined}
         selected={data.selected}
         related={data.related}
         dimmed={data.dimmed}
@@ -499,6 +516,7 @@ export function ScreenMap({
   width,
   mode,
   edgeStart = "element",
+  liveRun,
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -521,6 +539,8 @@ export function ScreenMap({
   mode: string;
   /** Where link edges start: the anchor element on the capture, or the card border. */
   edgeStart?: EdgeStart;
+  /** Render cards without a capture from source (the run's project can run). */
+  liveRun?: string;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -626,6 +646,7 @@ export function ScreenMap({
           data: {
             screen,
             anchors: anchors.get(screen.id),
+            liveRun,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -646,6 +667,7 @@ export function ScreenMap({
     [
       layout.nodes,
       anchors,
+      liveRun,
       diffsByPath,
       diffActive,
       mode,

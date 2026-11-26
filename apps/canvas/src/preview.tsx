@@ -359,6 +359,7 @@ function MapView({
             onSelectMobileView={setMobileView}
             onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}
             onSelectScreen={(id) => select(id)}
+            liveRun={run.responsiveAvailable ? run.key : undefined}
           />
         ) : (
           <div ref={overviewLayer} className="overview-layer">
@@ -397,6 +398,7 @@ function MapView({
                     width={width}
                     mode={mode}
                     edgeStart={edgeStart}
+                    liveRun={run.responsiveAvailable ? run.key : undefined}
                     selectedId={selectedId}
                     focusActive={showDetails}
                     openCommentsByPath={commentsByPath}

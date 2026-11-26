@@ -109,15 +109,17 @@ export function ScreenInspector({
       ? { state: cell.state, width: cell.width }
       : undefined;
   const cardSourceText =
-    snapshotShown && cell?.snapshot?.fidelity !== undefined
-      ? t.snapshotShown(percent(cell.snapshot.fidelity))
-      : usable.show === "snapshot"
-        ? t.pngZoomIn
-        : usable.why === "fidelity"
-          ? t.pngFidelity(percent(cell?.snapshot?.fidelity ?? 0))
-          : usable.why === "unmeasured"
-            ? t.pngUnmeasured
-            : t.pngNoSnapshot;
+    cell && !cell.image && run.responsiveAvailable && !screen?.nativeSource
+      ? t.liveCardShown
+      : snapshotShown && cell?.snapshot?.fidelity !== undefined
+        ? t.snapshotShown(percent(cell.snapshot.fidelity))
+        : usable.show === "snapshot"
+          ? t.pngZoomIn
+          : usable.why === "fidelity"
+            ? t.pngFidelity(percent(cell?.snapshot?.fidelity ?? 0))
+            : usable.why === "unmeasured"
+              ? t.pngUnmeasured
+              : t.pngNoSnapshot;
   const matchLabel = (value?: boolean) =>
     value === undefined ? t.notObserved : value ? t.matched : t.unmatched;
   const audit = cell?.localeAudit;
