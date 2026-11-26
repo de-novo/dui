@@ -104,6 +104,7 @@ pub mod ios;
 pub mod locale;
 pub mod model;
 pub mod nextjs;
+pub mod settle;
 pub mod storage;
 pub mod surface;
 pub mod transition;

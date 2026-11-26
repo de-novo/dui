@@ -919,24 +919,28 @@ impl Browser {
             .ok_or("missing DOM assertion")?;
         let selector = serde_json::to_string(selector)?;
         let expr = format!("globalThis.__duiRuntime?.observe({selector},false)");
-        let mut v = Value::Null;
-        let mut stable = 0;
+        let mut v;
         let mut settled = false;
+        let mut settle = dui_core::settle::Settle::default();
         // Wait between samples in the page so the CDP loop keeps serving intercepted requests.
         let delayed = format!("globalThis.__duiRuntime?.observe({selector},true)");
         let mut empty_since = None;
-        for poll in 0..100 {
+        let budget = Duration::from_millis(
+            spec["settleTimeoutMs"]
+                .as_u64()
+                .unwrap_or(dui_core::settle::DEFAULT_TIMEOUT_MS),
+        );
+        let started = std::time::Instant::now();
+        let mut polls = 0u32;
+        loop {
             let next = self.call(
                 s,
                 "Runtime.evaluate",
-                json!({"expression":if poll == 0 { &expr } else { &delayed },"awaitPromise":true,"returnByValue":true}),
+                json!({"expression":if polls == 0 { &expr } else { &delayed },"awaitPromise":true,"returnByValue":true}),
             )?["result"]["value"]
                 .clone();
-            if next == v && next["ready"] == true && next["width"] == width {
-                stable += 1;
-            } else {
-                stable = 0;
-            }
+            polls += 1;
+            let stable = settle.sample(&next, width);
             v = next;
             if v["emptyMount"] == true {
                 let start = empty_since.get_or_insert_with(std::time::Instant::now);
@@ -946,7 +950,7 @@ impl Browser {
                 continue;
             }
             empty_since = None;
-            if stable >= 4
+            if stable
                 && spec["requiredRequests"]
                     .as_array()
                     .into_iter()
@@ -962,6 +966,19 @@ impl Browser {
                 settled = true;
                 break;
             }
+            if started.elapsed() >= budget {
+                break;
+            }
+        }
+        if let Some(fields) = v.as_object_mut() {
+            fields.remove("volatile");
+        }
+        let ignored = settle.ignored();
+        if !ignored.is_empty() {
+            v["ignoredChanges"] = json!(ignored);
+        }
+        if !settled && v.is_object() {
+            v["unsettled"] = json!(settle.unsettled(10));
         }
         if let Some(fields) = v.as_object_mut() {
             let document_origin = fields.remove("documentOrigin");

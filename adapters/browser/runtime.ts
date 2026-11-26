@@ -298,7 +298,11 @@ declare var __duiProbe: {
     };
   }
 
-  function collectRenderTree(scopeRoot?: Element | null, measureText = false) {
+  function collectRenderTree(
+    scopeRoot?: Element | null,
+    measureText = false,
+    onNode?: (el: Element, id: string) => void,
+  ) {
     const interesting = new Set([
       "h1",
       "h2",
@@ -471,6 +475,7 @@ declare var __duiProbe: {
             ? `${tag}[role=${role}]#${idx}`
             : `${tag}#${idx}`;
       elToId.set(el, id);
+      onNode?.(el, id);
       let parentId: string | undefined;
       let curParent = el.parentElement;
       while (curParent) {
@@ -679,7 +684,26 @@ declare var __duiProbe: {
           .slice(0, 6),
       }))
       .filter((entry) => entry.values.length > 1);
-    const renderTree = collectRenderTree();
+    // Regions that change on their own (busy or progress indicators, timers, endlessly
+    // animated spinners) are reported so the settle loop does not wait for them.
+    const busyRoots: Element[] = Array.from(
+      document.querySelectorAll(
+        '[aria-busy="true"], [role="progressbar"], [role="timer"], progress, marquee',
+      ),
+    );
+    for (const animation of document.getAnimations()) {
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      if (
+        animation.playState === "running" &&
+        animation.effect?.getComputedTiming().iterations === Infinity &&
+        target instanceof Element
+      )
+        busyRoots.push(target);
+    }
+    const volatile: string[] = [];
+    const renderTree = collectRenderTree(null, false, (el, id) => {
+      if (busyRoots.some((busy) => busy === el || busy.contains(el))) volatile.push(id);
+    });
     const root = document.querySelector("#root, #app, #__next");
     const navigation = performance.getEntriesByType("navigation")[0] as
       | PerformanceNavigationTiming
@@ -724,6 +748,7 @@ declare var __duiProbe: {
       width: innerWidth,
       ...(selectOptions.length > 0 ? { selectOptions } : {}),
       ...(renderTree.length > 0 ? { renderTree } : {}),
+      ...(volatile.length > 0 ? { volatile } : {}),
     };
   }
   function visibleText(selector: string) {

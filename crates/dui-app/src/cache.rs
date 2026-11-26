@@ -384,6 +384,7 @@ impl<S: AppStore> CellCache<S> {
                 "generatedCsvResponses": spec["generatedCsvResponses"],
                 "requiredRequests": spec["requiredRequests"],
                 "expectedApiErrors": spec["expectedApiErrors"],
+                "settleTimeoutMs": spec["settleTimeoutMs"],
                 "readySelector": spec["readySelector"],
                 "slotAssertions": spec["slotAssertions"],
                 "routeSelector": spec["routeSelector"],
