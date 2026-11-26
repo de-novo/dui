@@ -126,7 +126,7 @@ try {
     const binary = resolve(executable);
     const home = join(root, name);
     mkdirSync(home);
-    const options = { cwd, env: { ...process.env, HOME: home } };
+    let options = { cwd, env: { ...process.env, HOME: home } };
     function run(args: string[]) {
       return JSON.parse(
         execFileSync(binary, args, {
@@ -164,6 +164,10 @@ try {
         report.cells.every((c) => (c as { reason?: string }).reason === "not-rendered"),
         "a map without capture plans its cells",
       );
+      // A home of its own, so the viewer lists just the captured run.
+      const captured = home + "-captured";
+      mkdirSync(captured);
+      options = { cwd, env: { ...process.env, HOME: captured } };
       report = run([...capture, "--capture"]) as { output: string; cells: Cell[] };
     }
     assert.ok(
