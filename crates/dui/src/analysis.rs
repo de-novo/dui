@@ -1408,19 +1408,27 @@ fn execute_with_locales(
             "capturedCells": captured,
         });
     }
-    // How each screen's snapshots lay out at its other captured widths (#323). It renders every
-    // pair again (46 s for a 301-page site), so it runs only when the manifest asks for it.
-    if spec["htmlReflow"] == true
-        && let Some(cells) = report["cells"].as_array()
-    {
-        let reflow = crate::chromium::snapshot_reflow(
-            cells,
-            out,
-            crate::host::resolve_capture_concurrency(spec),
-        );
-        if reflow["pairs"].as_array().is_some_and(|p| !p.is_empty())
-            || reflow.get("error").is_some()
+    // Each HTML snapshot is rendered back after capture, in the capture's own browsers: at its
+    // own width for its fidelity and, when the manifest asks (#323), at the screen's other
+    // captured widths, which renders every pair again (46 s for a 301-page site).
+    let reflow = spec["htmlReflow"] == true;
+    if let Some(cells) = report["cells"].as_array_mut() {
+        let concurrency = crate::host::resolve_capture_concurrency(spec);
+        let (fidelity, reflow) =
+            crate::chromium::snapshot_render_back(cells, out, reflow, |jobs| match renderer {
+                Some(renderer) => renderer.render_back_batch(jobs),
+                None => crate::chromium::render_back_in(&mut Vec::new(), None, concurrency, jobs),
+            });
+        let error = fidelity.get("error").cloned();
+        if fidelity["measured"] != 0 || fidelity["reused"] != 0 || error.is_some() {
+            report["htmlFidelity"] = fidelity;
+        }
+        if let Some(mut reflow) = reflow
+            && (reflow["pairs"].as_array().is_some_and(|p| !p.is_empty()) || error.is_some())
         {
+            if let Some(error) = error {
+                reflow["error"] = error;
+            }
             report["htmlReflow"] = reflow;
         }
     }

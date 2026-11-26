@@ -516,6 +516,14 @@ impl Renderer for LazyUniversalBrowser<'_> {
         browser.capture(spec, input, width, image)
     }
 
+    fn render_back_batch(
+        &mut self,
+        jobs: &[dui_ports::RenderBackJob<'_>],
+    ) -> Vec<Result<f64, String>> {
+        let concurrency = crate::host::resolve_capture_concurrency(&serde_json::Value::Null);
+        crate::chromium::render_back_in(&mut self.pool, self.browser.as_mut(), concurrency, jobs)
+    }
+
     fn capture_batch(&mut self, jobs: &[CaptureBatchJob<'_>]) -> Vec<Result<Value, String>> {
         let concurrency = jobs
             .first()
