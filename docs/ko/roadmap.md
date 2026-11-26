@@ -77,6 +77,10 @@ M0 검수 화면의 다섯 상태를 375·768·1280px에서 검증해 서로 다
 | v0.2.0 | **프레임워크 비종속 라우팅 트리, 풀페이지 실제 비율 노드, 모달 자동 캡처 및 사실 중심 코어.** 중첩 스크롤 셸을 포함한 화면 전체 높이를 캡처해 실제 비율대로 배치하고([#147](https://github.com/de-novo/dui/issues/147)), WAI-ARIA 메뉴 펼침 + 공식 컴파일러 라우트 레지스트리 기반 프레임워크 비종속 라우팅 트리·zero-config `dui scan` 및 멀티 호스트 `dui map`([#149](https://github.com/de-novo/dui/issues/149), [#153](https://github.com/de-novo/dui/issues/153)), macOS 통합 `TitleBar`·장애물 회피 거터 연결선([#155](https://github.com/de-novo/dui/issues/155), [#159](https://github.com/de-novo/dui/issues/159)), WAI-ARIA 기반 모달/다이얼로그/드로어 자동 캡처 및 자식 오버레이 노드 표현을 제공한다([#157](https://github.com/de-novo/dui/issues/157)). 또한 하드코딩 전역 디자인 결함 휴리스틱과 임시 iframe 라이브 마운트를 제거해 순수 객관적 렌더 증거만 보고한다([#163](https://github.com/de-novo/dui/issues/163), [#169](https://github.com/de-novo/dui/issues/169)). |
 | v0.3.0 | **플러그인 기반 디자인 시스템 정합성 검증 (`DESIGN.md` / 플러그인) 및 코드 기반 캔버스 렌더링.** `dui-core`는 순수 사실 중심으로 유지하고 `dui.json`에 프로젝트별 `DESIGN.md` · W3C Design Tokens · 커스텀 감사 플러그인을 연결해 디자인 시스템 불일치를 추출하며([#167](https://github.com/de-novo/dui/issues/167)), 캔버스 렌더링을 비트맵 캡처에서 직접 코드 기반 컴포넌트 렌더링으로 발전시킨다. |
 
+**렌더링 서버 (v0.2.x).** 렌더링을 프로젝트마다 오래 떠 있는 서버 하나로 옮긴다([결정](architecture.md#4-확정된-결정-2026-11-20)). 빌드한 호스트와 Chromium 하나가 떠 있고, 작업마다 브라우저 컨텍스트와 탭을 쓰며, CDP 클라이언트가 여러 탭을 동시에 그린다. `dui map`, `dui run`, 뷰어 카드와 미리보기가 이 서버를 함께 쓰고, 캡처는 화면에 이미 렌더링된 페이지를 저장한다. 공유 라이브 세션 소유 프로세스([#333](https://github.com/de-novo/dui/issues/333))에서 키운다.
+
+**dui 렌더러 (연구).** GPUI 방식으로 GPU로 그리고 바뀐 부분만 다시 그리는 dui 전용 렌더러를 `Renderer` 포트 뒤에 둔다. 어떤 표면에서 같은 셀의 Chromium 프레임과 충실도 한도 안에서 일치하기 전까지 그 프레임은 미리보기다. 스크립트 엔진이 필요 없는 HTML 스냅샷과 정적 페이지부터 시작한다.
+
 **Figma 내보내기 (v0.3.0 이후).** 코드 기반 캔버스 루프가 자리 잡은 뒤에, 화면 지도를 코드에서 만든 보기 전용 사본으로 Figma에 내보낸다. 원천은 코드로 남는다. Figma에서 고친 내용은 코드로 되돌리지 않는다. 그렇게 하면 원천이 다시 둘로 갈라지므로, 지금은 목표가 아니다.
 
 1. **화면을 프레임으로.** `dui map`으로 잡은 화면을 Figma로 보낸다. 렌더된 DOM과 스타일을 편집 가능한 레이어로 바꾸고, 화면마다 프레임 하나를 만들어 Figma에서 바로 볼 수 있게 한다.
