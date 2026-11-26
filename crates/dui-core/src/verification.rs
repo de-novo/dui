@@ -22,6 +22,8 @@ pub enum Failure {
     MissingScreenAssertion,
     HttpError,
     ApiError,
+    /// The ready selector matched, but the screen kept changing until the settle budget ran out.
+    Unsettled,
     AssertFailed,
 }
 
@@ -206,6 +208,9 @@ impl Intent<'_> {
         if !unexpected_api_errors(observed, self.expected_api_errors).is_empty() {
             return Some(Failure::ApiError);
         }
+        if observed["settled"] == false && observed["ready"] == true {
+            return Some(Failure::Unsettled);
+        }
         let values = observed["slots"].as_object();
         let values_match = self
             .inputs
@@ -322,7 +327,12 @@ mod tests {
         ] {
             let mut broken = baseline.clone();
             broken[key] = value;
-            assert_eq!(intent.failure(&broken), Some(Failure::AssertFailed));
+            let expected = if key == "settled" {
+                Failure::Unsettled
+            } else {
+                Failure::AssertFailed
+            };
+            assert_eq!(intent.failure(&broken), Some(expected));
         }
     }
 

@@ -62,6 +62,21 @@ http.createServer((req, res) => {
     </script></body></html>\`);
     return;
   }
+  if (req.url === "/clock") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(\`<html><body><style>.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style>
+      <h1>Orders</h1><p>Updated <span id="clock">0</span></p>
+      <svg class="spin" width="40" height="40" aria-label="Loading"><rect width="40" height="12"/></svg>
+      <script>setInterval(() => { clock.textContent = String(Date.now()); }, 50);</script></body></html>\`);
+    return;
+  }
+  if (req.url === "/feed") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(\`<html><body><h1>Feed</h1><ul id="feed"></ul><script>
+      let n = 0; setInterval(() => { const li = document.createElement("li"); li.textContent = "item " + n++; feed.append(li); }, 150);
+    </script></body></html>\`);
+    return;
+  }
   if (req.url === "/server-error") {
     res.writeHead(500, { "content-type": "text/html; charset=utf-8" });
     res.end("<html><body><h1>500 Error</h1></body></html>");
@@ -134,6 +149,24 @@ http.createServer((req, res) => {
   assert.equal(signedIn.status, 0);
   const expected = account({ expectedApiErrors: ["/api/*"] }, "expected-401");
   assert.equal(expected.cell.status, "verified", JSON.stringify(expected.cell.reason));
+
+  // 1c. A ticking clock and a spinner do not hold a screen back; a feed that keeps growing
+  // ends unverified at the settle budget and names the node that kept changing.
+  const clockStarted = Date.now();
+  const clock = account({ path: "/clock", settleTimeoutMs: 8000 }, "clock");
+  const clockMs = Date.now() - clockStarted;
+  assert.equal(clock.cell.status, "verified", JSON.stringify(clock.cell.reason));
+  assert.equal(clock.cell.observation.settled, true);
+  assert.deepEqual(
+    clock.cell.observation.ignoredChanges.map((c: { node: string }) => c.node).sort(),
+    ["#clock", "svg#0"],
+  );
+  assert.ok(clockMs < 8000, `clock page settled before the budget (${clockMs} ms)`);
+  const feed = account({ path: "/feed", settleTimeoutMs: 1500 }, "feed");
+  assert.equal(feed.status, 5);
+  assert.equal(feed.cell.status, "unverified");
+  assert.match(feed.cell.reason, /^unsettled: li#\d+ added/);
+  assert.equal(feed.cell.observation.settled, false);
 
   // 2. Valid 200 scenarios pass audit cleanly with 100% verified cells.
   const okManifest = path.join(appDir, "dui-ok.json");

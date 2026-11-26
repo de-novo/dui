@@ -47,6 +47,22 @@ fn failure_reason(failure: &dui_core::verification::Failure, obs: &Value, spec: 
             return format!("api-error: {status} {path}{more}");
         }
     }
+    if *failure == Failure::Unsettled
+        && let Some(first) = obs["unsettled"].as_array().and_then(|u| u.first())
+    {
+        let count = obs["unsettled"].as_array().map_or(0, Vec::len);
+        let what = match (first["node"].as_str(), first["field"].as_str()) {
+            (Some(node), _) => format!("{node} {}", first["change"].as_str().unwrap_or("changed")),
+            (None, Some(field)) => format!("{field} changed"),
+            (None, None) => "changed".to_owned(),
+        };
+        let more = if count > 1 {
+            format!(" (+{} more)", count - 1)
+        } else {
+            String::new()
+        };
+        return format!("unsettled: {what}{more}");
+    }
     serde_json::to_value(failure)
         .ok()
         .and_then(|v| v.as_str().map(str::to_owned))
