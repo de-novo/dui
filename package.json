@@ -35,6 +35,7 @@
     "check:box-model": "tsc --project scripts && cargo build --locked && node scripts/check-box-model.mts",
     "check:compiler-oracles": "tsc --project scripts && cargo build --locked && node scripts/check-compiler-oracles.mts",
     "check:reliability": "tsc --project scripts && cargo build --locked && node scripts/check-reliability.mts",
+    "check:settle": "tsc --project scripts && cargo build --locked && node scripts/check-settle.mts",
     "check:fact-overlays": "tsc --project scripts && cargo build --locked && node scripts/check-fact-overlays.mts",
     "check:html-snapshots": "tsc --project scripts && cargo build --locked && node scripts/check-html-snapshots.mts",
     "check:html-cards": "tsc --project scripts && cargo build --locked && node scripts/check-html-cards.mts",

@@ -17,6 +17,7 @@ declare var __duiProbe: {
   slots: SlotValues;
   hits: Set<string>;
   waitForSample(): Promise<void>;
+  pendingTimers(): number;
   branch(id: string, value: unknown): unknown;
   edit(id: string, instance: string, value: unknown): boolean;
   apply(values: SlotValues): boolean;
@@ -40,7 +41,47 @@ declare var __duiProbe: {
       );
     }
     const timer = globalThis.setTimeout.bind(globalThis);
+    // Short timers the page schedules while it mounts (a delayed render, a deferred fetch) can
+    // still change the screen, so settling waits for them. Timers scheduled later, such as a
+    // polling loop, do not hold it back.
+    const nativeSetTimeout = globalThis.setTimeout as unknown as (
+      handler: TimerHandler,
+      delay?: number,
+      ...args: unknown[]
+    ) => unknown;
+    const nativeClearTimeout = globalThis.clearTimeout;
+    const mounted = performance.now();
+    const mountTimers = new Set<unknown>();
+    // The callback of a tracked timer while it runs: scheduling itself again is a loop.
+    let running: unknown;
+    globalThis.setTimeout = function (handler: TimerHandler, delay?: number, ...args: unknown[]) {
+      const track =
+        typeof handler === "function" &&
+        handler !== running &&
+        (delay ?? 0) <= 1000 &&
+        performance.now() - mounted < 1500;
+      let id: unknown;
+      const run = track
+        ? (...values: unknown[]) => {
+            mountTimers.delete(id);
+            running = handler;
+            try {
+              (handler as (...v: unknown[]) => void)(...values);
+            } finally {
+              running = undefined;
+            }
+          }
+        : handler;
+      id = nativeSetTimeout.call(globalThis, run, delay, ...args);
+      if (track) mountTimers.add(id);
+      return id;
+    } as typeof setTimeout;
+    globalThis.clearTimeout = function (id?: Parameters<typeof clearTimeout>[0]) {
+      mountTimers.delete(id);
+      nativeClearTimeout.call(globalThis, id);
+    } as typeof clearTimeout;
     globalThis.__duiProbe = {
+      pendingTimers: () => mountTimers.size,
       instances: Object.create(null),
       commit(id, instance, value, setter) {
         const entries = (this.instances[id] ??= Object.create(null));
@@ -65,7 +106,7 @@ declare var __duiProbe: {
         setter(() => value);
         return true;
       },
-      waitForSample: () => new Promise((resolve) => timer(resolve, 100)),
+      waitForSample: () => new Promise((resolve) => timer(resolve, 40)),
       input,
       slots,
       hits,
@@ -982,7 +1023,7 @@ declare var __duiProbe: {
 
   async function observe(selector: string, delayed: boolean) {
     const p = globalThis.__duiProbe;
-    if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 100)));
+    if (delayed) await (p?.waitForSample() ?? new Promise((resolve) => setTimeout(resolve, 40)));
     if (!p) return null;
     const selectOptions = Array.from(document.querySelectorAll("select"))
       .map((sel) => ({
@@ -1058,6 +1099,7 @@ declare var __duiProbe: {
       ...(selectOptions.length > 0 ? { selectOptions } : {}),
       ...(renderTree.length > 0 ? { renderTree } : {}),
       ...(volatile.length > 0 ? { volatile } : {}),
+      ...(p.pendingTimers?.() ? { pendingTimers: p.pendingTimers() } : {}),
       ...(p.overlays?.size ? { overlaySlots: [...p.overlays].sort() } : {}),
     };
   }

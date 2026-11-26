@@ -1,7 +1,8 @@
 //! When a captured screen has stopped changing.
 //!
-//! The browser samples the page about every 100 ms. A screen is stable after
-//! [`STABLE_SAMPLES`] identical samples in a row. Regions that change on their own do not
+//! The browser samples the page about every 40 ms. A screen is stable after
+//! [`STABLE_SAMPLES`] identical samples in a row (and, in the capture, once its tab has no
+//! recent request in flight). Regions that change on their own do not
 //! hold it back:
 //! - nodes the page marks as busy (`volatile`: `aria-busy`, progress bars, timers and endlessly
 //!   animated spinners);
@@ -14,7 +15,7 @@
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const STABLE_SAMPLES: u32 = 4;
+pub const STABLE_SAMPLES: u32 = 3;
 pub const CHURN_SAMPLES: u32 = 3;
 /// Default `settleTimeoutMs`.
 pub const DEFAULT_TIMEOUT_MS: u64 = 10_000;

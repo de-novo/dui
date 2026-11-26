@@ -487,6 +487,9 @@ pub struct Browser {
     ),
     /// Live proxy requests of this visit still waiting for the API, and the ones that failed.
     proxy_pending: std::collections::BTreeSet<String>,
+    /// Requests each tab has sent and not finished, by CDP session and request ID, with when
+    /// they started. A screen is not settled while its tab waits for a recent one.
+    in_flight: BTreeMap<(String, String), std::time::Instant>,
     proxy_failures: BTreeMap<String, String>,
     mock_responses: BTreeMap<String, String>,
     generated_get: BTreeMap<String, (&'static str, String)>,
@@ -567,6 +570,7 @@ impl Browser {
             visit: 0,
             proxy_done: std::sync::mpsc::channel(),
             proxy_pending: Default::default(),
+            in_flight: Default::default(),
             proxy_failures: Default::default(),
             mock_responses: Default::default(),
             generated_get: Default::default(),
@@ -638,6 +642,27 @@ impl Browser {
             }
             bytes.pop();
             let mut msg: Value = serde_json::from_slice(&bytes)?;
+            match (
+                msg["method"].as_str(),
+                msg["sessionId"].as_str(),
+                msg["params"]["requestId"].as_str(),
+            ) {
+                (Some("Network.requestWillBeSent"), Some(tab), Some(id)) => {
+                    // Long-lived connections (polling, streams) never finish; forget old ones.
+                    self.in_flight
+                        .retain(|_, started| started.elapsed() < Duration::from_secs(60));
+                    self.in_flight
+                        .insert((tab.to_owned(), id.to_owned()), std::time::Instant::now());
+                }
+                (
+                    Some("Network.loadingFinished" | "Network.loadingFailed"),
+                    Some(tab),
+                    Some(id),
+                ) => {
+                    self.in_flight.remove(&(tab.to_owned(), id.to_owned()));
+                }
+                _ => {}
+            }
             if msg["method"] == "Network.responseReceived" {
                 let response = &msg["params"]["response"];
                 if let (Some(url), Some(code)) =
@@ -1396,7 +1421,15 @@ impl Browser {
                 continue;
             }
             empty_since = None;
+            // A request the tab started recently can still change the screen; one open for
+            // more than two seconds is a background connection.
+            // Proxied live API requests are in it too, as the page's own requests.
+            let waiting = v["pendingTimers"].as_u64().is_some_and(|n| n > 0)
+                || self.in_flight.iter().any(|((tab, _), started)| {
+                    tab == session && started.elapsed() < Duration::from_secs(2)
+                });
             if stable
+                && !waiting
                 && spec["requiredRequests"]
                     .as_array()
                     .into_iter()
@@ -2283,6 +2316,7 @@ pub fn capture_login_session(
         visit: 0,
         proxy_done: std::sync::mpsc::channel(),
         proxy_pending: Default::default(),
+        in_flight: Default::default(),
         proxy_failures: Default::default(),
         mock_responses: Default::default(),
         generated_get: Default::default(),
