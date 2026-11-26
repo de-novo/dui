@@ -16,25 +16,25 @@ dui 通过项目官方编译器读取类型，自动生成模拟数据并在真�
 
 dui 从项目的官方编译器读取类型。库规则识别程序中的特定 API 调用。运行画面由各平台的渲染器捕获。
 
-| 要查看的内容 | 方法 |
-| --- | --- |
-| 有类型的状态槽和路由参数 | `dui scan` 使用项目的 TypeScript 编译器及匹配符号的规则。 |
-| 不同宽度下可访问的网页 | 向 `dui map` 提供本地 URL 或静态构建目录。Chromium 可跨框架沿同源链接访问页面。 |
-| 源码中声明的原生界面 | 在 React Navigation、Expo Router 或 Flutter 项目中运行 `dui map`。每张卡片指向相应的声明。 |
-| 渲染后的 UI | 在配置的 Web、移动、桌面或终端宿主上捕获。部分 SwiftUI 和 Compose 组件也可导出为可交互的 HTML 预览。 |
+| 要查看的内容             | 方法                                                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 有类型的状态槽和路由参数 | `dui scan` 使用项目的 TypeScript 编译器及匹配符号的规则。                                            |
+| 不同宽度下可访问的网页   | 向 `dui map` 提供本地 URL 或静态构建目录。Chromium 可跨框架沿同源链接访问页面。                      |
+| 源码中声明的原生界面     | 在 React Navigation、Expo Router 或 Flutter 项目中运行 `dui map`。每张卡片指向相应的声明。           |
+| 渲染后的 UI              | 在配置的 Web、移动、桌面或终端宿主上捕获。部分 SwiftUI 和 Compose 组件也可导出为可交互的 HTML 预览。 |
 
 ### 分析与验证能力
 
-| 领域 | 能力 | 状态 |
-| --- | --- | --- |
-| 界面与链接发现 | 路由文件自动发现、无环多跳 BFS (`a[href]`)、动态 ID 模式折叠 (`/orders/:id`)、界面间 `linksTo` 连线 | 已支持 |
-| 状态规划与验证 | 官方编译器类型推导、贪心成对覆盖数组（Covering Array）、`<select>` 真实 DOM 选项发现、视觉变化佐证 (`visualWitness`)、收敛保护 | 已支持 |
-| 数据与 API 验证 | 类型化 `GET` JSON 自动模拟、CSV 模拟、显式 `mockResponses`、`hybrid` / `live` 真实 API 模式（只读保护）、认证会话（`storageState.json`、`POST authFlow`、交互式 `dui auth login`）与密钥脱敏 | 已支持 |
-| Diff 与变更评审 | 2D 画布内联对比（`元素` 渲染树 Diff · 2px 容差、`变更后`、`变更前`、惰性 `像素` 叠加）、分支对比 (`dui diff --base main`)、`--changed-since` | 已支持 |
-| 质量、多语言与审计 | 99% 覆盖率审计 (`dui audit`)、多语言与 RTL 校验、缺译键与文本溢出检测、SQLite 评审评论、基于模块图的内容寻址缓存 | 已支持 |
-| 实时编辑与查看器 | 共享 CLI/MCP 实时会话 (`dui live`)、内置 Web 画布 (`dui open`)、原生 GPUI 桌面查看器 (`dui desktop`) | 已支持 |
-| 元素检查器与盒模型 | 开发者工具级元素属性检查、盒模型图与叠加（宽高、外边距、内边距、边框、gap、圆角）以及元素间交互式间距标尺 | 已支持 |
-| 通用路由、模态框与画布 | 全页真实比例捕获、WAI-ARIA 导航展开与模态框/抽屉自动捕获、避障走廊连线、原生 macOS `TitleBar`（`apps/desktop`）、多工作进程并行捕获 (`concurrency`)、`SurfaceRegistry` 流水线 | 已支持 |
+| 领域                   | 能力                                                                                                                                                                                         | 状态   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 界面与链接发现         | 路由文件自动发现、无环多跳 BFS (`a[href]`)、动态 ID 模式折叠 (`/orders/:id`)、界面间 `linksTo` 连线                                                                                          | 已支持 |
+| 状态规划与验证         | 官方编译器类型推导、贪心成对覆盖数组（Covering Array）、`<select>` 真实 DOM 选项发现、视觉变化佐证 (`visualWitness`)、收敛保护                                                               | 已支持 |
+| 数据与 API 验证        | 类型化 `GET` JSON 自动模拟、CSV 模拟、显式 `mockResponses`、`hybrid` / `live` 真实 API 模式（只读保护）、认证会话（`storageState.json`、`POST authFlow`、交互式 `dui auth login`）与密钥脱敏 | 已支持 |
+| Diff 与变更评审        | 2D 画布内联对比（`元素` 渲染树 Diff · 2px 容差、`变更后`、`变更前`、惰性 `像素` 叠加）、分支对比 (`dui diff --base main`)、`--changed-since`                                                 | 已支持 |
+| 质量、多语言与审计     | 99% 覆盖率审计 (`dui audit`)、多语言与 RTL 校验、缺译键与文本溢出检测、SQLite 评审评论、基于模块图的内容寻址缓存                                                                             | 已支持 |
+| 实时编辑与查看器       | 共享 CLI/MCP 实时会话 (`dui live`)、内置 Web 画布 (`dui open`)、原生 GPUI 桌面查看器 (`dui desktop`)                                                                                         | 已支持 |
+| 元素检查器与盒模型     | 开发者工具级元素属性检查、盒模型图与叠加（宽高、外边距、内边距、边框、gap、圆角）以及元素间交互式间距标尺                                                                                    | 已支持 |
+| 通用路由、模态框与画布 | 全页真实比例捕获、WAI-ARIA 导航展开与模态框/抽屉自动捕获、避障走廊连线、原生 macOS `TitleBar`（`apps/desktop`）、多工作进程并行捕获 (`concurrency`)、`SurfaceRegistry` 流水线                | 已支持 |
 
 ## 安装
 
@@ -60,11 +60,13 @@ dui update --check
 安装 Node.js 26、Chrome 或 Chromium 以及 Vite 应用的依赖。[验证用的应用](fixtures/toggle)使用 Vite 8 和 React 19。在应用根目录的 `dui.json` 中，将 `readySelector` 设为目标界面就绪后可见的元素。例如，正文中包含页面标题的应用可以使用以下配置。
 
 <!-- quickstart:manifest -->
+
 ```json
 { "readySelector": "main h1" }
 ```
 
 <!-- quickstart:first-run -->
+
 ```sh
 dui --version
 dui map .
@@ -77,28 +79,31 @@ dui open --no-open
 
 运行 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh` 安装开发版。以下示例和命令表适用于开发版。网站也提供[默认安装版本的发布文档](https://dui.sh/?lang=zh-CN#release-guide)。
 
-如果静态站点已构建到 `dist/`，在项目根目录运行以下命令，再用上面的查看器命令打开结果。
+开发版的 `dui map` 规划界面、状态和宽度但不截图，`dui map --capture` 为所有计划的格子保存 PNG、渲染树和 HTML 快照证据。参见[共享屏幕地图](docs/zh-CN/web-viewer.md#共享屏幕地图)。
+
+如果静态站点已构建到 `dist/`，在项目根目录运行以下命令进行截图，再用上面的查看器命令打开结果。
 
 <!-- quickstart:static -->
+
 ```sh
-dui map . --build-dir dist
+dui map . --build-dir dist --capture
 ```
 
 ### `dui map` 与 `dui run` 的区别
 
-| 命令 | 适用场景 |
-| --- | --- |
-| `dui map [PROJECT]` | **带路由应用的默认命令**（TanStack Router、React Router 7/8、Next.js 或链接）。自动发现路由与模态框，并合并 `dui.json` 中的 `routeParams`、`storageState`、`readySelector` 及额外 `scenarios`。 |
-| `dui run [PROJECT] [MANIFEST]` | **按清单直接捕获。** 直接运行 `dui.json`（省略参数默认使用 `.` / `dui.json`；若未指定 `path` 或 `host` 则自动回退到 `dui map`）。 |
+| 命令                           | 适用场景                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dui map [PROJECT]`            | **带路由应用的默认命令**（TanStack Router、React Router 7/8、Next.js 或链接）。自动发现路由与模态框，并合并 `dui.json` 中的 `routeParams`、`storageState`、`readySelector` 及额外 `scenarios`。 |
+| `dui run [PROJECT] [MANIFEST]` | **按清单直接捕获。** 直接运行 `dui.json`（省略参数默认使用 `.` / `dui.json`；若未指定 `path` 或 `host` 则自动回退到 `dui map`）。                                                               |
 
-| 分组 | 命令 | 用途 |
-| --- | --- | --- |
-| 捕获 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 自动发现/捕获界面与模态框，或在不启动浏览器的情况下输出编译器事实与自动模拟 |
-| 复验失败项 | `dui recheck RUN [PROJECT [MANIFEST]]` | 仅重新渲染上次捕获未通过的单元格，并报告已恢复的项目 |
-| 认证 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 保存 Playwright 兼容的 `storageState.json`（`0600` 权限） |
-| 查看 | `dui open [RUN_DIR]` · `dui desktop` | 内置 2D Web 画布或原生 GPUI 桌面查看器 |
-| 对比与质量 | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 元素级与像素级 Diff、99% 覆盖率审计、评审评论 |
-| 工具 | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | 官方编译器探测、历史归档、缓存清理、版本更新、MCP stdio 服务器 |
+| 分组       | 命令                                                                                             | 用途                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| 捕获       | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]`                      | 自动发现/捕获界面与模态框，或在不启动浏览器的情况下输出编译器事实与自动模拟 |
+| 复验失败项 | `dui recheck RUN [PROJECT [MANIFEST]]`                                                           | 仅重新渲染上次捕获未通过的单元格，并报告已恢复的项目                        |
+| 认证       | `dui auth login URL [--out FILE] [--wait-url PATTERN]`                                           | 保存 Playwright 兼容的 `storageState.json`（`0600` 权限）                   |
+| 查看       | `dui open [RUN_DIR]` · `dui desktop`                                                             | 内置 2D Web 画布或原生 GPUI 桌面查看器                                      |
+| 对比与质量 | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 元素级与像素级 Diff、99% 覆盖率审计、评审评论                               |
+| 工具       | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp`                        | 官方编译器探测、历史归档、缓存清理、版本更新、MCP stdio 服务器              |
 
 ## 自动发现页面
 

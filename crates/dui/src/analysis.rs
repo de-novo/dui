@@ -1412,7 +1412,14 @@ fn execute_with_locales(
     store(&out.join("report.json"), &report)?;
     store(&out.join("graph.json"), &graph)?;
     store(&out.join("facts.json"), analysis)?;
-    if verified == renderable && unrenderable == 0 {
+    // A map without capture claims nothing about cells it did not render: it fails only when a
+    // cell it did capture (from the cache) is not verified.
+    let complete = if plan_only {
+        verified == attempted && unrenderable == 0
+    } else {
+        verified == renderable && unrenderable == 0
+    };
+    if complete {
         Ok(report)
     } else {
         Err((5, report))
@@ -1625,7 +1632,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let facts = json!({"facts":[{"file":"file","start":1,"end":2,"kind":"slot","owner":"Screen","shape":{"kind":"boolean"},"after":3,"init":[1,2]}],"diagnostics":[]});
         let mut page = CountingPage(Vec::new());
-        let (code, report) = execute_with(
+        // Planned cells are not failures: the map succeeds.
+        let report = execute_with(
             Some(&mut page),
             &facts,
             &json!({"path": "/", "capture": false, "maxNoImprovementRounds": 1}),
@@ -1633,8 +1641,7 @@ mod tests {
             &BTreeSet::from([375, 1280]),
             None,
         )
-        .unwrap_err();
-        assert_eq!(code, 5);
+        .expect("a map without capture succeeds");
         // The first state, once, at the widest width, to read the screen's links.
         assert_eq!(page.0, vec![1280]);
         let cells = report["cells"].as_array().unwrap();

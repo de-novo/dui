@@ -16,25 +16,25 @@ dui는 웹 또는 GPUI 앱에 목데이터와 상태를 넣고 실제로 그려�
 
 dui는 프로젝트의 공식 컴파일러에서 타입을 읽는다. 라이브러리 규칙은 코드에서 특정 API 호출을 식별한다. 실행 화면은 플랫폼별 렌더러로 캡처한다.
 
-| 확인할 내용 | 방법 |
-| --- | --- |
-| 타입이 있는 상태 슬롯과 경로 매개변수 | `dui scan`이 프로젝트의 TypeScript 컴파일러와 해당 심볼 규칙을 사용한다. |
-| 너비별로 이동 가능한 웹 화면 | `dui map`에 로컬 URL이나 정적 빌드를 넘긴다. Chromium이 프레임워크에 관계없이 동일 출처 링크를 따라간다. |
-| 코드에 선언된 네이티브 화면 | React Navigation, Expo Router, Flutter 프로젝트에서 `dui map`을 실행한다. 각 카드에서 화면의 선언 위치를 확인할 수 있다. |
-| 렌더링된 UI | 설정한 웹·모바일·데스크톱·터미널 호스트에서 캡처한다. 일부 SwiftUI·Compose 컴포넌트는 조작 가능한 HTML 미리보기로도 내보낼 수 있다. |
+| 확인할 내용                           | 방법                                                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 타입이 있는 상태 슬롯과 경로 매개변수 | `dui scan`이 프로젝트의 TypeScript 컴파일러와 해당 심볼 규칙을 사용한다.                                                            |
+| 너비별로 이동 가능한 웹 화면          | `dui map`에 로컬 URL이나 정적 빌드를 넘긴다. Chromium이 프레임워크에 관계없이 동일 출처 링크를 따라간다.                            |
+| 코드에 선언된 네이티브 화면           | React Navigation, Expo Router, Flutter 프로젝트에서 `dui map`을 실행한다. 각 카드에서 화면의 선언 위치를 확인할 수 있다.            |
+| 렌더링된 UI                           | 설정한 웹·모바일·데스크톱·터미널 호스트에서 캡처한다. 일부 SwiftUI·Compose 컴포넌트는 조작 가능한 HTML 미리보기로도 내보낼 수 있다. |
 
 ### 분석 및 검증 기능
 
-| 영역 | 기능 | 상태 |
-| --- | --- | --- |
-| 화면 · 링크 탐색 | 라우터 파일 자동 발견, 무한루프 방지 다단계 BFS (`a[href]`), 동적 ID 패턴 축약 (`/orders/:id`), 화면 간 `linksTo` 연결선 | 지원 |
-| 상태 계획 · 검증 | 공식 컴파일러 타입 기반 조합, Greedy Pairwise Covering Array, `<select>` 실옵션 자동 수집, 시각 변화 검증(`visualWitness`), 수렴 가드 | 지원 |
-| 데이터 · API 검증 | 타입 기반 `GET` JSON 자동 목, CSV 목, 명시적 `mockResponses`, `hybrid` / `live` 실서버 API 모드(읽기 전용 가드), 인증 세션(`storageState.json`, `POST authFlow`, 대화형 `dui auth login`) 및 비밀값 무유출 | 지원 |
-| Diff · 변경 리뷰 | 2D 캔버스 인라인 비교(`요소` 렌더 트리 Diff · 2px 노이즈 허용, `이후`, `이전`, 지연 `픽셀` 오버레이), 브랜치 비교(`dui diff --base main`), `--changed-since` | 지원 |
-| 품질 · 다국어 · 감사 | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱 | 지원 |
-| 라이브 편집 · 뷰어 | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`) | 지원 |
-| 요소 인스펙터 · 박스 모델 | 개발자도구형 요소 속성 확인, 박스 모델 다이어그램·오버레이(너비·높이·마진·패딩·테두리·gap·radius), 요소 간 간격 레드라인 측정 가이드 | 지원 |
-| 범용 라우팅 · 모달 · 캔버스 | 풀페이지 실제 비율 캡처, WAI-ARIA 네비게이션 펼침·모달/드로어 자동 캡처, 장애물 회피 거터 연결선, macOS 통합 `TitleBar`(`apps/desktop`), 병렬 멀티 워커 캡처(`concurrency`), `SurfaceRegistry` 파이프라인 | 지원 |
+| 영역                        | 기능                                                                                                                                                                                                       | 상태 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 화면 · 링크 탐색            | 라우터 파일 자동 발견, 무한루프 방지 다단계 BFS (`a[href]`), 동적 ID 패턴 축약 (`/orders/:id`), 화면 간 `linksTo` 연결선                                                                                   | 지원 |
+| 상태 계획 · 검증            | 공식 컴파일러 타입 기반 조합, Greedy Pairwise Covering Array, `<select>` 실옵션 자동 수집, 시각 변화 검증(`visualWitness`), 수렴 가드                                                                      | 지원 |
+| 데이터 · API 검증           | 타입 기반 `GET` JSON 자동 목, CSV 목, 명시적 `mockResponses`, `hybrid` / `live` 실서버 API 모드(읽기 전용 가드), 인증 세션(`storageState.json`, `POST authFlow`, 대화형 `dui auth login`) 및 비밀값 무유출 | 지원 |
+| Diff · 변경 리뷰            | 2D 캔버스 인라인 비교(`요소` 렌더 트리 Diff · 2px 노이즈 허용, `이후`, `이전`, 지연 `픽셀` 오버레이), 브랜치 비교(`dui diff --base main`), `--changed-since`                                               | 지원 |
+| 품질 · 다국어 · 감사        | 99% 커버리지 감사(`dui audit`), 다국어·RTL·미번역 키·텍스트 넘침 검사, SQLite 기반 리뷰 코멘트, 모듈 그래프 기반 콘텐츠 해시 캐싱                                                                          | 지원 |
+| 라이브 편집 · 뷰어          | 공유 CLI/MCP 라이브 세션(`dui live`), 내장 웹 캔버스(`dui open`), 네이티브 GPUI 데스크톱 뷰어(`dui desktop`)                                                                                               | 지원 |
+| 요소 인스펙터 · 박스 모델   | 개발자도구형 요소 속성 확인, 박스 모델 다이어그램·오버레이(너비·높이·마진·패딩·테두리·gap·radius), 요소 간 간격 레드라인 측정 가이드                                                                       | 지원 |
+| 범용 라우팅 · 모달 · 캔버스 | 풀페이지 실제 비율 캡처, WAI-ARIA 네비게이션 펼침·모달/드로어 자동 캡처, 장애물 회피 거터 연결선, macOS 통합 `TitleBar`(`apps/desktop`), 병렬 멀티 워커 캡처(`concurrency`), `SurfaceRegistry` 파이프라인  | 지원 |
 
 ## 설치
 
@@ -62,11 +62,13 @@ dui update --check
 Node.js 26, Chrome 또는 Chromium과 Vite 앱의 의존성을 설치한다. [검증에 사용하는 앱](fixtures/toggle)은 Vite 8과 React 19를 쓴다. 앱 루트의 `dui.json`에 원하는 화면이 준비됐을 때 보이는 요소를 `readySelector`로 지정한다. 예를 들어 본문 안에 페이지 제목이 있는 앱에서는 아래 설정을 쓸 수 있다.
 
 <!-- quickstart:manifest -->
+
 ```json
 { "readySelector": "main h1" }
 ```
 
 <!-- quickstart:first-run -->
+
 ```sh
 dui --version
 dui map .
@@ -79,28 +81,31 @@ dui open --no-open
 
 개발판은 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`로 설치한다. 아래 예제와 명령 표는 개발판 기준이다. 홈페이지에서 [기본 설치판의 릴리스 문서](https://dui.sh/?lang=ko#release-guide)도 열 수 있다.
 
-정적 사이트를 이미 `dist/`에 빌드했다면 프로젝트 루트에서 아래 명령을 실행한다. 결과는 위의 뷰어 명령으로 연다.
+개발판의 `dui map`은 화면·상태·폭을 캡처 없이 계획하고, `dui map --capture`는 계획한 모든 셀의 PNG·렌더 트리·HTML 스냅샷 근거를 저장한다. [공통 화면 지도](docs/ko/web-viewer.md#공통-화면-지도)를 참고한다.
+
+정적 사이트를 이미 `dist/`에 빌드했다면 프로젝트 루트에서 아래 명령으로 캡처한다. 결과는 위의 뷰어 명령으로 연다.
 
 <!-- quickstart:static -->
+
 ```sh
-dui map . --build-dir dist
+dui map . --build-dir dist --capture
 ```
 
 ### `dui map` vs `dui run`
 
-| 명령어 | 언제 쓰나 |
-| --- | --- |
-| `dui map [PROJECT]` | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · Next.js · 링크). 화면과 모달을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 한 번에 캡처한다. |
-| `dui run [PROJECT] [MANIFEST]` | **명시적 매니페스트 직접 캡처.** `dui.json` 설정 그대로 실행한다(인자를 생략하면 `.` / `dui.json`을 사용하며, 명시적 `path`/`host`가 없으면 `dui map`으로 자동 발견). |
+| 명령어                         | 언제 쓰나                                                                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `dui map [PROJECT]`            | **라우터가 있는 앱의 기본 명령** (TanStack Router · React Router 7/8 · Next.js · 링크). 화면과 모달을 자동 발견하고, `dui.json`의 `routeParams`(:id 샘플 값)·`storageState`·`readySelector`·라우터 밖 추가 `scenarios`를 자동 병합해 한 번에 캡처한다. |
+| `dui run [PROJECT] [MANIFEST]` | **명시적 매니페스트 직접 캡처.** `dui.json` 설정 그대로 실행한다(인자를 생략하면 `.` / `dui.json`을 사용하며, 명시적 `path`/`host`가 없으면 `dui map`으로 자동 발견).                                                                                  |
 
-| 분류 | 명령어 | 역할 |
-| --- | --- | --- |
-| 캡처 | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | 화면·모달 자동 발견·캡처 또는 브라우저 없이 컴파일러 사실/목 출력 |
-| 실패 항목 재검증 | `dui recheck RUN [PROJECT [MANIFEST]]` | 이전 캡처에서 검증에 실패한 항목만 다시 렌더링하고 해결 여부를 확인 |
-| 인증 | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | 인증된 화면 캡처용 `storageState.json` 저장(`0600`) |
-| 뷰어 | `dui open [RUN_DIR]` · `dui desktop` | 내장 2D 웹 캔버스 또는 네이티브 GPUI 데스크톱 뷰어 |
-| 비교 · 품질 | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 요소/픽셀 Diff, 99% 커버리지 감사, 리뷰 코멘트 |
-| 도구 | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | 공식 컴파일러 진단, 아카이브 목록, 캐시 정리, 업데이트, MCP 서버 |
+| 분류             | 명령어                                                                                           | 역할                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| 캡처             | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]`                      | 화면·모달 자동 발견·캡처 또는 브라우저 없이 컴파일러 사실/목 출력   |
+| 실패 항목 재검증 | `dui recheck RUN [PROJECT [MANIFEST]]`                                                           | 이전 캡처에서 검증에 실패한 항목만 다시 렌더링하고 해결 여부를 확인 |
+| 인증             | `dui auth login URL [--out FILE] [--wait-url PATTERN]`                                           | 인증된 화면 캡처용 `storageState.json` 저장(`0600`)                 |
+| 뷰어             | `dui open [RUN_DIR]` · `dui desktop`                                                             | 내장 2D 웹 캔버스 또는 네이티브 GPUI 데스크톱 뷰어                  |
+| 비교 · 품질      | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | 요소/픽셀 Diff, 99% 커버리지 감사, 리뷰 코멘트                      |
+| 도구             | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp`                        | 공식 컴파일러 진단, 아카이브 목록, 캐시 정리, 업데이트, MCP 서버    |
 
 ## 화면 자동 발견
 

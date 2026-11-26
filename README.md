@@ -16,24 +16,24 @@ The capability tables describe development on `main`. For the default installati
 
 dui reads types from the project's official compiler. Library rules identify specific API calls in that program. Runtime capture uses the renderer for each platform.
 
-| To see | Use |
-| --- | --- |
-| Typed state slots and route parameters | `dui scan` with the project's TypeScript compiler and matching symbol rules. |
-| Reachable web screens at different widths | `dui map` with a local URL or static build. Chromium follows same-origin links across frameworks. |
-| Declared native screens | `dui map` on a React Navigation, Expo Router or Flutter project. Each card points to its declaration. |
-| Rendered UI | Capture on the configured web, mobile, desktop or terminal host. Selected SwiftUI and Compose components can also be exported as interactive HTML previews. |
+| To see                                    | Use                                                                                                                                                         |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Typed state slots and route parameters    | `dui scan` with the project's TypeScript compiler and matching symbol rules.                                                                                |
+| Reachable web screens at different widths | `dui map` with a local URL or static build. Chromium follows same-origin links across frameworks.                                                           |
+| Declared native screens                   | `dui map` on a React Navigation, Expo Router or Flutter project. Each card points to its declaration.                                                       |
+| Rendered UI                               | Capture on the configured web, mobile, desktop or terminal host. Selected SwiftUI and Compose components can also be exported as interactive HTML previews. |
 
 ### Analysis & verification capabilities
 
-| Area | Capabilities | Status |
-| --- | --- | --- |
-| Screen & link discovery | Router file discovery, loop-free multi-hop BFS (`a[href]`), dynamic ID pattern collapsing (`/orders/:id`), `linksTo` screen-map edges | Supported |
-| State planning & verification | Compiler-derived types, greedy pairwise covering array, `<select>` real DOM `<option>` discovery, visual-change witness (`visualWitness`), convergence guard | Supported |
-| Data & API verification | Typed `GET` JSON auto-mocks, CSV mocks, explicit `mockResponses`, `hybrid` / `live` real-API modes with read-only guard, authenticated sessions (`storageState.json`, `POST authFlow`, interactive `dui auth login`) & secret redaction | Supported |
-| Diff & change review | 2D canvas inline diff (`Elements` render-tree diff with 2px tolerance, `After`, `Before`, lazy `Pixel` overlay), branch diff (`dui diff --base main`), `--changed-since` | Supported |
-| Quality, i18n & audit | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache | Supported |
-| Live editing & viewers | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`) | Supported |
-| Element inspector & box model | DevTools-style element attributes, box-model diagram & overlay (width, height, margin, padding, border, gap, radius), and interactive spacing redline guides between elements | Supported |
+| Area                               | Capabilities                                                                                                                                                                                                                                     | Status    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
+| Screen & link discovery            | Router file discovery, loop-free multi-hop BFS (`a[href]`), dynamic ID pattern collapsing (`/orders/:id`), `linksTo` screen-map edges                                                                                                            | Supported |
+| State planning & verification      | Compiler-derived types, greedy pairwise covering array, `<select>` real DOM `<option>` discovery, visual-change witness (`visualWitness`), convergence guard                                                                                     | Supported |
+| Data & API verification            | Typed `GET` JSON auto-mocks, CSV mocks, explicit `mockResponses`, `hybrid` / `live` real-API modes with read-only guard, authenticated sessions (`storageState.json`, `POST authFlow`, interactive `dui auth login`) & secret redaction          | Supported |
+| Diff & change review               | 2D canvas inline diff (`Elements` render-tree diff with 2px tolerance, `After`, `Before`, lazy `Pixel` overlay), branch diff (`dui diff --base main`), `--changed-since`                                                                         | Supported |
+| Quality, i18n & audit              | 99% coverage audit (`dui audit`), multi-locale & RTL checks, missing translation & overflow detection, SQLite-backed review comments, content-addressed module-graph cache                                                                       | Supported |
+| Live editing & viewers             | Shared CLI/MCP live sessions (`dui live`), embedded web canvas (`dui open`), native GPUI desktop viewer (`dui desktop`)                                                                                                                          | Supported |
+| Element inspector & box model      | DevTools-style element attributes, box-model diagram & overlay (width, height, margin, padding, border, gap, radius), and interactive spacing redline guides between elements                                                                    | Supported |
 | Universal routing, modals & canvas | Full-page true-aspect captures, WAI-ARIA navigation disclosure & modal/drawer auto-capture, obstacle-free gutter edge routing, native macOS TitleBar (`apps/desktop`), parallel multi-worker capture (`concurrency`), `SurfaceRegistry` pipeline | Supported |
 
 ## Install
@@ -62,11 +62,13 @@ Set `DUI_INSTALL_DIR` to change the install directory. [Prebuilt binaries](docs/
 Install Node.js 26, Chrome or Chromium, and the dependencies of a Vite app. The [tested app](fixtures/toggle) uses Vite 8 and React 19. In its root, set `readySelector` in `dui.json` to an element that appears when the intended screen is ready. For example, use this for an app whose main content contains its page heading.
 
 <!-- quickstart:manifest -->
+
 ```json
 { "readySelector": "main h1" }
 ```
 
 <!-- quickstart:first-run -->
+
 ```sh
 dui --version
 dui map .
@@ -79,28 +81,31 @@ The first command reports the installed version. The second writes a capture and
 
 To install the development build, run `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`. The following example and command reference describe that build. The website also links to the [documentation for the default release](https://dui.sh/?lang=en#release-guide).
 
-For a static site already built in `dist/`, run this command from its project root. Open the result with the viewer command above.
+On this build `dui map` plans the screens, states and widths without capturing them, and `dui map --capture` saves PNG, render tree and HTML snapshot evidence for every planned cell. See [Shared screen maps](docs/en/web-viewer.md#shared-screen-maps).
+
+For a static site already built in `dist/`, run this command from its project root to capture it. Open the result with the viewer command above.
 
 <!-- quickstart:static -->
+
 ```sh
-dui map . --build-dir dist
+dui map . --build-dir dist --capture
 ```
 
 ### `dui map` vs `dui run`
 
-| Command | When to use |
-| --- | --- |
-| `dui map [PROJECT]` | **Default for apps with a router** (TanStack Router, React Router 7/8, Next.js, or links). Automatically discovers screens & modals, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and captures everything. |
-| `dui run [PROJECT] [MANIFEST]` | **Explicit manifest capture.** Runs `dui.json` directly (omitting arguments defaults to `.` / `dui.json`, and falls back to `dui map` if no explicit `path` or `host` is set). |
+| Command                        | When to use                                                                                                                                                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dui map [PROJECT]`            | **Default for apps with a router** (TanStack Router, React Router 7/8, Next.js, or links). Automatically discovers screens & modals, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and captures everything. |
+| `dui run [PROJECT] [MANIFEST]` | **Explicit manifest capture.** Runs `dui.json` directly (omitting arguments defaults to `.` / `dui.json`, and falls back to `dui map` if no explicit `path` or `host` is set).                                                                                                  |
 
-| Group | Command | Purpose |
-| --- | --- | --- |
-| Capture | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]` | Discover/capture screens & modals or print compiler facts without launching a browser |
-| Retry failed cells | `dui recheck RUN [PROJECT [MANIFEST]]` | Re-render only unsuccessful cells from a capture and report which ones recovered |
-| Auth | `dui auth login URL [--out FILE] [--wait-url PATTERN]` | Save Playwright-compatible `storageState.json` (`0600`) for authenticated routes |
-| View | `dui open [RUN_DIR]` · `dui desktop` | Embedded 2D web canvas or native GPUI desktop viewer |
-| Diff & Quality | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage audit, review comments |
-| Tools | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp` | Official compiler probes, archive history, cache GC, self-update, MCP stdio server |
+| Group              | Command                                                                                          | Purpose                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Capture            | `dui map [PROJECT]` · `dui run [PROJECT] [MANIFEST]` · `dui scan [PROJECT]`                      | Discover/capture screens & modals or print compiler facts without launching a browser |
+| Retry failed cells | `dui recheck RUN [PROJECT [MANIFEST]]`                                                           | Re-render only unsuccessful cells from a capture and report which ones recovered      |
+| Auth               | `dui auth login URL [--out FILE] [--wait-url PATTERN]`                                           | Save Playwright-compatible `storageState.json` (`0600`) for authenticated routes      |
+| View               | `dui open [RUN_DIR]` · `dui desktop`                                                             | Embedded 2D web canvas or native GPUI desktop viewer                                  |
+| Diff & Quality     | `dui diff --base BRANCH [--regressions-only] [--markdown]` · `dui audit RUN_DIR` · `dui comment` | Element-level & pixel diff, 99% coverage audit, review comments                       |
+| Tools              | `dui toolchains` · `dui history` · `dui prune` · `dui update` · `dui mcp`                        | Official compiler probes, archive history, cache GC, self-update, MCP stdio server    |
 
 ## Discover screens
 
