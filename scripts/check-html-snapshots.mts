@@ -135,6 +135,21 @@ document.getElementById("d").show();
   );
   assert.ok(snap.fidelity <= 0.005, `fidelity ${snap.fidelity}`);
 
+  // A page taller than the window with a centered column: the capture reserves the scrollbar
+  // gutter, and the snapshot must lay out the same way (it did not when taken after the
+  // gutter was released, shifting the column by half a scrollbar).
+  writeFileSync(
+    join(site, "tall.html"),
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tall</title>
+<style>body{margin:0;font-family:sans-serif;background:#111;color:#eee} main{max-width:720px;margin:0 auto;padding:24px;background:#3a3a5a}
+section{height:600px;border-bottom:1px solid #444}</style></head><body><main><h1>Tall page</h1>
+${Array.from({ length: 6 }, (_, i) => `<section><p>Section ${i} with centered text.</p></section>`).join("")}
+</main></body></html>`,
+  );
+  const tall = capture({ path: "/tall.html" }, "home-tall");
+  const tallSnap = tall.cells[0]!.observation.htmlSnapshot!;
+  assert.ok(tallSnap.fidelity <= 0.005, `tall page fidelity ${tallSnap.fidelity}`);
+
   // A cache hit brings the snapshot along.
   const again = capture({}, "home");
   const reused = again.cells[0]!.observation.htmlSnapshot!;

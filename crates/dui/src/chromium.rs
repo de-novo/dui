@@ -1539,6 +1539,20 @@ impl Browser {
             json!({"format": "png"})
         };
         let screenshot = self.call(s, "Page.captureScreenshot", shot_params);
+        // The same moment as the PNG, as HTML (docs/en/web-viewer.md#html-cards): taken before
+        // the scrollbar gutter, caret and viewport set for the screenshot are restored, so the
+        // snapshot lays out exactly as the PNG did.
+        let snapshot_started = std::time::Instant::now();
+        if spec["htmlSnapshots"] != false
+            && let Some(out_dir) = png.parent()
+            && let Ok(shot) = &screenshot
+            && let Some(bytes) = shot["data"].as_str().and_then(|d| STANDARD.decode(d).ok())
+        {
+            v["htmlSnapshot"] = self.html_snapshot(s, width, out_dir, &bytes);
+            // Rendering it back used another tab; the page continues in front.
+            let _ = self.call(s, "Page.bringToFront", json!({}));
+        }
+        let snapshot_ms = ms(snapshot_started.elapsed());
         let _ = self.call(s, "Runtime.evaluate", caret(false));
         // Keyboard evidence in the render tree's layout: trusted Tab presses walk the focus order.
         // It costs a CDP round trip per focus stop, so it runs only when an audit asks for it.
@@ -1567,15 +1581,9 @@ impl Browser {
         let data = screenshot?;
         let png_bytes = STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?;
         fs::write(png, &png_bytes)?;
-        let screenshot_ms = ms(shot_started.elapsed()).saturating_sub(keyboard_ms);
-        // The same moment as the PNG, as HTML (docs/en/web-viewer.md#html-cards).
-        let snapshot_started = std::time::Instant::now();
-        if spec["htmlSnapshots"] != false
-            && let Some(out_dir) = png.parent()
-        {
-            v["htmlSnapshot"] = self.html_snapshot(s, width, out_dir, &png_bytes);
-        }
-        let snapshot_ms = ms(snapshot_started.elapsed());
+        let screenshot_ms = ms(shot_started.elapsed())
+            .saturating_sub(keyboard_ms)
+            .saturating_sub(snapshot_ms);
         let mut overlays_ms = 0;
         // After screenshot capture, safely expand collapsed WAI-ARIA nav disclosures to
         // discover hidden submenu links without mutating the captured image.
