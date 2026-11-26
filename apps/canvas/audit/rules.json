@@ -5,5 +5,14 @@
     "DerivedData/",
     "SourcePackages/checkouts/"
   ],
-  "tapTarget": { "maxViewportWidth": 430, "minSize": 24 }
+  "tapTarget": {
+    "maxViewportWidth": 430,
+    "minSize": 24
+  },
+  "keyboard": {
+    "focusVisible": true,
+    "reachable": true,
+    "escapeDismisses": true,
+    "focusReturns": true
+  }
 }

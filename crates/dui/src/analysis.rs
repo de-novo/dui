@@ -952,6 +952,9 @@ fn execute_with_locales(
             if let Some(tree) = ov.get("renderTree").filter(|t| t.is_array()) {
                 obs["renderTree"] = tree.clone();
             }
+            if let Some(dismissal) = ov.get("dismissal").filter(|d| d.is_object()) {
+                obs["dismissal"] = dismissal.clone();
+            }
             let parent_slug: String = parent_path
                 .chars()
                 .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })

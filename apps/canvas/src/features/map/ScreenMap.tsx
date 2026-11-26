@@ -619,6 +619,8 @@ export function ScreenMap({
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      // Edges carry no action; as Tab stops they only add focus targets without an indicator.
+      edgesFocusable={false}
       fitView
       minZoom={minMapZoom}
       maxZoom={maxMapZoom}

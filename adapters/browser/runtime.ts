@@ -276,6 +276,28 @@ declare var __duiProbe: {
       ),
     );
   }
+  /** Tag, label and rectangle rounded like render-tree nodes, so audits can match the two. */
+  function keyboardRecord(el: Element) {
+    const r = el.getBoundingClientRect();
+    const label = (el.getAttribute("aria-label") || (el as HTMLElement).innerText || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60);
+    return {
+      tag: el.tagName.toLowerCase(),
+      ...(el.getAttribute("role") ? { role: el.getAttribute("role")! } : {}),
+      label,
+      // Page coordinates: focusing a control can scroll it into view, while render-tree nodes are
+      // measured at the top of the page.
+      rect: {
+        x: Math.round(r.x + window.scrollX),
+        y: Math.round(r.y + window.scrollY),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      },
+    };
+  }
+
   function collectRenderTree(scopeRoot?: Element | null, measureText = false) {
     const interesting = new Set([
       "h1",
@@ -1092,6 +1114,9 @@ declare var __duiProbe: {
         const before = new Set(visibleDialogs());
         const startHref = location.href;
         try {
+          // A pointer or keyboard user focuses the trigger before activating it; dismissal checks
+          // whether focus comes back here.
+          entry.el.focus({ preventScroll: true });
           entry.el.click();
         } catch {
           return { opened: false };
@@ -1112,6 +1137,7 @@ declare var __duiProbe: {
 
         const dialog = newlyOpened[newlyOpened.length - 1]!;
         (globalThis as Record<string, unknown>).__duiActiveOverlay = dialog;
+        (globalThis as Record<string, unknown>).__duiOverlayTrigger = entry.el;
         if (isImagePreview(dialog)) return { opened: true, imagePreview: true };
         // Wait for CSS slide-in / fade-in animations on the dialog (e.g. Tailwind duration-500
         // drawers) to finish before measuring renderTree or taking the screenshot.
@@ -1161,6 +1187,79 @@ declare var __duiProbe: {
           scope: entry.scope,
           renderTree,
         };
+      },
+      /** After a trusted Escape: did the overlay close, and did focus go back to its trigger? */
+      async overlayDismissal() {
+        await new Promise((resolve) => setTimeout(resolve, 320));
+        const active = (globalThis as Record<string, unknown>).__duiActiveOverlay as
+          | HTMLElement
+          | undefined;
+        const trigger = (globalThis as Record<string, unknown>).__duiOverlayTrigger as
+          | HTMLElement
+          | undefined;
+        if (!active) return null;
+        const closed =
+          !active.isConnected ||
+          (active instanceof HTMLDialogElement && !active.open) ||
+          !active.checkVisibility({ visibilityProperty: true, opacityProperty: true });
+        const focused = document.activeElement;
+        return {
+          closedByEscape: closed,
+          focusReturned: closed
+            ? Boolean(trigger && focused && (focused === trigger || trigger.contains(focused)))
+            : null,
+        };
+      },
+      /** Elements a keyboard user should reach with Tab, in render-tree coordinates. */
+      keyboardTargets() {
+        const selector =
+          'a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex], [contenteditable="true"]';
+        return Array.from(document.querySelectorAll<HTMLElement>(selector))
+          .filter((el) => {
+            if (el.matches(":disabled, [inert] *, [aria-hidden='true'], [aria-hidden='true'] *"))
+              return false;
+            if (el.tabIndex < 0) return false;
+            const r = el.getBoundingClientRect();
+            return (
+              r.width > 0 &&
+              r.height > 0 &&
+              el.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+            );
+          })
+          .map((el) => keyboardRecord(el));
+      },
+      /** The element Tab focused, with whether a focus indicator is painted on it. */
+      focusStop() {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body || el === document.documentElement) return null;
+        const outlined = (node: Element) => {
+          const cs = getComputedStyle(node);
+          return (
+            cs.outlineStyle !== "none" &&
+            (cs.outlineStyle === "auto" || Number.parseFloat(cs.outlineWidth) > 0)
+          );
+        };
+        const ring = getComputedStyle(el).boxShadow !== "none";
+        // A wrapper can draw the indicator with :focus-within (a styled select inside its label).
+        let wrapper: Element | null = el.parentElement;
+        for (let depth = 0; wrapper && depth < 3 && !outlined(wrapper); depth++)
+          wrapper = wrapper.parentElement;
+        const around = Boolean(wrapper && wrapper.matches(":focus-within") && outlined(wrapper));
+        return {
+          ...keyboardRecord(el),
+          focusVisible: outlined(el) || ring || around,
+          indicator: outlined(el)
+            ? "outline"
+            : ring
+              ? "box-shadow"
+              : around
+                ? "outline on a :focus-within wrapper"
+                : "",
+        };
+      },
+      resetFocus() {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        window.scrollTo(0, 0);
       },
       async closeOverlay() {
         const target = (document.activeElement as HTMLElement | null) ?? document.body;

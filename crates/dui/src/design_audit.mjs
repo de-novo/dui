@@ -109,7 +109,15 @@ function audit(report, { root, plugins, designSpec }) {
       unverified.push({ cell: location, reason: cell.reason || "Missing verified render tree" });
       continue;
     }
-    const input = { version: 1, ...location, renderTree: tree, designSpec };
+    const input = {
+      version: 1,
+      ...location,
+      renderTree: tree,
+      // Interaction evidence: the Tab walk of a screen, and how an overlay reacted to Escape.
+      keyboard: cell.observation?.keyboard ?? null,
+      dismissal: cell.observation?.dismissal ?? null,
+      designSpec,
+    };
     for (const plugin of plugins) {
       const result = checkCell(plugin, input, root);
       for (const finding of result.findings)
