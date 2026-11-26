@@ -141,6 +141,7 @@ flowchart TD
 | 6. Slots, state, and lists | v0.3.0 | Toggle slot values, declared state, and list counts (0, 1, many) in the UI. Auto-generate mock items from the item schema. Hidden or unknown types stay placeholders. | Toggling `isOpen` or list count changes the picture with no network and no handlers. Saved value sets persist. |
 | 7. Optional render machine | v0.3.x | A common verification job: surface, cell, state, size in; frame, render tree, and fidelity out. Issues about a long-lived render server and concurrent browser work ([#343](https://github.com/de-novo/dui/issues/343), [#344](https://github.com/de-novo/dui/issues/344)) belong on this track, not the default map. | Fidelity is recorded when a job runs. Default map CI stays browserless. |
 | 8. Figma export | after v0.3.0 | Build frames and variants from the model only. Token names map to Figma variables when possible. | A read-only export needs no snapshot. |
+| 9. GPUI web canvas | from v1.0.0 | Try GPUI (wasm32 web backend, WebGPU with WebGL2 fallback) for the in-app canvas — the screen renderer only. The React shell stays. | Preconditions: a stable official `gpui` crate that includes the web backend; Korean IME and text selection verified. Measure bundle size and tab memory against the TypeScript renderer and record the numbers (a published reference is Zed's Delta web bundle, about 23MB). Keep the GPUI canvas opt-in until it wins on those measurements. Until then, the default screen renderer stays TypeScript/DOM or a lightweight canvas. |
 
 **Out of scope for the default path.** Running business logic, calling APIs, or reproducing exact native or web pixels. Those stay on the verification track.
 
@@ -156,6 +157,10 @@ flowchart TD
 Open questions include which prop combinations to render when the set grows large, how to capture states such as hover, disabled, and focus, and whether colors and typography should map to Figma variables or styles.
 
 The first proof of concept uses a few obora design-system components (Button, Input, Badge) and a couple of obora screens.
+
+**GPUI web canvas (from v1.0.0).** After the default approximate renderer is in place, try GPUI's wasm32 web backend (WebGPU, with WebGL2 fallback) for the in-app canvas, as an optimization of the screen renderer only. The React shell stays. This is a renderer running in the page, not a headless browser, and it does not change the [Never](#never) rule for the default map path.
+
+This attempt does not start until the official `gpui` crate is stable and includes the web backend, and until Korean IME and text selection have been verified on that backend. Bundle size and tab memory must be measured against the TypeScript renderer and recorded. A published reference is Zed's Delta web bundle, about 23MB; that figure is not a dui measurement or a target. The GPUI canvas stays opt-in until it wins those measurements. Until then, the default screen renderer is TypeScript/DOM or a lightweight canvas.
 
 **Hosting direction.** A Sentry-like model is under consideration: the core CLI (`dui map`, diff, local rendering, and JSON export) would stay open source, while a later hosted service could store CI uploads with code-location mapping, show screen comparisons on each pull request, sync with the Figma plugin, and link design comments back to the code, with team access. This is a direction to explore, not a commitment.
 

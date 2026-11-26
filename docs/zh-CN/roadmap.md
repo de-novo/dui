@@ -141,6 +141,7 @@ flowchart TD
 | 6. Slots, state, and lists | v0.3.0 | 在 UI 中切换槽位值、已声明状态和列表数量（0、1、many）。根据列表项 schema 自动生成 mock 项。隐藏或未知类型保持为占位。 | 切换 `isOpen` 或列表数量时，画面在无网络、无处理函数的情况下变化。已保存的值集会保留。 |
 | 7. Optional render machine | v0.3.x | 通用校验任务：输入 surface、cell、state、size，输出 frame、render tree 和 fidelity。关于常驻渲染服务器和并发浏览器工作的议题（[#343](https://github.com/de-novo/dui/issues/343)、[#344](https://github.com/de-novo/dui/issues/344)）属于这条轨道，而不是默认地图。 | 任务运行时记录保真度。默认地图 CI 仍不使用浏览器。 |
 | 8. Figma export | after v0.3.0 | 仅根据模型创建画板和变体。在可能时把 token 名称映射为 Figma 变量。 | 只读导出不需要快照。 |
+| 9. GPUI web canvas | from v1.0.0 | 从优化出发，尝试用 GPUI（wasm32 网页后端，WebGPU，回退为 WebGL2）绘制应用内画布——仅限屏幕渲染器。React 外壳保持不变。 | 前提：包含网页后端的稳定官方 `gpui` crate；已验证韩语 IME 和文本选择。对照 TypeScript 渲染器测量打包体积和标签页内存并记录数字（已公布的参考值是 Zed 的 Delta 网页打包，约 23MB）。在这些测量上胜出之前，GPUI 画布保持为可选项。在此之前，默认屏幕渲染器仍是 TypeScript/DOM 或轻量画布。 |
 
 **默认路径范围之外。** 运行业务逻辑、调用 API，或精确复现原生或 Web 像素。这些留在校验轨道。
 
@@ -156,6 +157,10 @@ flowchart TD
 尚待明确的问题包括：组合过多时渲染哪些组合，如何捕获 hover、disabled、focus 等状态，以及颜色和字体是否应映射为 Figma 变量或样式。
 
 首个概念验证使用若干 obora 设计系统组件（Button、Input、Badge）和两三个 obora 屏幕。
+
+**GPUI 网页画布（自 v1.0.0）。** 在默认近似渲染器就位之后，从优化出发，尝试用 GPUI 的 wasm32 网页后端（WebGPU，回退为 WebGL2）绘制应用内画布。仅替换屏幕渲染器，React 外壳保持不变。这是页面内运行的渲染器，不是无头浏览器，也不改变默认地图路径的[绝不做的事](#never)规则。
+
+此尝试须等到官方 `gpui` crate 稳定且包含网页后端，并在该后端上验证韩语 IME 和文本选择之后再开始。必须对照 TypeScript 渲染器测量打包体积和标签页内存并记录数字。已公布的参考值是 Zed 的 Delta 网页打包，约 23MB；该数字既不是 dui 的测量结果，也不是目标。在这些测量上胜出之前，GPUI 画布保持为可选项。在此之前，默认屏幕渲染器是 TypeScript/DOM 或轻量画布。
 
 **托管方向。** 正在考虑类似 Sentry 的模式：核心 CLI（`dui map`、diff、本地渲染和 JSON 导出）保持开源，日后可由托管服务保存带有代码位置映射的 CI 上传、在每个 pull request 上展示界面对比、与 Figma 插件同步，并把设计评论关联回代码位置，同时提供团队权限。这只是待探索的方向，并非承诺。
 
