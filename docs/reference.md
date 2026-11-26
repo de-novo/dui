@@ -24,6 +24,7 @@ Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the ta
 | `scenarios` | Array of overrides for extra cases. For example, `[{"path":"/settings","readySelector":"form"}]` adds a screen with its own readiness check. |
 | `maxNoImprovementRounds` | Optional convergence guard. Stops exploring additional states in a scenario after N consecutive states produce no new branch outcomes or slots; remaining planned cells stay in the denominator as `unverified (not-rendered)`. |
 | `requiredRequests` | Paths that must return a 2xx response. A required request with a generated mock must receive that mock. |
+| `expectedApiErrors` | API paths (or `prefix*`) whose 401, 403 or 5xx response is part of the screen, such as a signed-out state. Any other same-origin or `apiBaseUrl` Fetch/XHR response with those statuses leaves the cell `unverified` with the reason `api-error: STATUS PATH`. Failed calls are listed in `observation.apiErrors`. |
 | `responseChecks` | Compare named fields in a JSON response, for example `{"/api/status":{"ready":true}}`. |
 | `tsconfig` · `appRoot` | Paths relative to `PROJECT`. Defaults are `tsconfig.json` for analysis and `.` for Vite. |
 | `rulePacks` | Additional rule files, resolved relative to the manifest. See the [rule pack schema](../rules/schema.json). |
