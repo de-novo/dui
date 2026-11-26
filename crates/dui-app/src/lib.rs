@@ -10,6 +10,7 @@ pub mod compiler_oracle;
 pub mod diff;
 pub mod graph_view;
 pub mod inspect;
+pub mod thumbnail;
 
 use dui_ports::{Reply, failure};
 use std::{fs, path::Path};

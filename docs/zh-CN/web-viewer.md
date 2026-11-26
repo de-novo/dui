@@ -14,7 +14,13 @@
 
 **地图默认不启动浏览器（2026-11-27 决定，取代此前默认截图的决定；参见[禁止事项](../../AGENTS.md#never)）。** `dui map` 规划界面、状态和宽度但不截图：每个格子保持原因为 `not-rendered` 的 `unverified`，覆盖率不计为尝试。链接发现对每个可达页面读取一次应用服务器发送的 HTML，不运行脚本，因此只由脚本添加的链接会缺失，`screenDiscovery.limitations` 会说明这一点。Vite 应用的界面来自其路由器。`--no-capture` 表示默认行为。`dui map . --capture` 为像素验证截取所有计划的格子，因此查看器用浏览者的浏览器绘制已保存的 PNG 和 HTML 快照，无需运行中的应用。只有在请求时才在运行中的应用里从源码渲染：没有截图的卡片提供 **从源码渲染**，宽度预览和响应式预览在打开期间渲染。渲染所有者进程在最后一个会话后保留 20 秒。`dui run`、CI 检查和 MCP 工具截取所有计划的格子；截图缓存使未变化的格子没有开销。
 
+<<<<<<< HEAD
 使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿服务器发送的 HTML 中的同源链接导航。使用 `--capture` 时，它在 Chromium 中渲染每个页面，沿渲染后页面的链接导航并执行布局检查。Angular 等 Web 框架共享此流程。在 Vite 项目中，dui 还会先读取路由器，因此没有链接可达的路由也会进入地图，`screenDiscovery.mode` 为 `router+links`。需要开发服务器的应用（例如 `configureServer` 中间件或 `server.proxy`）应使用此方式。内置主机把这类应用渲染为空白时，报告会在 `screenDiscovery.devServerHint` 中说明。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
+=======
+每个截图还有一张缩略图 `thumb-IMAGE`：宽 200 px 的副本，在截图结束后写入，缺失时重新写入。地图卡片在屏幕上不超过 200 设备像素宽时绘制缩略图，更宽时绘制 PNG，因此缩小查看的数百个屏幕的地图不会加载每张原尺寸截图。卡片只在接近视口时加载图片。验证依据仍是 PNG。
+
+使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿同源链接导航，并使用 Chromium 执行截图和布局检查。Angular 等 Web 框架共享此流程。在 Vite 项目中，dui 还会先读取路由器，因此没有链接可达的路由也会从运行中的服务器截取，`screenDiscovery.mode` 为 `router+links`。需要开发服务器的应用（例如 `configureServer` 中间件或 `server.proxy`）应使用此方式。内置主机把这类应用渲染为空白时，报告会在 `screenDiscovery.devServerHint` 中说明。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
+>>>>>>> origin/main
 
 构建静态部署产物后，运行 `dui map . --build-dir dist`。dui 在临时回环端口提供该目录，默认以 375 和 1280 px 为沿链接可到达的页面生成地图，使用 `--capture` 时截图。在 `dui.json` 中设置 `path` 可指定其他 HTML 入口。若使用通过 `index.html` 处理导航的 history 路由，设置 `spaFallback: true`。Vue Router、使用 adapter-static 的 SvelteKit、Astro 静态输出和使用 preact-iso 的 Preact 共用此流程。需要应用服务器的部署使用 `--url`。需要登录或没有可达链接的页面需要项目提供入口或会话数据。
 

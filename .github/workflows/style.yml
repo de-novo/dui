@@ -94,6 +94,7 @@ jobs:
           npm run check:reliability
           npm run check:settle
           npm run check:browserless-map
+          npm run check:map-thumbnails
           npm run check:fact-overlays
           npm run check:html-snapshots
           npm run check:html-cards

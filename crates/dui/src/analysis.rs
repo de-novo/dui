@@ -1445,6 +1445,14 @@ fn execute_with_locales(
             report["htmlReflow"] = reflow;
         }
     }
+    // Map cards draw a small copy of each capture while they are small on screen (#350). It is
+    // derived from the PNG, so cached captures get theirs here too.
+    if let Some(cells) = report["cells"].as_array() {
+        let images: BTreeSet<&str> = cells.iter().filter_map(|c| c["image"].as_str()).collect();
+        if !images.is_empty() {
+            report["thumbnails"] = thumbnails(out, &images);
+        }
+    }
     let graph = crate::graph_view::with_cells(graph, &report)?;
     store(&out.join("report.json"), &report)?;
     store(&out.join("graph.json"), &graph)?;
@@ -1461,6 +1469,43 @@ fn execute_with_locales(
     } else {
         Err((5, report))
     }
+}
+
+/// Writes the missing thumbnails of `images` in `out`, a few at a time, and says how many it
+/// wrote and how long that took.
+fn thumbnails(out: &Path, images: &BTreeSet<&str>) -> Value {
+    let started = std::time::Instant::now();
+    let todo: Vec<&str> = images
+        .iter()
+        .copied()
+        .filter(|image| !out.join(dui_app::thumbnail::name(image)).is_file())
+        .collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let made = std::sync::atomic::AtomicUsize::new(0);
+    let workers = std::thread::available_parallelism().map_or(1, |n| n.get().min(8));
+    std::thread::scope(|scope| {
+        for _ in 0..workers.min(todo.len()) {
+            let (todo, next, made) = (&todo, &next, &made);
+            scope.spawn(move || {
+                while let Some(image) =
+                    todo.get(next.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+                {
+                    let Ok(png) = fs::read(out.join(image)) else {
+                        continue;
+                    };
+                    if let Ok(Some(thumb)) = dui_app::thumbnail::make(&png)
+                        && fs::write(out.join(dui_app::thumbnail::name(image)), thumb).is_ok()
+                    {
+                        made.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            });
+        }
+    });
+    json!({
+        "made": made.into_inner(),
+        "ms": u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+    })
 }
 
 /// Match active `string` slots whose baseline value matches a rendered `<select>`'s current

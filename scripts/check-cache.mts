@@ -100,7 +100,8 @@ function measurePngDiskUsage(dirs: string[]): {
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
     for (const entry of readdirSync(dir)) {
-      if (!entry.endsWith(".png")) continue;
+      // Captures only: thumbnails are derived from them in each run (#350).
+      if (!entry.endsWith(".png") || entry.startsWith("thumb-")) continue;
       const st = statSync(join(dir, entry));
       logicalFiles += 1;
       logicalBytes += st.size;
