@@ -848,6 +848,54 @@ impl Browser {
         let session = s.ok_or("missing session")?;
         Ok((self.observe(session, spec, width, png)?, session.to_owned()))
     }
+    /// Walks the focus order with trusted Tab presses and records each stop, so audits can check
+    /// that every keyboard target is reached and shows a focus indicator.
+    fn keyboard_walk(&mut self, s: Option<&str>) -> Option<Value> {
+        const MAX_STOPS: usize = 500;
+        let eval = |this: &mut Self, expression: &str| {
+            this.call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": expression, "returnByValue": true}),
+            )
+            .ok()
+            .map(|r| r["result"]["value"].clone())
+        };
+        let targets = eval(self, "globalThis.__duiRuntime?.keyboardTargets()")?;
+        let mut stops: Vec<Value> = Vec::new();
+        let mut complete = false;
+        for _ in 0..MAX_STOPS {
+            for kind in ["keyDown", "keyUp"] {
+                self.call(
+                    s,
+                    "Input.dispatchKeyEvent",
+                    json!({"type": kind, "key": "Tab", "code": "Tab",
+                           "windowsVirtualKeyCode": 9, "nativeVirtualKeyCode": 9}),
+                )
+                .ok()?;
+            }
+            let stop = eval(self, "globalThis.__duiRuntime.focusStop()")?;
+            if stop.is_null() {
+                // Focus left the document: the walk wrapped around.
+                if stops.is_empty() {
+                    continue;
+                }
+                complete = true;
+                break;
+            }
+            if stops
+                .first()
+                .is_some_and(|first| first["tag"] == stop["tag"] && first["rect"] == stop["rect"])
+            {
+                complete = true;
+                break;
+            }
+            stops.push(stop);
+        }
+        let _ = eval(self, "globalThis.__duiRuntime.resetFocus()");
+        Some(json!({"targets": targets, "stops": stops, "complete": complete}))
+    }
+
     fn observe(&mut self, session: &str, spec: &Value, width: u32, png: &Path) -> Result<Value> {
         let s = Some(session);
         let origin = self.allowed_origin.clone();
@@ -1016,6 +1064,10 @@ impl Browser {
             json!({"format": "png"})
         };
         let screenshot = self.call(s, "Page.captureScreenshot", shot_params);
+        // Keyboard evidence in the render tree's layout: trusted Tab presses walk the focus order.
+        if let Some(keyboard) = self.keyboard_walk(s) {
+            v["keyboard"] = keyboard;
+        }
         if target_h > vp_h {
             self.call(
                 s,
@@ -1139,6 +1191,25 @@ impl Browser {
                         "nativeVirtualKeyCode": 27
                     }),
                 );
+                // Did the trusted Escape close the overlay and return focus to its trigger?
+                let dismissal = self
+                    .call(
+                        s,
+                        "Runtime.evaluate",
+                        json!({
+                            "expression": "globalThis.__duiRuntime.overlayDismissal()",
+                            "awaitPromise": true,
+                            "returnByValue": true
+                        }),
+                    )
+                    .ok()
+                    .map(|r| r["result"]["value"].clone())
+                    .filter(Value::is_object);
+                if let (Some(dismissal), Some(last)) = (dismissal, overlays.last_mut())
+                    && last["slug"] == res["slug"]
+                {
+                    last["dismissal"] = dismissal;
+                }
                 let _ = self.call(
                     s,
                     "Runtime.evaluate",
