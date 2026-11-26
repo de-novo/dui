@@ -79,13 +79,13 @@ The first command reports the installed version. The second writes a capture and
 
 To install the development build, run `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`. The following example and command reference describe that build. The website also links to the [documentation for the default release](https://dui.sh/?lang=en#release-guide).
 
-On this build `dui map` plans the screens, states and widths without capturing them, and `dui map --capture` saves PNG, render tree and HTML snapshot evidence for every planned cell. See [Shared screen maps](docs/en/web-viewer.md#shared-screen-maps).
+On this build `dui map --no-capture` plans the screens, states and widths without capturing them; `dui map` captures every planned cell. See [Shared screen maps](docs/en/web-viewer.md#shared-screen-maps).
 
-For a static site already built in `dist/`, run this command from its project root to capture it. Open the result with the viewer command above.
+For a static site already built in `dist/`, run this command from its project root. Open the result with the viewer command above.
 
 <!-- quickstart:static -->
 ```sh
-dui map . --build-dir dist --capture
+dui map . --build-dir dist
 ```
 
 ### `dui map` vs `dui run`

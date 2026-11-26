@@ -260,19 +260,11 @@ function Card({
     );
   });
   const granted = useSnapshotFrame(id, wanted);
-  // A card without a capture is rendered from source once it is in view.
+  // A card without a capture is rendered from source only when asked: rendering holds a browser.
   const live =
     data.liveRun && !data.screenDiff ? liveCell(data.screen, cell, data.width) : undefined;
-  const inView = useViewportStore((state) => {
-    if (!live) return false;
-    const [tx, ty, zoom] = state.transform;
-    const left = positionAbsoluteX * zoom + tx;
-    const top = positionAbsoluteY * zoom + ty;
-    const w = (width ?? data.cardWidth) * zoom;
-    const h = (height ?? data.frameHeight) * zoom;
-    return left < state.width && left + w > 0 && top < state.height && top + h > 0;
-  });
-  const liveFrame = useLiveFrame(data.liveRun, live, inView);
+  const [requested, setRequested] = useState(false);
+  const liveFrame = useLiveFrame(data.liveRun, live, requested);
   return (
     <>
       {Object.values(Position).map((position) => (
@@ -297,7 +289,7 @@ function Card({
         imageUrl={data.imageUrl}
         snapshotUrl={granted && cell?.snapshot ? data.imageUrl(cell.snapshot.file) : undefined}
         overlay={data.anchors && <LinkAnchors anchors={data.anchors} selected={data.selected} />}
-        live={live ? liveFrame : undefined}
+        live={live ? { ...liveFrame, request: () => setRequested(true) } : undefined}
         selected={data.selected}
         related={data.related}
         dimmed={data.dimmed}

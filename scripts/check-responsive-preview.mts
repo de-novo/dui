@@ -324,14 +324,15 @@ async function check(media: number, container: number) {
     await stopped;
   }
 }
-// Cards of a map without capture are rendered from source in the running app (#327): on the
-// desktop map and in the mobile deck, the card shows a live frame at its width.
+// Cards of a map without capture are rendered from source in the running app when asked (#327):
+// nothing renders on its own, and after "Render from source" the card shows a live frame at its
+// width, on the desktop map and in the mobile deck.
 async function checkLiveCards() {
   // A home without the captures above: cached captures would be reused as evidence.
   const env = { ...process.env, HOME: join(root, "live-cards") };
   mkdirSync(env.HOME, { recursive: true });
   const planned = JSON.parse(
-    execFileSync(binary, ["map", "."], { cwd: project, env, encoding: "utf8" }),
+    execFileSync(binary, ["map", ".", "--no-capture"], { cwd: project, env, encoding: "utf8" }),
   ) as { output: string; cells: { image?: string; reason?: string; width: number }[] };
   assert.ok(planned.cells.every((c) => !c.image && c.reason === "not-rendered"));
   const width = planned.cells[0]!.width;
@@ -361,6 +362,19 @@ async function checkLiveCards() {
         });
         const { result, exceptionDetails } = (await call("Runtime.evaluate", {
           expression: `(async () => {
+            const until = async (read) => {
+              const end = performance.now() + 30000;
+              while (performance.now() < end) {
+                const value = read();
+                if (value) return value;
+                await new Promise((r) => setTimeout(r, 100));
+              }
+              throw Error("timed out: " + document.body.innerText.slice(0, 300));
+            };
+            const button = await until(() => document.querySelector("[data-live-render]"));
+            // Nothing rendered before the request.
+            if (document.querySelector(${JSON.stringify(selector)})) throw Error("rendered unasked");
+            button.click();
             const end = performance.now() + 60000;
             while (performance.now() < end) {
               const img = document.querySelector(${JSON.stringify(selector)});

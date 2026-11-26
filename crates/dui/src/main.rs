@@ -368,7 +368,7 @@ const CLI_HELP: &str = "\
 dui — real UI state capture, screen map, and diff
 
 CAPTURE
-  dui map [PROJECT] [--url URL | --build-dir DIR] [--capture]   Map source, a running app or built web pages (--capture saves evidence)
+  dui map [PROJECT] [--url URL | --build-dir DIR] [--no-capture]   Map source, a running app or built web pages (--no-capture plans cells without capturing)
   dui map attach SOURCE_RUN RECORDINGS_JSON  Attach identified runtime PNGs to native source cards
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
@@ -452,9 +452,14 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
     if let [cmd, all @ ..] = args.as_slice()
         && cmd == "map"
     {
-        // Maps hold no evidence unless asked (docs/en/web-viewer.md#shared-screen-maps).
-        let capture = all.iter().any(|a| a == "--capture");
-        let rest: Vec<_> = all.iter().filter(|a| *a != "--capture").cloned().collect();
+        // Maps capture every planned cell unless asked to only plan them
+        // (docs/en/web-viewer.md#shared-screen-maps). `--capture` states the default.
+        let capture = !all.iter().any(|a| a == "--no-capture");
+        let rest: Vec<_> = all
+            .iter()
+            .filter(|a| *a != "--capture" && *a != "--no-capture")
+            .cloned()
+            .collect();
         return match rest.as_slice() {
             [cmd, source, recordings] if cmd == "attach" => {
                 native_capture::attach(Path::new(source), Path::new(recordings))
@@ -484,7 +489,7 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
             }
             _ => Err(failure(
                 2,
-                "expected map [PROJECT] [--url URL | --build-dir DIR] [--capture]",
+                "expected map [PROJECT] [--url URL | --build-dir DIR] [--no-capture]",
             )),
         };
     }
