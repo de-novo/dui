@@ -18,7 +18,7 @@ import { useI18n } from "../../i18n/LocaleContext";
 import { MapGuideOptions } from "./MapCardGuides";
 import { CaptureCard } from "./CaptureCard";
 import { clearLane, layoutMap } from "./layout";
-import { cardCell } from "../../model/selection";
+import { cardCell, type EdgeStart } from "../../model/selection";
 import { anchorsTo, treeCell, type AnchorBox } from "../../model/linkAnchors";
 import { SNAPSHOT_MIN_SCREEN_WIDTH, snapshotUsable, useSnapshotFrame } from "./snapshotSlots";
 import {
@@ -498,6 +498,7 @@ export function ScreenMap({
   archive,
   width,
   mode,
+  edgeStart = "element",
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -518,6 +519,8 @@ export function ScreenMap({
   archive: Archive;
   width: number;
   mode: string;
+  /** Where link edges start: the anchor element on the capture, or the card border. */
+  edgeStart?: EdgeStart;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -576,7 +579,7 @@ export function ScreenMap({
   const anchors = useMemo(() => {
     const placed = new Map(layout.nodes.map((n) => [n.screen.id, n]));
     const bySource = new Map<string, CardAnchor[]>();
-    if (diffActive) return bySource;
+    if (diffActive || edgeStart === "card") return bySource;
     for (const link of layout.links) {
       const from = placed.get(link.source);
       const to = placed.get(link.target);
@@ -599,7 +602,7 @@ export function ScreenMap({
       bySource.set(link.source, list);
     }
     return bySource;
-  }, [layout, width, diffActive]);
+  }, [layout, width, diffActive, edgeStart]);
   // React Flow remeasures and re-renders a node whenever its object changes. Node objects are
   // built without selection; selecting then replaces only the selected and related cards.
   // Fading the other cards during selection focus is done in CSS (`data-node-focus`).

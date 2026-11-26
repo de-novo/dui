@@ -54,6 +54,9 @@ test("selection preserves selected screen when returning to overview from live v
   assert.equal(live.view, "live");
   assert.equal(live.screen, "route:/?q=demo");
   assert.equal(live.width, 375);
+  assert.equal(live.edges, "element");
+  assert.equal(parseSelection("?edges=card", archive).edges, "card");
+  assert.equal(parseSelection("?edges=nonsense", archive).edges, "element");
 
   const overviewUrl = withSearchChanges(
     "http://127.0.0.1/?screen=route%3A%2F%3Fq%3Ddemo&state=s-graph&width=375&view=live",

@@ -129,6 +129,7 @@ function MapView({
     locales,
     view,
     links: mode,
+    edges: edgeStart,
   } = selection;
   const screen = archive.screens.find((s) => s.id === selectedId);
   const { cells, cell } = resolveCell(screen, width, state, locale);
@@ -395,6 +396,7 @@ function MapView({
                     archive={visibleArchive}
                     width={width}
                     mode={mode}
+                    edgeStart={edgeStart}
                     selectedId={selectedId}
                     focusActive={showDetails}
                     openCommentsByPath={commentsByPath}
@@ -658,6 +660,17 @@ function MapView({
                   </option>
                 ))}
               </optgroup>
+            </select>
+          </label>
+          <label>
+            {t.mapEdgeStart}
+            <select
+              data-map-edge-start=""
+              value={edgeStart}
+              onChange={(e) => update({ edges: e.target.value === "card" ? "card" : null })}
+            >
+              <option value="element">{t.edgeStartElement}</option>
+              <option value="card">{t.edgeStartCard}</option>
             </select>
           </label>
           {widths.length > 0 && (

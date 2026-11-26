@@ -1,6 +1,8 @@
 import type { Cell, Screen, ScreenLink, ScreenMap } from "../data/overview";
 
 export type ViewMode = "overview" | "details" | "live";
+/** Where map link edges start: the anchor element on the capture, or the card border. */
+export type EdgeStart = "element" | "card";
 
 export type ViewerSelection = {
   screen: string | null;
@@ -11,6 +13,7 @@ export type ViewerSelection = {
   locales: string[];
   view: ViewMode;
   links: string;
+  edges: EdgeStart;
 };
 
 export function archiveWidths(archive: ScreenMap): number[] {
@@ -41,13 +44,14 @@ export function parseSelection(search: string, archive: ScreenMap): ViewerSelect
   const screen = params.get("screen");
   const state = params.get("state");
   const links = params.get("links") ?? "overview";
+  const edges: EdgeStart = params.get("edges") === "card" ? "card" : "element";
   const rawView = params.get("view");
   let view: ViewMode;
   if (rawView === "overview") view = "overview";
   else if (rawView === "live" && screen !== null) view = "live";
   else if (screen !== null) view = "details";
   else view = "overview";
-  return { screen, state, width, widths, locale, locales, view, links };
+  return { screen, state, width, widths, locale, locales, view, links, edges };
 }
 
 export function stateKeyFor(cells: Cell[], index: number): string {
