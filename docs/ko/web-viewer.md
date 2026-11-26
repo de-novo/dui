@@ -12,7 +12,7 @@ dui 빌드에서 클라이언트를 빌드하고 진입 페이지와 해시가 �
 
 ### 공통 화면 지도
 
-실행 중인 로컬 웹 앱은 `dui map . --url http://localhost:4200/`로 지도화한다. dui는 지정한 주소에서 시작해 같은 출처의 링크를 따라가고 Chromium에서 캡처와 레이아웃 검사를 수행한다. Angular를 포함한 웹 프레임워크가 이 경로를 공유한다. 라우트, 가드, 컴포넌트 입력과 상태를 소스에서 찾으려면 프로젝트의 컴파일러와 라우터에 맞는 규칙이 필요하다.
+실행 중인 로컬 웹 앱은 `dui map . --url http://localhost:4200/`로 지도화한다. dui는 지정한 주소에서 시작해 같은 출처의 링크를 따라가고 Chromium에서 캡처와 레이아웃 검사를 수행한다. Angular를 포함한 웹 프레임워크가 이 경로를 공유한다. Vite 프로젝트에서는 라우터도 먼저 읽는다. 그래서 링크로 닿지 않는 라우트도 실행 중인 서버에서 캡처하고, `screenDiscovery.mode`는 `router+links`가 된다. `configureServer` 미들웨어나 `server.proxy`처럼 dev 서버가 필요한 앱에 이 방법을 쓴다. 내장 호스트에서 이런 앱이 빈 화면으로 렌더링되면 리포트의 `screenDiscovery.devServerHint`가 그 사실을 알려 준다. 라우트, 가드, 컴포넌트 입력과 상태를 소스에서 찾으려면 프로젝트의 컴파일러와 라우터에 맞는 규칙이 필요하다.
 
 정적 배포 파일을 빌드한 뒤 `dui map . --build-dir dist`를 실행한다. dui가 해당 디렉터리를 임시 로컬 포트로 제공하고, 링크로 도달한 페이지를 기본 375 px와 1280 px에서 캡처한다. 시작 HTML이 다르면 `dui.json`에 `path`를 지정한다. 히스토리 라우터가 `index.html`로 요청을 처리하면 `spaFallback: true`를 지정한다. Vue Router, adapter-static을 사용하는 SvelteKit, Astro 정적 빌드, preact-iso를 사용하는 Preact가 이 경로를 공유한다. 실행 중인 앱 서버가 필요한 배포에는 `--url`을 사용한다. 로그인하거나 별도 링크로 들어가야 하는 페이지에는 프로젝트의 진입 경로나 세션 데이터가 필요하다.
 

@@ -8,6 +8,7 @@ on:
       - "crates/dui/src/native_map.rs"
       - "crates/dui/src/native_capture.rs"
       - "crates/dui/src/screen_map.rs"
+      - "adapters/vite/discover.mts"
       - "crates/dui/src/universal_web.rs"
       - "crates/dui-core/src/model/capture.rs"
       - "crates/dui-storage/src/lib.rs"
@@ -63,6 +64,7 @@ jobs:
       - name: Build and check the archives on desktop and mobile
         run: |
           npm ci --prefix apps/canvas
+          npm ci --prefix fixtures/toggle
           cargo build --locked
           npm install --prefix "$RUNNER_TEMP/t3-syntax" --no-audit --no-fund --ignore-scripts typescript@6.0.3
           ln -s "$RUNNER_TEMP/t3-syntax/node_modules" .t3code/apps/mobile/node_modules

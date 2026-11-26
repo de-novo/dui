@@ -10,12 +10,30 @@
     {
       "name": "OnboardingWelcomeView",
       "source": "Sources/App/Onboarding/Steps/Welcome/OnboardingWelcomeView.swift",
-      "witness": "Home Assistant Companion App",
+      "witness": "accessibility identifier onboarding.welcome.continue",
       "imageWidth": 1206,
       "imageHeight": 2622,
       "scale": 3.0,
-      "imageSha256": "b90865e701345b860b4c1a93cc0c63a98feda99b6ee82d444762237e2563b27d"
+      "imageSha256": "a76948f751696cf7c5c84379342600883007fea8b394b4a172fa4837368e8ad3"
+    },
+    {
+      "name": "OnboardingServersListView",
+      "source": "Sources/App/Onboarding/Steps/Servers/OnboardingServersListView.swift",
+      "witness": "accessibility identifier onboarding.servers.manualEntry",
+      "imageWidth": 1206,
+      "imageHeight": 2622,
+      "scale": 3.0,
+      "imageSha256": "98f22e80861b14d04925c02c31dca263d906234217414413f19aa63ba067c426"
+    },
+    {
+      "name": "ManualURLEntryView",
+      "source": "Sources/App/Onboarding/Steps/Servers/ManualURLEntry/ManualURLEntryView.swift",
+      "witness": "accessibility identifier onboarding.manualEntry.connect",
+      "imageWidth": 1206,
+      "imageHeight": 2622,
+      "scale": 3.0,
+      "imageSha256": "48c16c9af64c65461400a6f48bd20daa110b62d31f8a09ea0d26c767451e0ab7"
     }
   ],
-  "workflowRun": "https://github.com/de-novo/dui/actions/runs/45657497439"
+  "workflowRun": "https://github.com/de-novo/dui/actions/runs/45736960129"
 }

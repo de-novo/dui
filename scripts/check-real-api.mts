@@ -59,6 +59,9 @@ async function runDui(args: string[], envExtra: Record<string, string>) {
 
 let mutationHits = 0;
 let liveShelfHits = 0;
+let slowInFlight = 0;
+let slowPeak = 0;
+const cookiesSeen: string[] = [];
 const apiServer = createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
@@ -87,6 +90,35 @@ const apiServer = createServer((req, res) => {
     res.end(JSON.stringify({ title: "Live Shelf From Server" }));
     return;
   }
+  // Three slow endpoints that need the page's own bearer token (not apiHeaders).
+  if (req.url?.startsWith("/api/slow/")) {
+    if (req.headers.authorization !== "Bearer page-token") {
+      res.statusCode = 401;
+      res.end("{}");
+      return;
+    }
+    slowInFlight += 1;
+    slowPeak = Math.max(slowPeak, slowInFlight);
+    setTimeout(() => {
+      slowInFlight -= 1;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ part: req.url!.slice("/api/slow/".length) }));
+    }, 1500);
+    return;
+  }
+  if (req.url === "/api/session" && req.method === "GET") {
+    res.setHeader("Set-Cookie", "sid=from-api; Path=/");
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+  if (req.url === "/api/whoami" && req.method === "GET") {
+    cookiesSeen.push(req.headers.cookie ?? "");
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ cookie: req.headers.cookie ?? "" }));
+    return;
+  }
+  if (req.url === "/api/hang") return; // never answers
   if (req.url === "/api/banner" && req.method === "GET") {
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");
@@ -231,6 +263,75 @@ try {
   assert.equal(hybridCell.observation.apiProvenance["/api/shelf"], "live-api");
   assert.equal(hybridCell.observation.apiProvenance["/api/banner"], "mock");
 
+  // 3. The proxy does not block capture: three 1.5 s requests run together, carry the page's
+  // own Authorization header, a response cookie comes back to the page, and a request that
+  // never answers is reported by path instead of stalling the run.
+  writeFileSync(
+    join(appDir, "main.tsx"),
+    [
+      'import { useEffect, useState } from "react";',
+      'import { createRoot } from "react-dom/client";',
+      "",
+      "function App() {",
+      "  const [parts, setParts] = useState<string[]>([]);",
+      '  const [cookie, setCookie] = useState("");',
+      "  useEffect(() => {",
+      '    const auth = { headers: { Authorization: "Bearer page-token" } };',
+      '    Promise.all(["a", "b", "c"].map((p) => fetch("/api/slow/" + p, auth).then((r) => r.json())))',
+      "      .then((all: { part: string }[]) => setParts(all.map((x) => x.part)));",
+      '    fetch("/api/session")',
+      '      .then(() => fetch("/api/whoami"))',
+      "      .then((r) => r.json())",
+      '      .then((d: { cookie: string }) => setCookie(d.cookie || "none"));',
+      '    fetch("/api/hang").catch(() => {});',
+      "  }, []);",
+      "  if (parts.length < 3 || !cookie) return <div>Loading...</div>;",
+      "  return (",
+      '    <main data-testid="live-api-ready">',
+      '      <h1>{parts.join(",")}</h1>',
+      "      <p>{cookie}</p>",
+      "    </main>",
+      "  );",
+      "}",
+      "",
+      'createRoot(document.getElementById("app")!).render(<App />);',
+      "",
+    ].join("\n"),
+  );
+  const slowManifest = join(appDir, "dui.slow.json");
+  writeFileSync(
+    slowManifest,
+    JSON.stringify({
+      tsconfig: "tsconfig.json",
+      path: "/",
+      widths: [768],
+      readySelector: "[data-testid=live-api-ready]",
+      apiMode: "live",
+      apiBaseUrl,
+      apiProxyPrefix: "/api/",
+    }),
+  );
+  const slowStarted = Date.now();
+  const slowRun = await runDui(["run", appDir, slowManifest], env);
+  const slowMs = Date.now() - slowStarted;
+  const slowCell = (
+    slowRun.body.cells as {
+      status: string;
+      reason: string | null;
+      observation: {
+        text: string;
+        apiPending?: string[];
+        apiErrors?: Record<string, number>;
+      };
+    }[]
+  )[0]!;
+  assert.equal(slowCell.status, "verified", JSON.stringify(slowCell.reason));
+  assert.match(slowCell.observation.text, /a,b,c/);
+  assert.ok(slowPeak >= 3, `the three slow requests were in flight together (peak ${slowPeak})`);
+  assert.deepEqual(slowCell.observation.apiErrors ?? {}, {}, "the page token reached the API");
+  assert.deepEqual(slowCell.observation.apiPending, ["/api/hang"]);
+  assert.ok(slowMs < 15000, `capture did not wait on the hanging request (${slowMs} ms)`);
+
   console.log(
     JSON.stringify({
       ok: true,
@@ -239,6 +340,9 @@ try {
       liveProvenance: liveCell.observation.apiProvenance,
       hybridProvenance: hybridCell.observation.apiProvenance,
       secretRedacted: true,
+      slowPeak,
+      slowMs,
+      cookiesSeen,
     }),
   );
 } finally {

@@ -26,7 +26,10 @@ pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> R
     match target {
         None => discover(&project, &manifest)?,
         Some(target) => {
-            let profile = web_manifest(&project, target)?;
+            let profile = match target {
+                WebTarget::Url(url) if is_vite_project(&project) => url_with_router(&project, url)?,
+                target => web_manifest(&project, target)?,
+            };
             fs::write(&manifest, serde_json::to_vec(&profile).map_err(io)?).map_err(io)?;
         }
     }
@@ -219,9 +222,95 @@ fn apply_discovery_defaults(manifest: &mut Value) {
 
 pub(crate) fn discover(project: &Path, manifest: &Path) -> Result<(), (u8, serde_json::Value)> {
     if let Some(non_vite) = detect_non_vite_manifest(project) {
-        let bytes = serde_json::to_vec_pretty(&non_vite).map_err(io)?;
+        // `"host": "url"` on a Vite project: read the router, then capture the running app.
+        let profile = match non_vite["url"].as_str() {
+            Some(url) if non_vite["host"] == "url" && is_vite_project(project) => {
+                url_with_router(project, url)?
+            }
+            _ => non_vite,
+        };
+        let bytes = serde_json::to_vec_pretty(&profile).map_err(io)?;
         return fs::write(manifest, bytes).map_err(io);
     }
+    let routed = vite_discovery(project)?;
+    fs::write(manifest, serde_json::to_vec(&routed).map_err(io)?).map_err(io)
+}
+
+/// A Vite project: `vite` in the app's package.json or a `vite.config.*` file.
+fn is_vite_project(project: &Path) -> bool {
+    let profile: Value = fs::read(project.join("dui.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_else(|| json!({}));
+    let app_root = profile["appRoot"]
+        .as_str()
+        .map_or_else(|| project.to_path_buf(), |rel| project.join(rel));
+    let pkg: Value = fs::read(app_root.join("package.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or(Value::Null);
+    package_has_dep(&pkg, "vite") || has_config_prefix(&app_root, "vite.config")
+}
+
+/// Map a running Vite app at `url` with the routes its router declares. Link crawl still runs
+/// on top. Without router routes this is the plain URL map.
+fn url_with_router(project: &Path, url: &str) -> Reply {
+    let mut profile = web_manifest(project, WebTarget::Url(url))?;
+    let Ok(routed) = vite_discovery(project) else {
+        return Ok(profile);
+    };
+    if routed["screenDiscovery"]["mode"] != "router" {
+        return Ok(profile);
+    }
+    let requested = profile["path"].as_str().unwrap_or("/").to_owned();
+    for key in [
+        "path",
+        "readySelector",
+        "hasScreenAssertion",
+        "cookies",
+        "scenarios",
+        "screenDiscovery",
+        "linkDefaults",
+        "routeSelector",
+    ] {
+        match routed.get(key) {
+            Some(value) => profile[key] = value.clone(),
+            None => {
+                if let Some(fields) = profile.as_object_mut() {
+                    fields.remove(key);
+                }
+            }
+        }
+    }
+    // A deep URL is captured too, as one more screen.
+    let routed_paths: Vec<&str> = std::iter::once(&routed["path"])
+        .chain(
+            routed["scenarios"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|s| &s["path"]),
+        )
+        .filter_map(Value::as_str)
+        .collect();
+    if requested != "/" && !routed_paths.contains(&requested.as_str()) {
+        let screen = json!({
+            "path": requested,
+            "readySelector": routed["readySelector"],
+            "hasScreenAssertion": routed["hasScreenAssertion"],
+        });
+        if let Some(scenarios) = profile["scenarios"].as_array_mut() {
+            scenarios.push(screen);
+        } else {
+            profile["scenarios"] = json!([screen]);
+        }
+        profile["screenDiscovery"]["sources"][&requested] = json!({"kind": "entry"});
+    }
+    Ok(profile)
+}
+
+/// Run the Vite route discovery and return its capture manifest.
+fn vite_discovery(project: &Path) -> Reply {
     let work = tempfile::tempdir().map_err(io)?;
     let discover = work.path().join("discover.mjs");
     fs::write(
@@ -243,7 +332,7 @@ pub(crate) fn discover(project: &Path, manifest: &Path) -> Result<(), (u8, serde
     if !result.status.success() {
         return Err(failure(3, &String::from_utf8_lossy(&result.stderr)));
     }
-    fs::write(manifest, result.stdout).map_err(io)
+    serde_json::from_slice(&result.stdout).map_err(|e| failure(3, &e.to_string()))
 }
 
 #[cfg(test)]

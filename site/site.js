@@ -103,7 +103,7 @@
       tabSourcePreviewAlt:
         "dui map of home-assistant/iOS with the real onboarding screen captured on an iPhone simulator and its SwiftUI source declaration in the inspector",
       tabSourcePreviewCaption:
-        "home-assistant/iOS 2026.9.2: dui read 212 SwiftUI screens from the compiler's index store. The onboarding screen was captured on an iPhone simulator and attached to its source card, marked Unverified.",
+        "home-assistant/iOS 2026.9.2: dui read 212 SwiftUI screens from the compiler's index store. Three onboarding screens were captured on an iPhone simulator by a UI test and attached to their source cards, marked Unverified.",
       tabDesktopOverview: "macOS Desktop",
       tabDesktopOverviewAlt:
         "dui native GPUI macOS desktop viewer with transparent TitleBar, 11-screen full-page map, screen search, and gutter edges",
@@ -196,7 +196,7 @@
       tabSourcePreviewAlt:
         "iPhone 시뮬레이터에서 찍은 실제 온보딩 화면과 인스펙터의 SwiftUI 소스 선언을 보여 주는 home-assistant/iOS의 dui 지도",
       tabSourcePreviewCaption:
-        "home-assistant/iOS 2026.9.2: dui가 컴파일러 인덱스 스토어에서 SwiftUI 화면 212개를 읽었습니다. 온보딩 화면은 iPhone 시뮬레이터에서 찍어 소스 카드에 붙였고, 미검증으로 표시됩니다.",
+        "home-assistant/iOS 2026.9.2: dui가 컴파일러 인덱스 스토어에서 SwiftUI 화면 212개를 읽었습니다. 온보딩 화면 3개는 iPhone 시뮬레이터에서 UI 테스트로 찍어 소스 카드에 붙였고, 미검증으로 표시됩니다.",
       tabDesktopOverview: "macOS 데스크톱",
       tabDesktopOverviewAlt:
         "투명 TitleBar, 11개 전체 페이지 지도, 화면 검색, 거터 연결선을 갖춘 네이티브 GPUI macOS 데스크톱 뷰어",
@@ -289,7 +289,7 @@
       tabSourcePreviewAlt:
         "home-assistant/iOS 的 dui 地图：在 iPhone 模拟器上截取的真实引导界面，检查器中显示其 SwiftUI 源码声明",
       tabSourcePreviewCaption:
-        "home-assistant/iOS 2026.9.2：dui 从编译器索引库读取了 212 个 SwiftUI 界面。引导界面在 iPhone 模拟器上截图并关联到源码卡片，标记为未验证。",
+        "home-assistant/iOS 2026.9.2：dui 从编译器索引库读取了 212 个 SwiftUI 界面。三个引导界面由 UI 测试在 iPhone 模拟器上截图并关联到源码卡片，标记为未验证。",
       tabDesktopOverview: "macOS 桌面端",
       tabDesktopOverviewAlt:
         "带有透明 TitleBar、11 个整页界面地图、界面搜索与避让通道连线的原生 GPUI macOS 桌面查看器",

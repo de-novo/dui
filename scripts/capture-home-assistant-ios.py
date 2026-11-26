@@ -1,8 +1,9 @@
 """Capture home-assistant/iOS screens on a fresh iPhone simulator and attach them to its dui map.
 
-Run after `dui map` on the pinned checkout, with the same HOME. The app is rebuilt with local
-signing (simulator builds embed their entitlements only then; HA needs its app group), installed
-in English, and each screen is captured once its expected text is visible (OCR on the PNG).
+Run after `dui map` on the pinned checkout, with the same HOME. The Tests-UI scheme is built with
+local signing (simulator builds embed their entitlements only then; HA needs its app group) and
+runs fixtures/home-assistant-ios-capture in English: it walks onboarding without a server and
+captures each screen once an element with the app's own accessibility identifier exists.
 The attached run keeps every cell `unverified`. Writes the attached run's files and
 provenance.json into a new output directory.
 """
@@ -15,12 +16,16 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
-import time
 from ios_simulator import fresh_iphone
 
 ROOT = Path(__file__).resolve().parents[1]
-# Screens reachable without a Home Assistant server: (declaration name, OCR witness).
-SCREENS = [("OnboardingWelcomeView", "Home Assistant Companion App")]
+# Screens reachable without a Home Assistant server, in the order the capture flow visits them:
+# (declaration name, the app's own accessibility identifier that proves the screen is showing).
+SCREENS = [
+    ("OnboardingWelcomeView", "onboarding.welcome.continue"),
+    ("OnboardingServersListView", "onboarding.servers.manualEntry"),
+    ("ManualURLEntryView", "onboarding.manualEntry.connect"),
+]
 
 
 def read(*args, **kwargs):
@@ -58,41 +63,49 @@ def main():
     scheme = json.loads((checkout / "dui.json").read_text())["scheme"]
     dui = os.environ.get("DUI_BIN", str(ROOT / "target/debug/dui"))
 
-    subprocess.run(["xcodebuild", "-project", "HomeAssistant.xcodeproj", "-scheme", scheme,
-                    "-destination", "generic/platform=iOS Simulator", "-derivedDataPath", str(derived),
-                    "-quiet", "build", "CODE_SIGN_IDENTITY=-", "CODE_SIGN_STYLE=Manual",
-                    "DEVELOPMENT_TEAM=", "PROVISIONING_PROFILE_SPECIFIER="], cwd=checkout, check=True)
-    app = next((derived / "Build/Products/Debug-iphonesimulator").glob("*.app"))
-    bundle = plistlib.loads((app / "Info.plist").read_bytes())["CFBundleIdentifier"]
+    # The capture flow replaces a test file that is already in the Tests-UI target.
+    shutil.copy2(ROOT / "fixtures/home-assistant-ios-capture/HomeAssistantUITests.swift",
+                 checkout / "Tests/UI/HomeAssistantUITests.swift")
+    signing = ["CODE_SIGN_IDENTITY=-", "CODE_SIGN_STYLE=Manual", "DEVELOPMENT_TEAM=",
+               "PROVISIONING_PROFILE_SPECIFIER="]
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp = Path(temp_dir)
-        checker = temp / "check-image"
-        subprocess.run(["xcrun", "swiftc", str(ROOT / "scripts/check-ios-screenshot.swift"),
-                        "-o", str(checker)], check=True)
         captures, evidence = [], []
         with fresh_iphone("home-assistant") as phone:
             scale = screen_scale(phone.udid)
-            subprocess.run(["xcrun", "simctl", "install", phone.udid, str(app)], check=True)
+            # A fresh simulator covers the keyboard with a one-time typing tip; it is not app UI.
+            subprocess.run(["xcrun", "simctl", "spawn", phone.udid, "defaults", "write",
+                            "com.apple.keyboard.preferences", "DidShowContinuousPathIntroduction",
+                            "-bool", "true"], check=True)
+            result = temp / "capture.xcresult"
+            subprocess.run(["xcodebuild", "test", "-project", "HomeAssistant.xcodeproj", "-scheme", "Tests-UI",
+                            "-destination", f"platform=iOS Simulator,id={phone.udid}",
+                            "-derivedDataPath", str(derived), "-parallel-testing-enabled", "NO",
+                            "-only-testing:Tests-UI/HomeAssistantUITests/testDuiCaptures",
+                            "-resultBundlePath", str(result), "-quiet", *signing], cwd=checkout, check=True)
+            attachments = temp / "attachments"
+            subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
+                            "--output-path", str(attachments)], check=True)
+            manifest_rows = json.loads((attachments / "manifest.json").read_text())
+            exported = [entry for test in manifest_rows for entry in test["attachments"]
+                        if entry["suggestedHumanReadableName"].startswith("dui-capture-")]
             for name, witness in SCREENS:
+                matches = [e for e in exported
+                           if e["suggestedHumanReadableName"].startswith(f"dui-capture-{name}_")]
+                if len(matches) != 1:
+                    raise ValueError(f"Expected one capture for {name}, found {len(matches)}")
                 node = by_name[name]
-                subprocess.run(["xcrun", "simctl", "launch", "--terminate-running-process", phone.udid,
-                                bundle, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"], check=True)
                 image = temp / f"{name}.png"
-                deadline = time.monotonic() + 90
-                while True:
-                    time.sleep(3)
-                    subprocess.run(["xcrun", "simctl", "io", phone.udid, "screenshot", "--type=png",
-                                    str(image)], check=True, capture_output=True)
-                    found = subprocess.run([str(checker), str(image), witness], capture_output=True, text=True)
-                    if found.returncode == 0:
-                        width, height = map(int, found.stdout.split())
-                        break
-                    if time.monotonic() > deadline:
-                        raise TimeoutError(f"{name}: `{witness}` never appeared")
+                shutil.copyfile(attachments / matches[0]["exportedFileName"], image)
+                png = image.read_bytes()
+                if png[:8] != bytes.fromhex("89504e470d0a1a0a"):
+                    raise ValueError(f"{name}: capture is not a PNG")
+                width, height = int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big")
                 captures.append({"screenId": node["id"], "runtime": "ios", "observedPath": node["label"],
                                  "width": round(width / scale), "image": image.name})
-                evidence.append({"name": name, "source": node["nativeSource"]["source"], "witness": witness,
+                evidence.append({"name": name, "source": node["nativeSource"]["source"],
+                                 "witness": f"accessibility identifier {witness}",
                                  "imageWidth": width, "imageHeight": height, "scale": scale,
                                  "imageSha256": sha256(image)})
         manifest = temp / "recordings.json"
