@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -316,6 +324,71 @@ async function check(media: number, container: number) {
     await stopped;
   }
 }
+// Cards of a map without capture are rendered from source in the running app (#327): on the
+// desktop map and in the mobile deck, the card shows a live frame at its width.
+async function checkLiveCards() {
+  // A home without the captures above: cached captures would be reused as evidence.
+  const env = { ...process.env, HOME: join(root, "live-cards") };
+  mkdirSync(env.HOME, { recursive: true });
+  const planned = JSON.parse(
+    execFileSync(binary, ["map", "."], { cwd: project, env, encoding: "utf8" }),
+  ) as { output: string; cells: { image?: string; reason?: string; width: number }[] };
+  assert.ok(planned.cells.every((c) => !c.image && c.reason === "not-rendered"));
+  const width = planned.cells[0]!.width;
+  const viewer = spawn(binary, ["open", "--no-open", planned.output], {
+    cwd: project,
+    env,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  const lines = createInterface({ input: viewer.stdout });
+  try {
+    const [url] = (await once(lines, "line", { signal: AbortSignal.timeout(15000) })) as [string];
+    const [run] = (await (await fetch(url + "/archive/runs.json")).json()) as { key: string }[];
+    const results: Record<string, unknown> = {};
+    await withChromiumPage(async ({ call }) => {
+      for (const [vw, vh, selector] of [
+        [1440, 920, ".capture-frame[data-showing=live] img"],
+        [390, 844, ".mobile-deck-frame[data-showing=live] img"],
+      ] as const) {
+        await call("Emulation.setDeviceMetricsOverride", {
+          width: vw,
+          height: vh,
+          deviceScaleFactor: 1,
+          mobile: vw < 600,
+        });
+        await call("Page.navigate", {
+          url: url + "/?" + new URLSearchParams({ run: run!.key, uiLang: "en" }),
+        });
+        const { result, exceptionDetails } = (await call("Runtime.evaluate", {
+          expression: `(async () => {
+            const end = performance.now() + 60000;
+            while (performance.now() < end) {
+              const img = document.querySelector(${JSON.stringify(selector)});
+              if (img?.naturalWidth) return { width: img.naturalWidth, overflow: document.documentElement.scrollWidth - innerWidth };
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            throw Error("no live card: " + document.body.innerText.slice(0, 300));
+          })()`,
+          awaitPromise: true,
+          returnByValue: true,
+        })) as {
+          result: { value: { width: number; overflow: number } };
+          exceptionDetails?: unknown;
+        };
+        assert.ok(!exceptionDetails, JSON.stringify(exceptionDetails));
+        assert.equal(result.value.width, width, "the live frame has the card's width");
+        assert.equal(result.value.overflow, 0);
+        results[vw] = result.value;
+      }
+    });
+    console.log({ liveCards: results });
+  } finally {
+    lines.close();
+    const stopped = once(viewer, "exit");
+    viewer.kill();
+    await stopped;
+  }
+}
 try {
   cpSync("fixtures/replay", project, {
     recursive: true,
@@ -328,6 +401,7 @@ try {
     [713, 421],
   ] as const)
     await check(media, container);
+  await checkLiveCards();
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

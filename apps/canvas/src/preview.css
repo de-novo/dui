@@ -2878,3 +2878,11 @@ h2 {
   height: auto;
   margin: 0 auto;
 }
+/* A card without a capture, rendered from source (docs/en/web-viewer.md#shared-screen-maps). */
+.capture-frame .live-frame {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  object-position: top center;
+}

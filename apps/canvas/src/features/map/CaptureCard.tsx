@@ -38,6 +38,7 @@ export function CaptureCard({
   afterRunKey,
   snapshotUrl,
   overlay,
+  live,
 }: {
   screen: Screen;
   cell?: Cell;
@@ -46,6 +47,12 @@ export function CaptureCard({
   snapshotUrl?: string;
   /** Drawn over the capture in its own coordinates, such as where link edges start. */
   overlay?: ReactNode;
+  /** A card without a capture, rendered from source in the running app. */
+  live?: {
+    frame?: { src: string; width: number; height: number };
+    error?: string;
+    pending: boolean;
+  };
   selected?: boolean;
   related?: boolean;
   dimmed?: boolean;
@@ -132,15 +139,23 @@ export function CaptureCard({
       <div
         ref={frameRef}
         className={sourceCard ? "source-frame" : "capture-frame"}
-        data-showing={snapshotUrl && loadedSnapshot === snapshotUrl ? "snapshot" : "png"}
+        data-showing={
+          snapshotUrl && loadedSnapshot === snapshotUrl
+            ? "snapshot"
+            : !resolvedSrc && live?.frame
+              ? "live"
+              : "png"
+        }
         style={
           sourceCard
             ? undefined
-            : naturalW && naturalH
-              ? { aspectRatio: `${naturalW} / ${naturalH}` }
-              : cardWidth && frameHeight
-                ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
-                : undefined
+            : !resolvedSrc && live?.frame
+              ? { aspectRatio: `${live.frame.width} / ${live.frame.height}` }
+              : naturalW && naturalH
+                ? { aspectRatio: `${naturalW} / ${naturalH}` }
+                : cardWidth && frameHeight
+                  ? { aspectRatio: `${cardWidth} / ${frameHeight}` }
+                  : undefined
         }
       >
         {resolvedSrc ? (
@@ -161,6 +176,17 @@ export function CaptureCard({
           />
         ) : sourceCard ? (
           <SourceCardBody source={sourceCard} preview={screen.sourcePreview} />
+        ) : live?.frame ? (
+          <img className="live-frame" alt="" src={live.frame.src} />
+        ) : live?.pending ? (
+          <div className="missing-frame-copy" aria-busy="true">
+            <span>{t.liveRendering}</span>
+          </div>
+        ) : live?.error ? (
+          <div className="missing-frame-copy">
+            <span>{t.liveRenderFailed}</span>
+            <small>{live.error}</small>
+          </div>
         ) : (
           <div className="missing-frame-copy">
             <span>{cell ? "Missing image" : "No capture at this width"}</span>
