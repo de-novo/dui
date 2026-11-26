@@ -182,13 +182,18 @@ export const HomeRoute = createFileRoute("/dashboard")({ component: OrdersPage }
   fs.mkdirSync(path.join(rrApp, "src"), { recursive: true });
   fs.writeFileSync(
     path.join(rrApp, "src", "router.tsx"),
-    `import { createBrowserRouter, Route, Routes } from "react-router";
+    `import { createBrowserRouter, Navigate, Route, Routes } from "react-router";
+import { reportRoutes } from "./reports";
 const nestedRoutes = [
+  { path: "/old-home", element: <Navigate to="/" replace /> },
+  { path: "/billing", children: [{ path: "invoices" }, { path: "plans" }] },
+  { path: "/reports", children: reportRoutes },
   {
     path: "/",
     children: [
       { index: true },
       { path: "login" },
+      { path: "account", element: <Navigate to="../login" replace /> },
       {
         path: "items",
         children: [
@@ -204,6 +209,7 @@ export const router = createBrowserRouter(nestedRoutes);
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/legacy-settings" element={<Navigate to="profile" />} />
       <Route path="/settings">
         <Route index />
         <Route path="profile" />
@@ -231,13 +237,29 @@ export function AppRoutes() {
   const rrParsed7 = JSON.parse(rrDiscover7.stdout) as {
     path: string;
     scenarios: Array<{ path: string }>;
-    screenDiscovery: { mode: string; unresolved: string[]; parseFailures: string[] };
+    screenDiscovery: {
+      mode: string;
+      unresolved: string[];
+      parseFailures: string[];
+      layouts?: Record<string, string>;
+      redirects?: Record<string, { to: string }>;
+    };
   };
   const rrPaths7 = [rrParsed7.path, ...rrParsed7.scenarios.map((s) => s.path)].sort();
+  // Layout-only parents and static redirects are not screens; both stay listed.
+  assert.deepEqual(Object.keys(rrParsed7.screenDiscovery.layouts ?? {}), ["/billing", "/reports"]);
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(rrParsed7.screenDiscovery.redirects ?? {}).map(([from, r]) => [from, r.to]),
+    ),
+    { "/account": "/login", "/legacy-settings": "/legacy-settings/profile", "/old-home": "/" },
+  );
   assert.equal(rrParsed7.screenDiscovery.mode, "router");
   assert.deepEqual(rrParsed7.screenDiscovery.parseFailures, []);
   assert.deepEqual(rrPaths7, [
     "/",
+    "/billing/invoices",
+    "/billing/plans",
     "/extra-standalone",
     "/items",
     "/items/42",
@@ -246,7 +268,7 @@ export function AppRoutes() {
     "/settings/members/42",
     "/settings/profile",
   ]);
-  assert.deepEqual(rrParsed7.screenDiscovery.unresolved, ["/items/:missingParam"]);
+  assert.deepEqual(rrParsed7.screenDiscovery.unresolved, ["/items/:missingParam", "/reports/*"]);
 
   // Verify `dui --help` prints grouped CLI guide and exits 0.
   const helpRes = runDui(["--help"], duiHome);
