@@ -220,6 +220,7 @@ CLI 与 MCP 实时会话使用相同的测量方式。向已打开的会话发�
 | 内嵌客户端与不可变归档 | 从干净的检出安装。在目标应用停止时直接打开详情链接。缺失图像显示错误。保存实时状态后，新旧记录均可重新打开。 |
 | 多语言捕获与查看器 i18n（[#12](https://github.com/de-novo/dui/issues/12)） | 根据清单 `locales` 或自动检测的消息文件（`locales/*.json` / `messages/*.json`）按 `screen × state × width × locale` 捕获。按语言区域汇总（`report.locales`）并报告缺失翻译键、文本溢出选择器与 RTL 不匹配。可在工作区侧栏将查看器界面语言切换为 `en`、`zh-CN`、`ko`，并按语言区域筛选归档格子（`npm run check:i18n`）。 |
 | 捕获差异与像素差异叠加层（[#11](https://github.com/de-novo/dui/issues/11)） | 通过 `dui diff BEFORE AFTER [--overlay-dir DIR]`、MCP `diff` 与查看器的 `?view=diff` 视图（`/api/diff`）对比两次捕获。隐藏内容哈希一致的未变更格子，按界面、状态和宽度分组列出新增/移除/变更格子与变更源文件。已验证格子展示变更前后图像与像素差异叠加层，未验证或不可渲染格子仅展示状态变化而非像素差异（`npm run check:diff`）。 |
+| 地图重新渲染 | `npm run check:viewer-renders` 映射一个带对话框的 24 页网站，在开发版查看器中打开，并统计每次交互实际运行的 React 组件。静止的地图不重新渲染任何内容。指针经过卡片时只重新渲染进入和离开的卡片的连线，选择卡片时只重新渲染选中或相关状态改变的卡片。无关连线和卡片的淡化由地图上的 CSS（`data-edge-focus`、`data-node-focus`）完成，因此不会重新渲染它们。 |
 | 查看器与网站的自我验证 | `npm run verify:pages-demo` 用 `dui map --url` 映射所有已发布的演示页面和网站，并运行 `dui audit --design apps/canvas/audit/dui.json`。向用户显示机器或构建路径、手机上小于 24 × 24 CSS px 的独立触控目标（WCAG 2.2 SC 2.5.8）、没有焦点指示的 Tab 停留处（SC 2.4.7）、Tab 无法到达的控件（SC 2.1.1）、Escape 无法关闭或丢失焦点的浮层（SC 2.4.3），或任何未验证单元都会导致失败。 |
 
 实施顺序为归档和模式夹具 → 路由与可键盘操作的列表 → 地图 → 实时查询与编辑 → 打包和测量。使用 npmgraph 的两个真实界面，以及包含两个独立控件的可再分发夹具。测量 30 次热编辑，期间宿主重建和浏览器重启均为零。分别报告冷启动时间与热编辑的 p50、p95。[shadcn/ui](../../.agents/skills/shadcn/SKILL.md)

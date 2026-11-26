@@ -71,6 +71,7 @@ jobs:
           npm run check:recheck
           npm run check:diff
           npm run check:viewer
+          npm run check:viewer-renders
           node scripts/check-responsive-preview.mts
           node scripts/verify-pages-demo.mts --layout-only
           npm run check:example
