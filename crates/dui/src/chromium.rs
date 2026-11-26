@@ -1402,6 +1402,14 @@ impl Browser {
                 .unwrap_or(dui_core::settle::DEFAULT_TIMEOUT_MS),
         );
         let started = std::time::Instant::now();
+        // The first sample waits for the loaded page (at most 3 s, never past the budget), so a
+        // page that is finished by then settles after three identical samples.
+        let first_wait = budget.min(Duration::from_secs(3)).as_millis();
+        self.call(
+            s,
+            "Runtime.evaluate",
+            json!({"expression":format!("globalThis.__duiRuntime?.whenLoaded({first_wait})"),"awaitPromise":true,"returnByValue":true}),
+        )?;
         let mut polls = 0u32;
         loop {
             let next = self.call(
