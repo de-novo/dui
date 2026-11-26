@@ -311,7 +311,7 @@ impl SurfaceAdapter for AndroidSurface {
                 let reply = crate::surface::unrenderable_reply(SURFACE_ANDROID_MOBILE, &reason);
                 let _ = fs::create_dir_all(out);
                 let _ = analysis::store(&out.join("report.json"), &reply);
-                return Ok(reply);
+                return Err((5, reply));
             }
         };
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;

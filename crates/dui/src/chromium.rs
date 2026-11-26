@@ -12,19 +12,121 @@ use std::{
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 pub fn executable() -> PathBuf {
+    candidates()
+        .into_iter()
+        .find(|path| path.is_file())
+        .unwrap_or_default()
+}
+
+/// Every location `executable()` checks, in order. `DUI_CHROMIUM` replaces the search.
+pub fn candidates() -> Vec<PathBuf> {
     if let Some(path) = std::env::var_os("DUI_CHROMIUM") {
-        return path.into();
+        return vec![path.into()];
     }
+    let mut paths = installed_paths();
+    if let Some(cache) = playwright_cache() {
+        paths.extend(playwright_candidates(&cache));
+    }
+    paths
+}
+
+fn installed_paths() -> Vec<PathBuf> {
     [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
         "/usr/bin/chromium",
         "/usr/bin/google-chrome",
         "/usr/bin/chromium-browser",
     ]
     .into_iter()
     .map(PathBuf::from)
-    .find(|path| path.is_file())
-    .unwrap_or_default()
+    .collect()
+}
+
+/// The `no-browser` detail: what was checked and how to override it.
+pub fn missing_detail() -> String {
+    if let Some(path) = std::env::var_os("DUI_CHROMIUM") {
+        return format!(
+            "Chromium/Chrome executable not found: DUI_CHROMIUM={} is not a file",
+            PathBuf::from(path).display()
+        );
+    }
+    let mut checked: Vec<String> = installed_paths()
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect();
+    if let Some(cache) = playwright_cache() {
+        checked.push(format!("{}/chromium-*", cache.display()));
+        checked.push(format!("{}/chromium_headless_shell-*", cache.display()));
+    }
+    format!(
+        "Chromium/Chrome executable not found (set DUI_CHROMIUM to override). Checked: {}",
+        checked.join(", ")
+    )
+}
+
+/// Playwright's browser cache: `PLAYWRIGHT_BROWSERS_PATH`, else the platform default.
+fn playwright_cache() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("PLAYWRIGHT_BROWSERS_PATH")
+        && !path.is_empty()
+        && path != "0"
+    {
+        return Some(path.into());
+    }
+    let home = PathBuf::from(std::env::var_os("HOME")?);
+    if cfg!(target_os = "macos") {
+        Some(home.join("Library/Caches/ms-playwright"))
+    } else {
+        Some(
+            std::env::var_os("XDG_CACHE_HOME")
+                .map_or_else(|| home.join(".cache"), PathBuf::from)
+                .join("ms-playwright"),
+        )
+    }
+}
+
+/// Browsers in a Playwright cache: the newest `chromium-*` revision first, then the newest
+/// `chromium_headless_shell-*`. Each revision lists the layouts Playwright has shipped.
+fn playwright_candidates(cache: &Path) -> Vec<PathBuf> {
+    const CHROMIUM: &[&str] = &[
+        "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+        "chrome-linux64/chrome",
+        "chrome-linux/chrome",
+    ];
+    const HEADLESS_SHELL: &[&str] = &[
+        "chrome-headless-shell-mac-arm64/chrome-headless-shell",
+        "chrome-headless-shell-mac-x64/chrome-headless-shell",
+        "chrome-headless-shell-linux64/chrome-headless-shell",
+        "chrome-mac/headless_shell",
+        "chrome-linux/headless_shell",
+    ];
+    let revisions = |prefix: &str| {
+        let mut found: Vec<(u64, PathBuf)> = fs::read_dir(cache)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name();
+                let revision = name.to_str()?.strip_prefix(prefix)?.parse().ok()?;
+                Some((revision, entry.path()))
+            })
+            .collect();
+        found.sort_by(|a, b| b.0.cmp(&a.0));
+        found
+    };
+    let mut paths = Vec::new();
+    for (prefix, layouts) in [
+        ("chromium-", CHROMIUM),
+        ("chromium_headless_shell-", HEADLESS_SHELL),
+    ] {
+        for (_, dir) in revisions(prefix) {
+            paths.extend(layouts.iter().map(|layout| dir.join(layout)));
+        }
+    }
+    paths
 }
 pub fn version_tag(executable: &Path) -> Option<Value> {
     if !executable.is_file() {
@@ -1693,3 +1795,41 @@ pub fn capture_login_session(
 
 pub(crate) static BROWSER_LAUNCHES: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+mod tests {
+    use super::playwright_candidates;
+
+    #[test]
+    fn playwright_cache_prefers_the_newest_full_chromium_over_headless_shells() {
+        let cache = tempfile::tempdir().expect("cache");
+        for dir in [
+            "chromium-1208",
+            "chromium-1248",
+            "chromium_headless_shell-1300",
+            "chromium-tip",
+            "firefox-1509",
+        ] {
+            std::fs::create_dir(cache.path().join(dir)).expect("revision");
+        }
+        let revisions: Vec<String> = playwright_candidates(cache.path())
+            .iter()
+            .filter_map(|p| p.strip_prefix(cache.path()).ok()?.iter().next())
+            .map(|d| d.to_string_lossy().into_owned())
+            .collect();
+        let mut order = revisions.clone();
+        order.dedup();
+        assert_eq!(
+            order,
+            [
+                "chromium-1248",
+                "chromium-1208",
+                "chromium_headless_shell-1300"
+            ]
+        );
+        let first = &playwright_candidates(cache.path())[0];
+        assert!(first.ends_with(
+            "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+        ));
+    }
+}

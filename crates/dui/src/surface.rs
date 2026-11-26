@@ -121,13 +121,14 @@ impl SurfaceRegistry {
             );
             let _ = fs::create_dir_all(out);
             let _ = crate::analysis::store(&out.join("report.json"), &reply);
-            return Ok(reply);
+            return Err((5, reply));
         };
         if let Err(reason) = adapter.check_env() {
             let reply = unrenderable_reply(surface_id, &reason);
             let _ = fs::create_dir_all(out);
             let _ = crate::analysis::store(&out.join("report.json"), &reply);
-            return Ok(reply);
+            // Nothing was captured, so the run must not pass: exit 5 with the same JSON.
+            return Err((5, reply));
         }
         adapter.run(project, spec, out, force)
     }
@@ -222,9 +223,10 @@ mod tests {
 
         let mut missing_env = SurfaceRegistry::new();
         missing_env.register(Box::new(MockAndroidSurface { has_adb: false }));
-        let reply = missing_env
+        let (code, reply) = missing_env
             .dispatch(dir.path(), &spec, &dir.path().join("out"), false)
-            .expect("unrenderable reply is Ok");
+            .expect_err("a missing environment does not pass");
+        assert_eq!(code, 5);
         assert_eq!(reply["status"], "unrenderable");
         assert_eq!(reply["surface"], SURFACE_ANDROID_MOBILE);
         assert_eq!(reply["reason"], "no-android-emulator");
@@ -245,9 +247,10 @@ mod tests {
         fs::write(&spec, r#"{"host":"ios","widths":[390]}"#).expect("write manifest");
 
         let registry = SurfaceRegistry::new();
-        let reply = registry
+        let (code, reply) = registry
             .dispatch(dir.path(), &spec, &dir.path().join("out"), false)
-            .expect("unrenderable reply");
+            .expect_err("an unregistered surface does not pass");
+        assert_eq!(code, 5);
         assert_eq!(reply["status"], "unrenderable");
         assert_eq!(reply["surface"], "ios-mobile");
         assert_eq!(reply["reason"], "surface-not-registered");

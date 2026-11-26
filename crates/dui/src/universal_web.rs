@@ -569,7 +569,7 @@ impl SurfaceAdapter for UniversalWebSurface {
         } else {
             Err(UnrenderableReason::new(
                 "no-browser",
-                "Chromium/Chrome executable not found (set DUI_CHROMIUM to override)",
+                crate::chromium::missing_detail(),
             ))
         }
     }

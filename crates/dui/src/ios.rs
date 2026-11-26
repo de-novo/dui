@@ -311,7 +311,7 @@ impl SurfaceAdapter for IosMobileSurface {
                 let reply = crate::surface::unrenderable_reply(SURFACE_IOS_MOBILE, &reason);
                 let _ = fs::create_dir_all(out);
                 let _ = analysis::store(&out.join("report.json"), &reply);
-                return Ok(reply);
+                return Err((5, reply));
             }
         };
         let manifest: Value =
@@ -326,7 +326,7 @@ impl SurfaceAdapter for IosMobileSurface {
                 let reply = crate::surface::unrenderable_reply(SURFACE_IOS_MOBILE, &reason);
                 let _ = fs::create_dir_all(out);
                 let _ = analysis::store(&out.join("report.json"), &reply);
-                return Ok(reply);
+                return Err((5, reply));
             }
         };
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;

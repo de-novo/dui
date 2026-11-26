@@ -150,7 +150,7 @@ npm ci
 ~/.local/bin/dui run . dui.json
 ```
 
-运行 `~/.local/bin/dui open` 并选择示例项目。应看到一个已验证的 768px 截图，内含三本书。dui 根据 `fetchShelf()` 的返回类型为 `GET /api/shelf` 生成响应。若 Chrome 或 Chromium 安装在自定义路径，可将 `DUI_CHROMIUM` 设为其可执行文件路径。 [示例源码](fixtures/typed-api/main.tsx)
+运行 `~/.local/bin/dui open` 并选择示例项目。应看到一个已验证的 768px 截图，内含三本书。dui 根据 `fetchShelf()` 的返回类型为 `GET /api/shelf` 生成响应。dui 也会查找 Playwright 安装的浏览器（`PLAYWRIGHT_BROWSERS_PATH` 或其默认缓存）。若 Chrome 或 Chromium 安装在其他路径，可将 `DUI_CHROMIUM` 设为其可执行文件路径。找不到浏览器时，截图以退出码 5 结束，并列出已检查的路径。 [示例源码](fixtures/typed-api/main.tsx)
 
 ### 捕获真实的开源应用
 

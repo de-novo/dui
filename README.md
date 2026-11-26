@@ -152,7 +152,7 @@ npm ci
 ~/.local/bin/dui run . dui.json
 ```
 
-Run `~/.local/bin/dui open` and select the example app. Expect one verified 768 px capture with three books. dui generates the response to `GET /api/shelf` from the return type of `fetchShelf()`. If Chrome or Chromium is installed in a custom location, set `DUI_CHROMIUM` to its executable path. [Example source](fixtures/typed-api/main.tsx)
+Run `~/.local/bin/dui open` and select the example app. Expect one verified 768 px capture with three books. dui generates the response to `GET /api/shelf` from the return type of `fetchShelf()`. dui also finds a browser installed by Playwright (`PLAYWRIGHT_BROWSERS_PATH` or its default cache). If Chrome or Chromium is installed in another location, set `DUI_CHROMIUM` to its executable path. Without a browser, capture exits with code 5 and lists the paths it checked. [Example source](fixtures/typed-api/main.tsx)
 
 ### Capture an open-source app
 

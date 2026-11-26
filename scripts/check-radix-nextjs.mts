@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,6 +42,16 @@ function runDui(args: string[], envOverrides: Record<string, string>): unknown {
     env: { ...process.env, ...envOverrides },
   });
   return JSON.parse(stdout) as unknown;
+}
+
+// A missing environment captures nothing, so dui exits 5 with the unrenderable reply.
+function runDuiMissingEnv(args: string[], envOverrides: Record<string, string>): unknown {
+  const result = spawnSync(duiBin, args, {
+    encoding: "utf8",
+    env: { ...process.env, ...envOverrides },
+  });
+  assert.equal(result.status, 5, result.stderr);
+  return JSON.parse(result.stdout) as unknown;
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dui-radix-nextjs-"));
@@ -238,10 +248,13 @@ http.createServer((req, res) => {
   // Missing `next` binary without url/command override reports unrenderable (no-next-binary)
   const missingManifest = path.join(nextDir, "dui-missing.json");
   fs.writeFileSync(missingManifest, JSON.stringify({ host: "next", widths: [375] }));
-  const missingReply = runDui(["run", nextDir, missingManifest, path.join(tmp, "out-missing")], {
-    HOME: duiHome,
-    DUI_NEXT_BIN: "/nonexistent/next",
-  }) as { status: string; surface: string; reason: string };
+  const missingReply = runDuiMissingEnv(
+    ["run", nextDir, missingManifest, path.join(tmp, "out-missing")],
+    {
+      HOME: duiHome,
+      DUI_NEXT_BIN: "/nonexistent/next",
+    },
+  ) as { status: string; surface: string; reason: string };
   assert.equal(missingReply.status, "unrenderable");
   assert.equal(missingReply.surface, "nextjs-web");
   assert.equal(missingReply.reason, "no-next-binary");

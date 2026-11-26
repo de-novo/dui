@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -56,6 +56,16 @@ function runDui(args: string[], envOverrides: Record<string, string>): unknown {
     env: { ...process.env, ...envOverrides },
   });
   return JSON.parse(stdout) as unknown;
+}
+
+// A missing environment captures nothing, so dui exits 5 with the unrenderable reply.
+function runDuiMissingEnv(args: string[], envOverrides: Record<string, string>): unknown {
+  const result = spawnSync(duiBin, args, {
+    encoding: "utf8",
+    env: { ...process.env, ...envOverrides },
+  });
+  assert.equal(result.status, 5, result.stderr);
+  return JSON.parse(result.stdout) as unknown;
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dui-tui-"));
@@ -166,10 +176,13 @@ process.stdin.on("data", (chunk) => {
   );
 
   // 3. Missing PTY runtime honestly reports unrenderable (no-pty-env)
-  const missingEnvReply = runDui(["run", appDir, manifest, path.join(tmp, "out-missing")], {
-    HOME: duiHome,
-    DUI_PTY_PYTHON: "/nonexistent/python3",
-  }) as { status: string; surface: string; reason: string };
+  const missingEnvReply = runDuiMissingEnv(
+    ["run", appDir, manifest, path.join(tmp, "out-missing")],
+    {
+      HOME: duiHome,
+      DUI_PTY_PYTHON: "/nonexistent/python3",
+    },
+  ) as { status: string; surface: string; reason: string };
   assert.equal(missingEnvReply.status, "unrenderable");
   assert.equal(missingEnvReply.surface, "universal-tui");
   assert.equal(missingEnvReply.reason, "no-pty-env");

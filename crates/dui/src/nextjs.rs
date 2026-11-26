@@ -192,7 +192,7 @@ impl SurfaceAdapter for NextJsWebSurface {
         } else {
             Err(UnrenderableReason::new(
                 "no-browser",
-                "Chromium/Chrome executable not found for Next.js capture",
+                crate::chromium::missing_detail(),
             ))
         }
     }
@@ -207,7 +207,7 @@ impl SurfaceAdapter for NextJsWebSurface {
                 let reply = crate::surface::unrenderable_reply(SURFACE_NEXTJS_WEB, &reason);
                 let _ = fs::create_dir_all(out);
                 let _ = analysis::store(&out.join("report.json"), &reply);
-                return Ok(reply);
+                return Err((5, reply));
             }
         };
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;

@@ -152,7 +152,7 @@ npm ci
 ~/.local/bin/dui run . dui.json
 ```
 
-`~/.local/bin/dui open`으로 예제 앱을 선택하면 책 세 권이 보이는 768px 화면 한 칸이 **검증됨**으로 표시된다. 책 목록은 dui가 `fetchShelf()`의 반환 타입을 읽어 `GET /api/shelf`에 돌려준 목데이터다. Chrome이나 Chromium을 별도 경로에 설치했다면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다. [예제 소스](fixtures/typed-api/main.tsx)
+`~/.local/bin/dui open`으로 예제 앱을 선택하면 책 세 권이 보이는 768px 화면 한 칸이 **검증됨**으로 표시된다. 책 목록은 dui가 `fetchShelf()`의 반환 타입을 읽어 `GET /api/shelf`에 돌려준 목데이터다. Playwright가 설치한 브라우저(`PLAYWRIGHT_BROWSERS_PATH` 또는 기본 캐시)도 찾는다. Chrome이나 Chromium을 다른 경로에 설치했다면 `DUI_CHROMIUM`에 실행 파일 경로를 지정한다. 브라우저가 없으면 캡처는 확인한 경로를 나열하고 코드 5로 끝난다. [예제 소스](fixtures/typed-api/main.tsx)
 
 ### 실제 오픈소스 앱 캡처하기
 
