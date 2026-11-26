@@ -1408,8 +1408,11 @@ fn execute_with_locales(
             "capturedCells": captured,
         });
     }
-    // How each screen's snapshots lay out at its other captured widths (#323).
-    if let Some(cells) = report["cells"].as_array() {
+    // How each screen's snapshots lay out at its other captured widths (#323). It renders every
+    // pair again (46 s for a 301-page site), so it runs only when the manifest asks for it.
+    if spec["htmlReflow"] == true
+        && let Some(cells) = report["cells"].as_array()
+    {
         let reflow = crate::chromium::snapshot_reflow(
             cells,
             out,

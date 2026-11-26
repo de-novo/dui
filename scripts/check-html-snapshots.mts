@@ -122,7 +122,7 @@ document.getElementById("d").show();
     return JSON.parse(run.stdout) as Report;
   };
 
-  const first = capture({ widths: [800, 600] }, "home");
+  const first = capture({ widths: [800, 600], htmlReflow: true }, "home");
   const at800 = first.cells.find((c) => c.width === 800)!;
   const snap = at800.observation.htmlSnapshot!;
   assert.ok(snap?.file?.endsWith("-800.html"), JSON.stringify(at800.observation.htmlSnapshot));
@@ -169,6 +169,8 @@ ${Array.from({ length: 6 }, (_, i) => `<section><p>Section ${i} with centered te
 </main></body></html>`,
   );
   const tall = capture({ path: "/tall.html" }, "home-tall");
+  // The reflow comparison runs only when the manifest asks for it.
+  assert.equal(tall.htmlReflow, undefined, "no reflow pass unless htmlReflow is set");
   const tallSnap = tall.cells[0]!.observation.htmlSnapshot!;
   assert.ok(tallSnap.fidelity <= 0.005, `tall page fidelity ${tallSnap.fidelity}`);
 
@@ -194,7 +196,7 @@ document.getElementById("rows").innerHTML = Array.from({ length: narrow ? 2 : 6 
 </script></body></html>`,
   );
   const scripted = capture(
-    { path: "/script.html", widths: [800, 600], readySelector: "#rows div" },
+    { path: "/script.html", widths: [800, 600], readySelector: "#rows div", htmlReflow: true },
     "home-script",
   );
   const scriptedPairs = scripted.htmlReflow?.pairs ?? [];
@@ -205,7 +207,7 @@ document.getElementById("rows").innerHTML = Array.from({ length: narrow ? 2 : 6 
   );
 
   // A cache hit brings the snapshot along.
-  const again = capture({ widths: [800, 600] }, "home");
+  const again = capture({ widths: [800, 600], htmlReflow: true }, "home");
   const reused = again.cells.find((c) => c.width === 800)!.observation.htmlSnapshot!;
   assert.equal(reused?.file, snap.file);
   assert.ok(existsSync(join(again.output, reused.file)), "snapshot restored from the cache");
