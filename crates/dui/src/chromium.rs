@@ -1183,7 +1183,15 @@ impl Browser {
         use sha2::{Digest, Sha256};
         // Rendered back while self-contained, so fidelity compares the same content the viewer
         // shows; the file is then rewritten with large resources moved to shared assets.
-        let probe = out_dir.join(format!(".render-back-{width}.html"));
+        // A name of its own per probe: the reused render-back tab waits for the probe's URL, so
+        // a URL shared with the previous probe would be taken for loaded before it navigates,
+        // and parallel captures writing into one run must not overwrite each other's probe.
+        static PROBES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let probe = out_dir.join(format!(
+            ".render-back-{}-{}-{width}.html",
+            std::process::id(),
+            PROBES.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
         if let Err(e) = fs::write(&probe, inline) {
             return json!({"error": e.to_string()});
         }
