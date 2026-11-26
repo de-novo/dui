@@ -12,9 +12,11 @@
 
 ### 共享屏幕地图
 
-使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿同源链接导航，并使用 Chromium 执行截图和布局检查。Angular 等 Web 框架共享此流程。在 Vite 项目中，dui 还会先读取路由器，因此没有链接可达的路由也会从运行中的服务器截取，`screenDiscovery.mode` 为 `router+links`。需要开发服务器的应用（例如 `configureServer` 中间件或 `server.proxy`）应使用此方式。内置主机把这类应用渲染为空白时，报告会在 `screenDiscovery.devServerHint` 中说明。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
+**地图的截图为可选项（2026-11-26 决定）。** `dui map` 生成地图时不截图。它记录找到的界面、状态和宽度；每个格子保持原因为 `not-rendered` 的 `unverified`，因此覆盖率不计为尝试。在 `dui open` 中，项目可以运行时，视口内的卡片通过实时会话在运行中的应用里从源码渲染；无法渲染的卡片会说明原因。要保存证据（PNG、渲染树和 HTML 快照），在卡片或选区上选择 **截图**，或运行 `dui map . --capture`；截图保存为新的运行。链接发现（`--url`、`--build-dir`）仍会为读取链接而在一个宽度下加载每个可达页面一次，但不保存图像。由于验证和覆盖率需要已保存的证据，`dui run`、CI 检查和 MCP 工具继续截取所有计划的格子。截图缓存使未变化的格子没有开销。
 
-构建静态部署产物后，运行 `dui map . --build-dir dist`。dui 在临时回环端口提供该目录，默认以 375 和 1280 px 截取沿链接可到达的页面。在 `dui.json` 中设置 `path` 可指定其他 HTML 入口。若使用通过 `index.html` 处理导航的 history 路由，设置 `spaFallback: true`。Vue Router、使用 adapter-static 的 SvelteKit、Astro 静态输出和使用 preact-iso 的 Preact 共用此流程。需要应用服务器的部署使用 `--url`。需要登录或没有可达链接的页面需要项目提供入口或会话数据。
+使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿同源链接导航，并使用 Chromium 执行截图和布局检查。Angular 等 Web 框架共享此流程。在 Vite 项目中，dui 还会先读取路由器，因此没有链接可达的路由也会从运行中的服务器加入地图，`screenDiscovery.mode` 为 `router+links`。需要开发服务器的应用（例如 `configureServer` 中间件或 `server.proxy`）应使用此方式。内置主机把这类应用渲染为空白时，报告会在 `screenDiscovery.devServerHint` 中说明。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
+
+构建静态部署产物后，运行 `dui map . --build-dir dist`。dui 在临时回环端口提供该目录，将沿链接可到达的页面加入地图；使用 `--capture` 时默认以 375 和 1280 px 截取。在 `dui.json` 中设置 `path` 可指定其他 HTML 入口。若使用通过 `index.html` 处理导航的 history 路由，设置 `spaFallback: true`。Vue Router、使用 adapter-static 的 SvelteKit、Astro 静态输出和使用 preact-iso 的 Preact 共用此流程。需要应用服务器的部署使用 `--url`。需要登录或没有可达链接的页面需要项目提供入口或会话数据。
 
 对 React Navigation、Expo Router 或 Flutter 应用包运行 `dui map PATH`，可以在没有设备的情况下从路由声明生成地图。React Navigation 和 Expo Router 使用项目所安装的 TypeScript。Flutter 使用 Dart SDK，dui 在首次运行时将锁定版本的分析器安装到自己的缓存中。在 monorepo 中可指定应用包路径，或在 `dui.json` 中设置 `appRoot`。
 
