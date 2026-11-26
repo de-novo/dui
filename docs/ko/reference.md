@@ -89,7 +89,7 @@
 
 | CLI | MCP | 동작 |
 | --- | --- | --- |
-| `dui map [PROJECT]` | `map(project)` | 라우터(TanStack Router · React Router)와 링크에서 화면을 자동 발견하고, `dui.json`(`routeParams`, `storageState`, 추가 `scenarios`)을 병합해 캡처한다. |
+| `dui map [PROJECT]` | `map(project)` | 라우터(TanStack Router · React Router)와 링크에서 화면을 자동 발견하고, `dui.json`(`routeParams`, `storageState`, 추가 `scenarios`)을 병합해 캡처한다. React Router에서 자식은 있지만 `element`, `Component`, `index`가 없는 라우트는 묶음이고, element가 정적 `<Navigate to>`인 라우트는 리다이렉트다. 둘 다 캡처하지 않고 `screenDiscovery.layouts`와 `screenDiscovery.redirects`에 기록한다. 정적으로 읽을 수 없는 자식 라우트는 `screenDiscovery.unresolved`에 `PATH/*`로 남는다. |
 | `dui run [PROJECT] [MANIFEST] [OUTPUT]` | `run(project, manifest, output?)` | `dui.json` 설정대로 직접 캡처한다(인자 생략 시 `.` / `dui.json` 사용, 설정이 없으면 `map`으로 자동 발견). |
 | `dui scan [PROJECT] [MANIFEST]` | `scan(project, manifest)` | 브라우저 없이 컴파일러 사실, 프레임워크 컨트롤, 생성한 목 응답을 출력한다. |
 | `dui auth login URL [--out FILE]` | — | Chromium 창에서 로그인(폼·MFA·OAuth) 후 `0600` 권한의 `storageState.json`으로 저장한다. |
