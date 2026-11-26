@@ -8,6 +8,7 @@ on:
       - "crates/dui/src/native_map/**"
       - "scripts/check-swift-map.mts"
       - "scripts/capture-home-assistant-ios.py"
+      - "fixtures/home-assistant-ios-capture/**"
       - ".github/workflows/swift-map.yml"
   workflow_dispatch:
 permissions:
