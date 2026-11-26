@@ -93,7 +93,7 @@ The commands assume `dui` is on your `PATH`. With the default installation you c
 | `dui run [PROJECT] [MANIFEST] [OUTPUT]` | `run(project, manifest, output?)` | Capture using `dui.json` directly (defaults to `.` / `dui.json`, or auto-discovers via `map` when omitted). |
 | `dui scan [PROJECT] [MANIFEST]` | `scan(project, manifest)` | Print compiler facts, framework controls, and generated mocks without launching a browser. |
 | `dui auth login URL [--out FILE]` | — | Launch Chromium to sign in (form / MFA / OAuth) and save Playwright-compatible `storageState.json` (`0600`). |
-| `dui open [RUN_DIR]` | — | Open the embedded 2D canvas viewer in the browser. |
+| `dui open [RUN_DIR]` | — | Open the embedded 2D canvas viewer in the browser. A `RUN_DIR` must contain `graph.json`; another path or an unknown option exits 2 with the reason. `--help` prints the options. |
 | `dui desktop` | — | Open the native GPUI desktop viewer over `~/.dui/dui.db`. |
 | `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | Compare two runs (element `renderDiff`, lazy pixel overlay, or `--base BRANCH --markdown` for PR comments). |
 | `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | Compute coverage percentage, gaps, and unresolved review comments. |

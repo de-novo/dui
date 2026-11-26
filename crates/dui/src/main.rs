@@ -349,6 +349,19 @@ fn is_supported_ts(version: &str) -> bool {
         })
 }
 
+const VIEW_HELP: &str = "\
+Usage: dui open [RUN_DIR...] [OPTIONS]
+       dui serve [RUN_DIR...] [OPTIONS]
+
+Open the screen-map viewer. Without RUN_DIR it lists every saved run in ~/.dui.
+A RUN_DIR is a run's output directory (it contains graph.json).
+
+Options:
+  --port PORT   Bind a fixed port (default: any free port)
+  --no-open     Print the URL without launching a browser (the default for dui serve)
+  -h, --help    Print this help
+";
+
 const CLI_HELP: &str = "\
 dui — real UI state capture, screen map, and diff
 
@@ -403,7 +416,10 @@ fn manifest_has_explicit_target(spec_path: &Path) -> bool {
 }
 
 fn run() -> Reply {
-    let args: Vec<_> = env::args_os().skip(1).collect();
+    run_with(env::args_os().skip(1).collect())
+}
+
+fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
     if args.is_empty()
         || matches!(
             args.as_slice(),
@@ -539,8 +555,31 @@ fn run() -> Reply {
                     .to_str()
                     .and_then(|s| s.parse::<u16>().ok())
                     .ok_or_else(|| failure(2, "invalid --port"))?;
+            } else if arg == "--help" || arg == "-h" {
+                return Ok(json!({ "__rawStdout": VIEW_HELP }));
+            } else if arg.to_str().is_some_and(|a| a.starts_with('-')) {
+                return Err(failure(
+                    2,
+                    &format!(
+                        "unknown option {} for dui {}; run dui {} --help",
+                        arg.to_string_lossy(),
+                        cmd.to_string_lossy(),
+                        cmd.to_string_lossy()
+                    ),
+                ));
             } else {
-                run_dirs.push(std::path::PathBuf::from(arg));
+                // A run directory holds graph.json; anything else would show an empty viewer.
+                let dir = std::path::PathBuf::from(arg);
+                if !dir.join("graph.json").is_file() {
+                    return Err(failure(
+                        2,
+                        &format!(
+                            "{} is not a dui run directory (no graph.json)",
+                            dir.display()
+                        ),
+                    ));
+                }
+                run_dirs.push(dir);
             }
         }
         return viewer::serve(run_dirs, port, open_browser);
@@ -1033,6 +1072,36 @@ fn main() -> ExitCode {
         println!("{body}");
     }
     ExitCode::from(code)
+}
+
+#[cfg(test)]
+mod view_args_tests {
+    use super::run_with;
+
+    #[test]
+    fn open_help_and_bad_arguments_never_start_a_viewer() {
+        let args = |a: &[&str]| a.iter().map(std::ffi::OsString::from).collect::<Vec<_>>();
+        for help in [["open", "--help"], ["serve", "-h"]] {
+            let body = run_with(args(&help)).expect("help");
+            assert!(
+                body["__rawStdout"]
+                    .as_str()
+                    .is_some_and(|t| t.starts_with("Usage: dui open"))
+            );
+        }
+        let (code, body) = run_with(args(&["open", "--bogus"])).expect_err("unknown option");
+        assert_eq!(code, 2);
+        assert!(
+            body["reason"]
+                .as_str()
+                .is_some_and(|r| r.contains("--bogus"))
+        );
+        let empty = tempfile::tempdir().expect("dir");
+        let path = empty.path().to_string_lossy().into_owned();
+        let (code, body) = run_with(args(&["serve", &path])).expect_err("not a run");
+        assert_eq!(code, 2);
+        assert!(body["reason"].as_str().is_some_and(|r| r.contains(&path)));
+    }
 }
 
 #[cfg(test)]

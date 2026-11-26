@@ -93,7 +93,7 @@
 | `dui run [PROJECT] [MANIFEST] [OUTPUT]` | `run(project, manifest, output?)` | `dui.json` 설정대로 직접 캡처한다(인자 생략 시 `.` / `dui.json` 사용, 설정이 없으면 `map`으로 자동 발견). |
 | `dui scan [PROJECT] [MANIFEST]` | `scan(project, manifest)` | 브라우저 없이 컴파일러 사실, 프레임워크 컨트롤, 생성한 목 응답을 출력한다. |
 | `dui auth login URL [--out FILE]` | — | Chromium 창에서 로그인(폼·MFA·OAuth) 후 `0600` 권한의 `storageState.json`으로 저장한다. |
-| `dui open [RUN_DIR]` | — | 내장 2D 캔버스 뷰어를 브라우저에서 연다. |
+| `dui open [RUN_DIR]` | — | 내장 2D 캔버스 뷰어를 브라우저에서 연다. `RUN_DIR`에는 `graph.json`이 있어야 하며, 다른 경로나 알 수 없는 옵션은 이유와 함께 종료 코드 2로 끝난다. `--help`는 옵션을 출력한다. |
 | `dui desktop` | — | `~/.dui/dui.db`를 직접 읽는 네이티브 GPUI 데스크톱 뷰어를 연다. |
 | `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | 두 캡처를 비교한다(요소 `renderDiff`, 지연 픽셀 오버레이, `--base BRANCH --markdown` PR 코멘트 출력). |
 | `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | 검증률·누락 사유·미해결 리뷰 코멘트를 계산한다. |
