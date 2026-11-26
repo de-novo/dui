@@ -310,6 +310,22 @@ h2 {
   opacity: 0.62;
   filter: saturate(0.8);
 }
+/* Selection focus fades every card that is neither selected nor related. In CSS, so those
+   cards keep their React Flow objects and do not re-render. */
+.map
+  .react-flow[data-node-focus]
+  .react-flow__node:not(.selected-screen):not(.related-screen)
+  .screen-card {
+  opacity: 0.22;
+  filter: saturate(0.45);
+}
+.map
+  .react-flow[data-node-focus]
+  .react-flow__node:not(.selected-screen):not(.related-screen)
+  .screen-card:hover {
+  opacity: 0.62;
+  filter: saturate(0.8);
+}
 .native-empty {
   align-self: center;
   margin: auto;
@@ -418,6 +434,11 @@ h2 {
   vector-effect: non-scaling-stroke;
   stroke-width: 1.25;
   transition: opacity 160ms ease;
+}
+/* A focused card (hover or selection): edges it does not touch fade. Done in CSS so those
+   edges keep their React Flow objects and do not re-render. */
+.map .react-flow[data-edge-focus] .react-flow__edge:not(.edge-focus) .react-flow__edge-path {
+  opacity: 0.08 !important;
 }
 .map-edge-label {
   position: absolute;

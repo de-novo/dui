@@ -17,6 +17,7 @@
     "check:diff": "tsc --project scripts && cargo build --locked && node scripts/check-diff.mts",
     "check:example": "tsc --project scripts && cargo build --locked && node scripts/check-dispatch.mts",
     "check:viewer": "tsc --project scripts && cargo build --locked && node scripts/check-viewer.mts",
+    "check:viewer-renders": "tsc --project scripts && cargo build --locked && node scripts/check-viewer-renders.mts",
     "check:transitions": "tsc --project scripts && cargo build --locked && node scripts/check-transitions.mts",
     "check:comments": "tsc --project scripts && cargo build --locked && node scripts/check-comments.mts",
     "check:audit": "tsc --project scripts && cargo build --locked && node scripts/check-audit.mts",

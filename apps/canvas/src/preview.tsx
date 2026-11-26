@@ -48,6 +48,59 @@ function archiveUrl(name: string, run: Run) {
   return archiveFileUrl(name, run.key);
 }
 
+// One image-URL function per run object, so the map's cards keep stable props across renders.
+const imageUrls = new WeakMap<Run, (name: string) => string>();
+// The diff index and the archive filtered by it, per archive and diff object.
+type DiffView = {
+  diffsByPath: ReturnType<typeof indexScreenDiffs>;
+  visibleArchive: Archive;
+};
+const diffViews = new WeakMap<Archive, WeakMap<object, Map<string, DiffView>>>();
+const noDiff = {};
+function diffViewFor(
+  archive: Archive,
+  diff: CaptureDiff | null,
+  width: number,
+  diffActive: boolean,
+  changedOnly: boolean,
+): DiffView {
+  let byDiff = diffViews.get(archive);
+  if (!byDiff) diffViews.set(archive, (byDiff = new WeakMap()));
+  let byOptions = byDiff.get(diff ?? noDiff);
+  if (!byOptions) byDiff.set(diff ?? noDiff, (byOptions = new Map()));
+  const key = `${width}|${diffActive}|${changedOnly}`;
+  let view = byOptions.get(key);
+  if (!view) {
+    const diffsByPath = indexScreenDiffs(diff, width);
+    view = {
+      diffsByPath,
+      visibleArchive: filterArchiveForDiff(archive, diffsByPath, diffActive, changedOnly),
+    };
+    byOptions.set(key, view);
+  }
+  return view;
+}
+// Open comment counts per audit report object, for the same reason.
+const comments = new WeakMap<AuditReport, Record<string, number>>();
+const noComments: Record<string, number> = {};
+function commentsFor(audit: AuditReport | null) {
+  if (!audit) return noComments;
+  let counts = comments.get(audit);
+  if (!counts) {
+    counts = openCommentsByPath(audit);
+    comments.set(audit, counts);
+  }
+  return counts;
+}
+function imageUrlFor(run: Run) {
+  let url = imageUrls.get(run);
+  if (!url) {
+    url = (name: string) => archiveUrl(name, run);
+    imageUrls.set(run, url);
+  }
+  return url;
+}
+
 function MapView({
   archive,
   run,
@@ -142,8 +195,16 @@ function MapView({
     return () => controller.abort();
   }, [compareBeforeKey, run.key, wantPixelOverlay]);
 
-  const diffsByPath = indexScreenDiffs(activeDiff, width);
-  const visibleArchive = filterArchiveForDiff(archive, diffsByPath, diffActive, changedOnly);
+  // Stable references: the map rebuilds every card when one of its props changes identity.
+  const { diffsByPath, visibleArchive } = diffViewFor(
+    archive,
+    activeDiff,
+    width,
+    diffActive,
+    changedOnly,
+  );
+  const commentsByPath = commentsFor(audit);
+  const imageUrl = imageUrlFor(run);
   const selectedScreen = visibleArchive.screens.find((s) => s.id === selectedId) ?? screen;
   const selectedDiff = selectedScreen ? diffsByPath[selectedScreen.path] : undefined;
 
@@ -336,13 +397,13 @@ function MapView({
                     mode={mode}
                     selectedId={selectedId}
                     focusActive={showDetails}
-                    openCommentsByPath={openCommentsByPath(audit)}
+                    openCommentsByPath={commentsByPath}
                     diffsByPath={diffsByPath}
                     diffActive={diffActive}
                     diffVisualMode={diffVisualMode}
                     beforeRunKey={compareBeforeKey || undefined}
                     afterRunKey={run.key}
-                    imageUrl={(name) => archiveUrl(name, run)}
+                    imageUrl={imageUrl}
                     select={select}
                     onClearSelection={returnToOverview}
                   />

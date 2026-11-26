@@ -181,6 +181,41 @@ function ZoomOneToOneButton({
   );
 }
 
+// The last node object built for each screen. A re-measured card changes the layout, which
+// rebuilds every node; a card whose node is equal to its previous one keeps that object, so
+// React Flow re-renders only the cards that changed.
+const previousCards = new WeakMap<object, CardNode>();
+function sameCardAsBefore(node: CardNode): CardNode {
+  const prior = previousCards.get(node.data.screen);
+  if (
+    prior &&
+    prior.position.x === node.position.x &&
+    prior.position.y === node.position.y &&
+    prior.selected === node.selected &&
+    prior.className === node.className &&
+    prior.ariaLabel === node.ariaLabel &&
+    shallowEqual(prior.data, node.data)
+  )
+    return prior;
+  previousCards.set(node.data.screen, node);
+  return node;
+}
+function shallowEqual<T extends object>(a: T, b: T): boolean {
+  const keys = Object.keys(a) as (keyof T)[];
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.is(a[key], b[key]));
+}
+
+// Shared style objects: Handle is memoized, and a new object per render would re-render all
+// eight handles of every card that renders.
+const handleStyles = {
+  source: { side: { top: "46%" }, axis: { left: "46%" } },
+  target: { side: { top: "54%" }, axis: { left: "54%" } },
+} as const;
+function handleStyle(position: Position, kind: "source" | "target") {
+  const sides = position === Position.Left || position === Position.Right;
+  return sides ? handleStyles[kind].side : handleStyles[kind].axis;
+}
+
 function Card({ data }: NodeProps<CardNode>) {
   const cell = cardCell(data.screen, data.width);
   return (
@@ -191,21 +226,13 @@ function Card({ data }: NodeProps<CardNode>) {
             type="source"
             id={position}
             position={position}
-            style={
-              position === Position.Left || position === Position.Right
-                ? { top: "46%" }
-                : { left: "46%" }
-            }
+            style={handleStyle(position, "source")}
           />
           <Handle
             type="target"
             id={position}
             position={position}
-            style={
-              position === Position.Left || position === Position.Right
-                ? { top: "54%" }
-                : { left: "54%" }
-            }
+            style={handleStyle(position, "target")}
           />
         </Fragment>
       ))}
@@ -233,8 +260,9 @@ type GutterEdgeData = {
   gutterY?: number;
   multiColumn: boolean;
   highlighted: boolean;
-  dimmed: boolean;
   labelFontSize: number;
+  /** Overlay or replay-verified edges keep the primary color when focused. */
+  emphasized: boolean;
 };
 
 type MapEdge = Edge<GutterEdgeData, "gutter">;
@@ -424,19 +452,17 @@ export function ScreenMap({
     }
     return set;
   }, [focusActive, selectedId, layout.links]);
-  // React Flow remeasures new node objects. Hover changes only edge emphasis.
-  const nodes = useMemo<CardNode[]>(
+  // React Flow remeasures and re-renders a node whenever its object changes. Node objects are
+  // built without selection; selecting then replaces only the selected and related cards.
+  // Fading the other cards during selection focus is done in CSS (`data-node-focus`).
+  const baseNodes = useMemo<CardNode[]>(
     () =>
       layout.nodes.map(({ screen, position, frameHeight: nodeFrameHeight }) => {
         const screenDiff = diffsByPath?.[screen.path];
-        const isSelected = screen.id === selectedId;
-        const isRelated = dimming && !isSelected && relatedIds.has(screen.id);
-        const isDimmed = (dimming && !relatedIds.has(screen.id)) || (diffActive && !screenDiff);
+        const diffDimmed = diffActive && !screenDiff;
         const classes = [
           mode === "focus:" + screen.id ? "focus-screen" : "",
-          isSelected ? "selected-screen" : "",
-          isRelated ? "related-screen" : "",
-          isDimmed ? "dimmed-screen" : "",
+          diffDimmed ? "dimmed-screen" : "",
           screenDiff ? `diff-node-${screenDiff.kind}` : "",
         ]
           .filter(Boolean)
@@ -445,15 +471,15 @@ export function ScreenMap({
           id: screen.id,
           type: "screen",
           position,
-          selected: isSelected,
+          selected: false,
           data: {
             screen,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
-            selected: isSelected,
-            related: isRelated,
-            dimmed: isDimmed,
+            selected: false,
+            related: false,
+            dimmed: diffDimmed,
             openComments: openCommentsByPath?.[screen.path] ?? 0,
             imageUrl,
             screenDiff,
@@ -461,16 +487,13 @@ export function ScreenMap({
             beforeRunKey,
             afterRunKey,
           },
-          ariaLabel: isSelected ? `${screen.path} (selected)` : screen.path,
+          ariaLabel: screen.path,
           className: classes || undefined,
         };
       }),
     [
       layout.nodes,
       diffsByPath,
-      selectedId,
-      dimming,
-      relatedIds,
       diffActive,
       mode,
       width,
@@ -482,110 +505,156 @@ export function ScreenMap({
       afterRunKey,
     ],
   );
-  const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
-  const cardRects = layout.nodes.map((n) => ({
-    x: n.position.x,
-    y: n.position.y,
-    w: cardWidth,
-    h: heights.get(n.screen.id) ?? n.frameHeight,
-  }));
-  const findClearGutterY = (x1: number, x2: number, preferredY: number): number => {
-    const left = Math.min(x1, x2);
-    const right = Math.max(x1, x2);
-    // Leave room for the curve at either end of the horizontal segment.
-    const radius = 28;
-    const obstacles = cardRects.filter((r) => r.x + r.w > left && r.x < right);
-    return clearLane(
-      preferredY,
-      obstacles.map((r) => ({ top: r.y - radius, bottom: r.y + r.h + radius })),
-    );
-  };
-  const edges: MapEdge[] = layout.links.map(
-    ({ source, target, origin, provenance, replayVerified, action }, edgeIdx) => {
-      const a = positions.get(source)!,
-        b = positions.get(target)!;
-      const dx = Math.abs(b.x - a.x);
-      const multiColumn = dx > column * 1.1;
-      const interveningSibling =
-        a.x === b.x &&
-        cardRects.some((r) => r.x === a.x && r.y > Math.min(a.y, b.y) && r.y < Math.max(a.y, b.y));
-      const [out, into] = interveningSibling
-        ? [Position.Right, Position.Right]
-        : a.x === b.x
-          ? a.y < b.y
-            ? [Position.Bottom, Position.Top]
-            : [Position.Top, Position.Bottom]
-          : a.x < b.x
-            ? [Position.Right, Position.Left]
-            : [Position.Left, Position.Right];
-      const originText =
-        origin === "overlay"
-          ? "Discovered overlay"
-          : origin === "anchor"
-            ? "Discovered anchor"
-            : "Discovered link";
-      const isConnectedToFocus =
-        edgeFocusActive && (source === activeFocusId || target === activeFocusId);
-      const isEdgeDimmed = edgeFocusActive && !isConnectedToFocus;
-      const isOverlayEdge = origin === "overlay";
-      const strokeColor =
-        isOverlayEdge || replayVerified
-          ? "var(--primary)"
-          : isConnectedToFocus
-            ? "var(--foreground)"
-            : "var(--map-link)";
-      const edgeStrokeWidth = isConnectedToFocus ? Math.round(strokeWidth * 1.7) : strokeWidth;
-      const strokeDasharray =
-        provenance === "verified" ? undefined : provenance === "inferred" ? "2 4" : "5 4";
-      const edgeLabel = action?.label
-        ? action.label
-        : replayVerified
-          ? "Verified"
-          : provenance === "inferred"
-            ? "Inferred"
-            : layout.total === 1
-              ? "Extracted"
-              : undefined;
-      const trackOffset = ((edgeIdx % 3) - 1) * 18;
-      const preferredGutterY = b.y - Math.max(64, Math.round(rowGap * 0.42)) + trackOffset;
-      const gutterY = multiColumn
-        ? findClearGutterY(
-            a.x + (b.x >= a.x ? cardWidth : 0),
-            b.x + (b.x >= a.x ? 0 : cardWidth),
-            preferredGutterY,
-          )
-        : preferredGutterY;
-      const baseOpacity = isOverlayEdge ? 0.72 : 0.28;
-      return {
-        id: JSON.stringify([source, target]),
-        source,
-        target,
-        type: "gutter",
-        zIndex: isConnectedToFocus ? 10 : 0,
-        sourceHandle: out,
-        targetHandle: into,
-        label: edgeLabel,
-        data: {
-          colGap,
-          gutterY,
-          multiColumn,
-          highlighted: isConnectedToFocus || layout.total <= 6,
-          dimmed: isEdgeDimmed,
-          labelFontSize,
-        },
-        ariaLabel: replayVerified
-          ? `Replay-verified transition from ${source} to ${target}`
-          : `${originText} (${provenance}) from ${source} to ${target}, not replay-verified`,
-        style: {
-          stroke: strokeColor,
-          strokeWidth: edgeStrokeWidth,
-          strokeDasharray,
-          opacity: isEdgeDimmed ? 0.08 : isConnectedToFocus ? 1 : baseOpacity,
-        },
-        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 16, height: 16 },
-      };
-    },
+  const nodes = useMemo<CardNode[]>(
+    () =>
+      baseNodes.map((node) => {
+        const isSelected = node.id === selectedId;
+        const isRelated = dimming && !isSelected && relatedIds.has(node.id);
+        if (!isSelected && !isRelated) return sameCardAsBefore(node);
+        const className = [node.className, isSelected ? "selected-screen" : "related-screen"]
+          .filter(Boolean)
+          .join(" ");
+        return sameCardAsBefore({
+          ...node,
+          selected: isSelected,
+          data: { ...node.data, selected: isSelected, related: isRelated },
+          ariaLabel: isSelected ? `${node.data.screen.path} (selected)` : node.ariaLabel,
+          className,
+        });
+      }),
+    [baseNodes, selectedId, dimming, relatedIds],
   );
+  // Edge geometry depends only on the layout. Hover and selection emphasis below reuse these
+  // objects for every edge they do not touch, so React Flow re-renders only the changed edges.
+  const baseEdges = useMemo<MapEdge[]>(() => {
+    const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
+    const cardRects = layout.nodes.map((n) => ({
+      x: n.position.x,
+      y: n.position.y,
+      w: cardWidth,
+      h: heights.get(n.screen.id) ?? n.frameHeight,
+    }));
+    const findClearGutterY = (x1: number, x2: number, preferredY: number): number => {
+      const left = Math.min(x1, x2);
+      const right = Math.max(x1, x2);
+      // Leave room for the curve at either end of the horizontal segment.
+      const radius = 28;
+      const obstacles = cardRects.filter((r) => r.x + r.w > left && r.x < right);
+      return clearLane(
+        preferredY,
+        obstacles.map((r) => ({ top: r.y - radius, bottom: r.y + r.h + radius })),
+      );
+    };
+    return layout.links.map(
+      ({ source, target, origin, provenance, replayVerified, action }, edgeIdx) => {
+        const a = positions.get(source)!,
+          b = positions.get(target)!;
+        const dx = Math.abs(b.x - a.x);
+        const multiColumn = dx > column * 1.1;
+        const interveningSibling =
+          a.x === b.x &&
+          cardRects.some(
+            (r) => r.x === a.x && r.y > Math.min(a.y, b.y) && r.y < Math.max(a.y, b.y),
+          );
+        const [out, into] = interveningSibling
+          ? [Position.Right, Position.Right]
+          : a.x === b.x
+            ? a.y < b.y
+              ? [Position.Bottom, Position.Top]
+              : [Position.Top, Position.Bottom]
+            : a.x < b.x
+              ? [Position.Right, Position.Left]
+              : [Position.Left, Position.Right];
+        const originText =
+          origin === "overlay"
+            ? "Discovered overlay"
+            : origin === "anchor"
+              ? "Discovered anchor"
+              : "Discovered link";
+        const isOverlayEdge = origin === "overlay";
+        const emphasized = isOverlayEdge || Boolean(replayVerified);
+        const strokeColor = emphasized ? "var(--primary)" : "var(--map-link)";
+        const strokeDasharray =
+          provenance === "verified" ? undefined : provenance === "inferred" ? "2 4" : "5 4";
+        const edgeLabel = action?.label
+          ? action.label
+          : replayVerified
+            ? "Verified"
+            : provenance === "inferred"
+              ? "Inferred"
+              : layout.total === 1
+                ? "Extracted"
+                : undefined;
+        const trackOffset = ((edgeIdx % 3) - 1) * 18;
+        const preferredGutterY = b.y - Math.max(64, Math.round(rowGap * 0.42)) + trackOffset;
+        const gutterY = multiColumn
+          ? findClearGutterY(
+              a.x + (b.x >= a.x ? cardWidth : 0),
+              b.x + (b.x >= a.x ? 0 : cardWidth),
+              preferredGutterY,
+            )
+          : preferredGutterY;
+        return {
+          id: JSON.stringify([source, target]),
+          source,
+          target,
+          type: "gutter",
+          zIndex: 0,
+          sourceHandle: out,
+          targetHandle: into,
+          label: edgeLabel,
+          data: {
+            colGap,
+            gutterY,
+            multiColumn,
+            highlighted: layout.total <= 6,
+            labelFontSize,
+            emphasized,
+          },
+          ariaLabel: replayVerified
+            ? `Replay-verified transition from ${source} to ${target}`
+            : `${originText} (${provenance}) from ${source} to ${target}, not replay-verified`,
+          style: {
+            stroke: strokeColor,
+            strokeWidth,
+            strokeDasharray,
+            opacity: isOverlayEdge ? 0.72 : 0.28,
+          },
+          markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, width: 16, height: 16 },
+        } satisfies MapEdge;
+      },
+    );
+  }, [layout, heights, cardWidth, column, rowGap, colGap, strokeWidth, labelFontSize]);
+  // The focused card's edges are drawn on top in full strength. Every other edge keeps its
+  // object and is dimmed by the `data-edge-focus` rule in preview.css.
+  const edges = useMemo<MapEdge[]>(() => {
+    if (!activeFocusId) return baseEdges;
+    return baseEdges.map((edge) => {
+      if (edge.source !== activeFocusId && edge.target !== activeFocusId) return edge;
+      const stroke = edge.data?.emphasized ? "var(--primary)" : "var(--foreground)";
+      return {
+        ...edge,
+        zIndex: 10,
+        className: "edge-focus",
+        data: { ...edge.data!, highlighted: true },
+        style: { ...edge.style, stroke, strokeWidth: Math.round(strokeWidth * 1.7), opacity: 1 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: stroke, width: 16, height: 16 },
+      };
+    });
+  }, [baseEdges, activeFocusId, strokeWidth]);
+
+  // Stable handlers: React Flow re-renders every node when a handler prop changes identity.
+  const onNodeMouseEnter = useCallback((_: unknown, node: CardNode) => setHoveredId(node.id), []);
+  const onNodeMouseLeave = useCallback(() => setHoveredId(null), []);
+  // `select` is a new function on every parent render; read the latest one at click time.
+  const selectRef = useRef(select);
+  useLayoutEffect(() => {
+    selectRef.current = select;
+  });
+  const onNodeClick = useCallback((_: unknown, node: CardNode) => selectRef.current(node.id), []);
+  const onPaneClick = useCallback(() => {
+    if (focusActive) onClearSelection?.();
+  }, [focusActive, onClearSelection]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -636,12 +705,12 @@ export function ScreenMap({
       nodesDraggable={false}
       nodesConnectable={false}
       onKeyDown={handleKeyDown}
-      onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
-      onNodeMouseLeave={() => setHoveredId(null)}
-      onNodeClick={(_, node) => select(node.id)}
-      onPaneClick={() => {
-        if (focusActive) onClearSelection?.();
-      }}
+      data-edge-focus={edgeFocusActive ? "" : undefined}
+      data-node-focus={dimming ? "" : undefined}
+      onNodeMouseEnter={onNodeMouseEnter}
+      onNodeMouseLeave={onNodeMouseLeave}
+      onNodeClick={onNodeClick}
+      onPaneClick={onPaneClick}
     >
       <MapGuideScale root={flowElement} />
       <ResponsiveOverview
