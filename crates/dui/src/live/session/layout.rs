@@ -39,7 +39,7 @@ impl Session {
                 let Backend::Web(web) = &mut self.backend else {
                     return Err(invalid("resize-unavailable"));
                 };
-                web.browser.call(Some(&web.page), "Emulation.setDeviceMetricsOverride", json!({
+                web.bench.browser.borrow_mut().call(Some(&web.page), "Emulation.setDeviceMetricsOverride", json!({
                     "width": width.map_or_else(|| viewport["width"].clone(), Value::from),
                     "height": height.map_or_else(|| viewport["height"].clone(), Value::from),
                     "deviceScaleFactor":1, "mobile":false
@@ -82,10 +82,12 @@ impl Session {
         };
         if value.is_empty() {
             for kind in ["rawKeyDown", "keyUp"] {
-                web.browser.call(Some(&web.page), "Input.dispatchKeyEvent", json!({"type":kind,"key":"Backspace","code":"Backspace","windowsVirtualKeyCode":8})).map_err(io)?;
+                web.bench.browser.borrow_mut().call(Some(&web.page), "Input.dispatchKeyEvent", json!({"type":kind,"key":"Backspace","code":"Backspace","windowsVirtualKeyCode":8})).map_err(io)?;
             }
         } else {
-            web.browser
+            web.bench
+                .browser
+                .borrow_mut()
                 .call(Some(&web.page), "Input.insertText", json!({"text":value}))
                 .map_err(io)?;
         }
