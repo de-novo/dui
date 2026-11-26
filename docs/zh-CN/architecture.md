@@ -164,6 +164,7 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 | 黄金渲染用 Chromium | 黄金 CI 固定一个**精确的稳定版构建**。普通运行记录所用的 Chromium 版本 | 区分浏览器变化和应用变化。黄金运行还固定 OS、字体、时钟、随机数和动画；更新 PR 审查差异 |
 | salsa | 推迟到性能分析表明与变更无关的重复计算是主要瓶颈时（例如在 MCP 编辑循环中）。先用内容哈希缓存，键为阶段输入加工具和规则包版本 | 核心是纯的，所以以后可以加入增量查询而无需重写 |
 | SwiftUI 屏幕发现（2026-11-25 决定） | `adapters/native-map/swift` 中的 Swift 包（像 Dart 工具一样缓存）按源码位置结合官方构建的**索引库**与 **swift-syntax** 调用结构。dui 将所选 scheme 以 `COMPILER_INDEX_STORE_ENABLE=YES` 构建到自己的 DerivedData（iOS 模拟器），不修改项目。按[路线图规则](roadmap.md#swiftui-screen-discovery)输出声明而非截图 | 类型和调用目标来自编译器，连接来自代码自身结构。仅用 swift-syntax 会猜测类型，仅用索引无法区分跳转目标与标签，逐点 SourceKit 请求在批量处理时慢且不稳定。两个库均为 Apache-2.0 |
+| HTML 屏幕快照（2026-11-26 决定） | Web 截图在生成 PNG 的同一时刻，还会把渲染出的页面保存为不含脚本的自包含 HTML 快照：实际 DOM（包括开放的 shadow root）、浏览器解析后的 CSS 规则、表单状态，并内嵌同源的图片、字体和画布。截图浏览器以相同宽度重新渲染快照并与 PNG 比较，不同像素的比例作为保真度保存。当卡片在屏幕上足够大且保真度在限值内时，查看器在禁止脚本的沙箱框架中绘制快照，否则绘制 PNG。验证依据仍是 PNG。原生截图只使用 PNG | 任何缩放下文字都清晰，可以选择和检查元素。代码修改（v0.3.0）和 Figma 导出需要的也是这棵元素树。与从源码重绘屏幕不同，它是实际渲染的副本，不会臆造内容；副本不同时由保真度检查说明。与已移除的 live-mount iframe（#169）不同，它不需要运行中的应用服务器。它不会缩短截图时间：DOM 仍需运行应用才能得到 |
 
 ## 5. Monorepo 布局
 

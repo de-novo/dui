@@ -39,6 +39,13 @@ Run `dui map attach SOURCE_RUN recordings.json` against the original local sourc
 
 For iOS evidence, install the app’s simulator build on an iPhone simulator and capture a route after checking that its expected content is visible. Record the logical width, PNG dimensions, route and app revision. The simulator checks use public sample data. A standard run verifies the images on the runner. Explicitly requested fixture exports contain PNGs and expire after one day.
 
+### HTML cards
+
+A web capture saves `HASH-WIDTH.html` next to its PNG and records it in `observation.htmlSnapshot`: `file`, `bytes`, `fidelity` (the share of pixels that differ when the snapshot is rendered back at the capture width), and `omitted` (resources that could not be inlined, such as cross-origin images or a canvas the browser refuses to read). The snapshot has no scripts. Inputs keep their values, open dialogs stay open, and animations show the state they had when the PNG was taken.
+
+The map draws a card from its snapshot when the card is at least 320 CSS px wide on screen and `fidelity` is at most 0.5 %. Otherwise it draws the PNG. At most 12 snapshot frames are mounted at once; cards outside the viewport go back to their PNG. A frame is sandboxed without scripts or same-origin access, and the viewer serves snapshots with a content security policy that allows only inline styles and `data:` images and fonts. The PNG remains the verification evidence, and the inspector says which of the two a card is showing.
+
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.
