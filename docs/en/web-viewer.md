@@ -48,9 +48,13 @@ The map draws a card from its snapshot when the card is at least 320 CSS px wide
 
 ### Width preview
 
-A snapshot keeps the page's style sheets with their media queries, so the browser can lay it out at any width. After capturing, each run renders every screen's snapshot at that screen's other captured widths (same state, scenario and locale) and compares it with the PNG taken at that width. `report.json` records each pair in `htmlReflow.pairs` with `path`, `from`, `to` and `mismatch`, and the time taken in `htmlReflow.ms`. A screen that adapts with CSS alone agrees; layout chosen by scripts at another width (for example a component that renders a different menu below a breakpoint) is not in a snapshot, so it shows up as a mismatch.
+In the inspector, **Width preview** shows the selected screen at any width from 320 CSS px.
 
-In the inspector, **Width preview** lays the selected capture's snapshot out at any width from 320 CSS px, starting from the captured width nearest the chosen one. A captured width is labelled as captured. Any other width is labelled as an unverified CSS reflow preview: it adds no cell and does not count toward coverage. The dialog lists how this snapshot measured at the other captured widths. When any pair of the screen differs by more than 0.5 %, it warns that scripts also change the layout and points to **Responsive preview** for a running app.
+When the project can run (the same conditions as **Responsive preview**), the screen is rendered from its source at that width in the running app, through the live session, scripts included. The frame follows the width as it changes. It is not recorded as a capture and does not count toward coverage.
+
+Otherwise, for example for an archive opened away from its project, the capture's HTML snapshot is laid out at that width instead, starting from the captured width nearest the chosen one. A snapshot keeps the page's style sheets with their media queries, but layout that scripts choose at another width (for example a component that renders a different menu below a breakpoint) is not in it. A captured width is labelled as captured; any other width is labelled as an unverified CSS reflow preview. If the live session cannot be opened, the dialog says why and shows the snapshot.
+
+To say how far a snapshot can be trusted at other widths, each run renders every screen's snapshot at that screen's other captured widths (same state, scenario and locale) and compares it with the PNG taken at that width. `report.json` records each pair in `htmlReflow.pairs` with `path`, `from`, `to` and `mismatch`, plus `measured`, `reused` and `ms`. Snapshot and PNG names are hashes of their content, so a pair measured before with the same dui and Chromium build is read back from `~/.dui/reflow` instead of rendered again; a run whose captures all come from the cache measures nothing. The snapshot preview lists these results and, when any pair of the screen differs by more than 0.5 %, warns that scripts also change the layout.
 
 ### React Flow validation
 

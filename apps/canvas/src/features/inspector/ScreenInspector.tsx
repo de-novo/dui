@@ -103,6 +103,11 @@ export function ScreenInspector({
   const percent = (value: number) => `${(value * 100).toFixed(2)} %`;
   const usable = snapshotUsable(cell?.snapshot);
   const widthSources = widthPreviewSources(rawScreenCells, cell);
+  // A project that can run renders the screen from source (Responsive preview's live session).
+  const liveCell =
+    run.responsiveAvailable && !screen?.nativeSource && cell?.state && cell.scenario !== "live"
+      ? { state: cell.state, width: cell.width }
+      : undefined;
   const cardSourceText =
     snapshotShown && cell?.snapshot?.fidelity !== undefined
       ? t.snapshotShown(percent(cell.snapshot.fidelity))
@@ -156,12 +161,13 @@ export function ScreenInspector({
             cell={{ state: cell.state, width: cell.width }}
           />
         )}
-      {widthSources.length > 0 && cell && (
+      {(widthSources.length > 0 || liveCell) && cell && (
         <WidthPreview
           key={JSON.stringify([run.key, screen?.id, cell.state, cell.width])}
           runKey={run.key}
           sources={widthSources}
           width={cell.width}
+          live={liveCell}
         />
       )}
       {screen?.nativeSource && !screen.sourcePreview && (

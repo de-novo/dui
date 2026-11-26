@@ -53,7 +53,11 @@ type Snapshot = {
 };
 type Report = {
   output: string;
-  htmlReflow?: { pairs: { path: string; from: number; to: number; mismatch: number }[] };
+  htmlReflow?: {
+    pairs: { path: string; from: number; to: number; mismatch: number }[];
+    measured: number;
+    reused: number;
+  };
   cells: {
     status: string;
     image: string;
@@ -206,6 +210,16 @@ document.getElementById("rows").innerHTML = Array.from({ length: narrow ? 2 : 6 
   assert.equal(reused?.file, snap.file);
   assert.ok(existsSync(join(again.output, reused.file)), "snapshot restored from the cache");
   assert.ok(existsSync(join(again.output, largeName)), "shared asset restored from the cache");
+  // The same snapshots and PNGs: their reflow pairs are read back, not rendered again.
+  assert.deepEqual(
+    [again.htmlReflow?.measured, again.htmlReflow?.reused],
+    [0, 2],
+    JSON.stringify(again.htmlReflow),
+  );
+  assert.deepEqual(
+    again.htmlReflow?.pairs.map((p) => p.mismatch),
+    first.htmlReflow?.pairs.map((p) => p.mismatch),
+  );
 
   // The manifest can turn snapshots off.
   const off = capture({ htmlSnapshots: false }, "home-off");

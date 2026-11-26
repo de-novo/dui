@@ -16,7 +16,7 @@ type Layout = Bounds & {
   }[];
 };
 
-async function request<T>(payload: object): Promise<T> {
+export async function request<T>(payload: object): Promise<T> {
   const response = await fetch("/api/responsive", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -2100,13 +2100,52 @@ pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -
             }
         }
     }
+    // Snapshot and PNG names are hashes of their content, so a pair measured before with the same
+    // dui and Chromium build has the same result: it is read back instead of rendered again.
+    let exe = executable();
+    let build = json!([
+        crate::update::VERSION,
+        exe.to_string_lossy(),
+        fs::metadata(&exe)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs()),
+    ]);
+    let cache = crate::archive::home_dir()
+        .ok()
+        .map(|home| home.join("reflow"));
+    let cache_file = |(_, _, file, to, image): &(Value, u32, String, u32, String)| {
+        use sha2::{Digest, Sha256};
+        let key = json!([build, file, to, image]).to_string();
+        cache
+            .as_ref()
+            .map(|dir| dir.join(format!("{:x}.json", Sha256::digest(key.as_bytes()))))
+    };
+    let mut cached = 0;
     let results: std::sync::Mutex<Vec<Option<std::result::Result<f64, String>>>> =
-        std::sync::Mutex::new(vec![None; jobs.len()]);
+        std::sync::Mutex::new(
+            jobs.iter()
+                .map(|job| {
+                    let hit = cache_file(job)
+                        .and_then(|path| fs::read(path).ok())
+                        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                        .and_then(|v| v["mismatch"].as_f64());
+                    cached += usize::from(hit.is_some());
+                    hit.map(Ok)
+                })
+                .collect(),
+        );
+    let todo: Vec<usize> = results
+        .lock()
+        .map(|slots| (0..jobs.len()).filter(|i| slots[*i].is_none()).collect())
+        .unwrap_or_default();
     let next = std::sync::atomic::AtomicUsize::new(0);
     let launch_error: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
     std::thread::scope(|scope| {
-        for _ in 0..concurrency.clamp(1, 4).min(jobs.len()) {
-            let (jobs, results, next, launch_error) = (&jobs, &results, &next, &launch_error);
+        for _ in 0..concurrency.clamp(1, 4).min(todo.len()) {
+            let (jobs, todo, results, next, launch_error) =
+                (&jobs, &todo, &results, &next, &launch_error);
             scope.spawn(move || {
                 let launched = tempfile::tempdir()
                     .map_err(|e| e.to_string())
@@ -2125,7 +2164,10 @@ pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -
                     }
                 };
                 loop {
-                    let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let at = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let Some(&i) = todo.get(at) else {
+                        break;
+                    };
                     let Some((_, _, file, to, image)) = jobs.get(i) else {
                         break;
                     };
@@ -2144,6 +2186,14 @@ pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -
         }
     });
     let results = results.into_inner().unwrap_or_default();
+    for &i in &todo {
+        if let (Some(Some(Ok(mismatch))), Some(path)) = (results.get(i), cache_file(&jobs[i]))
+            && let Some(dir) = path.parent()
+            && fs::create_dir_all(dir).is_ok()
+        {
+            let _ = fs::write(path, json!({"mismatch": mismatch}).to_string());
+        }
+    }
     let pairs: Vec<Value> = jobs
         .iter()
         .zip(results)
@@ -2163,6 +2213,8 @@ pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -
         .collect();
     let mut summary = json!({
         "pairs": pairs,
+        "measured": todo.len(),
+        "reused": cached,
         "ms": u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
     });
     if let Some(e) = launch_error.into_inner().ok().flatten() {

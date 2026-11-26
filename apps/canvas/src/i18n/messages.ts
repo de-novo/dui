@@ -85,6 +85,8 @@ export type Messages = {
   reflowAgreement: (pairs: string) => string;
   reflowUnmeasured: string;
   reflowWarning: string;
+  widthLive: (width: number) => string;
+  widthLiveFailed: (reason: string) => string;
   viewport: string;
   constraint: string;
   height: string;
@@ -284,6 +286,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     reflowAgreement: (pairs) =>
       `This snapshot at the other captured widths, against their PNGs: ${pairs}`,
     reflowUnmeasured: "Only one captured width, so reflow agreement is not measured.",
+    widthLive: (width) =>
+      `Rendered from source at ${width} px in the running app, scripts included. Not recorded as a capture.`,
+    widthLiveFailed: (reason) =>
+      `The running app could not be opened (${reason}). Showing the HTML snapshot instead.`,
     reflowWarning:
       "Scripts also change this screen's layout with its width, so other widths may differ from the app. Use Responsive preview on a running app to see them.",
     viewport: "Viewport",
@@ -494,6 +500,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     widthReflowed: (from, to) => `CSS 重排预览，未验证：将 ${from} px 快照按 ${to} px 排版`,
     reflowAgreement: (pairs) => `此快照按其他已捕获宽度排版，与其 PNG 对比：${pairs}`,
     reflowUnmeasured: "只有一个已捕获宽度，无法测量重排一致度。",
+    widthLive: (width) => `在运行中的应用里按 ${width} px 从源码渲染，包含脚本。不记录为捕获。`,
+    widthLiveFailed: (reason) => `无法打开运行中的应用（${reason}），改为显示 HTML 快照。`,
     reflowWarning:
       "脚本也会随宽度改变此界面的布局，因此其他宽度可能与应用不同。可在运行中的应用上使用响应式预览查看。",
     viewport: "视口",
@@ -698,6 +706,10 @@ export const MESSAGES: Record<UiLocale, Messages> = {
       `CSS 재배치 미리보기 · 미검증: ${from} px 스냅샷을 ${to} px로 다시 그림`,
     reflowAgreement: (pairs) => `이 스냅샷을 다른 캡처 폭으로 다시 그려 PNG와 비교: ${pairs}`,
     reflowUnmeasured: "캡처한 폭이 하나뿐이라 재배치 일치도를 측정하지 못했습니다.",
+    widthLive: (width) =>
+      `실행 중인 앱에서 소스를 ${width} px로 렌더링함 (스크립트 포함). 캡처로 기록되지 않음.`,
+    widthLiveFailed: (reason) =>
+      `실행 중인 앱을 열지 못했습니다 (${reason}). 대신 HTML 스냅샷을 보여 줍니다.`,
     reflowWarning:
       "이 화면은 스크립트도 폭에 따라 레이아웃을 바꾸므로, 다른 폭은 실제 앱과 다를 수 있습니다. 실행 중인 앱에서는 반응형 미리보기로 확인하세요.",
     viewport: "화면 영역",
