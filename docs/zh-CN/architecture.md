@@ -267,7 +267,7 @@ flowchart BT
 
 所有路径均在配置文件所在目录内解析。CLI 对每个拥有非空渲染树且已验证的单元按配置顺序调用插件。它使用 Node.js 执行 `.mjs` 文件，直接调用其他可执行文件。插件以调用者的本地权限运行，从标准输入读取一个 JSON 对象，向标准输出写入一个 JSON 对象。
 
-- 输入字段为 `version`（1）、`index`（从 0 开始的单元序号）、`path`、`width`、`state`、`locale`、`scenario`、`renderTree`、`keyboard`、`dismissal` 和 `designSpec`。`keyboard` 是网页界面的 Tab 遍历记录：键盘目标、每个焦点停留处是否绘制了焦点指示，以及遍历是否回到起点。`dismissal` 记录真实的 Escape 按键是否关闭了浮层并把焦点还给触发元素。缺少相应证据时为 `null`。规范包含配置中的 `path` 和 `content`。`.json` 文件解析为 JSON，`DESIGN.md` 等文件按 UTF-8 文本读取。
+- 输入字段为 `version`（1）、`index`（从 0 开始的单元序号）、`path`、`width`、`state`、`locale`、`scenario`、`renderTree`、`keyboard`、`dismissal` 和 `designSpec`。`keyboard` 是网页界面的 Tab 遍历记录（每个焦点停留都要一次浏览器往返，因此仅在清单设置 `"keyboardEvidence": true` 或 `DUI_KEYBOARD_EVIDENCE=1` 时记录）：键盘目标、每个焦点停留处是否绘制了焦点指示，以及遍历是否回到起点。`dismissal` 记录真实的 Escape 按键是否关闭了浮层并把焦点还给触发元素。缺少相应证据时为 `null`。规范包含配置中的 `path` 和 `content`。`.json` 文件解析为 JSON，`DESIGN.md` 等文件按 UTF-8 文本读取。
 - 输出包括 `findings` 和可选的原因列表 `unverified`。每条发现包含 `rule`、`severity`（`info`、`warning` 或 `error`）、`nodeId`、`rect`、`summary`、`measured`、`expected` 和可选的 `specRef`。节点 ID 和矩形必须匹配同一捕获节点。
 - 覆盖率报告的 `designAudit` 包含单元位置和插件路径。检查通过返回 0；有发现或缺少证据返回 5；配置无效返回 2；插件失败、响应无效或插件超时 30 秒返回 3。
 

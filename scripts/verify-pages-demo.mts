@@ -653,7 +653,8 @@ async function dogfoodAudit(port: number, keys: string[]) {
   if (!binary) throw new Error("Build dui before verifying Pages: the self-audit runs it");
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "dui-dogfood-home-"));
   const project = fs.mkdtempSync(path.join(os.tmpdir(), "dui-dogfood-"));
-  const env = { ...process.env, HOME: home };
+  // The viewer plugin's keyboard rules need the Tab walk, which dui only records on request.
+  const env = { ...process.env, HOME: home, DUI_KEYBOARD_EVIDENCE: "1" };
   const failures: string[] = [];
   let cells = 0;
   try {
