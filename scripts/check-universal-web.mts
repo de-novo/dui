@@ -362,6 +362,64 @@ http.createServer((_req, res) => {
     `expected 1 verified command cell, got ${cmdReport.coverage.verified}`,
   );
 
+  // A shared header trigger is probed once per width; later screens reuse its overlay.
+  const shared = path.join(tmp, "shared-header");
+  fs.mkdirSync(shared);
+  const pages = ["index", "a", "b", "c"];
+  for (const page of pages) {
+    fs.writeFileSync(
+      path.join(shared, `${page}.html`),
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${page}</title></head>
+<body><header><button type="button" aria-haspopup="dialog" onclick="profile.showModal()">Profile</button></header>
+<nav>${pages.map((p) => `<a href="/${p}.html">${p}</a>`).join(" ")}</nav>
+<main><h1>Page ${page}</h1>
+<button type="button" aria-haspopup="dialog" onclick="create.showModal()">Create ${page}</button></main>
+<dialog id="profile" aria-label="Profile"><h2>Profile</h2><p>Signed in as Ada</p></dialog>
+<dialog id="create" aria-label="Create ${page}"><h2>Create ${page}</h2><p>New item</p></dialog>
+</body></html>`,
+    );
+  }
+  const sharedManifest = path.join(shared, "dui.json");
+  fs.writeFileSync(
+    sharedManifest,
+    JSON.stringify({
+      host: "static",
+      widths: [375, 1280],
+      readySelector: "h1",
+      routeSelector: "a[href]",
+      discoverOverlays: true,
+    }),
+  );
+  const sharedOut = path.join(tmp, "out-shared-header");
+  await runDui(["run", shared, sharedManifest, sharedOut], duiHome).catch(() => null);
+  type Probed = { slug: string; scope: string; probe?: string; dismissal?: unknown };
+  const sharedCells = (
+    JSON.parse(fs.readFileSync(path.join(sharedOut, "report.json"), "utf8")) as {
+      cells: (ReportCell & { observation?: { overlays?: Probed[] } })[];
+    }
+  ).cells;
+  const screens = sharedCells.filter((c) => !c.path.includes("#overlay:"));
+  assert.equal(screens.length, 10, "index.html, / and three pages at two widths");
+  const headerProbes = screens.flatMap((c) =>
+    (c.observation?.overlays ?? []).filter((o) => o.scope === "header"),
+  );
+  assert.equal(headerProbes.length, screens.length, "every screen lists the header overlay");
+  assert.equal(
+    headerProbes.filter((o) => o.probe !== "reused").length,
+    2,
+    "the header trigger is opened once per width",
+  );
+  assert.ok(
+    headerProbes.every((o) => o.dismissal),
+    "reused overlays keep their dismissal",
+  );
+  const overlayPaths = sharedCells
+    .filter((c) => c.path.includes("#overlay:"))
+    .map((c) => `${c.path}@${c.width}`)
+    .sort();
+  assert.equal(overlayPaths.filter((p) => p.includes("#overlay:profile")).length, 2);
+  assert.equal(overlayPaths.filter((p) => p.includes("#overlay:create-")).length, 10);
+
   console.log(
     JSON.stringify({
       status: "ok",
