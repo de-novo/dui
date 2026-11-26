@@ -132,7 +132,23 @@ type Capture = {
   reason?: string;
   state?: string;
   scenario?: string;
-  observation?: { htmlSnapshot?: { file?: unknown; fidelity?: unknown; omitted?: unknown } };
+  observation?: {
+    htmlSnapshot?: { file?: unknown; fidelity?: unknown; omitted?: unknown; assets?: unknown };
+  };
+};
+
+const assetName = /^asset-[0-9a-f]{64}\.(woff2|woff|ttf|otf|png|jpg|gif|webp|avif|svg)$/;
+const assetTypes: Record<string, string> = {
+  woff2: "font/woff2",
+  woff: "font/woff",
+  ttf: "font/ttf",
+  otf: "font/otf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  svg: "image/svg+xml",
 };
 
 async function openArchive(root: string) {
@@ -140,6 +156,14 @@ async function openArchive(root: string) {
   const report = await optionalJson(root, "report.json");
   const captures: Capture[] = report?.cells ?? graph.overview;
   const snapshotName = /^[0-9a-f]{64}-\d+\.html$/;
+  // Fonts and images snapshots of the run share (crates/dui/src/snapshot_assets.rs).
+  const assets = new Set<string>();
+  for (const capture of captures) {
+    const listed = capture.observation?.htmlSnapshot?.assets;
+    if (Array.isArray(listed))
+      for (const name of listed)
+        if (typeof name === "string" && assetName.test(name)) assets.add(name);
+  }
   const cells = captures.map(
     ({ path, width, image, status, reason, state, scenario, observation }) => {
       const snapshot = observation?.htmlSnapshot;
@@ -163,7 +187,7 @@ async function openArchive(root: string) {
       };
     },
   );
-  const images = new Set<string>();
+  const images = new Set<string>(assets);
   for (const { image } of [...cells, ...graph.overview]) {
     if (typeof image === "string" && basename(image) === image && image.endsWith(".png"))
       images.add(image);
@@ -260,7 +284,14 @@ const server = await createServer({
         vite.middlewares.use("/archive", async (req, res, next) => {
           try {
             const url = new URL(req.url ?? "/", "http://localhost");
-            const name = decodeURIComponent(url.pathname.slice(1));
+            let name = decodeURIComponent(url.pathname.slice(1));
+            // `/archive/r/<run>/<name>`, where a snapshot's relative asset names resolve.
+            let pathKey: string | null = null;
+            const scoped = url.pathname.match(/^\/r\/([^/]+)\/(.+)$/);
+            if (scoped) {
+              pathKey = decodeURIComponent(scoped[1]!);
+              name = decodeURIComponent(scoped[2]!);
+            }
             res.setHeader("Cache-Control", "no-store");
             const archives = await listArchives();
             if (name === "runs.json") {
@@ -268,7 +299,7 @@ const server = await createServer({
               res.end(JSON.stringify(archives.map((a) => a.run)));
               return;
             }
-            const key = url.searchParams.get("run");
+            const key = pathKey ?? url.searchParams.get("run");
             const archive = key === null ? archives[0] : archives.find((a) => a.run.key === key);
             if (archive) {
               const { root } = archive;
@@ -283,12 +314,28 @@ const server = await createServer({
                 const image = await realpath(join(root, name)).catch(() => undefined);
                 if (image && dirname(image) === root) {
                   if (name.endsWith(".html")) {
-                    // Same policy as `dui open` (crates/dui/src/viewer.rs, SNAPSHOT_POLICY).
+                    // Same policy and base as `dui open` (crates/dui/src/viewer.rs,
+                    // snapshot_policy and with_asset_base).
+                    const host = `http://${req.headers.host}/archive/`;
                     res.setHeader("Content-Type", "text/html; charset=utf-8");
                     res.setHeader(
                       "Content-Security-Policy",
-                      "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; sandbox",
+                      `default-src 'none'; style-src 'unsafe-inline'; img-src data: ${host}; font-src data: ${host}; sandbox`,
                     );
+                    res.setHeader("X-Content-Type-Options", "nosniff");
+                    const html = await readFile(image, "utf8");
+                    const base = `<base href="/archive/r/${encodeURIComponent(archive.run.key)}/">`;
+                    const head = html.search(/<head>/i);
+                    res.end(
+                      head < 0
+                        ? base + html
+                        : html.slice(0, head + 6) + base + html.slice(head + 6),
+                    );
+                    return;
+                  }
+                  if (assetName.test(name)) {
+                    res.setHeader("Content-Type", assetTypes[name.split(".").pop()!]!);
+                    res.setHeader("Access-Control-Allow-Origin", "*");
                     res.setHeader("X-Content-Type-Options", "nosniff");
                   } else res.setHeader("Content-Type", "image/png");
                   createReadStream(image)

@@ -461,10 +461,25 @@ impl<S: AppStore> CellCache<S> {
                     obs["htmlSnapshot"]["file"].as_str(),
                     obs["htmlSnapshot"]["blobId"].as_str(),
                 ) {
-                    (Some(file), Some(raw)) => dui_core::model::BlobId::parse(raw)
-                        .ok()
-                        .filter(|id| store.blob_path(id).is_file())
-                        .is_some_and(|id| store.link_or_copy_blob(&id, &out.join(file)).is_ok()),
+                    (Some(file), Some(raw)) => {
+                        let restore = |raw: &str, name: &str| {
+                            dui_core::model::BlobId::parse(raw)
+                                .ok()
+                                .filter(|id| store.blob_path(id).is_file())
+                                .is_some_and(|id| {
+                                    out.join(name).is_file()
+                                        || store.link_or_copy_blob(&id, &out.join(name)).is_ok()
+                                })
+                        };
+                        // Shared assets are named by the SHA-256 of their bytes, as blobs are.
+                        restore(raw, file)
+                            && obs["htmlSnapshot"]["assets"]
+                                .as_array()
+                                .into_iter()
+                                .flatten()
+                                .filter_map(Value::as_str)
+                                .all(|name| asset_hash(name).is_some_and(|h| restore(h, name)))
+                    }
                     _ => true,
                 };
                 if !restored_snapshot && let Some(fields) = obs.as_object_mut() {
@@ -535,7 +550,24 @@ impl<S: AppStore> CellCache<S> {
                 && let Ok(html_blob) = ImageBlob::from_bytes("text/html", &html, 0, 0)
                 && store.put_blob(&html_blob, &html).is_ok()
             {
-                obs_for_cache["htmlSnapshot"]["blobId"] = json!(html_blob.id().as_str());
+                let assets_stored = obs_for_cache["htmlSnapshot"]["assets"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .all(|name| {
+                        let blob_present = asset_hash(name)
+                            .and_then(|h| dui_core::model::BlobId::parse(h).ok())
+                            .is_some_and(|id| store.blob_path(&id).is_file());
+                        blob_present
+                            || fs::read(out_dir.join(name)).is_ok_and(|bytes| {
+                                ImageBlob::from_bytes("application/octet-stream", &bytes, 0, 0)
+                                    .is_ok_and(|b| store.put_blob(&b, &bytes).is_ok())
+                            })
+                    });
+                if assets_stored {
+                    obs_for_cache["htmlSnapshot"]["blobId"] = json!(html_blob.id().as_str());
+                }
             }
             let evidence = observation_to_evidence(&obs_for_cache);
             let ev_id = evidence.id().clone();
@@ -553,6 +585,16 @@ impl<S: AppStore> CellCache<S> {
         }
         Ok(())
     }
+}
+
+/// The SHA-256 in a shared snapshot asset name, `asset-<64 hex>.<ext>`.
+fn asset_hash(name: &str) -> Option<&str> {
+    let (hash, ext) = name.strip_prefix("asset-")?.split_once('.')?;
+    (hash.len() == 64
+        && hash.bytes().all(|b| b.is_ascii_hexdigit())
+        && !ext.is_empty()
+        && ext.bytes().all(|b| b.is_ascii_alphanumeric()))
+    .then_some(hash)
 }
 
 fn observation_to_evidence(obs: &Value) -> Evidence {

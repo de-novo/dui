@@ -312,6 +312,14 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
             && root.join(file).is_file()
         {
             images.insert(file.to_owned());
+            // Fonts and images the snapshot shares with others of the run.
+            for asset in snapshot["assets"].as_array().into_iter().flatten() {
+                if let Some(name) = asset.as_str()
+                    && crate::snapshot_assets::is_asset_name(name)
+                {
+                    images.insert(name.to_owned());
+                }
+            }
             cell["snapshot"] = json!({
                 "file": file,
                 "fidelity": snapshot["fidelity"],
@@ -445,9 +453,43 @@ fn send_response(
     send_response_with(stream, status, content_type, cache_control, "", body);
 }
 
-/// The policy an HTML snapshot is served with: no scripts, no requests, only inline styles and
-/// `data:` images and fonts, and a sandbox even when opened directly.
-const SNAPSHOT_POLICY: &str = "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; sandbox\r\nX-Content-Type-Options: nosniff\r\n";
+/// The policy an HTML snapshot is served with: no scripts, only inline styles, images and fonts
+/// from `data:` or the run's shared assets on this server, and a sandbox even when opened
+/// directly. The sandbox makes the document's origin opaque, so the server is named explicitly.
+fn snapshot_policy(host: &str) -> String {
+    format!(
+        "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data: http://{host}/archive/; font-src data: http://{host}/archive/; sandbox\r\nX-Content-Type-Options: nosniff\r\n"
+    )
+}
+
+/// Resolve the snapshot's shared asset names against the run it belongs to.
+fn with_asset_base(html: &[u8], run_key: &str) -> Vec<u8> {
+    let base = format!(
+        "<base href=\"/archive/r/{}/\">",
+        percent_encode_segment(run_key)
+    );
+    let head = html
+        .windows(6)
+        .position(|w| w.eq_ignore_ascii_case(b"<head>"))
+        .map_or(0, |at| at + 6);
+    let mut out = Vec::with_capacity(html.len() + base.len());
+    out.extend_from_slice(&html[..head]);
+    out.extend_from_slice(base.as_bytes());
+    out.extend_from_slice(&html[head..]);
+    out
+}
+
+fn percent_encode_segment(text: &str) -> String {
+    text.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect()
+}
 
 fn send_response_with(
     stream: &mut TcpStream,
@@ -570,7 +612,16 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         }
         return;
     }
-    if let Some(archive_name) = path.strip_prefix("/archive/") {
+    if let Some(mut archive_name) = path.strip_prefix("/archive/") {
+        // `/archive/r/<run>/<name>`: the run in the path, so a snapshot's relative asset names
+        // resolve within its run.
+        let mut path_key = None;
+        if let Some(rest) = archive_name.strip_prefix("r/")
+            && let Some((key, name)) = rest.split_once('/')
+        {
+            path_key = Some(key);
+            archive_name = name;
+        }
         if method != "GET" {
             send_response(&mut stream, 405, "text/plain", "no-store", b"");
             return;
@@ -606,7 +657,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             cached_graph: Option<Arc<ArchiveGraph>>,
             cached_images: Option<Arc<BTreeSet<String>>>,
         }
-        let requested_key = query.get("run").map(String::as_str);
+        let requested_key = path_key.or_else(|| query.get("run").map(String::as_str));
         // Fast O(1) lookup for cached run root + image manifest without holding the mutex during disk I/O.
         let resolved: Option<ResolvedArchive> = {
             let Ok(mut guard) = state.lock() else {
@@ -668,6 +719,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             send_response(&mut stream, 404, "text/plain", "no-store", b"");
             return;
         };
+        let run_key_for_base = run_key.clone();
 
         let (graph, images) = match (cached_graph, cached_images) {
             (Some(g), Some(imgs)) => (g, imgs),
@@ -707,12 +759,25 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         {
             // Saved archive files are content-immutable per run directory.
             if is_safe_snapshot_name(archive_name) {
+                let host = headers.get("host").map(String::as_str).unwrap_or_default();
                 send_response_with(
                     &mut stream,
                     200,
                     "text/html; charset=utf-8",
                     "public, max-age=31536000, immutable",
-                    SNAPSHOT_POLICY,
+                    &snapshot_policy(host),
+                    &with_asset_base(&bytes, &run_key_for_base),
+                );
+            } else if let Some(media) = crate::snapshot_assets::media_type(archive_name)
+                .filter(|_| crate::snapshot_assets::is_asset_name(archive_name))
+            {
+                // Fonts load in CORS mode from the sandboxed (opaque-origin) snapshot.
+                send_response_with(
+                    &mut stream,
+                    200,
+                    media,
+                    "public, max-age=31536000, immutable",
+                    "Access-Control-Allow-Origin: *\r\nX-Content-Type-Options: nosniff\r\n",
                     &bytes,
                 );
             } else {
@@ -1141,4 +1206,27 @@ pub fn serve(run_dirs: Vec<PathBuf>, port: u16, open_browser: bool) -> Reply {
     }
 
     Ok(json!({ "url": url }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshots_resolve_assets_within_their_run() {
+        let html = br#"<!DOCTYPE html><html><HEAD><style>@font-face{src:url("asset-a.woff2")}</style></HEAD></html>"#;
+        let served = String::from_utf8(with_asset_base(html, "main/a b")).unwrap_or_default();
+        assert!(
+            served.starts_with(
+                r#"<!DOCTYPE html><html><HEAD><base href="/archive/r/main%2Fa%20b/"><style>"#
+            ),
+            "{served}"
+        );
+        let headless = with_asset_base(b"<p>x</p>", "k");
+        assert!(headless.starts_with(br#"<base href="/archive/r/k/"><p>"#));
+        assert!(
+            snapshot_policy("127.0.0.1:4000")
+                .contains("font-src data: http://127.0.0.1:4000/archive/;")
+        );
+    }
 }
