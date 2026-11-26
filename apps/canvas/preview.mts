@@ -132,6 +132,7 @@ type Capture = {
   reason?: string;
   state?: string;
   scenario?: string;
+  locale?: string;
   observation?: {
     htmlSnapshot?: { file?: unknown; fidelity?: unknown; omitted?: unknown; assets?: unknown };
     renderTree?: unknown;
@@ -179,9 +180,17 @@ async function openArchive(root: string) {
       for (const name of listed)
         if (typeof name === "string" && assetName.test(name)) assets.add(name);
   }
+  // How each snapshot lays out at the screen's other captured widths, as `dui open` sends it.
+  const reflow = new Map<string, { width: number; mismatch: number }[]>();
+  for (const pair of report?.htmlReflow?.pairs ?? []) {
+    if (typeof pair.to !== "number" || typeof pair.mismatch !== "number") continue;
+    const key = JSON.stringify([pair.path, pair.state, pair.scenario, pair.locale, pair.from]);
+    reflow.set(key, [...(reflow.get(key) ?? []), { width: pair.to, mismatch: pair.mismatch }]);
+  }
   const cells = captures.map(
-    ({ path, width, image, status, reason, state, scenario, observation }) => {
+    ({ path, width, image, status, reason, state, scenario, locale, observation }) => {
       const snapshot = observation?.htmlSnapshot;
+      const pairs = reflow.get(JSON.stringify([path, state, scenario, locale, width]));
       return {
         path,
         width,
@@ -198,6 +207,7 @@ async function openArchive(root: string) {
                 file: snapshot.file,
                 fidelity: snapshot.fidelity,
                 omitted: Array.isArray(snapshot.omitted) ? snapshot.omitted.length : 0,
+                ...(pairs ? { reflow: pairs } : {}),
               },
             }
           : {}),

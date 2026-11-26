@@ -71,6 +71,50 @@ async function checkDialog() {
   return true;
 }
 
+// Width preview renders the screen from its source in the running app (#323): the live frame
+// follows the chosen width, and the status says it is rendered, not captured.
+async function checkWidthPreview(widths: number[]) {
+  async function until<T>(read: () => T | undefined | null | false): Promise<T> {
+    const end = performance.now() + 30000;
+    while (performance.now() < end) {
+      const value = read();
+      if (value) return value;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw Error("Timed out waiting for the width preview: " + document.body.innerText.slice(-400));
+  }
+  const trigger = await until(() =>
+    document.querySelector<HTMLButtonElement>("[data-width-preview-open]"),
+  );
+  trigger.click();
+  const status = () => document.querySelector<HTMLElement>("[data-width-preview-status]");
+  await until(() => status()?.dataset.widthPreviewStatus === "live");
+  const input = await until(() =>
+    document.querySelector<HTMLInputElement>("[data-width-preview-input]"),
+  );
+  const shown: number[] = [];
+  for (const width of widths) {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+      input,
+      String(width),
+    );
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await until(
+      () =>
+        document.querySelector<HTMLElement>(".width-preview-stage")?.dataset.liveWidth ===
+          String(width) &&
+        document.querySelector<HTMLImageElement>(".width-preview-live")?.naturalWidth === width,
+    );
+    shown.push(document.querySelector<HTMLImageElement>(".width-preview-live")!.naturalWidth);
+  }
+  if (document.querySelector('[role="alert"]')) throw Error("live session failed");
+  if (document.documentElement.scrollWidth > innerWidth) throw Error("horizontal overflow");
+  for (const el of document.querySelectorAll(".width-preview-dialog :is(input, button)")) {
+    const box = el.getBoundingClientRect();
+    if (box.left < 0 || box.right > innerWidth) throw Error("clipped width preview control");
+  }
+  return shown;
+}
 async function check(media: number, container: number) {
   writeFileSync(
     join(project, "index.html"),
@@ -251,6 +295,17 @@ async function check(media: number, container: number) {
           returnByValue: true,
         });
         assert.ok(!exceptionDetails, JSON.stringify(exceptionDetails));
+        await call("Page.navigate", {
+          url: url + "/?" + new URLSearchParams({ run: run.key, screen: "route:/", uiLang: "en" }),
+        });
+        const widths = [media - 20, media + 20];
+        const preview = (await call("Runtime.evaluate", {
+          expression: `(${checkWidthPreview.toString()})(${JSON.stringify(widths)})`,
+          awaitPromise: true,
+          returnByValue: true,
+        })) as { result: { value: number[] }; exceptionDetails?: unknown };
+        assert.ok(!preview.exceptionDetails, JSON.stringify(preview.exceptionDetails));
+        assert.deepEqual(preview.result.value, widths);
       }
     });
     assert.deepEqual(readFileSync(archive), original);

@@ -1382,6 +1382,19 @@ fn execute_with_locales(
             "capturedCells": captured,
         });
     }
+    // How each screen's snapshots lay out at its other captured widths (#323).
+    if let Some(cells) = report["cells"].as_array() {
+        let reflow = crate::chromium::snapshot_reflow(
+            cells,
+            out,
+            crate::host::resolve_capture_concurrency(spec),
+        );
+        if reflow["pairs"].as_array().is_some_and(|p| !p.is_empty())
+            || reflow.get("error").is_some()
+        {
+            report["htmlReflow"] = reflow;
+        }
+    }
     let graph = crate::graph_view::with_cells(graph, &report)?;
     store(&out.join("report.json"), &report)?;
     store(&out.join("graph.json"), &graph)?;

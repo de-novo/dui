@@ -46,6 +46,16 @@ A web capture saves `HASH-WIDTH.html` next to its PNG and records it in `observa
 The map draws a card from its snapshot when the card is at least 320 CSS px wide on screen and `fidelity` is at most 0.5 %. Otherwise it draws the PNG. At most 12 snapshot frames are mounted at once; cards outside the viewport go back to their PNG. A frame is sandboxed without scripts or same-origin access, and the viewer serves snapshots with a content security policy that allows only inline styles and images and fonts from `data:` or the run's shared assets on the viewer. Snapshots are served with a `<base>` under `/archive/r/RUN/`, so asset names resolve within their run. The PNG remains the verification evidence, and the inspector says which of the two a card is showing.
 
 
+### Width preview
+
+In the inspector, **Width preview** shows the selected screen at any width from 320 CSS px.
+
+When the project can run (the same conditions as **Responsive preview**), the screen is rendered from its source at that width in the running app, through the live session, scripts included. The frame follows the width as it changes. It is not recorded as a capture and does not count toward coverage.
+
+Otherwise, for example for an archive opened away from its project, the capture's HTML snapshot is laid out at that width instead, starting from the captured width nearest the chosen one. A snapshot keeps the page's style sheets with their media queries, but layout that scripts choose at another width (for example a component that renders a different menu below a breakpoint) is not in it. A captured width is labelled as captured; any other width is labelled as an unverified CSS reflow preview. If the live session cannot be opened, the dialog says why and shows the snapshot.
+
+To say how far a snapshot can be trusted at other widths, each run renders every screen's snapshot at that screen's other captured widths (same state, scenario and locale) and compares it with the PNG taken at that width. `report.json` records each pair in `htmlReflow.pairs` with `path`, `from`, `to` and `mismatch`, plus `measured`, `reused` and `ms`. Snapshot and PNG names are hashes of their content, so a pair measured before with the same dui and Chromium build is read back from `~/.dui/reflow` instead of rendered again; a run whose captures all come from the cache measures nothing. The snapshot preview lists these results and, when any pair of the screen differs by more than 0.5 %, warns that scripts also change the layout.
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.

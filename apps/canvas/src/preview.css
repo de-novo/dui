@@ -2810,3 +2810,71 @@ h2 {
   border-style: dashed;
   opacity: 0.7;
 }
+/* A screen's HTML snapshot laid out at any width (docs/en/web-viewer.md#width-preview). */
+.width-preview-dialog {
+  width: min(75rem, calc(100% - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+.width-preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem 0.75rem;
+}
+.width-preview-dialog[data-slot="dialog-content"] label {
+  margin: 0;
+  min-width: 0;
+}
+.width-preview-controls input[type="number"] {
+  width: 7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.375rem 0.5rem;
+}
+.width-preview-controls input[type="range"] {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: 44px;
+  accent-color: var(--primary);
+}
+.width-preview-captured {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.width-preview-status,
+.width-preview-agreement {
+  margin: 0;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.width-preview-agreement[data-script-driven] strong {
+  color: var(--foreground);
+}
+.width-preview-stage {
+  position: relative;
+  height: min(60dvh, 40rem);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+}
+.width-preview-frame {
+  position: absolute;
+  top: 0;
+  border: 0;
+  transform-origin: 0 0;
+  background: white;
+}
+.width-preview-live {
+  display: block;
+  max-width: none;
+  height: auto;
+  margin: 0 auto;
+}
