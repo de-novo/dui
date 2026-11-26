@@ -303,7 +303,7 @@ const site = http.createServer((req, res) => {
 try {
   fs.cpSync(path.join(root, "examples/dispatch"), project, { recursive: true });
   fs.mkdirSync(home);
-  const before = dui("map", ".");
+  const before = dui("map", ".", "--capture");
   const cells: Cell[] = json(path.join(before.output, "report.json")).cells;
   const entry = cells.find((c) => c.path === "/");
   assert.ok(entry);
@@ -320,7 +320,7 @@ try {
     const html = fs.readFileSync(index, "utf8");
     assert.ok(html.includes(`<h1>${heading.text}</h1>`));
     fs.writeFileSync(index, html.replace(`<h1>${heading.text}</h1>`, `<h1>${revised}</h1>`));
-    const after = dui("map", ".");
+    const after = dui("map", ".", "--capture");
     const diff = dui("diff", before.output, after.output);
     type Change = { tag: string; beforeText?: string; afterText?: string };
     type DiffCell = { path: string; width: number; renderDiff?: { changes: Change[] } };
