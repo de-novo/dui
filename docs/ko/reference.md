@@ -23,6 +23,7 @@
 | `routeSelector` | 선택자에 맞는 같은 출처 링크를 사이클 차단과 동적 ID 패턴 축약(`/orders/:id`)이 적용된 다단계 BFS로 재귀 탐색한다. |
 | `scenarios` | 기본 설정에서 달라지는 값만 담은 배열. 예를 들어 `[{"path":"/settings","readySelector":"form"}]`은 폼이 준비될 때까지 기다리는 설정 화면을 추가한다. |
 | `maxNoImprovementRounds` | 선택적 수렴 가드. 연속 N개 상태에서 새 분기나 새 슬롯이 관측되지 않으면 시나리오 탐색을 종료하며, 남은 계획 칸은 분모에 `unverified (not-rendered)`로 보존한다. |
+| `concurrency` | 동시에 캡처하는 브라우저 수(1~4). 기본값은 논리 CPU 수의 절반이며 최대 4다(`DUI_CONCURRENCY`로도 지정). 대기열에 있는 각 화면의 첫 상태와 한 상태의 여러 폭을 병렬로 캡처한다. 리포트의 셀과 순서는 같다. |
 | `requiredRequests` | 2xx 응답을 받아야 할 요청 경로. 생성한 목 응답을 지정한 요청은 실제로 그 응답을 받아야 한다. |
 | `settleTimeoutMs` | 화면이 변화를 멈추기까지 기다리는 시간 예산(밀리초, 기본 `10000`). dui는 약 100ms마다 페이지를 샘플링하고 같은 샘플이 네 번 연속 나와야 안정된 것으로 본다. 스스로 바뀌는 영역은 비교에서 빼고 `observation.ignoredChanges`에 기록한다. 대상은 `aria-busy`, 진행 표시줄, 타이머, 끝없이 반복되는 애니메이션 요소, 세 샘플 연속으로 텍스트나 위치가 바뀌는 노드다. 예산이 끝날 때까지 바뀌는 화면은 `unverified`가 되고 사유는 `unsettled: NODE CHANGE`이며, `observation.unsettled`에 마지막으로 바뀐 것을 기록한다. |
 | `expectedApiErrors` | 401, 403, 5xx 응답이 화면의 일부인 API 경로(또는 `prefix*`). 예를 들어 로그아웃 상태가 있다. 그 밖의 same-origin 또는 `apiBaseUrl` Fetch/XHR 응답이 이 상태 코드면 셀은 `unverified`가 되고 사유는 `api-error: STATUS PATH`다. 실패한 호출은 `observation.apiErrors`에 기록된다. |
@@ -69,6 +70,8 @@
 **한 칸**은 시나리오 하나의 상태 하나를 한 가지 폭으로 캡처할 자리다. `verified`는 경로, 폭, 준비 조건, 필수 요청과 해당 상태에 대한 검사를 통과한 칸이다. `unverified`에는 검사에 실패한 칸과 예산 한도로 시도하지 못한 칸(`not-rendered`)이 포함된다. `unrenderable`에는 렌더 환경의 한계를 기록한다. 미지원 프로젝트는 캡처 전에 거절한다.
 
 **칸 검증률**은 `coverage.verified / coverage.renderable`이다. 화면 여섯 개를 폭 세 가지에서 모두 캡처하면 기본 상태 18칸을 채운 것이다. 추가로 계획된 상태도 분모에 포함한다. 분기 커버리지는 `observedBranchOutcomes`와 `branchOutcomes`로 따로 확인한다.
+
+**소요 시간.** 캡처한 각 셀에는 밀리초 단위 `timing`이 있다: `navigateMs`, `settleMs`(`settlePolls` 포함), `screenshotMs`, `overlaysMs`, `keyboardMs`, `totalMs`. 캐시에서 가져온 셀에는 없다. 리포트의 `timings`에는 `wallMs`, 단계별 `totals`, `slowestPhase`, 가장 느린 셀 다섯 개(`slowestCells`)가 있다. `dui map`은 셀 수, 전체 시간, 가장 느린 단계를 stderr에 한 줄로 출력한다.
 
 ## 로컬 캡처 기록
 

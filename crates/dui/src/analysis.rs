@@ -69,6 +69,47 @@ fn failure_reason(failure: &dui_core::verification::Failure, obs: &Value, spec: 
         .unwrap_or_else(|| "assert-failed".to_owned())
 }
 
+/// Capture phases in `cell.timing`, in the order a capture runs them.
+const TIMING_PHASES: [&str; 5] = [
+    "navigateMs",
+    "settleMs",
+    "screenshotMs",
+    "overlaysMs",
+    "keyboardMs",
+];
+
+/// Run-level timing: wall time, per-phase totals over captured cells, and the slowest cells.
+fn timing_summary(cells: &Value, wall: std::time::Duration) -> Value {
+    let timed: Vec<&Value> = cells
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|c| c["timing"].is_object())
+        .collect();
+    let total = |key: &str| -> u64 { timed.iter().filter_map(|c| c["timing"][key].as_u64()).sum() };
+    let mut totals = serde_json::Map::new();
+    for phase in TIMING_PHASES.iter().chain(["totalMs"].iter()) {
+        totals.insert((*phase).to_owned(), json!(total(phase)));
+    }
+    let slowest_phase = TIMING_PHASES
+        .iter()
+        .max_by_key(|phase| total(phase))
+        .map(|phase| phase.trim_end_matches("Ms"));
+    let mut slowest: Vec<&Value> = timed.clone();
+    slowest.sort_by_key(|c| std::cmp::Reverse(c["timing"]["totalMs"].as_u64().unwrap_or(0)));
+    json!({
+        "wallMs": wall.as_millis() as u64,
+        "capturedCells": timed.len(),
+        "totals": totals,
+        "slowestPhase": slowest_phase,
+        "slowestCells": slowest
+            .iter()
+            .take(5)
+            .map(|c| json!({"path": c["path"], "width": c["width"], "state": c["state"], "totalMs": c["timing"]["totalMs"]}))
+            .collect::<Vec<_>>(),
+    })
+}
+
 pub fn analyze(project: &Path, spec: &Path) -> Reply {
     if let Ok(bytes) = fs::read(spec)
         && let Ok(manifest) = serde_json::from_slice::<Value>(&bytes)
@@ -337,6 +378,7 @@ fn execute_with_locales(
     missing_by_locale: &BTreeMap<String, Vec<String>>,
     mut cache: Option<&mut CellCache>,
 ) -> Reply {
+    let run_started = std::time::Instant::now();
     let facts = analysis["facts"]
         .as_array()
         .ok_or_else(|| failure(3, "invalid facts"))?;
@@ -406,6 +448,12 @@ fn execute_with_locales(
         Some((target.scenario.clone(), case, Some(target)))
     });
     let mut retry_rounds = BTreeMap::new();
+    // First-state captures of upcoming scenarios, taken together in parallel browsers and
+    // consumed in the usual order: (scenario, path, locale, width) → (image, result).
+    type PrefetchKey = (String, String, Option<String>, u32);
+    let mut prefetched: BTreeMap<PrefetchKey, (tempfile::NamedTempFile, Result<Value, String>)> =
+        BTreeMap::new();
+    let mut prefetched_scenarios: BTreeSet<(String, String)> = BTreeSet::new();
     let mut previous_scenario = None;
     let mut baselines = BTreeMap::new();
     let mut proven_visual_slots = BTreeSet::new();
@@ -414,6 +462,92 @@ fn execute_with_locales(
         .or_else(|| scenarios.pop_front().map(|(name, case)| (name, case, None)))
     {
         apply_generated(&mut spec, &analysis["autoMocks"]);
+        let scenario_path = spec["path"].as_str().unwrap_or_default().to_owned();
+        let concurrency = crate::host::resolve_capture_concurrency(&spec);
+        if target.is_none()
+            && concurrency > 1
+            && !prefetched_scenarios.contains(&(scenario.clone(), scenario_path.clone()))
+            && let Some(browser) = renderer.as_deref_mut()
+        {
+            let wanted = concurrency * 2;
+            let mut meta: Vec<(PrefetchKey, Value, tempfile::NamedTempFile)> = Vec::new();
+            let upcoming = std::iter::once((scenario.clone(), spec.clone(), true)).chain(
+                scenarios
+                    .iter()
+                    .map(|(name, case)| (name.clone(), case.clone(), false)),
+            );
+            for (name, mut case, current) in upcoming {
+                if meta.len() >= wanted {
+                    break;
+                }
+                if !current {
+                    apply_generated(&mut case, &analysis["autoMocks"]);
+                }
+                let path = case["path"].as_str().unwrap_or_default().to_owned();
+                if !prefetched_scenarios.insert((name.clone(), path.clone())) {
+                    continue;
+                }
+                let checks = assertions(facts, &BTreeMap::new(), &case);
+                let locale_slots: Vec<Option<&str>> = if locales.is_empty() {
+                    vec![None]
+                } else {
+                    locales.iter().map(|l| Some(l.as_str())).collect()
+                };
+                for locale in locale_slots {
+                    let mut capture_spec = case.clone();
+                    if let Some(loc) = locale {
+                        capture_spec["locale"] = json!(loc);
+                    }
+                    capture_spec["assertions"] = checks.clone();
+                    for width in widths {
+                        let cached = cache
+                            .as_deref()
+                            .and_then(|c| {
+                                c.build_inputs(
+                                    &name,
+                                    &capture_spec,
+                                    &BTreeMap::new(),
+                                    *width,
+                                    locale,
+                                )
+                            })
+                            .is_some_and(|inputs| {
+                                cache.as_deref_mut().is_some_and(|c| {
+                                    matches!(c.lookup(&inputs, out), CacheLookup::Hit { .. })
+                                })
+                            });
+                        if cached {
+                            continue;
+                        }
+                        let staged = tempfile::NamedTempFile::new_in(out)
+                            .map_err(|e| failure(3, &e.to_string()))?;
+                        let key = (
+                            name.clone(),
+                            path.clone(),
+                            locale.map(str::to_owned),
+                            *width,
+                        );
+                        meta.push((key, capture_spec.clone(), staged));
+                    }
+                }
+            }
+            if meta.len() >= 2 {
+                let input_val = json!({});
+                let jobs: Vec<CaptureBatchJob<'_>> = meta
+                    .iter()
+                    .map(|((_, _, _, width), cspec, staged)| CaptureBatchJob {
+                        spec: cspec,
+                        input: &input_val,
+                        width: *width,
+                        image: staged.path(),
+                    })
+                    .collect();
+                let results = browser.capture_batch(&jobs);
+                for ((key, _, staged), res) in meta.into_iter().zip(results) {
+                    prefetched.insert(key, (staged, res));
+                }
+            }
+        }
         let max_stagnant = spec["maxNoImprovementRounds"].as_u64().map(|n| n as usize);
         let mut active = BTreeSet::new();
         let mut done = BTreeSet::new();
@@ -457,6 +591,19 @@ fn execute_with_locales(
                     u32,
                     (tempfile::NamedTempFile, Result<Value, String>),
                 > = BTreeMap::new();
+                if index == 0 && target.is_none() {
+                    for width in widths {
+                        let key = (
+                            scenario.clone(),
+                            scenario_path.clone(),
+                            locale.map(str::to_owned),
+                            *width,
+                        );
+                        if let Some(hit) = prefetched.remove(&key) {
+                            pre_rendered.insert(*width, hit);
+                        }
+                    }
+                }
                 if widths.len() >= 2
                     && crate::host::resolve_capture_concurrency(&locale_spec) > 1
                     && let Some(browser) = renderer.as_deref_mut()
@@ -464,6 +611,9 @@ fn execute_with_locales(
                     let input_val = json!(row);
                     let mut batch_meta: Vec<(u32, Value, tempfile::NamedTempFile)> = Vec::new();
                     for width in widths {
+                        if pre_rendered.contains_key(width) {
+                            continue;
+                        }
                         let mut capture_spec = locale_spec.clone();
                         capture_spec["assertions"] = checks.clone();
                         if index != 0
@@ -634,6 +784,9 @@ fn execute_with_locales(
                         };
                     let mut cell = match reached {
                         Ok(mut obs) => {
+                            // Timing describes this run, not the screen: keep it on the cell, out
+                            // of the cached observation.
+                            let timing = obs.as_object_mut().and_then(|o| o.remove("timing"));
                             let bytes =
                                 fs::read(staged.path()).map_err(|e| failure(3, &e.to_string()))?;
                             let png_hash = format!("{:x}", Sha256::digest(&bytes));
@@ -778,6 +931,9 @@ fn execute_with_locales(
                                     .map_err(|e| failure(3, &e.to_string()))?;
                             }
                             let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason.as_ref().map(|f| failure_reason(f, &obs, &spec)),"observation":obs});
+                            if let Some(timing) = timing {
+                                entry["timing"] = timing;
+                            }
                             if let Some(expected_p) = spec["path"].as_str()
                                 && let Some(obs_p) = entry["observation"]["path"].as_str()
                             {
@@ -1047,6 +1203,7 @@ fn execute_with_locales(
         .count();
     let renderable = cells.len() - unrenderable;
     let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
+    report["timings"] = timing_summary(&report["cells"], run_started.elapsed());
     if !locales.is_empty() {
         report["locales"] = summarize_by_locale(&cells, missing_by_locale);
     }

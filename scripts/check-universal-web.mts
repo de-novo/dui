@@ -388,6 +388,8 @@ http.createServer((_req, res) => {
       readySelector: "h1",
       routeSelector: "a[href]",
       discoverOverlays: true,
+      // One capture browser, so the header is probed exactly once per width.
+      concurrency: 1,
     }),
   );
   const sharedOut = path.join(tmp, "out-shared-header");
@@ -419,6 +421,42 @@ http.createServer((_req, res) => {
     .sort();
   assert.equal(overlayPaths.filter((p) => p.includes("#overlay:profile")).length, 2);
   assert.equal(overlayPaths.filter((p) => p.includes("#overlay:create-")).length, 10);
+
+  // Parallel capture changes only time: the same cells, states and images as one browser,
+  // and every captured cell says where its time went.
+  type Timed = ReportCell & { image?: string; state: string; timing?: Record<string, number> };
+  const parallelOut = path.join(tmp, "out-shared-parallel");
+  fs.writeFileSync(
+    sharedManifest,
+    JSON.stringify({
+      host: "static",
+      widths: [375, 1280],
+      readySelector: "h1",
+      routeSelector: "a[href]",
+      discoverOverlays: true,
+      concurrency: 3,
+    }),
+  );
+  await runDui(
+    ["run", shared, sharedManifest, parallelOut],
+    path.join(tmp, ".dui-home-parallel"),
+  ).catch(() => null);
+  const parallelReport = JSON.parse(
+    fs.readFileSync(path.join(parallelOut, "report.json"), "utf8"),
+  ) as { cells: Timed[]; timings: { wallMs: number; totals: Record<string, number> } };
+  const fingerprint = (cells: Timed[]) =>
+    cells.map((c) => [c.path, c.width, c.state, c.status, c.image ?? null].join(" "));
+  assert.deepEqual(
+    fingerprint(parallelReport.cells),
+    fingerprint(sharedCells as Timed[]),
+    "parallel capture yields the same cells",
+  );
+  for (const cell of parallelReport.cells.filter((c) => !c.path.includes("#overlay:"))) {
+    for (const phase of ["navigateMs", "settleMs", "screenshotMs", "overlaysMs", "totalMs"]) {
+      assert.equal(typeof cell.timing?.[phase], "number", `${cell.path}@${cell.width} ${phase}`);
+    }
+  }
+  assert.ok(parallelReport.timings.wallMs > 0 && parallelReport.timings.totals.totalMs > 0);
 
   console.log(
     JSON.stringify({
