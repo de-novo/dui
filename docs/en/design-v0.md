@@ -205,7 +205,7 @@ type VerificationStatus =
    - **Code branch**: AI solves each branch condition backwards to produce values that enter that branch.
    - **Sequence**: follow the graph from event handlers to state-change points to build `state + event → next state` rules. Expand the rules from the initial state (model-checking style). Infinite expansion is cut with representative values (0, 1, last, one past last) and a depth limit. Identical value sets are merged.
 3. **Injection build**: the injector produces a dev build. Slots that fail to compile get `injectable=false`.
-4. **Render** (`dui render`): workers inject values + mock responses per state and render per width. Save image, DOM, and branch coverage.
+4. **Render** (`dui render`): workers inject values + mock responses per state and render per width. Save image, DOM, and branch coverage. `dui run` renders and captures every planned cell. `dui map` plans cells without capturing; the viewer renders the cards in view from source, and evidence is saved only when asked (`--capture` or **Capture** in the viewer) ([decided 2026-11-26](web-viewer.md#shared-screen-maps)).
 5. **Verify**: §7.
 6. **Fill-in loop**: if uncovered branches remain, go back to step 2 and create states for those branches. Stop when there is no improvement or the iteration limit is reached.
 7. **Sequence replay verification**: for sequence states, not only inject but actually replay the events along the path from the initial state and check the same screen appears. If it matches, the edge becomes `verified`.
