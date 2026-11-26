@@ -109,9 +109,35 @@ fn load_cell_snapshots<S: AppStore>(
     Ok(out)
 }
 
+/// Share of pixels that differ between two PNGs (any channel off by more than `tolerance`).
+/// Rows present in only one image count as differing.
+pub fn png_mismatch(a: &[u8], b: &[u8], tolerance: u8) -> Result<f64, String> {
+    let (aw, ah, ap) = decode_png_rgba_bytes(a)?;
+    let (bw, bh, bp) = decode_png_rgba_bytes(b)?;
+    if aw != bw {
+        return Ok(1.0);
+    }
+    let rows = ah.min(bh) as usize;
+    let row_bytes = aw as usize * 4;
+    let mut differing = (ah.max(bh) as usize - rows) * aw as usize;
+    for (pa, pb) in ap[..rows * row_bytes]
+        .chunks_exact(4)
+        .zip(bp[..rows * row_bytes].chunks_exact(4))
+    {
+        if pa.iter().zip(pb).any(|(x, y)| x.abs_diff(*y) > tolerance) {
+            differing += 1;
+        }
+    }
+    let total = (ah.max(bh) as usize * aw as usize).max(1);
+    Ok(differing as f64 / total as f64)
+}
+
 fn decode_png_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>), String> {
-    let file = File::open(path).map_err(|e| e.to_string())?;
-    let mut decoder = png::Decoder::new(std::io::BufReader::new(file));
+    decode_png_rgba_bytes(&fs::read(path).map_err(|e| e.to_string())?)
+}
+
+fn decode_png_rgba_bytes(png_bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
     let buf_size = reader

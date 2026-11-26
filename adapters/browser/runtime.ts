@@ -702,6 +702,239 @@ declare var __duiProbe: {
     return { title, slug };
   }
 
+  /**
+   * A self-contained, script-free copy of the page as rendered now (see "HTML cards" in
+   * docs/en/web-viewer.md): the live DOM with open shadow roots, the parsed CSS rules, form
+   * state, and same-origin images, fonts and readable canvases inlined as data: URLs.
+   * Live elements get temporary attributes for state that only exists as properties; they are
+   * removed again before returning.
+   */
+  async function htmlSnapshot(width: number) {
+    const omitted: { resource: string; reason: string }[] = [];
+    const MAX_ASSET = 3 * 1024 * 1024;
+    const MAX_TOTAL = 24 * 1024 * 1024;
+    let inlinedBytes = 0;
+    const dataUrls = new Map<string, Promise<string | null>>();
+    const toDataUrl = (raw: string) => {
+      let url: URL;
+      try {
+        url = new URL(raw, document.baseURI);
+      } catch {
+        return Promise.resolve(null);
+      }
+      if (url.protocol === "data:") return Promise.resolve(url.href);
+      if (url.origin !== location.origin) {
+        omitted.push({ resource: url.href, reason: "cross-origin" });
+        return Promise.resolve(null);
+      }
+      const key = url.href;
+      if (!dataUrls.has(key))
+        dataUrls.set(
+          key,
+          (async () => {
+            try {
+              const response = await fetch(key);
+              if (!response.ok) throw Error("HTTP " + response.status);
+              const blob = await response.blob();
+              if (blob.size > MAX_ASSET || inlinedBytes + blob.size > MAX_TOTAL) {
+                omitted.push({ resource: key, reason: "too large" });
+                return null;
+              }
+              inlinedBytes += blob.size;
+              return await new Promise<string>((done, fail) => {
+                const reader = new FileReader();
+                reader.onload = () => done(String(reader.result));
+                reader.onerror = () => fail(reader.error);
+                reader.readAsDataURL(blob);
+              });
+            } catch (error) {
+              omitted.push({ resource: key, reason: String((error as Error)?.message ?? error) });
+              return null;
+            }
+          })(),
+        );
+      return dataUrls.get(key)!;
+    };
+    // url(...) references in CSS text, resolved against `base` and inlined.
+    const inlineCssUrls = async (css: string, base: string) => {
+      const found = [...css.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)];
+      let out = css;
+      for (const [whole, , ref] of found) {
+        if (ref.startsWith("data:") || ref.startsWith("#")) continue;
+        let absolute: string;
+        try {
+          absolute = new URL(ref, base).href;
+        } catch {
+          continue;
+        }
+        const data = await toDataUrl(absolute);
+        out = out.replace(whole, data ? `url("${data}")` : "none");
+      }
+      return out;
+    };
+    const sheetCss = async (sheet: CSSStyleSheet): Promise<string> => {
+      let rules: CSSRuleList;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        omitted.push({ resource: sheet.href ?? "style sheet", reason: "cross-origin style sheet" });
+        return "";
+      }
+      const base = sheet.href ?? document.baseURI;
+      let text = "";
+      for (const rule of Array.from(rules)) {
+        if (rule instanceof CSSImportRule) {
+          if (rule.styleSheet) text += await sheetCss(rule.styleSheet);
+          continue;
+        }
+        text += (await inlineCssUrls(rule.cssText, base)) + "\n";
+      }
+      const media = sheet.media?.mediaText;
+      return media && media !== "all" ? `@media ${media} {\n${text}}\n` : text;
+    };
+
+    const restore: (() => void)[] = [];
+    const setAttr = (el: Element, name: string, value: string | null) => {
+      const had = el.hasAttribute(name);
+      const before = el.getAttribute(name);
+      if (value === null) el.removeAttribute(name);
+      else el.setAttribute(name, value);
+      restore.push(() => (had ? el.setAttribute(name, before!) : el.removeAttribute(name)));
+    };
+    const roots: (Document | ShadowRoot)[] = [document];
+    const shadowRoots: ShadowRoot[] = [];
+    for (let i = 0; i < roots.length; i++) {
+      for (const el of roots[i]!.querySelectorAll("*")) {
+        const root = (el as HTMLElement).shadowRoot;
+        if (root) {
+          roots.push(root);
+          shadowRoots.push(root);
+        }
+      }
+    }
+    try {
+      for (const root of roots) {
+        for (const el of root.querySelectorAll("input, textarea, select option, canvas, img")) {
+          if (el instanceof HTMLInputElement) {
+            if (el.type === "checkbox" || el.type === "radio")
+              setAttr(el, "checked", el.checked ? "" : null);
+            else if (el.type !== "password" && el.type !== "file") setAttr(el, "value", el.value);
+          } else if (el instanceof HTMLTextAreaElement) {
+            setAttr(el, "data-dui-value", el.value);
+          } else if (el instanceof HTMLOptionElement) {
+            setAttr(el, "selected", el.selected ? "" : null);
+          } else if (el instanceof HTMLCanvasElement) {
+            try {
+              setAttr(el, "data-dui-canvas", el.toDataURL());
+            } catch {
+              omitted.push({ resource: "canvas", reason: "canvas cannot be read" });
+            }
+          } else if (el instanceof HTMLImageElement && el.currentSrc) {
+            const data = await toDataUrl(el.currentSrc);
+            setAttr(el, "data-dui-src", data);
+          }
+        }
+      }
+      // Adopted style sheets of shadow roots travel inside their template.
+      for (const root of shadowRoots) {
+        if (!root.adoptedStyleSheets.length) continue;
+        const style = document.createElement("style");
+        style.setAttribute("data-dui-adopted", "");
+        let css = "";
+        for (const sheet of root.adoptedStyleSheets) css += await sheetCss(sheet);
+        style.textContent = css;
+        root.prepend(style);
+        restore.push(() => style.remove());
+      }
+      let css = "";
+      for (const sheet of [...Array.from(document.styleSheets), ...document.adoptedStyleSheets])
+        css += await sheetCss(sheet as CSSStyleSheet);
+      const html = document.documentElement.getHTML({
+        serializableShadowRoots: true,
+        shadowRoots,
+      });
+      const parsed = new DOMParser().parseFromString(
+        "<!doctype html><html>" + html.replace(/^<html[^>]*>/, ""),
+        "text/html",
+      );
+      const out = parsed.documentElement;
+      for (const attr of Array.from(document.documentElement.attributes))
+        out.setAttribute(attr.name, attr.value);
+      // Declarative shadow roots are templates here; walk them as well as the document.
+      const scopes: ParentNode[] = [parsed];
+      for (let i = 0; i < scopes.length; i++)
+        for (const t of scopes[i]!.querySelectorAll("template[shadowrootmode]"))
+          scopes.push((t as HTMLTemplateElement).content);
+      for (const scope of scopes) {
+        for (const el of scope.querySelectorAll(
+          'script, noscript, link[rel~="stylesheet" i], link[rel~="preload" i], link[rel~="modulepreload" i], link[rel~="prefetch" i], base',
+        ))
+          el.remove();
+        for (const el of scope.querySelectorAll("style:not([data-dui-adopted])"))
+          if (scope === parsed) el.remove();
+        for (const el of scope.querySelectorAll("iframe, object, embed")) {
+          omitted.push({ resource: el.tagName.toLowerCase(), reason: "embedded document" });
+          el.replaceWith(parsed.createElement("div"));
+        }
+        for (const el of scope.querySelectorAll("*")) {
+          for (const attr of Array.from(el.attributes))
+            if (/^on/i.test(attr.name) || /^\s*javascript:/i.test(attr.value))
+              el.removeAttribute(attr.name);
+          if (el.hasAttribute("style"))
+            el.setAttribute(
+              "style",
+              await inlineCssUrls(el.getAttribute("style")!, document.baseURI),
+            );
+        }
+        for (const el of scope.querySelectorAll("textarea[data-dui-value]")) {
+          el.textContent = el.getAttribute("data-dui-value");
+          el.removeAttribute("data-dui-value");
+        }
+        for (const el of scope.querySelectorAll("canvas[data-dui-canvas]")) {
+          const img = parsed.createElement("img");
+          img.src = el.getAttribute("data-dui-canvas")!;
+          for (const name of ["class", "style", "width", "height", "id"])
+            if (el.hasAttribute(name)) img.setAttribute(name, el.getAttribute(name)!);
+          el.replaceWith(img);
+        }
+        for (const el of scope.querySelectorAll("img")) {
+          const data = el.getAttribute("data-dui-src");
+          el.removeAttribute("data-dui-src");
+          el.removeAttribute("srcset");
+          el.removeAttribute("loading");
+          if (data) el.setAttribute("src", data);
+          else if (el.getAttribute("src") && !el.getAttribute("src")!.startsWith("data:"))
+            el.removeAttribute("src");
+        }
+        for (const el of scope.querySelectorAll("a[href]")) {
+          try {
+            el.setAttribute("href", new URL(el.getAttribute("href")!, document.baseURI).href);
+          } catch {
+            // Keep the href as written.
+          }
+        }
+      }
+      const head = parsed.head;
+      if (!head.querySelector("meta[charset]")) {
+        const meta = parsed.createElement("meta");
+        meta.setAttribute("charset", "utf-8");
+        head.prepend(meta);
+      }
+      const viewport = parsed.createElement("meta");
+      viewport.setAttribute("name", "viewport");
+      viewport.setAttribute("content", `width=${width}`);
+      head.append(viewport);
+      const style = parsed.createElement("style");
+      style.setAttribute("data-dui-snapshot", "");
+      style.textContent = css;
+      head.append(style);
+      const text = "<!doctype html>\n" + out.outerHTML;
+      return { html: text, omitted };
+    } finally {
+      for (const undo of restore.reverse()) undo();
+    }
+  }
+
   /** Resolve as soon as `done()` holds (checked every 16 ms), or after `ms`. */
   async function waitUntil(done: () => boolean, ms: number) {
     const deadline = performance.now() + ms;
@@ -1343,6 +1576,7 @@ declare var __duiProbe: {
         (document.activeElement as HTMLElement | null)?.blur?.();
         window.scrollTo(0, 0);
       },
+      htmlSnapshot,
       /** The dialog dui opened from a compiler fact: its title, slug and render tree. */
       openDialog() {
         const dialog = visibleDialogs().at(-1);
