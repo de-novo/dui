@@ -12,7 +12,7 @@
 
 ### 共享屏幕地图
 
-使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿同源链接导航，并使用 Chromium 执行截图和布局检查。Angular 等 Web 框架共享此流程。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
+使用 `dui map . --url http://localhost:4200/` 为运行中的本地 Web 应用生成地图。dui 从指定地址开始，沿同源链接导航，并使用 Chromium 执行截图和布局检查。Angular 等 Web 框架共享此流程。在 Vite 项目中，dui 还会先读取路由器，因此没有链接可达的路由也会从运行中的服务器截取，`screenDiscovery.mode` 为 `router+links`。需要开发服务器的应用（例如 `configureServer` 中间件或 `server.proxy`）应使用此方式。内置主机把这类应用渲染为空白时，报告会在 `screenDiscovery.devServerHint` 中说明。从源码分析框架的路由、守卫、组件输入和状态需要适配项目编译器和路由器的规则。
 
 构建静态部署产物后，运行 `dui map . --build-dir dist`。dui 在临时回环端口提供该目录，默认以 375 和 1280 px 截取沿链接可到达的页面。在 `dui.json` 中设置 `path` 可指定其他 HTML 入口。若使用通过 `index.html` 处理导航的 history 路由，设置 `spaFallback: true`。Vue Router、使用 adapter-static 的 SvelteKit、Astro 静态输出和使用 preact-iso 的 Preact 共用此流程。需要应用服务器的部署使用 `--url`。需要登录或没有可达链接的页面需要项目提供入口或会话数据。
 

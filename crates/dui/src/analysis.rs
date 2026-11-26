@@ -1048,6 +1048,34 @@ fn execute_with_locales(
     }
     if let Some(discovery) = spec.get("screenDiscovery") {
         let mut discovered = discovery.clone();
+        // Router routes, with link crawl on top.
+        if discovered["mode"] == "router" && spec["routeSelector"].is_string() {
+            discovered["mode"] = json!("router+links");
+        }
+        // The built-in host serves a production build, without the dev server's middleware
+        // or proxy. When the app relies on them and screens came out blank, say so.
+        if spec["host"] != "url"
+            && let Some(dev) = discovered.get("devServer").filter(|d| d.is_object())
+            && cells.iter().any(|c| {
+                c["observation"]["emptyMount"] == true || c["observation"]["ready"] == false
+            })
+        {
+            let mut needs = Vec::new();
+            if let Some(names) = dev["configureServer"].as_array().filter(|n| !n.is_empty()) {
+                let names: Vec<_> = names.iter().filter_map(Value::as_str).collect();
+                needs.push(format!("configureServer middleware ({})", names.join(", ")));
+            }
+            if let Some(prefixes) = dev["proxy"].as_array().filter(|p| !p.is_empty()) {
+                let prefixes: Vec<_> = prefixes.iter().filter_map(Value::as_str).collect();
+                needs.push(format!("server.proxy ({})", prefixes.join(", ")));
+            }
+            discovered["devServerHint"] = json!(format!(
+                "Some screens rendered blank. The app's Vite config uses {}, which only the dev \
+                 server runs. Start the dev server and map it with `dui map --url URL`; the \
+                 router routes are still read.",
+                needs.join(" and ")
+            ));
+        }
         if let Some(paths) = report["discoveredRoutes"].as_array() {
             for path in paths.iter().filter_map(Value::as_str) {
                 let origin_from = discovered_from
