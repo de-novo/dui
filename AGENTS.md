@@ -1,11 +1,11 @@
 # AGENTS.md
 
 Entry point for AI coding agents (and humans) working on `de-novo/dui`. Read this first, then follow the links.
-Updated: 2026-11-24 · Stage: v0.2.0 workspace crates (`dui-core`, `dui-ports`, `dui-storage`, `dui-app`, `dui`) & fact-only core ready · Next goal: [examples, demo video & official website](docs/en/roadmap.md)
+Updated: 2026-11-27 · Stage: v0.2.0 workspace crates (`dui-core`, `dui-ports`, `dui-storage`, `dui-app`, `dui`) & fact-only core ready · Next goal: the [default pipeline](docs/en/roadmap.md#default-pipeline) (AST model, approximate renderer)
 
 ## Mission
 
-dui reads existing UI code through each language's official compiler and really renders every state × width of every screen, then reports UI state coverage. AI agents drive it through the `dui` CLI and MCP server; humans only look at the canvas. Nothing is invented: what cannot be shown is `unverified` or `unrenderable`.
+dui reads existing UI code, reassembles screens, relations, slots, declared state, item schemas, and styles into a versioned model, and draws them with its own approximate renderer. Official compilers may refine types. Official-engine captures are optional pixel verification, never the default path. AI agents drive it through the `dui` CLI and MCP server; humans only look at the canvas. Nothing is invented: what cannot be shown is a placeholder, `unverified`, or `unrenderable`.
 
 ## Source-of-truth docs (English is canonical)
 
@@ -37,12 +37,19 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 
 ## Product constraints
 
-1. **Official-compiler-dependent.** Type information comes only from each language's official compiler / toolchain already in the user's project (TypeScript: `tsc` 7.0+). Never reimplement type checking. Unofficial compilers are `unsupported`.
+1. **Official-compiler-dependent.** When type information is used, it comes only from each language's official compiler / toolchain already in the user's project (TypeScript: `tsc` 7.0+). Never reimplement type checking. Unofficial compilers are `unsupported`. Syntax-only extraction may proceed without types.
 2. **Latest stable major only.** Older majors are `unsupported` (a project-level status, not a cell status; excluded from coverage).
 3. **Deterministic combinations.** States and combinations come from rules, not from AI. AI only fills gaps, marked as inferred.
 4. **Rendering limits are stated, not hidden.** A cell that cannot be drawn is `unrenderable (reason)`, separate from `unverified`.
 5. **No audience declaration.** Do not add "who it's for" or similar audience lines to any doc.
 6. **No other products' names or trademarks** in dui product or package names, and none in the positioning line.
+7. **No memory-heavy rendering on the default path.** See [Never](#never).
+
+## Never
+
+The default path for `dui map`, `dui open`, hot reload, and drawing cards **must not** launch Chromium or any other memory-heavy renderer: no headless browser, no live browser session, and no emulator or simulator. Empty or incomplete cards stay empty or show a placeholder. A heavy renderer is allowed only as an explicit opt-in for pixel verification (`--capture`, `dui run`, or a render machine). It is never a fallback that fills cards on the default path.
+
+This rule is non-negotiable. Do not add a default-path feature that starts a browser or emulator "just this once," or "until the approximate renderer is ready." The same rule is recorded in [Architecture §3](docs/en/architecture.md#never-default-path) and the [roadmap](docs/en/roadmap.md#never).
 
 ## Code rules
 

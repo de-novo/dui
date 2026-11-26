@@ -26,3 +26,23 @@
 설계 기준은 공식 TypeScript 7이다. 현재 CLI에는 공식 안정판 6.x 프로젝트용 호환 경로도 있다. `dui check-ts PROJECT`로 프로젝트의 컴파일러를 확인한다. TypeScript 스캔은 설치된 React·React DOM의 안정판 18+와 Vite 7+를 검사하고, Next 호스트에서 Next.js가 설치되어 있으면 16+를 검사한다. 라이브러리 규칙은 버전에 따라 진단 메모를 남기고 스캔을 계속할 수 있다. [컴파일러 검사](../../crates/dui/src/main.rs) · [스캔 버전 검사](../../adapters/typescript/facts.mts)
 
 `dui toolchains`는 설치된 `tsc`, `rustc`, `go`, `swiftc`, `kotlinc`, `dart`의 버전을 확인한다. 이 검사에 성공하면 해당 도구를 사용할 수 있다는 뜻이다. 타입 정보 추출, 화면 탐색, 렌더링의 검증 근거는 위 표에서 각각 확인할 수 있다. 예정된 작업은 로드맵에서 관리한다. [도구 설치 검사](../../crates/dui-app/src/compiler_oracle.rs) · [로드맵](roadmap.md)
+
+
+## 언어 어댑터 (기본 파이프라인)
+
+위 표는 오늘 `main`의 동작이다. [기본 파이프라인](roadmap.md#default-pipeline)에서는 새 언어를 붙이는 방법이 바뀐다. 어댑터 하나가 그 언어의 소스를 버전 있는 모델로 옮긴다. 모델, 근사 렌더러, 핫리로드, Figma 내보내기는 재사용한다.
+
+어댑터가 매핑하는 것은 다음과 같다.
+
+- 레이아웃 요소를 모델의 레이아웃 타입으로
+- 선언된 상태와 데이터 슬롯
+- 화면 이동(라우터, 링크, 목적지)
+- 스타일 문법을 공통 스타일 속성(spacing, color, typography, radius, size, layout)으로, 토큰 이름은 토큰 층에 남김
+
+스타일 난이도:
+
+- 쉬움: Tailwind 클래스, SwiftUI modifier, Compose Modifier, 인라인 스타일은 바로 매핑한다.
+- 보통: 테마, 디자인 토큰, CSS 변수는 정의 파일에서 해석한다.
+- 어려움: CSS 파일과 CSS Modules는 캐스케이드, 우선순위, 미디어 쿼리가 필요하다. 브라우저 없는 가벼운 CSS 해석기가 이를 근사한다. 런타임 CSS-in-JS 값은 슬롯처럼 다룬다.
+
+기본 어댑터 경로는 브라우저나 에뮬레이터를 실행하면 안 되고, 무거운 렌더러로 카드를 채우는 폴백을 쓰면 안 된다. [절대 하지 않는 것](architecture.md#never-default-path)을 본다.

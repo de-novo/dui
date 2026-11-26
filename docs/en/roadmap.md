@@ -14,9 +14,13 @@ Today, the sources of truth for making a product are split across planning docum
 **What this is not**
 
 - A standalone design tool with its own file format.
-- Support for every platform at once. The priority is to deepen the capture and editing paths needed for this goal.
+- Support for every platform at once. The priority is the parse-and-approximate path needed for this goal; capture is optional verification.
 
-**Current focus.** Close the loop: generate the map from code, and write UI edits back into that code (the code-based canvas work planned for v0.3.0). Broader platform coverage and packaging can wait. The first step is drawing web cards from HTML snapshots of the real render ([decision](architecture.md#4-finalized-decisions-2026-11-20)); rendering components directly from code follows.
+<a id="never"></a>
+
+**Never.** The default path for `dui map`, `dui open`, hot reload, and drawing cards must not launch Chromium or any other memory-heavy renderer: no headless browser, no live browser session, and no emulator or simulator. Heavy renderers are allowed only as explicit opt-in pixel verification (`--capture`, `dui run`, or a render machine). They are never a fallback that fills cards. This rule is also in [AGENTS.md](../../AGENTS.md#never) and [Architecture §3](architecture.md#never-default-path).
+
+**Current focus.** Close the loop: generate the map from code, and write UI edits back into that code (the code-based canvas work planned for v0.3.0). Broader platform coverage and packaging can wait. The default path is source parsing (AST) to a versioned model to dui's own approximate renderer, with no browser or platform build required ([decision](architecture.md#4-finalized-decisions-2026-11-20)). Optional capture stays available for pixel verification.
 
 dui maps the screens an app actually renders so a reviewer can follow a task from start to finish. Screens are the landmarks. Each screen opens into its states and viewport widths. A connection records the action that leads to another screen or state.
 
@@ -75,20 +79,88 @@ Existing paths include local web URLs, native route discovery and captures on se
 | v0.0.9 | **Android, Desktop, Design-Defect Detection & DevTools Element Inspector.** Add the Android adapter (`adb screencap` + `uiautomator`/Semantics -> `RenderNodeSnapshot`, [#102](https://github.com/de-novo/dui/issues/102)), Electron 45 host + GPUI AccessKit render-tree diff ([#103](https://github.com/de-novo/dui/issues/103)), Radix UI / shadcn rule packs + Next.js 16 host ([#104](https://github.com/de-novo/dui/issues/104)), multi-tab parallel capture + automatic design-defect & a11y lint over `renderTree` (overflow, overlap, clipping, contrast, touch target size, spacing/alignment drift — shown visually on the canvas for humans and as structured JSON via CLI/MCP for AI, [#105](https://github.com/de-novo/dui/issues/105)), and the DevTools-style element inspector with box-model measurements (width, height, margin, padding, gap, spacing redlines, [#106](https://github.com/de-novo/dui/issues/106)). |
 | v0.1.0 | **Cross-platform Mobile Capture & Compiler-Oracle Foundations.** Add iOS Simulator (`xcrun simctl` + XCUI) capture, universal authenticated sessions (`storageState.json` / `POST authFlow`), PR Markdown diff output, React Native / Expo Router / Ink `tsc` rule packs, shared compiler-oracle IR, and `dui toolchains` probing 6 official compilers (`tsc`, `rustc`, `go`, `swiftc`, `kotlinc`, `dart`). |
 | v0.2.0 | **Universal Routing Tree, Full-Page True-Aspect Nodes, Modal Auto-Capture & Fact-Only Core.** Capture full-page screen heights (including nested app-shell scroll containers) and size canvas/desktop nodes to each screen's real aspect ratio without cropping or overlap ([#147](https://github.com/de-novo/dui/issues/147)), discover framework-agnostic navigation trees via WAI-ARIA disclosure expansion + official compiler route registries with zero-config `dui scan` & multi-host `dui map` ([#149](https://github.com/de-novo/dui/issues/149), [#153](https://github.com/de-novo/dui/issues/153)), align GPUI desktop UX with native macOS `TitleBar` and obstacle-free gutter edge routing ([#155](https://github.com/de-novo/dui/issues/155), [#159](https://github.com/de-novo/dui/issues/159)), auto-discover and capture modals/dialogs/drawers via WAI-ARIA as child overlay nodes ([#157](https://github.com/de-novo/dui/issues/157)), and remove hardcoded global design-defect heuristics and premature iframe live-mount so `dui` reports strictly objective rendering evidence ([#163](https://github.com/de-novo/dui/issues/163), [#169](https://github.com/de-novo/dui/issues/169)). |
-| v0.3.0 | **Pluggable Design-System Conformance (`DESIGN.md` / Plugins) & Code-Based Canvas Rendering.** Keep `dui-core` strictly fact-only while adding an opt-in plugin architecture in `dui.json` so projects can attach their own `DESIGN.md`, W3C Design Tokens, or custom checker plugins ([#167](https://github.com/de-novo/dui/issues/167)), and evolve canvas rendering from bitmap captures toward direct code-based component rendering. |
+| v0.3.0 | **Pluggable Design-System Conformance (`DESIGN.md` / Plugins) & Code-Based Canvas Rendering.** Keep `dui-core` strictly fact-only while adding an opt-in plugin architecture in `dui.json` so projects can attach their own `DESIGN.md`, W3C Design Tokens, or custom checker plugins ([#167](https://github.com/de-novo/dui/issues/167)). The default picture of the canvas is dui's approximate renderer of the versioned model, not a bitmap capture. |
 
-**Render server (v0.2.x).** Rendering moves to one long-lived server per project ([decision](architecture.md#4-finalized-decisions-2026-11-20)): the built host and one Chromium stay up, every job is a browser context and tab, and the CDP client renders several tabs at once. `dui map`, `dui run`, viewer cards and previews share it, and a capture saves the page already rendered on screen. It grows out of the shared live session owner ([#333](https://github.com/de-novo/dui/issues/333)).
+<a id="default-pipeline"></a>
 
-**dui renderer (research).** A GPU-drawn, incremental renderer owned by dui, in the spirit of GPUI, behind the `Renderer` port. Its frames stay previews until they match Chromium's for the same cells within the fidelity limit on a given surface; it starts with HTML snapshots and static pages, which need no script engine.
+**Default pipeline (decided 2026-11-27).** The goal is a map of screens and their relations, not a live demo of business logic. The default path must run on any OS and must not depend on a particular render engine. Source is parsed into an abstract syntax tree, reassembled into a versioned JSON model, and drawn by dui's own approximate renderer. The model holds screens, components and their props, navigation edges, code locations, data slots, declared state and the UI branches that depend on it, item schemas, field-to-UI bindings, neutral style properties, and a token layer that keeps token names (for later Figma variables). Values that are only known at runtime stay placeholders. The reviewer can change slot, state, and list-count values in the UI without running handlers or talking to a network. Saved value sets can later become Figma variants.
+
+A new language needs one adapter that maps that language onto this model: layout elements, declared state and data, navigation, and style syntax. The model, the approximate renderer, hot reload, and Figma export are reused.
+
+**Style and design tokens.** Neutral style properties are spacing, color, typography, radius, size, and layout. Each adapter maps its own style syntax onto them and keeps token names in the token layer.
+
+- Easy: Tailwind classes, SwiftUI modifiers, Compose Modifier, and inline styles map directly.
+- Medium: themes, design tokens, and CSS variables are resolved from their definition files.
+- Hard: CSS files and CSS Modules need cascade, specificity, and media queries. A lightweight, browserless CSS resolver approximates these. Runtime CSS-in-JS values are treated like slots: the declaration is recorded, and the reviewer can set a value in the UI without running the code.
+
+Unresolved styles stay placeholders. They must not be filled by launching a browser.
+
+Capture, HTML snapshots, live browser sessions, and simulator or emulator recordings are kept as optional pixel verification. They are no longer the default map, a fallback that fills cards, or the intermediate for Figma export or code edits. The first language is TypeScript/TSX, then Swift with syntax only (any OS). A compiler index or type checker is an optional accuracy upgrade, not a requirement for a card to appear.
+
+```mermaid
+flowchart TD
+  subgraph current [Current default]
+    CS[Source] --> CD[Route and type facts]
+    CD --> CP[Plan cells]
+    CP --> CC[Load pages in a browser to read links]
+    CC --> CV[Viewer]
+    CV --> CL[Live frames or HTML snapshots]
+  end
+  subgraph target [Target default]
+    TS[Source] --> TAST[AST parse on any OS]
+    TAST --> TM[Versioned model]
+    TM --> TR[Approximate renderer]
+    TR --> TV[Map of screens and relations]
+    TV --> TSlot[Toggle slots, state, and list counts]
+    TSlot --> TR
+    Watch[File watcher] --> TAST
+    TM --> TF[Figma export after v0.3.0]
+  end
+  subgraph opt [Optional pixel verification]
+    TM --> OJ[Render job]
+    OJ --> OW[Web]
+    OJ --> OA[Android]
+    OJ --> OI[iOS]
+    OJ --> OD[Desktop]
+    OW --> OE[Frame and fidelity]
+    OA --> OE
+    OI --> OE
+    OD --> OE
+  end
+```
+
+**Phases toward the default pipeline.**
+
+| Phase | When | Goal | Exit criterion |
+| --- | --- | --- | --- |
+| 1. Schema | v0.2.x | Freeze a versioned JSON model for screens, components, edges, code locations, slots, declared state and branches, item schemas, field-to-UI bindings, neutral style properties (spacing, color, typography, radius, size, layout), and a token layer that keeps token names. | One example validates against the schema, including style properties and token names. |
+| 2. Browserless default map | v0.2.x | `dui map` and `dui open` no longer start a browser by default. `--capture` and `dui run` stay for verification. | A browserless CI run shows screens and edges, and existing capture checks still pass. On the same example, measure end-to-end map time for the capture path and the AST path, both cold and incremental, and record the numbers. The AST default must be clearly faster. Do not publish target times before that measurement. |
+| 3. AST extractors | v0.2.x–v0.3.0 | Extract the model from source. First TypeScript/TSX, then Swift syntax only, on any OS. A type checker or compiler index is optional. Each adapter maps layout, state, navigation, and style syntax onto the model. | On Linux, with no browser and no Xcode, a TSX fixture and a Swift fixture emit the model, including easy style mappings. |
+| 4. Approximate renderer | v0.3.0 | Draw cards from the model only, including its style properties. Label them as approximate. | Cards are not empty; text, stacks, and styles match the model; no browser is started. |
+| 5. Hot reload | v0.3.0 | Watch files (in the same spirit as Vite), re-parse only what changed, patch only affected model nodes, and redraw with the approximate renderer. Track the import graph so screens that depend on a changed file update too. No app rebuild and no browser. | On the same example, measure edit-to-update latency and record it. Changing a file updates the dependent cards without rebuilding the app or starting a browser. |
+| 6. Slots, state, and lists | v0.3.0 | Toggle slot values, declared state, and list counts (0, 1, many) in the UI. Auto-generate mock items from the item schema. Hidden or unknown types stay placeholders. | Toggling `isOpen` or list count changes the picture with no network and no handlers. Saved value sets persist. |
+| 7. Optional render machine | v0.3.x | A common verification job: surface, cell, state, size in; frame, render tree, and fidelity out. Issues about a long-lived render server and concurrent browser work ([#343](https://github.com/de-novo/dui/issues/343), [#344](https://github.com/de-novo/dui/issues/344)) belong on this track, not the default map. | Fidelity is recorded when a job runs. Default map CI stays browserless. |
+| 8. Figma export | after v0.3.0 | Build frames and variants from the model only. Token names map to Figma variables when possible. | A read-only export needs no snapshot. |
+| 9. GPUI web canvas | from v1.0.0 | Try GPUI (wasm32 web backend, WebGPU with WebGL2 fallback) for the in-app canvas — the screen renderer only. The React shell stays. | Preconditions: a stable official `gpui` crate that includes the web backend; Korean IME and text selection verified. Measure bundle size and tab memory against the TypeScript renderer and record the numbers (a published reference is Zed's Delta web bundle, about 23MB). Keep the GPUI canvas opt-in until it wins on those measurements. Until then, the default screen renderer stays TypeScript/DOM or a lightweight canvas. |
+
+**Out of scope for the default path.** Running business logic, calling APIs, or reproducing exact native or web pixels. Those stay on the verification track.
+
+**Pixel verification and the render server (optional, v0.3.x).** A long-lived official-engine render server is optional pixel verification, not the default map ([decision](architecture.md#4-finalized-decisions-2026-11-20)). The default `dui map` and `dui open` do not start a browser. When used, the server is a job dispatcher for `--capture`, `dui run`, and later other surfaces. Work described in [#343](https://github.com/de-novo/dui/issues/343) and [#344](https://github.com/de-novo/dui/issues/344) belongs on this track. It can still grow out of the shared live session owner ([#333](https://github.com/de-novo/dui/issues/333)), but only behind an explicit opt-in.
+
+**dui approximate renderer (v0.3.0).** The default picture of the code-based canvas is dui's approximate renderer of the versioned model, including style properties. It needs no browser and no platform build. Frames are labeled as approximate. Matching official-engine frames for optional fidelity remains research on the verification track; until then, those frames are verification evidence, not the default card.
 
 **Figma export (after v0.3.0).** After the code-based canvas loop is in place, export the screen map into Figma as a read-only view generated from the code. The code stays the single source of truth. Edits made in Figma are not written back; syncing those edits into the code would split the source again and is not a goal for now.
 
-1. **Screens as frames.** Export screens from a `dui map` run into Figma: turn the rendered DOM and styles into editable layers, one frame per screen, so the map is immediately visible in Figma.
+1. **Screens as frames.** Export screens from a `dui map` run into Figma: turn the versioned model (layout, text, and style properties) into editable layers, one frame per screen, so the map is immediately visible in Figma. Token names in the model map to Figma variables when possible.
 2. **Components and variants.** Read component information from the code (for example a React component and its props), render the relevant prop combinations, and create Figma component sets with those props mapped to variant properties. Place the matching elements on each screen as instances of those components.
 
 Open questions include which prop combinations to render when the set grows large, how to capture states such as hover, disabled, and focus, and whether colors and typography should map to Figma variables or styles.
 
 The first proof of concept uses a few obora design-system components (Button, Input, Badge) and a couple of obora screens.
+
+**GPUI web canvas (from v1.0.0).** After the default approximate renderer is in place, try GPUI's wasm32 web backend (WebGPU, with WebGL2 fallback) for the in-app canvas, as an optimization of the screen renderer only. The React shell stays. This is a renderer running in the page, not a headless browser, and it does not change the [Never](#never) rule for the default map path.
+
+This attempt does not start until the official `gpui` crate is stable and includes the web backend, and until Korean IME and text selection have been verified on that backend. Bundle size and tab memory must be measured against the TypeScript renderer and recorded. A published reference is Zed's Delta web bundle, about 23MB; that figure is not a dui measurement or a target. The GPUI canvas stays opt-in until it wins those measurements. Until then, the default screen renderer is TypeScript/DOM or a lightweight canvas.
 
 **Hosting direction.** A Sentry-like model is under consideration: the core CLI (`dui map`, diff, local rendering, and JSON export) would stay open source, while a later hosted service could store CI uploads with code-location mapping, show screen comparisons on each pull request, sync with the Figma plugin, and link design comments back to the code, with team access. This is a direction to explore, not a commitment.
 
@@ -102,7 +174,7 @@ node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Sett
 ```
 
 <a id="swiftui-screen-discovery"></a>
-**SwiftUI screen discovery (experimental).** `dui map` finds SwiftUI screens in an Xcode or SwiftPM app on macOS by joining the build's index store with swift-syntax ([decision](architecture.md#4-finalized-decisions-2026-11-20)). Rules: an `App` scene root (`WindowGroup`, `DocumentGroup`) is the entry; `NavigationLink`, `.navigationDestination` (matched by value type) and `TabView` children are screens; `.sheet`, `.fullScreenCover` and `.popover` content are overlays. A SwiftUI view that UIKit shows through `UIHostingController(rootView:)` is a screen. `NavigationStack`, `NavigationView` and `Group` wrappers are looked through, and so are modifier chains and `#if` postfix blocks. A view type at a `NavigationStack` or `NavigationView` root is a screen. A reference to a project property or function (`root`, `view(for:)`) is followed into its body with the same rules. A destination chosen at runtime is marked dynamic with its condition or reported as a limitation. A card's path is `Target/File.swift#TypeName`. UIKit `UIViewController` subclasses are listed without edges in v1. Set `"scheme"` in `dui.json` when the project has more than one scheme. Check: `npm run check:swift-map`. Native images come from simulator recordings through `dui map attach` and stay unverified. Linux reports a project-level limitation. The upstream fixture is [home-assistant/iOS](https://github.com/home-assistant/iOS) (Apache-2.0), pinned to a commit; [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire) (MIT) follows for UIKit edges.
+**SwiftUI screen discovery (experimental).** The default path finds SwiftUI screens from syntax alone and runs on any OS ([decision](architecture.md#4-finalized-decisions-2026-11-20)). Joining a compiler index from an official macOS build remains an optional accuracy upgrade; it is not required for a card to appear. Rules: an `App` scene root (`WindowGroup`, `DocumentGroup`) is the entry; `NavigationLink`, `.navigationDestination` (matched by value type) and `TabView` children are screens; `.sheet`, `.fullScreenCover` and `.popover` content are overlays. A SwiftUI view that UIKit shows through `UIHostingController(rootView:)` is a screen. `NavigationStack`, `NavigationView` and `Group` wrappers are looked through, and so are modifier chains and `#if` postfix blocks. A view type at a `NavigationStack` or `NavigationView` root is a screen. A reference to a project property or function (`root`, `view(for:)`) is followed into its body with the same rules. A destination chosen at runtime is marked dynamic with its condition or reported as a limitation. A card's path is `Target/File.swift#TypeName`. UIKit `UIViewController` subclasses are listed without edges in v1. Set `"scheme"` in `dui.json` when the project has more than one scheme. Check: `npm run check:swift-map`. Native images come from simulator recordings through `dui map attach` and stay unverified. Linux and Windows use the syntax-only default. The upstream fixture is [home-assistant/iOS](https://github.com/home-assistant/iOS) (Apache-2.0), pinned to a commit; [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire) (MIT) follows for UIKit edges.
 
 ## Multi-surface architecture & evolution
 
