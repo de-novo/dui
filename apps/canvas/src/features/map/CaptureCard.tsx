@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { SourceCardBody } from "../../components/NativeSourceEvidence";
 import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
@@ -36,10 +36,13 @@ export function CaptureCard({
   diffVisualMode = "after",
   beforeRunKey,
   afterRunKey,
+  snapshotUrl,
 }: {
   screen: Screen;
   cell?: Cell;
   imageUrl: (name: string) => string;
+  /** The capture's HTML snapshot, drawn over the PNG once it has loaded. */
+  snapshotUrl?: string;
   selected?: boolean;
   related?: boolean;
   dimmed?: boolean;
@@ -91,6 +94,19 @@ export function CaptureCard({
     diffVisualMode === "render" && Boolean(screenDiff && renderChangeCount > 0);
   const capW = Math.max(1, screenDiff?.captureWidth ?? naturalW ?? cell?.width ?? 1280);
   const capH = Math.max(1, screenDiff?.captureHeight ?? naturalH ?? frameHeight ?? 800);
+  // The snapshot is laid out at the capture width and scaled to the frame, like the PNG.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frameWidth, setFrameWidth] = useState(0);
+  const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!snapshotUrl || !frame) return;
+    const observer = new ResizeObserver(([entry]) => setFrameWidth(entry!.contentRect.width));
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [snapshotUrl]);
+  const snapshotW = cell?.imageWidth ?? naturalW;
+  const snapshotH = cell?.imageHeight ?? naturalH;
   return (
     <article
       className={
@@ -111,7 +127,9 @@ export function CaptureCard({
       title={screen.path}
     >
       <div
+        ref={frameRef}
         className={sourceCard ? "source-frame" : "capture-frame"}
+        data-showing={snapshotUrl && loadedSnapshot === snapshotUrl ? "snapshot" : "png"}
         style={
           sourceCard
             ? undefined
@@ -145,6 +163,24 @@ export function CaptureCard({
             <span>{cell ? "Missing image" : "No capture at this width"}</span>
             {cell?.reason && <small>{cell.reason}</small>}
           </div>
+        )}
+        {snapshotUrl && snapshotW && snapshotH && frameWidth > 0 && (
+          <iframe
+            className={
+              "card-snapshot" + (loadedSnapshot === snapshotUrl ? " card-snapshot-loaded" : "")
+            }
+            src={snapshotUrl}
+            sandbox=""
+            title={screen.path}
+            tabIndex={-1}
+            aria-hidden="true"
+            onLoad={() => setLoadedSnapshot(snapshotUrl)}
+            style={{
+              width: `${snapshotW}px`,
+              height: `${snapshotH}px`,
+              transform: `scale(${frameWidth / snapshotW})`,
+            }}
+          />
         )}
         {cell && displayedImage && activeLoaded && (
           <MapCardGuides

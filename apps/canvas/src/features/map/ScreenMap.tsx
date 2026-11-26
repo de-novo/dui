@@ -19,6 +19,7 @@ import { MapGuideOptions } from "./MapCardGuides";
 import { CaptureCard } from "./CaptureCard";
 import { clearLane, layoutMap } from "./layout";
 import { cardCell } from "../../model/selection";
+import { SNAPSHOT_MIN_SCREEN_WIDTH, snapshotUsable, useSnapshotFrame } from "./snapshotSlots";
 import {
   Background,
   BaseEdge,
@@ -216,8 +217,35 @@ function handleStyle(position: Position, kind: "source" | "target") {
   return sides ? handleStyles[kind].side : handleStyles[kind].axis;
 }
 
-function Card({ data }: NodeProps<CardNode>) {
+function Card({
+  id,
+  data,
+  positionAbsoluteX,
+  positionAbsoluteY,
+  width,
+  height,
+}: NodeProps<CardNode>) {
   const cell = cardCell(data.screen, data.width);
+  // A faithful snapshot replaces the PNG while the card is large enough on screen and in view.
+  // The selector returns a boolean, so panning and zooming re-render a card only when that
+  // answer changes.
+  const usable = snapshotUsable(cell?.snapshot).show === "snapshot" && !data.screenDiff;
+  const wanted = useViewportStore((state) => {
+    if (!usable) return false;
+    const [tx, ty, zoom] = state.transform;
+    const left = positionAbsoluteX * zoom + tx;
+    const top = positionAbsoluteY * zoom + ty;
+    const w = (width ?? data.cardWidth) * zoom;
+    const h = (height ?? data.frameHeight) * zoom;
+    return (
+      data.cardWidth * zoom >= SNAPSHOT_MIN_SCREEN_WIDTH &&
+      left < state.width &&
+      left + w > 0 &&
+      top < state.height &&
+      top + h > 0
+    );
+  });
+  const granted = useSnapshotFrame(id, wanted);
   return (
     <>
       {Object.values(Position).map((position) => (
@@ -240,6 +268,7 @@ function Card({ data }: NodeProps<CardNode>) {
         screen={data.screen}
         cell={cell}
         imageUrl={data.imageUrl}
+        snapshotUrl={granted && cell?.snapshot ? data.imageUrl(cell.snapshot.file) : undefined}
         selected={data.selected}
         related={data.related}
         dimmed={data.dimmed}

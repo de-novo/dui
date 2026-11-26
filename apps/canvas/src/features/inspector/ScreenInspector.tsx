@@ -1,3 +1,4 @@
+import { snapshotUsable, useSnapshotShown } from "../map/snapshotSlots";
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
 import { ResponsivePreview } from "./ResponsivePreview";
@@ -95,6 +96,20 @@ export function ScreenInspector({
   const widthsOnScreen = new Set(screenCells.map((c) => c.width)).size;
   const multipleStatesPerWidth = screenCells.length > widthsOnScreen;
   const evidence = cell?.screenEvidence;
+  // Which of the capture's two forms the map card shows (docs/en/web-viewer.md#html-cards).
+  const snapshotShown = useSnapshotShown(screen?.id);
+  const percent = (value: number) => `${(value * 100).toFixed(2)} %`;
+  const usable = snapshotUsable(cell?.snapshot);
+  const cardSourceText =
+    snapshotShown && cell?.snapshot?.fidelity !== undefined
+      ? t.snapshotShown(percent(cell.snapshot.fidelity))
+      : usable.show === "snapshot"
+        ? t.pngZoomIn
+        : usable.why === "fidelity"
+          ? t.pngFidelity(percent(cell?.snapshot?.fidelity ?? 0))
+          : usable.why === "unmeasured"
+            ? t.pngUnmeasured
+            : t.pngNoSnapshot;
   const matchLabel = (value?: boolean) =>
     value === undefined ? t.notObserved : value ? t.matched : t.unmatched;
   const audit = cell?.localeAudit;
@@ -319,6 +334,14 @@ export function ScreenInspector({
               {evidence.settled === false && <span>{t.didNotSettle}</span>}
               {evidence.selectorSource === "default" && <span>{t.noScreenCondition}</span>}
             </li>
+            {cell?.image && (
+              <li className="link-evidence-item" data-card-source>
+                <span>{cardSourceText}</span>
+                {cell.snapshot && cell.snapshot.omitted > 0 && (
+                  <span>{t.snapshotOmitted(cell.snapshot.omitted)}</span>
+                )}
+              </li>
+            )}
           </ul>
         </details>
       )}

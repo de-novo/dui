@@ -132,27 +132,49 @@ type Capture = {
   reason?: string;
   state?: string;
   scenario?: string;
+  observation?: { htmlSnapshot?: { file?: unknown; fidelity?: unknown; omitted?: unknown } };
 };
 
 async function openArchive(root: string) {
   const graph = JSON.parse(await readFile(join(root, "graph.json"), "utf8"));
   const report = await optionalJson(root, "report.json");
   const captures: Capture[] = report?.cells ?? graph.overview;
-  const cells = captures.map(({ path, width, image, status, reason, state, scenario }) => ({
-    path,
-    width,
-    image,
-    status,
-    reason,
-    state,
-    scenario,
-  }));
+  const snapshotName = /^[0-9a-f]{64}-\d+\.html$/;
+  const cells = captures.map(
+    ({ path, width, image, status, reason, state, scenario, observation }) => {
+      const snapshot = observation?.htmlSnapshot;
+      return {
+        path,
+        width,
+        image,
+        status,
+        reason,
+        state,
+        scenario,
+        ...(typeof snapshot?.file === "string" && snapshotName.test(snapshot.file)
+          ? {
+              snapshot: {
+                file: snapshot.file,
+                fidelity: snapshot.fidelity,
+                omitted: Array.isArray(snapshot.omitted) ? snapshot.omitted.length : 0,
+              },
+            }
+          : {}),
+      };
+    },
+  );
   const images = new Set<string>();
   for (const { image } of [...cells, ...graph.overview]) {
     if (typeof image === "string" && basename(image) === image && image.endsWith(".png"))
       images.add(image);
   }
-  return { graph: JSON.stringify({ ...graph, cells }), images };
+  for (const cell of cells) if (cell.snapshot) images.add(cell.snapshot.file);
+  // Overview entries are the map cards; they get the snapshot of the capture with their image.
+  const byImage = new Map(cells.filter((c) => c.snapshot).map((c) => [c.image, c.snapshot]));
+  const overview = graph.overview.map((item: { image?: string }) =>
+    item.image && byImage.has(item.image) ? { ...item, snapshot: byImage.get(item.image) } : item,
+  );
+  return { graph: JSON.stringify({ ...graph, overview, cells }), images };
 }
 
 function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -260,7 +282,15 @@ const server = await createServer({
               if (data.images.has(name)) {
                 const image = await realpath(join(root, name)).catch(() => undefined);
                 if (image && dirname(image) === root) {
-                  res.setHeader("Content-Type", "image/png");
+                  if (name.endsWith(".html")) {
+                    // Same policy as `dui open` (crates/dui/src/viewer.rs, SNAPSHOT_POLICY).
+                    res.setHeader("Content-Type", "text/html; charset=utf-8");
+                    res.setHeader(
+                      "Content-Security-Policy",
+                      "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; sandbox",
+                    );
+                    res.setHeader("X-Content-Type-Options", "nosniff");
+                  } else res.setHeader("Content-Type", "image/png");
                   createReadStream(image)
                     .on("error", () => res.destroy())
                     .pipe(res);
