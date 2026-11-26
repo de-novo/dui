@@ -89,9 +89,12 @@ fn summary_line(report: &Value) -> Option<String> {
             .flatten()
             .filter_map(|c| c["path"].as_str())
             .collect();
+        let screens = match screens.len() {
+            1 => "1 screen".to_owned(),
+            n => format!("{n} screens"),
+        };
         return Some(format!(
-            "dui map: {} screens, {cells} cells planned without a browser in {}; capture them with --capture",
-            screens.len(),
+            "dui map: {screens}, {cells} cells planned without a browser in {}; capture them with --capture",
             seconds(&timings["wallMs"])
         ));
     }
@@ -447,19 +450,18 @@ mod tests {
             "dui map: 5 cells, 5 captured (1 verified) in 12.3 s; slowest phase settle (9.0 s over \
              5 captures); unverified: 2 not-ready, 1 api-error, 1 redirected"
         );
-        // A map without capture plans its cells: none captured, none counted as a failure kind
-        // other than not-rendered.
+        // A map without capture plans its cells and started no browser.
         let planned = json!({
             "coverage": {"verified": 0},
             "timings": {"wallMs": 1_000},
             "cells": [
-                {"status": "unverified", "reason": "not-rendered"},
-                {"status": "unverified", "reason": "not-rendered"},
+                {"path": "/", "status": "unverified", "reason": "not-rendered"},
+                {"path": "/", "status": "unverified", "reason": "not-rendered"},
             ],
         });
         assert_eq!(
             summary_line(&planned).expect("line"),
-            "dui map: 2 cells, 0 captured (0 verified) in 1.0 s; unverified: 2 not-rendered"
+            "dui map: 1 screen, 2 cells planned without a browser in 1.0 s; capture them with --capture"
         );
     }
 

@@ -196,6 +196,12 @@ fn serve_connection(mut stream: TcpStream, root: &Path, spa_fallback: bool) {
     if reader.read_line(&mut request_line).is_err() || request_line.trim().is_empty() {
         return;
     }
+    // The rest of the request head is read too: closing with unread bytes resets the
+    // connection, and the client can lose the response.
+    let mut line = String::new();
+    while reader.read_line(&mut line).is_ok_and(|n| n > 0) && line.trim_end() != "" {
+        line.clear();
+    }
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let target = parts.next().unwrap_or("/");

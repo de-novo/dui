@@ -111,9 +111,32 @@ fn header<'h>(headers: &'h [(String, String)], name: &str) -> Option<&'h str> {
         .map(|(_, v)| v.as_str())
 }
 
-type Response = (u16, Vec<(String, String)>, Vec<u8>);
+type Headers = Vec<(String, String)>;
+type Response = (u16, Headers, Vec<u8>);
 
+/// One request, tried again when the server resets the connection.
 fn get(port: u16, path: &str) -> Result<Response, Box<dyn std::error::Error>> {
+    let mut attempt = 0;
+    loop {
+        match get_once(port, path) {
+            Err(e)
+                if attempt < 3
+                    && e.downcast_ref::<std::io::Error>().is_some_and(|e| {
+                        matches!(
+                            e.kind(),
+                            std::io::ErrorKind::ConnectionReset
+                                | std::io::ErrorKind::ConnectionAborted
+                        )
+                    }) =>
+            {
+                attempt += 1;
+            }
+            result => return result,
+        }
+    }
+}
+
+fn get_once(port: u16, path: &str) -> Result<Response, Box<dyn std::error::Error>> {
     let mut stream = TcpStream::connect(("127.0.0.1", port))?;
     stream.set_read_timeout(Some(Duration::from_secs(30)))?;
     write!(
@@ -124,7 +147,8 @@ fn get(port: u16, path: &str) -> Result<Response, Box<dyn std::error::Error>> {
     // connection open despite `Connection: close`.
     let mut raw = Vec::new();
     let mut buf = [0u8; 16 * 1024];
-    let mut parsed: Option<(usize, u16, Vec<(String, String)>)> = None;
+    // Where the body starts, the status and the headers, once the head has arrived.
+    let mut parsed: Option<(usize, u16, Headers)> = None;
     loop {
         if parsed.is_none()
             && let Some(split) = raw.windows(4).position(|w| w == b"\r\n\r\n")
