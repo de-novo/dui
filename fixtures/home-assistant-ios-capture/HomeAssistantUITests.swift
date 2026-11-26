@@ -8,7 +8,9 @@ final class HomeAssistantUITests: XCTestCase {
     func testDuiCaptures() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        // FASTLANE_SNAPSHOT is HA's own capture mode (its E2E test uses it too). Without it, a Debug
+        // build adds a fake discovered server every 1.5 s, so the servers list would depend on timing.
+        app.launchArguments = ["-FASTLANE_SNAPSHOT", "YES", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let welcome = app.buttons["onboarding.welcome.continue"]
@@ -18,7 +20,8 @@ final class HomeAssistantUITests: XCTestCase {
 
         let manualEntry = app.buttons["onboarding.servers.manualEntry"]
         XCTAssertTrue(manualEntry.waitForExistence(timeout: 30), "servers list")
-        capture("OnboardingServersListView")
+        // Past the point where a Debug build would have listed two fake servers.
+        capture("OnboardingServersListView", settle: 5)
         manualEntry.tap()
 
         let connect = app.buttons["onboarding.manualEntry.connect"]
@@ -28,8 +31,8 @@ final class HomeAssistantUITests: XCTestCase {
 
     /// Waits for navigation animations to finish, then attaches the screen as a PNG. The name has
     /// no dots: xcresulttool treats the text after a dot as a file extension.
-    private func capture(_ name: String) {
-        Thread.sleep(forTimeInterval: 1.5)
+    private func capture(_ name: String, settle: TimeInterval = 1.5) {
+        Thread.sleep(forTimeInterval: settle)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "dui-capture-\(name)"
         attachment.lifetime = .keepAlways
