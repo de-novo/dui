@@ -15,16 +15,41 @@ pub struct Intent<'a> {
     pub expects_probe: bool,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Failure {
     MissingStateAssertion,
     MissingScreenAssertion,
     HttpError,
     ApiError,
+    /// The page ended on another route than the one requested.
+    Redirected,
+    /// The ready selector never matched (possibly while the page kept changing).
+    NotReady,
     /// The ready selector matched, but the screen kept changing until the settle budget ran out.
     Unsettled,
+    WidthMismatch,
+    /// A required request or a response check did not succeed.
+    RequestFailed,
+    /// The compiler reported diagnostics, so the state plan cannot be trusted.
+    NotAnalyzed,
+    /// A requested state was not observed: a slot value, a state assertion or the branch probe.
     AssertFailed,
+}
+
+/// `NODE CHANGE (+N more)` from `observation.unsettled`, or `None` without that evidence.
+fn unsettled_detail(observed: &Value) -> Option<String> {
+    let all = observed["unsettled"].as_array()?;
+    let first = all.first()?;
+    let what = match (first["node"].as_str(), first["field"].as_str()) {
+        (Some(node), _) => format!("{node} {}", first["change"].as_str().unwrap_or("changed")),
+        (None, Some(field)) => format!("{field} changed"),
+        (None, None) => "changed".to_owned(),
+    };
+    Some(match all.len() {
+        1 => what,
+        n => format!("{what} (+{} more)", n - 1),
+    })
 }
 
 /// API responses that failed the screen: `observed["apiErrors"]` (path → 401, 403 or 5xx),
@@ -208,38 +233,129 @@ impl Intent<'_> {
         if !unexpected_api_errors(observed, self.expected_api_errors).is_empty() {
             return Some(Failure::ApiError);
         }
-        if observed["settled"] == false && observed["ready"] == true {
+        if !route_reached(self.path, observed) {
+            return Some(Failure::Redirected);
+        }
+        if observed["ready"] != true {
+            return Some(Failure::NotReady);
+        }
+        if observed["settled"] == false {
             return Some(Failure::Unsettled);
         }
+        if observed["width"] != self.width {
+            return Some(Failure::WidthMismatch);
+        }
+        if self.failed_request(observed).is_some() {
+            return Some(Failure::RequestFailed);
+        }
+        if !self.analyzed {
+            return Some(Failure::NotAnalyzed);
+        }
+        self.unobserved_state(observed)
+            .map(|_| Failure::AssertFailed)
+    }
+
+    /// The first required request or response check that did not succeed, described.
+    fn failed_request(&self, observed: &Value) -> Option<String> {
+        if let Some((path, _)) = observed["responseChecks"]
+            .as_object()
+            .and_then(|checks| checks.iter().find(|(_, ok)| **ok != true))
+        {
+            return Some(format!("{path} response check"));
+        }
+        if observed["responseChecks"].as_object().is_none() {
+            return Some("no response checks recorded".to_owned());
+        }
+        self.required_requests.iter().find_map(|r| {
+            let path = r.as_str()?;
+            match observed["responses"][path].as_u64() {
+                Some(status) if (200..300).contains(&status) => None,
+                Some(status) => Some(format!("{path} {status}")),
+                None => Some(format!("{path} no response")),
+            }
+        })
+    }
+
+    /// The first requested state that was not observed, described.
+    fn unobserved_state(&self, observed: &Value) -> Option<String> {
         let values = observed["slots"].as_object();
-        let values_match = self
+        if let Some((k, v)) = self
             .inputs
             .iter()
-            .all(|(k, v)| values.and_then(|slots| slots.get(k)) == Some(v));
-        let targets_match = observed["assertions"].as_array().is_some_and(|results| {
-            results.len() == self.assertions.len() && results.iter().all(|v| v == true)
-        });
-        let responses_match = observed["responseChecks"]
-            .as_object()
-            .is_some_and(|checks| checks.values().all(|v| v == true))
-            && self.required_requests.iter().all(|r| {
-                r.as_str()
-                    .and_then(|path| observed["responses"][path].as_u64())
-                    .is_some_and(|s| (200..300).contains(&s))
-            });
+            .find(|(k, v)| values.and_then(|slots| slots.get(*k)) != Some(*v))
+        {
+            let seen = values
+                .and_then(|slots| slots.get(k))
+                .unwrap_or(&Value::Null);
+            return Some(format!("slot {k} is {seen} (expected {v})"));
+        }
+        match observed["assertions"].as_array() {
+            Some(results) if results.len() != self.assertions.len() => {
+                return Some(format!(
+                    "{} of {} state assertions evaluated",
+                    results.len(),
+                    self.assertions.len()
+                ));
+            }
+            Some(results) => {
+                if let Some(i) = results.iter().position(|v| v != true) {
+                    return Some(format!("state assertion {} failed", i + 1));
+                }
+            }
+            None => return Some("no state assertions recorded".to_owned()),
+        }
         let probe_ran = observed["hits"]
             .as_array()
             .is_some_and(|hits| hits.iter().any(Value::is_string));
-        let matches = self.analyzed
-            && values_match
-            && targets_match
-            && responses_match
-            && observed["settled"] != false
-            && observed["ready"] == true
-            && observed["width"] == self.width
-            && route_reached(self.path, observed)
-            && (!self.expects_probe || probe_ran);
-        (!matches).then_some(Failure::AssertFailed)
+        (self.expects_probe && !probe_ran).then(|| "branch probe did not run".to_owned())
+    }
+
+    /// The wire reason of an unverified cell: the failure's name and what failed, for example
+    /// `redirected: /a → /b`, `not-ready: main h1 + unsettled: li#3 added` or
+    /// `api-error: 401 /api/me`.
+    pub fn describe(&self, failure: &Failure, observed: &Value, selector: Option<&str>) -> String {
+        let name = serde_json::to_value(failure)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_default();
+        let detail = match failure {
+            Failure::ApiError => {
+                let errors = unexpected_api_errors(observed, self.expected_api_errors);
+                errors.first().map(|(path, status)| match errors.len() {
+                    1 => format!("{status} {path}"),
+                    n => format!("{status} {path} (+{} more)", n - 1),
+                })
+            }
+            Failure::Redirected => Some(format!(
+                "{} → {}",
+                self.path,
+                observed["path"].as_str().unwrap_or("(no route)")
+            )),
+            Failure::NotReady => {
+                let wanted = selector.unwrap_or("ready selector").to_owned();
+                Some(match unsettled_detail(observed) {
+                    Some(still) if observed["settled"] == false => {
+                        format!("{wanted} + unsettled: {still}")
+                    }
+                    _ => wanted,
+                })
+            }
+            Failure::Unsettled => unsettled_detail(observed),
+            Failure::WidthMismatch => Some(format!(
+                "observed {} (expected {})",
+                observed["width"], self.width
+            )),
+            Failure::RequestFailed => self.failed_request(observed),
+            Failure::NotAnalyzed => Some("compiler diagnostics".to_owned()),
+            Failure::AssertFailed => self.unobserved_state(observed),
+            Failure::MissingStateAssertion
+            | Failure::MissingScreenAssertion
+            | Failure::HttpError => None,
+        };
+        match detail {
+            Some(detail) => format!("{name}: {detail}"),
+            None => name,
+        }
     }
 }
 
@@ -316,24 +432,71 @@ mod tests {
         };
         let baseline = json!({"ready":true,"width":768,"path":"/grid?item=A","assertions":[true],"slots":{"slot":false},"responses":{"/queue":200},"responseChecks":{"/queue":true},"hits":["branch:false"]});
         assert_eq!(intent.failure(&baseline), None);
-        for (key, value) in [
-            ("path", json!("/grid?item=B")),
-            ("hits", json!([])),
-            ("settled", json!(false)),
-            ("slots", json!({})),
-            ("assertions", json!([])),
-            ("responses", json!({"/queue":404})),
-            ("responseChecks", json!({"/queue":false})),
+        for (key, value, failure, reason) in [
+            (
+                "path",
+                json!("/grid?item=B"),
+                Failure::Redirected,
+                "redirected: /grid?item=A → /grid?item=B",
+            ),
+            (
+                "hits",
+                json!([]),
+                Failure::AssertFailed,
+                "assert-failed: branch probe did not run",
+            ),
+            ("settled", json!(false), Failure::Unsettled, "unsettled"),
+            (
+                "slots",
+                json!({}),
+                Failure::AssertFailed,
+                "assert-failed: slot slot is null (expected false)",
+            ),
+            (
+                "assertions",
+                json!([]),
+                Failure::AssertFailed,
+                "assert-failed: 0 of 1 state assertions evaluated",
+            ),
+            (
+                "responses",
+                json!({"/queue":404}),
+                Failure::RequestFailed,
+                "request-failed: /queue 404",
+            ),
+            (
+                "responseChecks",
+                json!({"/queue":false}),
+                Failure::RequestFailed,
+                "request-failed: /queue response check",
+            ),
+            ("ready", json!(false), Failure::NotReady, "not-ready: main"),
+            (
+                "width",
+                json!(375),
+                Failure::WidthMismatch,
+                "width-mismatch: observed 375 (expected 768)",
+            ),
         ] {
             let mut broken = baseline.clone();
             broken[key] = value;
-            let expected = if key == "settled" {
-                Failure::Unsettled
-            } else {
-                Failure::AssertFailed
-            };
-            assert_eq!(intent.failure(&broken), Some(expected));
+            let got = intent.failure(&broken);
+            assert_eq!(got, Some(failure), "{key}");
+            assert_eq!(
+                intent.describe(&failure, &broken, Some("main")),
+                reason,
+                "{key}"
+            );
         }
+        let mut stuck = baseline.clone();
+        stuck["ready"] = json!(false);
+        stuck["settled"] = json!(false);
+        stuck["unsettled"] = json!([{"node":"li#3","change":"added"},{"field":"text"}]);
+        assert_eq!(intent.failure(&stuck), Some(Failure::NotReady));
+        assert_eq!(
+            intent.describe(&Failure::NotReady, &stuck, Some("main")),
+            "not-ready: main + unsettled: li#3 added (+1 more)"
+        );
     }
 
     #[test]

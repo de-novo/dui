@@ -64,6 +64,22 @@ fn summary_line(report: &Value) -> Option<String> {
             timings["capturedCells"]
         ));
     }
+    // Unverified cells by the kind of failure, most frequent first.
+    let mut kinds: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for cell in report["cells"].as_array().into_iter().flatten() {
+        if cell["status"] == "unverified"
+            && let Some(reason) = cell["reason"].as_str()
+        {
+            let kind = reason.split(':').next().unwrap_or(reason);
+            *kinds.entry(kind).or_default() += 1;
+        }
+    }
+    if !kinds.is_empty() {
+        let mut kinds: Vec<_> = kinds.into_iter().collect();
+        kinds.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let parts: Vec<String> = kinds.iter().map(|(k, n)| format!("{n} {k}")).collect();
+        line.push_str(&format!("; unverified: {}", parts.join(", ")));
+    }
     Some(line)
 }
 
@@ -371,6 +387,28 @@ mod tests {
         );
         std::os::unix::fs::symlink(outside.path(), build.join("loop")).expect("link");
         assert!(crate::universal_web::collect_static_source_files(&project, "output").is_empty());
+    }
+
+    #[test]
+    fn the_summary_groups_unverified_cells_by_reason() {
+        let cell = |status: &str, reason: Option<&str>| json!({"status": status, "reason": reason});
+        let report = json!({
+            "coverage": {"verified": 1},
+            "timings": {"wallMs": 12_300, "slowestPhase": "settle", "capturedCells": 5,
+                        "totals": {"settleMs": 9_000}},
+            "cells": [
+                cell("verified", None),
+                cell("unverified", Some("not-ready: h1 + unsettled: li#3 added")),
+                cell("unverified", Some("not-ready: h1")),
+                cell("unverified", Some("redirected: /a → /b")),
+                cell("unverified", Some("api-error: 401 /api/me")),
+            ],
+        });
+        assert_eq!(
+            summary_line(&report).expect("line"),
+            "dui map: 5 cells (1 verified) in 12.3 s; slowest phase settle (9.0 s over 5 captures); \
+             unverified: 2 not-ready, 1 api-error, 1 redirected"
+        );
     }
 
     #[test]
