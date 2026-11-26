@@ -14,9 +14,13 @@
 **목표가 아닌 것**
 
 - 자체 파일 형식을 가진 독립 디자인 도구가 되는 것.
-- 모든 플랫폼을 한꺼번에 지원하는 것. 이 목표에 필요한 캡처와 편집 기능을 우선한다.
+- 모든 플랫폼을 한꺼번에 지원하는 것. 이 목표에 필요한 파싱과 근사 렌더를 우선하고, 캡처는 선택적 검증으로 둔다.
 
-**지금 집중할 일.** 코드를 기준으로 지도를 만들고, UI를 고친 결과를 같은 코드로 되돌리는 루프를 닫는다(v0.3.0에서 계획한 코드 기반 캔버스). 더 넓은 플랫폼 지원과 패키징은 그다음에 한다. 첫 단계는 실제 렌더링의 HTML 스냅샷으로 웹 카드를 그리는 것이다([결정](architecture.md#4-확정된-결정-2026-11-20)). 코드에서 컴포넌트를 직접 렌더링하는 것은 그다음이다.
+<a id="never"></a>
+
+**절대 하지 않는 것.** `dui map`, `dui open`, 핫리로드, 카드 그리기의 기본 경로는 Chromium이나 그 밖에 메모리를 많이 쓰는 렌더러를 실행하면 안 된다. 헤드리스 브라우저, 라이브 브라우저 세션, 에뮬레이터, 시뮬레이터도 안 된다. 무거운 렌더러는 픽셀 검증을 위한 명시적 선택 옵션(`--capture`, `dui run`, 렌더 머신)으로만 허용한다. 카드를 채우는 폴백으로 쓰면 안 된다. 이 규칙은 [AGENTS.md](../../AGENTS.md#never)와 [아키텍처 §3](architecture.md#never-default-path)에도 있다.
+
+**지금 집중할 일.** 코드를 기준으로 지도를 만들고, UI를 고친 결과를 같은 코드로 되돌리는 루프를 닫는다(v0.3.0에서 계획한 코드 기반 캔버스). 더 넓은 플랫폼 지원과 패키징은 그다음에 한다. 기본 경로는 소스를 AST로 파싱하고, 버전 있는 모델로 재조립한 뒤, dui 근사 렌더러로 그리는 것이다. 브라우저나 플랫폼 빌드는 필요 없다([결정](architecture.md#4-확정된-결정-2026-11-20)). 픽셀 검증이 필요할 때만 캡처를 쓴다.
 
 dui는 실제 앱의 화면을 한 장의 지도로 펼쳐, 사용자가 일을 시작해서 마칠 때까지의 흐름을 리뷰하는 도구다. 지도의 노드는 화면이다. 노드를 펼치면 상태와 화면 폭이 보이고, 연결선을 따라가면 어떤 행동이 다음 화면이나 상태로 이어지는지 알 수 있다.
 
@@ -75,15 +79,78 @@ M0 검수 화면의 다섯 상태를 375·768·1280px에서 검증해 서로 다
 | v0.0.9 | **Android · Desktop · 디자인 결함 탐지 및 개발자도구형 요소 인스펙터.** Android 어댑터(`adb screencap` + `uiautomator`/Semantics → `RenderNodeSnapshot`, [#102](https://github.com/de-novo/dui/issues/102)), Electron 45 호스트 + GPUI AccessKit 렌더 트리 Diff([#103](https://github.com/de-novo/dui/issues/103)), Radix UI / shadcn 룰팩 + Next.js 16 호스트([#104](https://github.com/de-novo/dui/issues/104)), 멀티 탭 병렬 캡처 + `renderTree` 기반 자동 디자인 결함·접근성 진단(넘침·겹침·텍스트 잘림·색상 대비·터치 타깃 크기·간격/정렬 불일치 — 사람은 캔버스에서 시각적으로, AI는 CLI/MCP 정형 JSON으로 즉시 확인, [#105](https://github.com/de-novo/dui/issues/105)), 그리고 각 요소의 속성·너비·높이·마진·패딩·간격 가이드를 확인하는 개발자도구형 요소 인스펙터와 박스 모델 측정 오버레이([#106](https://github.com/de-novo/dui/issues/106))를 구현한다. |
 | v0.1.0 | **크로스플랫폼 모바일 캡처 및 컴파일러 오라클 기반.** iOS Simulator(`xcrun simctl` + XCUI) 캡처, 범용 인증 세션(`storageState.json` / `POST authFlow`), PR 마크다운 Diff 출력, React Native · Expo Router · Ink `tsc` 룰팩, 공용 컴파일러 오라클 IR 및 공식 6개 툴체인 진단(`dui toolchains`: `tsc`, `rustc`, `go`, `swiftc`, `kotlinc`, `dart`)을 추가한다. |
 | v0.2.0 | **프레임워크 비종속 라우팅 트리, 풀페이지 실제 비율 노드, 모달 자동 캡처 및 사실 중심 코어.** 중첩 스크롤 셸을 포함한 화면 전체 높이를 캡처해 실제 비율대로 배치하고([#147](https://github.com/de-novo/dui/issues/147)), WAI-ARIA 메뉴 펼침 + 공식 컴파일러 라우트 레지스트리 기반 프레임워크 비종속 라우팅 트리·zero-config `dui scan` 및 멀티 호스트 `dui map`([#149](https://github.com/de-novo/dui/issues/149), [#153](https://github.com/de-novo/dui/issues/153)), macOS 통합 `TitleBar`·장애물 회피 거터 연결선([#155](https://github.com/de-novo/dui/issues/155), [#159](https://github.com/de-novo/dui/issues/159)), WAI-ARIA 기반 모달/다이얼로그/드로어 자동 캡처 및 자식 오버레이 노드 표현을 제공한다([#157](https://github.com/de-novo/dui/issues/157)). 또한 하드코딩 전역 디자인 결함 휴리스틱과 임시 iframe 라이브 마운트를 제거해 순수 객관적 렌더 증거만 보고한다([#163](https://github.com/de-novo/dui/issues/163), [#169](https://github.com/de-novo/dui/issues/169)). |
-| v0.3.0 | **플러그인 기반 디자인 시스템 정합성 검증 (`DESIGN.md` / 플러그인) 및 코드 기반 캔버스 렌더링.** `dui-core`는 순수 사실 중심으로 유지하고 `dui.json`에 프로젝트별 `DESIGN.md` · W3C Design Tokens · 커스텀 감사 플러그인을 연결해 디자인 시스템 불일치를 추출하며([#167](https://github.com/de-novo/dui/issues/167)), 캔버스 렌더링을 비트맵 캡처에서 직접 코드 기반 컴포넌트 렌더링으로 발전시킨다. |
+| v0.3.0 | **플러그인 기반 디자인 시스템 정합성 검증 (`DESIGN.md` / 플러그인) 및 코드 기반 캔버스 렌더링.** `dui-core`는 순수 사실 중심으로 유지하고 `dui.json`에 프로젝트별 `DESIGN.md` · W3C Design Tokens · 커스텀 감사 플러그인을 연결해 디자인 시스템 불일치를 추출한다([#167](https://github.com/de-novo/dui/issues/167)). 캔버스의 기본 그림은 비트맵 캡처가 아니라, 버전 있는 모델을 dui 근사 렌더러로 그린 것이다. |
 
-**렌더링 서버 (v0.2.x).** 렌더링을 프로젝트마다 오래 떠 있는 서버 하나로 옮긴다([결정](architecture.md#4-확정된-결정-2026-11-20)). 빌드한 호스트와 Chromium 하나가 떠 있고, 작업마다 브라우저 컨텍스트와 탭을 쓰며, CDP 클라이언트가 여러 탭을 동시에 그린다. `dui map`, `dui run`, 뷰어 카드와 미리보기가 이 서버를 함께 쓰고, 캡처는 화면에 이미 렌더링된 페이지를 저장한다. 공유 라이브 세션 소유 프로세스([#333](https://github.com/de-novo/dui/issues/333))에서 키운다.
+<a id="default-pipeline"></a>
 
-**dui 렌더러 (연구).** GPUI 방식으로 GPU로 그리고 바뀐 부분만 다시 그리는 dui 전용 렌더러를 `Renderer` 포트 뒤에 둔다. 어떤 표면에서 같은 셀의 Chromium 프레임과 충실도 한도 안에서 일치하기 전까지 그 프레임은 미리보기다. 스크립트 엔진이 필요 없는 HTML 스냅샷과 정적 페이지부터 시작한다.
+**기본 파이프라인 (2026-11-27 결정).** 목표는 화면과 그 관계의 지도이지, 비즈니스 로직을 라이브로 시연하는 것이 아니다. 기본 경로는 어느 OS에서나 동작해야 하고, 특정 렌더 엔진에 의존하면 안 된다. 소스를 추상 구문 트리로 파싱하고, 버전 있는 JSON 모델로 재조립한 뒤, dui 근사 렌더러로 그린다. 모델에는 화면, 컴포넌트와 props, 이동, 코드 위치, 데이터 슬롯, 선언된 상태와 그에 의존하는 UI 분기, 아이템 스키마, 필드-UI 바인딩, 공통 스타일 속성, 토큰 이름을 남기는 토큰 층(나중에 Figma 변수로 씀)이 들어간다. 실행 중에만 알 수 있는 값은 placeholder로 둔다. 리뷰어는 핸들러를 실행하거나 네트워크를 쓰지 않고 UI에서 슬롯, 상태, 리스트 개수 값을 바꿀 수 있다. 저장한 값 세트는 나중에 Figma 베리언트가 될 수 있다.
+
+새 언어는 그 언어를 이 모델로 옮기는 어댑터 하나만 있으면 된다. 레이아웃 요소, 선언된 상태와 데이터, 화면 이동, 스타일 문법을 매핑한다. 모델, 근사 렌더러, 핫리로드, Figma 내보내기는 그대로 재사용한다.
+
+**스타일과 디자인 토큰.** 공통 스타일 속성은 spacing, color, typography, radius, size, layout이다. 어댑터마다 자기 스타일 문법을 이 속성에 매핑하고, 토큰 이름은 토큰 층에 남긴다.
+
+- 쉬움: Tailwind 클래스, SwiftUI modifier, Compose Modifier, 인라인 스타일은 바로 매핑한다.
+- 보통: 테마, 디자인 토큰, CSS 변수는 정의 파일에서 해석한다.
+- 어려움: CSS 파일과 CSS Modules는 캐스케이드, 우선순위, 미디어 쿼리가 필요하다. 브라우저 없는 가벼운 CSS 해석기가 이를 근사한다. 런타임 CSS-in-JS 값은 슬롯처럼 다룬다. 선언을 기록해 두고, 리뷰어가 코드를 실행하지 않고 UI에서 값을 넣을 수 있게 한다.
+
+해석하지 못한 스타일은 placeholder로 남긴다. 브라우저를 띄워 채우면 안 된다.
+
+캡처, HTML 스냅샷, 라이브 브라우저 세션, 시뮬레이터나 에뮬레이터 녹화는 선택적 픽셀 검증으로 남긴다. 더 이상 기본 지도도, 카드를 채우는 폴백도, Figma 내보내기나 코드 수정의 중간 형식도 아니다. 첫 언어는 TypeScript/TSX이고, 그다음은 어느 OS에서나 동작하는 Swift syntax only다. 컴파일러 인덱스나 타입 검사기는 정확도를 높이는 선택 사항이지, 카드가 나오기 위한 조건이 아니다.
+
+```mermaid
+flowchart TD
+  subgraph current [Current default]
+    CS[Source] --> CD[Route and type facts]
+    CD --> CP[Plan cells]
+    CP --> CC[Load pages in a browser to read links]
+    CC --> CV[Viewer]
+    CV --> CL[Live frames or HTML snapshots]
+  end
+  subgraph target [Target default]
+    TS[Source] --> TAST[AST parse on any OS]
+    TAST --> TM[Versioned model]
+    TM --> TR[Approximate renderer]
+    TR --> TV[Map of screens and relations]
+    TV --> TSlot[Toggle slots, state, and list counts]
+    TSlot --> TR
+    Watch[File watcher] --> TAST
+    TM --> TF[Figma export after v0.3.0]
+  end
+  subgraph opt [Optional pixel verification]
+    TM --> OJ[Render job]
+    OJ --> OW[Web]
+    OJ --> OA[Android]
+    OJ --> OI[iOS]
+    OJ --> OD[Desktop]
+    OW --> OE[Frame and fidelity]
+    OA --> OE
+    OI --> OE
+    OD --> OE
+  end
+```
+
+**기본 파이프라인을 향한 단계.**
+
+| 단계 | 시기 | 목표 | 완료 기준 |
+| --- | --- | --- | --- |
+| 1. Schema | v0.2.x | 화면, 컴포넌트, 이동, 코드 위치, 슬롯, 선언된 상태와 분기, 아이템 스키마, 필드-UI 바인딩, 공통 스타일 속성(spacing, color, typography, radius, size, layout), 토큰 이름을 남기는 토큰 층을 버전 있는 JSON 모델로 고정한다. | 스타일 속성과 토큰 이름을 포함한 예제 하나가 스키마 검증을 통과한다. |
+| 2. Browserless default map | v0.2.x | `dui map`과 `dui open`은 기본적으로 브라우저를 시작하지 않는다. `--capture`와 `dui run`은 검증용으로 남긴다. | 브라우저 없는 CI 실행에서 화면과 이동이 나오고, 기존 캡처 검사도 통과한다. 같은 예제에서 캡처 경로와 AST 경로의 처음부터 끝까지 지도 생성 시간을 콜드와 증분 모두 측정하고 숫자를 기록한다. AST 기본 경로가 분명히 더 빨라야 한다. 그 측정 전에 목표 시간을 공개하지 않는다. |
+| 3. AST extractors | v0.2.x–v0.3.0 | 소스에서 모델을 추출한다. 먼저 TypeScript/TSX, 그다음 어느 OS에서나 동작하는 Swift syntax only. 타입 검사기나 컴파일러 인덱스는 선택이다. 어댑터마다 레이아웃, 상태, 이동, 스타일 문법을 모델에 매핑한다. | Linux에서 브라우저와 Xcode 없이, TSX 픽스처와 Swift 픽스처가 쉬운 스타일 매핑을 포함해 모델을 낸다. |
+| 4. Approximate renderer | v0.3.0 | 스타일 속성을 포함해 모델만으로 카드를 그린다. 근사임을 표시한다. | 카드가 비어 있지 않고, 텍스트·스택·스타일이 모델과 맞으며, 브라우저를 시작하지 않는다. |
+| 5. Hot reload | v0.3.0 | 파일 감시(Vite와 같은 취지)로 바뀐 파일만 다시 파싱하고, 영향받는 모델 노드만 패치한 뒤 근사 렌더러로 다시 그린다. import 그래프를 추적해 바뀐 파일에 의존하는 화면도 갱신한다. 앱 재빌드와 브라우저는 없다. | 같은 예제에서 수정부터 갱신까지 지연 시간을 측정하고 기록한다. 파일을 바꾸면 앱을 다시 빌드하거나 브라우저를 시작하지 않고 의존 카드가 갱신된다. |
+| 6. Slots, state, and lists | v0.3.0 | UI에서 슬롯 값, 선언된 상태, 리스트 개수(0, 1, many)를 바꾼다. 아이템 스키마로 목 아이템을 자동 생성한다. 숨거나 알 수 없는 타입은 placeholder로 둔다. | `isOpen`이나 리스트 개수를 바꾸면 네트워크와 핸들러 없이 그림이 바뀐다. 저장한 값 세트는 유지된다. |
+| 7. Optional render machine | v0.3.x | 검증용 공통 작업: surface, cell, state, size를 넣고 frame, render tree, fidelity를 받는다. 오래 떠 있는 렌더링 서버와 동시 브라우저 작업 이슈([#343](https://github.com/de-novo/dui/issues/343), [#344](https://github.com/de-novo/dui/issues/344))는 기본 지도가 아니라 이 트랙에 둔다. | 작업이 실행되면 충실도를 기록한다. 기본 지도 CI는 계속 브라우저 없이 돈다. |
+| 8. Figma export | after v0.3.0 | 모델만으로 프레임과 베리언트를 만든다. 가능하면 토큰 이름을 Figma 변수에 대응한다. | 보기 전용 내보내기에 스냅샷이 필요 없다. |
+
+**기본 경로의 범위 밖.** 비즈니스 로직 실행, API 호출, 네이티브나 웹 픽셀을 그대로 재현하는 것. 이런 일은 검증 트랙에 남긴다.
+
+**픽셀 검증과 렌더링 서버 (옵션, v0.3.x).** 오래 떠 있는 공식 엔진 렌더링 서버는 선택적 픽셀 검증이지 기본 지도가 아니다([결정](architecture.md#4-확정된-결정-2026-11-20)). 기본 `dui map`과 `dui open`은 브라우저를 시작하지 않는다. 쓸 때는 `--capture`, `dui run`, 이후 다른 표면을 위한 작업 디스패처다. [#343](https://github.com/de-novo/dui/issues/343)과 [#344](https://github.com/de-novo/dui/issues/344)에 적힌 작업은 이 트랙에 둔다. 공유 라이브 세션 소유 프로세스([#333](https://github.com/de-novo/dui/issues/333))에서 키울 수는 있지만, 명시적 선택 옵션 뒤에서만 한다.
+
+**dui 근사 렌더러 (v0.3.0).** 코드 기반 캔버스의 기본 그림은 스타일 속성을 포함한 버전 있는 모델을 dui 근사 렌더러로 그린 것이다. 브라우저와 플랫폼 빌드는 필요 없다. 프레임에는 근사임을 표시한다. 선택적 충실도를 위해 공식 엔진 프레임과 맞추는 일은 검증 트랙의 연구로 남긴다. 그때까지 그 프레임은 검증 근거이지 기본 카드가 아니다.
 
 **Figma 내보내기 (v0.3.0 이후).** 코드 기반 캔버스 루프가 자리 잡은 뒤에, 화면 지도를 코드에서 만든 보기 전용 사본으로 Figma에 내보낸다. 원천은 코드로 남는다. Figma에서 고친 내용은 코드로 되돌리지 않는다. 그렇게 하면 원천이 다시 둘로 갈라지므로, 지금은 목표가 아니다.
 
-1. **화면을 프레임으로.** `dui map`으로 잡은 화면을 Figma로 보낸다. 렌더된 DOM과 스타일을 편집 가능한 레이어로 바꾸고, 화면마다 프레임 하나를 만들어 Figma에서 바로 볼 수 있게 한다.
+1. **화면을 프레임으로.** `dui map`으로 잡은 화면을 Figma로 보낸다. 버전 있는 모델(레이아웃, 텍스트, 스타일 속성)을 편집 가능한 레이어로 바꾸고, 화면마다 프레임 하나를 만들어 Figma에서 바로 볼 수 있게 한다. 모델의 토큰 이름은 가능하면 Figma 변수에 대응한다.
 2. **컴포넌트와 베리언트.** 코드에서 컴포넌트 정보를 읽는다. 예를 들어 React 컴포넌트와 props를 읽고, 필요한 props 조합을 렌더링한 뒤 Figma 컴포넌트 세트로 묶고 props를 베리언트 속성에 대응시킨다. 화면에 올라간 같은 요소는 그 컴포넌트의 인스턴스로 넣는다.
 
 아직 열어 둘 문제는, 조합이 많아질 때 어떤 조합을 그릴지, hover·disabled·focus 같은 상태를 어떻게 담을지, 색과 타이포그래피를 Figma 변수나 스타일로 옮길지다.
@@ -102,7 +169,7 @@ node scripts/source-preview.mts fixtures/source-preview/Settings.kt example.Sett
 ```
 
 <a id="swiftui-screen-discovery"></a>
-**SwiftUI 화면 탐색 (실험 단계).** `dui map`은 macOS에서 Xcode 또는 SwiftPM 앱의 빌드 인덱스 스토어와 swift-syntax를 결합해 SwiftUI 화면을 찾는다([결정](architecture.md#4-확정된-결정-2026-11-20)). 규칙: `App`의 씬 루트(`WindowGroup`, `DocumentGroup`)가 진입 화면이다. `NavigationLink`, `.navigationDestination`(값 타입으로 대응), `TabView` 자식은 화면이고, `.sheet`, `.fullScreenCover`, `.popover` 내용은 오버레이다. UIKit이 `UIHostingController(rootView:)`로 보여 주는 SwiftUI 뷰도 화면이다. `NavigationStack`, `NavigationView`, `Group` 래퍼와 수정자 체인, `#if` 후위 블록은 걷어 내고 본다. `NavigationStack`이나 `NavigationView`의 루트에 있는 뷰 타입도 화면이다. 프로젝트의 프로퍼티나 함수 참조(`root`, `view(for:)`)는 그 본문까지 따라가 같은 규칙으로 읽는다. 실행 중에 정해지는 이동 대상은 조건과 함께 동적으로 표시하거나 제약으로 보고한다. 카드 경로는 `Target/File.swift#TypeName`이다. v1에서 UIKit `UIViewController` 하위 클래스는 연결 없이 목록에만 올린다. 스킴이 여러 개면 `dui.json`에 `"scheme"`을 지정한다. 검사: `npm run check:swift-map`. 실제 화면은 시뮬레이터 녹화를 `dui map attach`로 연결하며 미검증으로 남는다. Linux에서는 프로젝트 수준 제약으로 보고한다. 업스트림 픽스처는 커밋으로 고정한 [home-assistant/iOS](https://github.com/home-assistant/iOS)(Apache-2.0)이며, UIKit 연결은 [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)(MIT)로 이어 간다.
+**SwiftUI 화면 탐색 (실험 단계).** 기본 경로는 syntax만으로 SwiftUI 화면을 찾으며 어느 OS에서나 동작한다([결정](architecture.md#4-확정된-결정-2026-11-20)). 공식 macOS 빌드의 컴파일러 인덱스를 결합하는 것은 정확도를 높이는 선택 사항이지, 카드가 나오기 위한 조건이 아니다. 규칙: `App`의 씬 루트(`WindowGroup`, `DocumentGroup`)가 진입 화면이다. `NavigationLink`, `.navigationDestination`(값 타입으로 대응), `TabView` 자식은 화면이고, `.sheet`, `.fullScreenCover`, `.popover` 내용은 오버레이다. UIKit이 `UIHostingController(rootView:)`로 보여 주는 SwiftUI 뷰도 화면이다. `NavigationStack`, `NavigationView`, `Group` 래퍼와 수정자 체인, `#if` 후위 블록은 걷어 내고 본다. `NavigationStack`이나 `NavigationView`의 루트에 있는 뷰 타입도 화면이다. 프로젝트의 프로퍼티나 함수 참조(`root`, `view(for:)`)는 그 본문까지 따라가 같은 규칙으로 읽는다. 실행 중에 정해지는 이동 대상은 조건과 함께 동적으로 표시하거나 제약으로 보고한다. 카드 경로는 `Target/File.swift#TypeName`이다. v1에서 UIKit `UIViewController` 하위 클래스는 연결 없이 목록에만 올린다. 스킴이 여러 개면 `dui.json`에 `"scheme"`을 지정한다. 검사: `npm run check:swift-map`. 실제 화면은 시뮬레이터 녹화를 `dui map attach`로 연결하며 미검증으로 남는다. Linux와 Windows는 syntax only 기본 경로를 쓴다. 업스트림 픽스처는 커밋으로 고정한 [home-assistant/iOS](https://github.com/home-assistant/iOS)(Apache-2.0)이며, UIKit 연결은 [NetNewsWire](https://github.com/Ranchero-Software/NetNewsWire)(MIT)로 이어 간다.
 
 ## 멀티 서피스 아키텍처와 진화 방향
 
