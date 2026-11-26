@@ -427,6 +427,38 @@ if (Array.isArray(profile.scenarios)) {
     discoverySources[p] = "dui.json";
   }
 }
+// Dev-server behaviour that a production build served by dui's static host does not have:
+// `configureServer` middleware and `server.proxy`. Reported so a blank capture can name it.
+async function devServerFeatures() {
+  try {
+    const loaded = await vite.loadConfigFromFile(
+      { command: "serve", mode: "development", isSsrBuild: false, isPreview: false },
+      undefined,
+      app,
+      "silent",
+    );
+    const flatten = async (items: unknown[]): Promise<Record<string, unknown>[]> =>
+      (
+        await Promise.all(
+          items.map(async (item) => {
+            const value = await item;
+            if (Array.isArray(value)) return flatten(value);
+            return value && typeof value === "object" ? [value as Record<string, unknown>] : [];
+          }),
+        )
+      ).flat();
+    const plugins = await flatten(loaded?.config.plugins ?? []);
+    const configureServer = plugins
+      .filter((p) => p.configureServer)
+      .map((p) => String(p.name ?? "unnamed plugin"))
+      .sort();
+    const proxy = Object.keys(loaded?.config.server?.proxy ?? {}).sort();
+    return configureServer.length || proxy.length ? { configureServer, proxy } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const devServer = await devServerFeatures();
 const config = {
   ...profile,
   appRoot: rel || ".",
@@ -447,6 +479,7 @@ const config = {
     unresolved: [...unresolved].sort(),
     parseFailures,
     mode: paths.length ? "router" : "links",
+    ...(devServer ? { devServer } : {}),
   },
 };
 if (profile.routeSelector !== false) {
