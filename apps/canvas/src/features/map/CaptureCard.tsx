@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SourceCardBody } from "../../components/NativeSourceEvidence";
+import { Button } from "../../components/ui/button";
 import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
@@ -52,6 +53,8 @@ export function CaptureCard({
     frame?: { src: string; width: number; height: number };
     error?: string;
     pending: boolean;
+    /** Ask for the frame; rendering holds a browser, so it never starts on its own. */
+    request?: () => void;
   };
   selected?: boolean;
   related?: boolean;
@@ -186,6 +189,21 @@ export function CaptureCard({
           <div className="missing-frame-copy">
             <span>{t.liveRenderFailed}</span>
             <small>{live.error}</small>
+          </div>
+        ) : live?.request ? (
+          <div className="missing-frame-copy">
+            <Button
+              size="sm"
+              variant="outline"
+              className="nodrag nopan"
+              data-live-render=""
+              onClick={(event) => {
+                event.stopPropagation();
+                live.request?.();
+              }}
+            >
+              {t.liveRender}
+            </Button>
           </div>
         ) : (
           <div className="missing-frame-copy">

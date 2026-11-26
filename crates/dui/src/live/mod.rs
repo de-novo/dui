@@ -285,8 +285,9 @@ fn attach(
     ))
 }
 
-/// How long an owner with a workbench and no sessions stays warm for the next one.
-const POOL_IDLE: Duration = Duration::from_secs(120);
+/// How long an owner with a workbench and no sessions stays warm for the next one: long enough
+/// for a preview's next request, short enough not to hold a browser's memory while idle.
+const POOL_IDLE: Duration = Duration::from_secs(20);
 
 fn serve() -> Result<(), (u8, Value)> {
     let open: Value = serde_json::from_reader(std::io::stdin().lock()).map_err(io)?;

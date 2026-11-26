@@ -10,9 +10,9 @@ import {
 } from "../../model/canvasDiff";
 import { routeName } from "./CaptureCard";
 import { liveCell, useLiveFrame } from "./liveFrames";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-/** A deck card without a capture, rendered from source once it scrolls into view. */
+/** A deck card without a capture, rendered from source when asked: rendering holds a browser. */
 function LiveDeckFrame({
   run,
   cell,
@@ -23,24 +23,27 @@ function LiveDeckFrame({
   label: string;
 }) {
   const { t } = useI18n();
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(([entry]) => setInView(entry!.isIntersecting));
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-  const live = useLiveFrame(run, cell, inView);
+  const [requested, setRequested] = useState(false);
+  const live = useLiveFrame(run, cell, requested);
   return (
-    <div ref={ref} className="mobile-deck-frame" data-showing={live.frame ? "live" : undefined}>
+    <div className="mobile-deck-frame" data-showing={live.frame ? "live" : undefined}>
       {live.frame ? (
         <img src={live.frame.src} alt={label} />
-      ) : (
+      ) : live.pending || live.error ? (
         <div className="missing-frame-copy" aria-busy={live.pending || undefined}>
           <span>{live.error ? t.liveRenderFailed : t.liveRendering}</span>
           {live.error && <small>{live.error}</small>}
+        </div>
+      ) : (
+        <div className="missing-frame-copy">
+          <Button
+            size="sm"
+            variant="outline"
+            data-live-render=""
+            onClick={() => setRequested(true)}
+          >
+            {t.liveRender}
+          </Button>
         </div>
       )}
     </div>

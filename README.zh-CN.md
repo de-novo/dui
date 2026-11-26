@@ -77,13 +77,13 @@ dui open --no-open
 
 运行 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh` 安装开发版。以下示例和命令表适用于开发版。网站也提供[默认安装版本的发布文档](https://dui.sh/?lang=zh-CN#release-guide)。
 
-开发版的 `dui map` 规划界面、状态和宽度但不截图，`dui map --capture` 为所有计划的格子保存 PNG、渲染树和 HTML 快照证据。参见[共享屏幕地图](docs/zh-CN/web-viewer.md#共享屏幕地图)。
+开发版的 `dui map --no-capture` 规划界面、状态和宽度但不截图，`dui map` 截取所有计划的格子。参见[共享屏幕地图](docs/zh-CN/web-viewer.md#共享屏幕地图)。
 
-如果静态站点已构建到 `dist/`，在项目根目录运行以下命令进行截图，再用上面的查看器命令打开结果。
+如果静态站点已构建到 `dist/`，在项目根目录运行以下命令，再用上面的查看器命令打开结果。
 
 <!-- quickstart:static -->
 ```sh
-dui map . --build-dir dist --capture
+dui map . --build-dir dist
 ```
 
 ### `dui map` 与 `dui run` 的区别

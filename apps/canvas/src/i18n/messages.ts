@@ -87,6 +87,7 @@ export type Messages = {
   reflowWarning: string;
   widthLive: (width: number) => string;
   liveRendering: string;
+  liveRender: string;
   liveRenderFailed: string;
   liveCardShown: string;
   widthLiveFailed: (reason: string) => string;
@@ -292,6 +293,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     widthLive: (width) =>
       `Rendered from source at ${width} px in the running app, scripts included. Not recorded as a capture.`,
     liveRendering: "Rendering from source…",
+    liveRender: "Render from source",
     liveRenderFailed: "Could not render from source",
     liveCardShown:
       "The card shows the screen rendered from source in the running app; it is not a capture",
@@ -509,6 +511,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     reflowUnmeasured: "只有一个已捕获宽度，无法测量重排一致度。",
     widthLive: (width) => `在运行中的应用里按 ${width} px 从源码渲染，包含脚本。不记录为捕获。`,
     liveRendering: "正在从源码渲染…",
+    liveRender: "从源码渲染",
     liveRenderFailed: "无法从源码渲染",
     liveCardShown: "卡片显示在运行中的应用里从源码渲染的界面，不是捕获",
     widthLiveFailed: (reason) => `无法打开运行中的应用（${reason}），改为显示 HTML 快照。`,
@@ -719,6 +722,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     widthLive: (width) =>
       `실행 중인 앱에서 소스를 ${width} px로 렌더링함 (스크립트 포함). 캡처로 기록되지 않음.`,
     liveRendering: "소스에서 렌더링 중…",
+    liveRender: "소스에서 렌더링",
     liveRenderFailed: "소스에서 렌더링하지 못함",
     liveCardShown: "카드가 실행 중인 앱에서 소스로 렌더링한 화면을 표시 · 캡처 아님",
     widthLiveFailed: (reason) =>

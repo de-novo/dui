@@ -2,9 +2,9 @@ use crate::{Reply, archive, failure, replay::io};
 use serde_json::{Value, json};
 use std::{fs, path::Path, process::Command};
 
-/// Map a project. Without `capture` the map holds no evidence: screens, states and widths are
-/// planned, each screen is loaded once to read its links, and cells stay `not-rendered` until
-/// captured (docs/en/web-viewer.md#shared-screen-maps). `dui run` and MCP always capture.
+/// Map a project, capturing every planned cell. Without `capture` (`--no-capture`) the map holds
+/// no evidence: screens, states and widths are planned, each screen is loaded once to read its
+/// links, and cells stay `not-rendered` (docs/en/web-viewer.md#shared-screen-maps).
 pub fn capture(project: &Path, capture: bool) -> Reply {
     capture_target(project, None, capture)
 }
