@@ -326,6 +326,12 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
                 cell["imageWidth"] = json!(iw);
                 cell["imageHeight"] = json!(ih);
             }
+            // The small copy map cards draw while they are small on screen (#350).
+            let thumbnail = dui_app::thumbnail::name(img);
+            if root.join(&thumbnail).is_file() {
+                images.insert(thumbnail.clone());
+                cell["thumbnail"] = json!(thumbnail);
+            }
         }
         // The HTML copy of the capture (docs/en/web-viewer.md#html-cards).
         let snapshot = &item["observation"]["htmlSnapshot"];
@@ -377,6 +383,11 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
                 if let Some((iw, ih)) = png_dims(&img) {
                     item["imageWidth"] = json!(iw);
                     item["imageHeight"] = json!(ih);
+                }
+                let thumbnail = dui_app::thumbnail::name(&img);
+                if root.join(&thumbnail).is_file() {
+                    images.insert(thumbnail.clone());
+                    item["thumbnail"] = json!(thumbnail);
                 }
             }
         }

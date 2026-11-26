@@ -20,7 +20,12 @@ import { CaptureCard } from "./CaptureCard";
 import { clearLane, layoutMap } from "./layout";
 import { cardCell, type EdgeStart } from "../../model/selection";
 import { anchorsTo, treeCell, type AnchorBox } from "../../model/linkAnchors";
-import { SNAPSHOT_MIN_SCREEN_WIDTH, snapshotUsable, useSnapshotFrame } from "./snapshotSlots";
+import {
+  SNAPSHOT_MIN_SCREEN_WIDTH,
+  THUMBNAIL_WIDTH,
+  snapshotUsable,
+  useSnapshotFrame,
+} from "./snapshotSlots";
 import { liveCell, useLiveFrame } from "./liveFrames";
 import {
   Background,
@@ -260,6 +265,10 @@ function Card({
     );
   });
   const granted = useSnapshotFrame(id, wanted);
+  // Small on screen, a card draws the capture's thumbnail (docs/en/web-viewer.md#shared-screen-maps).
+  const small = useViewportStore(
+    (state) => data.cardWidth * state.transform[2] * devicePixelRatio <= THUMBNAIL_WIDTH,
+  );
   // A card without a capture is rendered from source only when asked: rendering holds a browser.
   const live =
     data.liveRun && !data.screenDiff ? liveCell(data.screen, cell, data.width) : undefined;
@@ -288,6 +297,7 @@ function Card({
         cell={cell}
         imageUrl={data.imageUrl}
         snapshotUrl={granted && cell?.snapshot ? data.imageUrl(cell.snapshot.file) : undefined}
+        small={small}
         overlay={data.anchors && <LinkAnchors anchors={data.anchors} selected={data.selected} />}
         live={live ? { ...liveFrame, request: () => setRequested(true) } : undefined}
         selected={data.selected}

@@ -93,6 +93,8 @@ export type Cell = {
   status: "verified" | "unverified" | "unrenderable";
   reason?: string;
   image?: string;
+  /** A small copy of `image` for cards drawn small (docs/en/web-viewer.md#shared-screen-maps). */
+  thumbnail?: string;
   imageWidth?: number;
   imageHeight?: number;
   state?: string;
@@ -379,6 +381,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
         width: cell.width,
         status: cell.status,
         image: typeof cell.image === "string" ? cell.image : undefined,
+        thumbnail: typeof cell.thumbnail === "string" ? cell.thumbnail : undefined,
         imageWidth:
           typeof cell.imageWidth === "number" &&
           Number.isFinite(cell.imageWidth) &&
