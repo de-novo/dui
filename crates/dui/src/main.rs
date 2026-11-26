@@ -7,6 +7,7 @@ mod design_audit;
 mod electron;
 mod gpui;
 mod host;
+mod interrupt;
 mod ios;
 mod live;
 mod mcp;
@@ -1025,6 +1026,7 @@ fn main() -> ExitCode {
         Ok(body) => (0, body),
         Err(err) => err,
     };
+    interrupt::wait_if_interrupted();
     if let Some(raw) = body.get("__rawStdout").and_then(Value::as_str) {
         print!("{raw}");
     } else if !body.is_null() {

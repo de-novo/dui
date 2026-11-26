@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -186,6 +186,38 @@ http.createServer((req, res) => {
   assert.equal(moved.cell.reason, "redirected: /moved → /landing");
   const shell = account({ path: "/shell", settleTimeoutMs: 1500 }, "shell");
   assert.match(shell.cell.reason, /^not-ready: h1 \+ unsettled: li#\d+ added/);
+
+  // 1e. SIGTERM during a run removes its staging directory and exits 128 + 15.
+  const interruptHome = path.join(tmp, ".dui-home-interrupt");
+  const feedManifest = path.join(appDir, "dui-interrupt.json");
+  fs.writeFileSync(
+    feedManifest,
+    JSON.stringify({
+      host: "command",
+      command: [process.execPath, "serve.mjs"],
+      path: "/feed",
+      widths: [375, 1280],
+      readySelector: "h1",
+      settleTimeoutMs: 30000,
+    }),
+  );
+  const pending = () =>
+    fs
+      .globSync(path.join(interruptHome, ".dui/projects/*/runs/.pending-*"))
+      .filter((p) => fs.statSync(p).isDirectory());
+  const running = spawn(duiBin, ["run", appDir, feedManifest, path.join(tmp, "out-interrupt")], {
+    env: { ...process.env, HOME: interruptHome, DUI_CONCURRENCY: "2" },
+    stdio: "ignore",
+  });
+  const exited = new Promise<number | null>((done) => running.on("exit", (code) => done(code)));
+  for (let i = 0; i < 200 && pending().length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(pending().length, 1, "the run staged its output");
+  await new Promise((r) => setTimeout(r, 1500));
+  running.kill("SIGTERM");
+  assert.equal(await exited, 143);
+  assert.deepEqual(pending(), [], "the interrupted run left no staging directory");
 
   // 2. Valid 200 scenarios pass audit cleanly with 100% verified cells.
   const okManifest = path.join(appDir, "dui-ok.json");

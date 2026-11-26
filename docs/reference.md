@@ -77,7 +77,7 @@ A **cell** represents one scenario, state, and width. `verified` means the obser
 
 ## Local capture history
 
-`run`, `exercise`, and `replay` save artifacts in `~/.dui/projects/<project-id>/runs/<snapshot-id>/`. Each run gets a new directory, including incomplete captures that return exit code 5. The CLI returns its absolute path as `output`. An optional output argument provides a filesystem link at the requested location. For an existing output directory, dui links the generated files individually.
+`run`, `exercise`, and `replay` save artifacts in `~/.dui/projects/<project-id>/runs/<snapshot-id>/`. Each run gets a new directory, including incomplete captures that return exit code 5. The CLI returns its absolute path as `output`. An optional output argument provides a filesystem link at the requested location. For an existing output directory, dui links the generated files individually. A run writes into `runs/.pending-*` until it finishes. SIGINT, SIGTERM or SIGHUP stops the run's browsers and servers, removes that directory and exits with 128 + the signal number. A `.pending-*` directory whose process is gone, or that has no owner and is older than an hour, is removed when the next run starts.
 
 Run `dui open` to choose a project and compare two snapshots in the browser. `dui history` refreshes the viewer and returns the snapshot list as JSON. MCP exposes the same `history()` operation. Linked Git worktrees share the primary checkout’s project identity. Apps within a monorepo are grouped by relative path. Independent clones and non-Git directories have separate histories. Detached HEAD captures retain the commit.
 
