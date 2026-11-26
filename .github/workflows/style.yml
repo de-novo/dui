@@ -92,6 +92,7 @@ jobs:
           npm run check:box-model
           npm run check:compiler-oracles
           npm run check:reliability
+          npm run check:settle
           npm run check:fact-overlays
           npm run check:html-snapshots
           npm run check:html-cards
