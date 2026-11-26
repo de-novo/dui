@@ -69,6 +69,8 @@ A proxied request still waiting when the screen is captured is listed in `observ
 
 A **cell** represents one scenario, state, and width. `verified` means the observed route, width, readiness, required requests, and applicable state checks passed. `unverified` includes failed checks and queued states left beyond the budget (`not-rendered`). `unrenderable` records an environment limitation. An unsupported project is rejected before capture.
 
+**Unverified reasons.** `reason` starts with the kind of failure, followed by what failed: `http-error` (the document returned 4xx/5xx), `api-error: 401 /api/me`, `redirected: /a → /b`, `not-ready: SELECTOR` (with `+ unsettled: NODE CHANGE` when the page also kept changing), `unsettled: NODE CHANGE`, `width-mismatch: observed W (expected W)`, `request-failed: /path STATUS`, `not-analyzed: compiler diagnostics`, `assert-failed: slot NAME is VALUE (expected VALUE)` (or a failed state assertion, or a branch probe that did not run), `missing-state-assertion`, `missing-screen-assertion` and `not-rendered`. `dui map` counts unverified cells by kind in its stderr summary.
+
 **Cell coverage** is `coverage.verified / coverage.renderable`. If all six routes are captured at three widths, that accounts for 18 baseline cells. Additional planned states still count in the denominator. Use `observedBranchOutcomes` and `branchOutcomes` to inspect branch coverage separately.
 
 **Timing.** Each captured cell has `timing` in milliseconds: `navigateMs`, `settleMs` with `settlePolls`, `screenshotMs`, `overlaysMs`, `keyboardMs` and `totalMs`. Cells served from the cache have none. `timings` in the report gives `wallMs`, per-phase `totals`, the `slowestPhase` and the five `slowestCells`. `dui map` also prints one line to stderr with the cell count, the wall time and the slowest phase.
@@ -87,7 +89,7 @@ The commands assume `dui` is on your `PATH`. With the default installation you c
 
 | CLI | MCP | Operation |
 | --- | --- | --- |
-| `dui map [PROJECT]` | `map(project)` | Auto-discover routes (TanStack Router, React Router, links), merge optional `dui.json` (`routeParams`, `storageState`, extra `scenarios`), and capture. |
+| `dui map [PROJECT]` | `map(project)` | Auto-discover routes (TanStack Router, React Router, links), merge optional `dui.json` (`routeParams`, `storageState`, extra `scenarios`), and capture. A React Router route with children but no `element`, `Component` or `index` is a group, and one whose element is a static `<Navigate to>` is a redirect. Neither is captured; both are listed in `screenDiscovery.layouts` and `screenDiscovery.redirects`. Children that cannot be read statically appear in `screenDiscovery.unresolved` as `PATH/*`. |
 | `dui run [PROJECT] [MANIFEST] [OUTPUT]` | `run(project, manifest, output?)` | Capture using `dui.json` directly (defaults to `.` / `dui.json`, or auto-discovers via `map` when omitted). |
 | `dui scan [PROJECT] [MANIFEST]` | `scan(project, manifest)` | Print compiler facts, framework controls, and generated mocks without launching a browser. |
 | `dui auth login URL [--out FILE]` | — | Launch Chromium to sign in (form / MFA / OAuth) and save Playwright-compatible `storageState.json` (`0600`). |

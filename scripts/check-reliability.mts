@@ -77,6 +77,18 @@ http.createServer((req, res) => {
     </script></body></html>\`);
     return;
   }
+  if (req.url === "/moved") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(\`<html><body><script>history.replaceState(null, "", "/landing");</script><h1>Landing</h1></body></html>\`);
+    return;
+  }
+  if (req.url === "/shell") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(\`<html><body><nav>Menu</nav><ul id="log"></ul><script>
+      let n = 0; setInterval(() => { const li = document.createElement("li"); li.textContent = "tick " + n++; log.append(li); }, 150);
+    </script></body></html>\`);
+    return;
+  }
   if (req.url === "/server-error") {
     res.writeHead(500, { "content-type": "text/html; charset=utf-8" });
     res.end("<html><body><h1>500 Error</h1></body></html>");
@@ -167,6 +179,13 @@ http.createServer((req, res) => {
   assert.equal(feed.cell.status, "unverified");
   assert.match(feed.cell.reason, /^unsettled: li#\d+ added/);
   assert.equal(feed.cell.observation.settled, false);
+
+  // 1d. An unverified cell names what failed: a redirect with both routes, and a selector that
+  // never matched on a page that also kept changing.
+  const moved = account({ path: "/moved" }, "moved");
+  assert.equal(moved.cell.reason, "redirected: /moved → /landing");
+  const shell = account({ path: "/shell", settleTimeoutMs: 1500 }, "shell");
+  assert.match(shell.cell.reason, /^not-ready: h1 \+ unsettled: li#\d+ added/);
 
   // 1e. SIGTERM during a run removes its staging directory and exits 128 + 15.
   const interruptHome = path.join(tmp, ".dui-home-interrupt");

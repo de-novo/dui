@@ -29,46 +29,6 @@ pub(crate) fn store(path: &Path, data: &Value) -> Result<(), (u8, Value)> {
         .map_err(|e| failure(3, &e.to_string()))?;
     Ok(())
 }
-/// The wire reason of an unverified cell. A failed API call names its status and endpoint,
-/// for example `api-error: 401 /api/me` (`+N more` when several failed).
-fn failure_reason(failure: &dui_core::verification::Failure, obs: &Value, spec: &Value) -> String {
-    use dui_core::verification::{Failure, unexpected_api_errors};
-    if *failure == Failure::ApiError {
-        let expected = spec["expectedApiErrors"]
-            .as_array()
-            .map(Vec::as_slice)
-            .unwrap_or_default();
-        let errors = unexpected_api_errors(obs, expected);
-        if let Some((path, status)) = errors.first() {
-            let more = match errors.len() {
-                1 => String::new(),
-                n => format!(" (+{} more)", n - 1),
-            };
-            return format!("api-error: {status} {path}{more}");
-        }
-    }
-    if *failure == Failure::Unsettled
-        && let Some(first) = obs["unsettled"].as_array().and_then(|u| u.first())
-    {
-        let count = obs["unsettled"].as_array().map_or(0, Vec::len);
-        let what = match (first["node"].as_str(), first["field"].as_str()) {
-            (Some(node), _) => format!("{node} {}", first["change"].as_str().unwrap_or("changed")),
-            (None, Some(field)) => format!("{field} changed"),
-            (None, None) => "changed".to_owned(),
-        };
-        let more = if count > 1 {
-            format!(" (+{} more)", count - 1)
-        } else {
-            String::new()
-        };
-        return format!("unsettled: {what}{more}");
-    }
-    serde_json::to_value(failure)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_else(|| "assert-failed".to_owned())
-}
-
 /// Capture phases in `cell.timing`, in the order a capture runs them.
 const TIMING_PHASES: [&str; 5] = [
     "navigateMs",
@@ -910,7 +870,8 @@ fn execute_with_locales(
                                     CellStatus::verified()
                                 }
                                 Some(f) => {
-                                    let r = failure_reason(f, &obs, &spec);
+                                    let r =
+                                        intent.describe(f, &obs, spec["readySelector"].as_str());
                                     CellStatus::unverified(r)
                                         .unwrap_or_else(|_| CellStatus::verified())
                                 }
@@ -930,7 +891,7 @@ fn execute_with_locales(
                                     .persist(&target_png)
                                     .map_err(|e| failure(3, &e.to_string()))?;
                             }
-                            let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason.as_ref().map(|f| failure_reason(f, &obs, &spec)),"observation":obs});
+                            let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason.as_ref().map(|f| intent.describe(f, &obs, spec["readySelector"].as_str())),"observation":obs});
                             if let Some(timing) = timing {
                                 entry["timing"] = timing;
                             }

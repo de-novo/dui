@@ -60,6 +60,10 @@ const routes: { pattern: string; source: string }[] = [];
 const candidates = new Map<string, string>();
 const params = profile.routeParams ?? {};
 const unresolved = new Set<string>();
+// Route objects that group children without rendering a screen of their own, and routes whose
+// element is a static `<Navigate to>`: neither is captured as a screen.
+const layouts = new Map<string, string>();
+const redirects = new Map<string, { to: string; source: string }>();
 const parseFailures: string[] = [];
 const REACT_ROUTER_CREATORS = new Set([
   "createBrowserRouter",
@@ -174,6 +178,7 @@ try {
     const factories = new Set<string>();
     const routerCreators = new Set<string>();
     const routeComponents = new Set<string>();
+    const navigateComponents = new Set<string>();
     const relSource = relative(root, join(app, file));
     for (const statement of ast.program.body as Node[]) {
       if (statement.type === "ImportDeclaration") {
@@ -181,6 +186,8 @@ try {
         for (const s of statement.specifiers) {
           const imported = s.imported?.name;
           if (!imported) continue;
+          if (imported === "Navigate" && /^react-router(-dom)?$/.test(pkg))
+            navigateComponents.add(s.local.name);
           if (routeRules.some((r) => r.package === pkg && r.symbol === imported)) {
             if (REACT_ROUTER_CREATORS.has(imported)) routerCreators.add(s.local.name);
             else if (imported === "Route") routeComponents.add(s.local.name);
@@ -240,6 +247,20 @@ try {
         return resolved.properties.map((p) => p.value.value as string);
       return [];
     }
+    /** A static `<Navigate to="…">` element: its target resolved against the route's path.
+     * `null` for a Navigate whose target is not a literal; `undefined` for any other element. */
+    function navigateTarget(node: Node | undefined, routePath: string): string | null | undefined {
+      const el = unwrapExpr(node);
+      const name = el?.type === "JSXElement" ? el.openingElement?.name?.name : undefined;
+      if (!name || !navigateComponents.has(name)) return undefined;
+      const toAttr = el?.openingElement?.attributes?.find(
+        (a) => a.type === "JSXAttribute" && a.name?.name === "to",
+      );
+      const to = literalString(toAttr?.value ?? undefined);
+      if (to === undefined || /[{}:*]/.test(to)) return null;
+      const base = "http://route" + (routePath.endsWith("/") ? routePath : routePath + "/");
+      return new URL(to, base).pathname.replace(/(.)\/$/, "$1");
+    }
     function collectRouteObjects(node: Node | undefined, parentPath: string): void {
       const arr = unwrapExpr(node);
       if (arr?.type !== "ArrayExpression" || !arr.elements) return;
@@ -249,6 +270,8 @@ try {
         let routePath: string | undefined;
         let isIndex = false;
         let childrenNode: Node | undefined;
+        let elementNode: Node | undefined;
+        let renders = false;
         for (const prop of obj.properties) {
           if (prop.type !== "Property" || prop.computed) continue;
           const key = prop.key?.name;
@@ -258,6 +281,11 @@ try {
             isIndex = val?.type === "Literal" && val.value === true;
           } else if (key === "children") {
             childrenNode = prop.value;
+          } else if (key === "element") {
+            elementNode = prop.value;
+            renders = true;
+          } else if (key === "Component" || key === "lazy") {
+            renders = true;
           }
         }
         const fullPath = isIndex
@@ -270,7 +298,18 @@ try {
           resolvedChildren?.type === "ArrayExpression" &&
           (resolvedChildren.elements?.length ?? 0) > 0;
         if (hasChildren) collectRouteObjects(resolvedChildren, fullPath);
-        if (isIndex || (routePath !== undefined && !hasChildren)) {
+        else if (childrenNode && !(resolvedChildren?.type === "ArrayExpression"))
+          // Children defined elsewhere: their routes cannot be read here.
+          unresolved.add((fullPath || "") + "/*");
+        const target = navigateTarget(elementNode, fullPath || "/");
+        if (typeof target === "string") {
+          redirects.set(fullPath || "/", { to: target, source: relSource });
+          continue;
+        }
+        // A route with children renders them; without an element or index it is only a group.
+        if (childrenNode && !renders && !isIndex) layouts.set(fullPath || "/", relSource);
+        // A rendering parent whose children cannot be read still shows its own screen.
+        if (isIndex || (routePath !== undefined && (!childrenNode || (!hasChildren && renders)))) {
           routes.push({ pattern: fullPath || "/", source: relSource });
         }
       }
@@ -282,9 +321,11 @@ try {
       const attrs = el.openingElement?.attributes ?? [];
       let routePath: string | undefined;
       let isIndex = false;
+      let elementNode: Node | undefined;
       for (const attr of attrs) {
         if (attr.type !== "JSXAttribute") continue;
         const name = attr.name?.name;
+        if (name === "element") elementNode = attr.value ?? undefined;
         if (name === "path") routePath = literalString(attr.value ?? undefined);
         else if (name === "index") {
           if (attr.value == null) isIndex = true;
@@ -306,6 +347,13 @@ try {
           routeComponents.has(c.openingElement.name.name),
       );
       for (const child of childRoutes) collectJsxRoute(child, fullPath);
+      const target = navigateTarget(elementNode, fullPath || "/");
+      if (typeof target === "string") {
+        redirects.set(fullPath || "/", { to: target, source: relSource });
+        return;
+      }
+      if (childRoutes.length > 0 && !elementNode && !isIndex)
+        layouts.set(fullPath || "/", relSource);
       if (isIndex || (routePath !== undefined && childRoutes.length === 0)) {
         routes.push({ pattern: fullPath || "/", source: relSource });
       }
@@ -479,6 +527,15 @@ const config = {
     unresolved: [...unresolved].sort(),
     parseFailures,
     mode: paths.length ? "router" : "links",
+    // Not captured as screens, so they are not in the coverage denominator.
+    ...(layouts.size
+      ? {
+          layouts: Object.fromEntries(
+            [...layouts].filter(([path]) => !discoveredPaths.has(path)).sort(),
+          ),
+        }
+      : {}),
+    ...(redirects.size ? { redirects: Object.fromEntries([...redirects].sort()) } : {}),
     ...(devServer ? { devServer } : {}),
   },
 };
