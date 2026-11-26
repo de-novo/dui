@@ -1554,6 +1554,22 @@ h2 {
 .capture-frame {
   position: relative;
 }
+/* The HTML copy of the capture over its PNG (docs/en/web-viewer.md#html-cards). It takes no
+   pointer input, so the map keeps panning and selecting through it. */
+.card-snapshot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  background: transparent;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.card-snapshot-loaded {
+  opacity: 1;
+}
 .render-diff-box-layer {
   position: absolute;
   inset: 0;

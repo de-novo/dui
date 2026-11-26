@@ -101,7 +101,24 @@ export type Cell = {
   localeAudit?: LocaleAudit;
   redirectedTo?: string;
   renderTree?: RenderNode[];
+  /** The script-free HTML copy of the capture (docs/en/web-viewer.md#html-cards). */
+  snapshot?: CellSnapshot;
 };
+export type CellSnapshot = { file: string; fidelity?: number; omitted: number };
+function decodeSnapshot(raw: unknown): CellSnapshot | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const value = raw as { file?: unknown; fidelity?: unknown; omitted?: unknown };
+  if (typeof value.file !== "string" || !/^[0-9a-f]{64}-\d+\.html$/.test(value.file))
+    return undefined;
+  return {
+    file: value.file,
+    fidelity:
+      typeof value.fidelity === "number" && Number.isFinite(value.fidelity)
+        ? value.fidelity
+        : undefined,
+    omitted: typeof value.omitted === "number" ? value.omitted : 0,
+  };
+}
 export type ScreenOrigin =
   | { kind: "entry" }
   | { kind: "anchor"; from: string; selector?: string }
@@ -360,6 +377,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
         ...(typeof cell.redirectedTo === "string" ? { redirectedTo: cell.redirectedTo } : {}),
         screenEvidence: decodeScreenEvidence(cell.screenEvidence),
         renderTree: decodeRenderTree(cell.renderTree),
+        snapshot: decodeSnapshot(cell.snapshot),
       });
     }
   }

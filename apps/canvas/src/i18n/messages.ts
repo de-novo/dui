@@ -65,6 +65,12 @@ export type Messages = {
   notObserved: string;
   visibility: string;
   didNotSettle: string;
+  snapshotShown: (percent: string) => string;
+  pngNoSnapshot: string;
+  pngUnmeasured: string;
+  pngFidelity: (percent: string) => string;
+  pngZoomIn: string;
+  snapshotOmitted: (count: number) => string;
   observedHeading: string;
   captureVerified: string;
   overview: string;
@@ -243,6 +249,14 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     notObserved: "Not observed",
     visibility: "Visible match",
     didNotSettle: "Page did not settle",
+    snapshotShown: (percent) =>
+      `Card shows the HTML snapshot · ${percent} of pixels differ from the PNG`,
+    pngNoSnapshot: "Card shows the PNG · no HTML snapshot",
+    pngUnmeasured: "Card shows the PNG · the HTML snapshot was not compared",
+    pngFidelity: (percent) =>
+      `Card shows the PNG · the HTML snapshot differs in ${percent} of pixels`,
+    pngZoomIn: "Card shows the PNG · zoom in on it to see the HTML snapshot",
+    snapshotOmitted: (count) => `${count} resource${count === 1 ? "" : "s"} not in the snapshot`,
     observedHeading: "Observed heading",
     captureVerified: "Capture verified",
     overview: "Overview",
@@ -434,6 +448,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     notObserved: "未观测",
     visibility: "可见匹配",
     didNotSettle: "页面未稳定",
+    snapshotShown: (percent) => `卡片显示 HTML 快照 · 与 PNG 不同的像素占 ${percent}`,
+    pngNoSnapshot: "卡片显示 PNG · 没有 HTML 快照",
+    pngUnmeasured: "卡片显示 PNG · HTML 快照未经比较",
+    pngFidelity: (percent) => `卡片显示 PNG · HTML 快照有 ${percent} 的像素不同`,
+    pngZoomIn: "卡片显示 PNG · 放大该卡片即可查看 HTML 快照",
+    snapshotOmitted: (count) => `${count} 个资源未包含在快照中`,
     observedHeading: "观测到的标题",
     captureVerified: "捕获已验证",
     overview: "概览",
@@ -618,6 +638,12 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     notObserved: "관측되지 않음",
     visibility: "보이는 요소",
     didNotSettle: "페이지 안정화 미확인",
+    snapshotShown: (percent) => `카드가 HTML 스냅샷을 표시 · PNG와 다른 픽셀 ${percent}`,
+    pngNoSnapshot: "카드가 PNG를 표시 · HTML 스냅샷 없음",
+    pngUnmeasured: "카드가 PNG를 표시 · HTML 스냅샷을 비교하지 않음",
+    pngFidelity: (percent) => `카드가 PNG를 표시 · HTML 스냅샷이 픽셀 ${percent}에서 다름`,
+    pngZoomIn: "카드가 PNG를 표시 · 카드를 확대하면 HTML 스냅샷이 보임",
+    snapshotOmitted: (count) => `스냅샷에 넣지 못한 리소스 ${count}개`,
     observedHeading: "관측한 제목",
     captureVerified: "캡처 검증됨",
     overview: "개요",

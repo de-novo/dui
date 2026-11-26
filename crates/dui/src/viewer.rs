@@ -305,10 +305,31 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
                 cell["imageHeight"] = json!(ih);
             }
         }
+        // The HTML copy of the capture (docs/en/web-viewer.md#html-cards).
+        let snapshot = &item["observation"]["htmlSnapshot"];
+        if let Some(file) = snapshot["file"].as_str()
+            && is_safe_snapshot_name(file)
+            && root.join(file).is_file()
+        {
+            images.insert(file.to_owned());
+            cell["snapshot"] = json!({
+                "file": file,
+                "fidelity": snapshot["fidelity"],
+                "omitted": snapshot["omitted"].as_array().map_or(0, Vec::len),
+            });
+        }
         cells.push(cell);
     }
+    // Overview entries are the map cards; they get the snapshot of the capture with their image.
+    let snapshots: BTreeMap<String, Value> = cells
+        .iter()
+        .filter_map(|c| Some((c["image"].as_str()?.to_owned(), c.get("snapshot")?.clone())))
+        .collect();
     if let Some(overview) = graph["overview"].as_array_mut() {
         for item in overview {
+            if let Some(snapshot) = item["image"].as_str().and_then(|img| snapshots.get(img)) {
+                item["snapshot"] = snapshot.clone();
+            }
             if let Some(img) = item["image"].as_str().map(str::to_owned)
                 && is_safe_png_name(&img)
             {
@@ -341,6 +362,17 @@ fn is_safe_png_name(name: &str) -> bool {
         && !name.contains('\\')
         && !name.contains("..")
         && name.ends_with(".png")
+}
+
+fn is_safe_snapshot_name(name: &str) -> bool {
+    name.strip_suffix(".html")
+        .and_then(|stem| stem.split_once('-'))
+        .is_some_and(|(hash, width)| {
+            hash.len() == 64
+                && hash.bytes().all(|b| b.is_ascii_hexdigit())
+                && !width.is_empty()
+                && width.bytes().all(|b| b.is_ascii_digit())
+        })
 }
 
 fn is_valid_overlay_name(name: &str) -> bool {
@@ -410,6 +442,21 @@ fn send_response(
     cache_control: &str,
     body: &[u8],
 ) {
+    send_response_with(stream, status, content_type, cache_control, "", body);
+}
+
+/// The policy an HTML snapshot is served with: no scripts, no requests, only inline styles and
+/// `data:` images and fonts, and a sandbox even when opened directly.
+const SNAPSHOT_POLICY: &str = "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; sandbox\r\nX-Content-Type-Options: nosniff\r\n";
+
+fn send_response_with(
+    stream: &mut TcpStream,
+    status: u16,
+    content_type: &str,
+    cache_control: &str,
+    extra_headers: &str,
+    body: &[u8],
+) {
     let reason = match status {
         200 => "OK",
         400 => "Bad Request",
@@ -420,7 +467,7 @@ fn send_response(
         _ => "Internal Server Error",
     };
     let header = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: {cache_control}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: {cache_control}\r\n{extra_headers}Connection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(header.as_bytes());
@@ -656,16 +703,27 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         if images.contains(archive_name)
             && let Ok(img_path) = root.join(archive_name).canonicalize()
             && img_path.parent() == Some(root.as_path())
-            && let Ok(png) = fs::read(&img_path)
+            && let Ok(bytes) = fs::read(&img_path)
         {
-            // Saved archive PNGs are content-immutable per run directory.
-            send_response(
-                &mut stream,
-                200,
-                "image/png",
-                "public, max-age=31536000, immutable",
-                &png,
-            );
+            // Saved archive files are content-immutable per run directory.
+            if is_safe_snapshot_name(archive_name) {
+                send_response_with(
+                    &mut stream,
+                    200,
+                    "text/html; charset=utf-8",
+                    "public, max-age=31536000, immutable",
+                    SNAPSHOT_POLICY,
+                    &bytes,
+                );
+            } else {
+                send_response(
+                    &mut stream,
+                    200,
+                    "image/png",
+                    "public, max-age=31536000, immutable",
+                    &bytes,
+                );
+            }
             return;
         }
         send_response(&mut stream, 404, "text/plain", "no-store", b"");
