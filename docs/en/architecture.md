@@ -151,6 +151,16 @@ Order mistakes are compile errors:
 | Accepting snapshots blindly in CI | Silent regressions | Reviewed snapshot diffs |
 | An adapter or rule pack without a fixture | Untested support | No fixture, no merge |
 | Copying code from other projects; non-permissive dependencies | License and clean-room rules | Ideas only; allowlist (§6.2) |
+| Chromium, a headless browser, a live browser session, or an emulator/simulator on the default `dui map` / `dui open` / hot-reload / render path, or as a fallback that fills cards | Ties the product to one engine, uses large amounts of memory, and is slow | Approximate renderer of the versioned model; heavy renderers only behind `--capture`, `dui run`, or a render machine |
+
+
+<a id="never-default-path"></a>
+
+### Never: memory-heavy rendering on the default path
+
+The default path for `dui map`, `dui open`, hot reload, and drawing cards **must not** launch Chromium or any other memory-heavy renderer: no headless browser, no live browser session, and no emulator or simulator. Empty or incomplete cards stay empty or show a placeholder. A heavy renderer is allowed only as an explicit opt-in for pixel verification (`--capture`, `dui run`, or a render machine). It is never a fallback that fills cards on the default path.
+
+This rule is non-negotiable. It is also recorded in [AGENTS.md](../../AGENTS.md#never) and the [roadmap](roadmap.md#never).
 
 ## 4. Finalized decisions (2026-11-20)
 
@@ -161,10 +171,49 @@ Order mistakes are compile errors:
 | Version tracking bot | Renovate, **as an external service only**. It updates the dependency catalog (exact npm fixture versions) and the lockfiles in the same PR. Never bundled in dui. Raising a support baseline still happens only in a dui major release | It can track custom files such as `stacks.toml`. Renovate is AGPL-3.0, so its code never ships with dui |
 | Chromium for golden renders | Golden CI pins an **exact stable build**. Normal runs record the Chromium version used | Separates browser changes from app changes. Golden runs also fix OS, fonts, clock, randomness, and animations; update PRs review the diffs |
 | salsa | Deferred until profiling shows recomputation unrelated to the change is the main bottleneck (e.g. in the MCP edit loop). Content-hash cache first, keyed by stage inputs plus tool and pack versions | The core is pure, so incremental queries can be added later without a rewrite |
-| SwiftUI screen discovery (decided 2026-11-25) | A Swift package in `adapters/native-map/swift` (cached like the Dart tool) joins the **index store** from an official build with **swift-syntax** call shapes by source location. dui builds the selected scheme for the iOS Simulator into its own DerivedData with `COMPILER_INDEX_STORE_ENABLE=YES` and never modifies the project. Declarations, not captures, follow the [roadmap rules](roadmap.md#swiftui-screen-discovery) | Types and callees come from the compiler and edges from the code's own structure. swift-syntax alone would guess types, the index alone cannot tell a destination from a label, and per-site SourceKit requests are slow and unstable for batch use. Both libraries are Apache-2.0 |
-| HTML screen snapshots (decided 2026-11-26) | A web capture also saves the page it rendered as a self-contained, script-free HTML snapshot, taken at the same moment as the PNG: the live DOM (open shadow roots included), the CSS rules the browser parsed, form state, and same-origin images, fonts and canvases inlined. After capture, the capture browsers render each snapshot back at the same width and compare it with the PNG; the share of differing pixels is stored as its fidelity. The viewer draws a card from the snapshot in a sandboxed frame without scripts when the card is large enough on screen and the fidelity is within the limit, and from the PNG otherwise. The PNG stays the verification evidence. Native captures keep PNGs only | Text stays sharp at any zoom, and elements can be selected and inspected. The same element tree is what code edits (v0.3.0) and Figma export need. A copy of the real render invents nothing, unlike a screen redrawn from source, and the fidelity check says when the copy differs. Unlike the removed live-mount iframe (#169), it needs no running app server. It does not shorten capture: the DOM still comes from running the app |
-| Render server (decided 2026-11-27) | One long-lived render server per project, source state and run, built from the live session owner. It keeps the built host and one Chromium, and gives every job its own browser context and tab: map discovery visits, `dui run` captures, viewer cards and previews, and captures saved from what is on screen. The CDP client becomes asynchronous so one browser renders several tabs at once. A capture of a card that is already rendered saves that page (PNG, render tree, HTML snapshot, verification) instead of rendering it again. A change to the source starts a new server; the old one finishes its sessions. Shortcuts that skip a fresh load (resizing instead of reloading for another width, setting a state in a loaded page) are kept only where their images match a fresh load's | Each run and each live open used to build the host, launch browsers and render from scratch (1–2 s before the first capture, 2.3 s per live open). Browser contexts keep jobs isolated in one process, so memory stays flat while work runs in parallel. Rendering stays in the official engine, so evidence keeps its meaning |
-| dui renderer (direction 2026-11-27, research) | A renderer owned by dui, GPU-drawn and incremental like GPUI, is a long-term goal behind the same `Renderer` port as a `dui-render-<x>` adapter. Its frames are previews until, for a surface, they match Chromium's frames of the same cells within the fidelity limit, measured like HTML snapshot fidelity; Chromium stays the evidence until then. It starts from content that needs no script engine (HTML snapshots, static pages) and uses permissive dependencies only | Hundreds of cards could be drawn and redrawn instantly, which a browser per tab cannot match. A redraw that differs from the browser would be invented evidence, so the fidelity gate decides where it may replace Chromium |
+| SwiftUI screen discovery (decided 2026-11-25, revised 2026-11-27) | The default path uses syntax only and runs on any OS. Joining a compiler index from an official macOS build remains an optional accuracy upgrade; it is not required for a card to appear. Declarations, not captures, follow the [roadmap rules](roadmap.md#swiftui-screen-discovery) | A screen map should appear without Xcode or a simulator. Types from the compiler can refine edges later, but syntax is enough for structure and most destinations |
+| HTML screen snapshots (decided 2026-11-26, revised 2026-11-27) | A web capture may still save a script-free HTML snapshot next to the PNG and record fidelity. The snapshot is verification evidence, not the default card and not the intermediate for Figma export or code edits. The default map uses the versioned model and the approximate renderer. Native captures keep PNGs only | A copy of a real render is useful when comparing pixels. It still requires running the app, so it does not belong on the default path |
+| Render server (decided 2026-11-27, moved to the verification track) | A long-lived official-engine render server is optional pixel verification, not the default map. When used, it is a job dispatcher for `--capture`, `dui run`, and later other surfaces. The default `dui map` and `dui open` do not start a browser | Default mapping must stay fast, platform-independent, and light on memory. Parallel official-engine work still helps optional verification |
+| dui renderer (revised 2026-11-27) | The v0.3.0 default picture is dui's approximate renderer of the versioned model, including style properties. Frames are labeled approximate. Matching official-engine frames within a fidelity limit, including a GPU-drawn incremental renderer, remains research on the verification track | The canvas should show screens and relations without a browser. A redraw that claims to be official-engine evidence must still pass a fidelity gate |
+| Default map pipeline (decided 2026-11-27) | The default path is AST parse on any OS, a versioned JSON model (screens, components, edges, code locations, slots, declared state and branches, item schemas, field-to-UI bindings, style properties, token names), and dui's approximate renderer. After a file change, only affected model nodes are re-parsed and redrawn (hot reload), with no app rebuild or browser. Reviewers change slot, state, and list values in the UI without running business logic. The first language is TypeScript/TSX, then Swift syntax only. Capture and official-engine renders are optional pixel verification, never a fallback that fills cards | The goal is screens and relations, not a live demo of logic, and must not depend on a particular OS or render engine. Capture is slow because it builds and loads the app; the AST path is expected to be faster, and phase 2 records the measurement |
+| Style and design tokens (decided 2026-11-27) | The model has neutral style properties (spacing, color, typography, radius, size, layout) and a token layer that keeps token names for later Figma variables. Each adapter maps its style syntax onto these properties. Easy: Tailwind classes, SwiftUI modifiers, Compose Modifier, inline styles. Medium: themes, tokens, and CSS variables from definition files. Hard: CSS files and CSS Modules (cascade, specificity, media queries) via a lightweight browserless CSS resolver with approximation; runtime CSS-in-JS treated like slots | Approximate rendering and Figma export need styles from source, not from a browser. Unresolved styles stay placeholders |
+| Language adapters (decided 2026-11-27) | A new language needs one adapter that maps layout elements, declared state and data, navigation, and style syntax onto the shared model. The model, approximate renderer, hot reload, and Figma export are reused | Platform dependence disappears on the default path once structure lives in the model; adding a language should not require a new renderer or a browser |
+
+The current default versus the target default (optional pixel verification stays off the default path):
+
+```mermaid
+flowchart TD
+  subgraph current [Current default]
+    CS[Source] --> CD[Route and type facts]
+    CD --> CP[Plan cells]
+    CP --> CC[Load pages in a browser to read links]
+    CC --> CV[Viewer]
+    CV --> CL[Live frames or HTML snapshots]
+  end
+  subgraph target [Target default]
+    TS[Source] --> TAST[AST parse on any OS]
+    TAST --> TM[Versioned model]
+    TM --> TR[Approximate renderer]
+    TR --> TV[Map of screens and relations]
+    TV --> TSlot[Toggle slots, state, and list counts]
+    TSlot --> TR
+    Watch[File watcher] --> TAST
+    TM --> TF[Figma export after v0.3.0]
+  end
+  subgraph opt [Optional pixel verification]
+    TM --> OJ[Render job]
+    OJ --> OW[Web]
+    OJ --> OA[Android]
+    OJ --> OI[iOS]
+    OJ --> OD[Desktop]
+    OW --> OE[Frame and fidelity]
+    OA --> OE
+    OI --> OE
+    OD --> OE
+  end
+```
+
+Phases and exit criteria: [Default pipeline](roadmap.md#default-pipeline).
 
 ## 5. Monorepo layout
 

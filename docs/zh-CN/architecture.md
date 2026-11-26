@@ -153,6 +153,16 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 | CI 中盲目接受快照 | 静默回归 | 审查快照差异 |
 | 没有 fixture 的适配器或规则包 | 支持未经测试 | 没有 fixture 不合并 |
 | 复制其他项目的代码；非宽松许可证依赖 | 许可证和洁净室规则 | 只参考思路；允许列表（§6.2） |
+| 在默认的 `dui map` / `dui open` / 热重载 / 渲染路径上启动 Chromium、无头浏览器、实时浏览器会话或仿真器/模拟器，或用它们作为填补卡片的回退 | 把产品绑在单一引擎上，占用大量内存，而且慢 | 对带版本模型使用近似渲染器；重型渲染器仅用于 `--capture`、`dui run` 或渲染机器 |
+
+
+<a id="never-default-path"></a>
+
+### 绝不做的事：默认路径上的高内存渲染
+
+`dui map`、`dui open`、热重载和绘制卡片的默认路径**不得**启动 Chromium 或其他高内存渲染器：禁止无头浏览器、实时浏览器会话、仿真器或模拟器。空白或不完整的卡片保持空白，或显示占位。重型渲染器只允许作为显式选择的像素校验（`--capture`、`dui run` 或渲染机器）。它们绝不能作为默认路径上填补卡片的回退。
+
+此规则不可妥协。同一规则见 [AGENTS.md](../../AGENTS.md#never) 和[路线图](roadmap.md#never)。
 
 ## 4. 已确定的决定（2026-11-20）
 
@@ -163,10 +173,49 @@ pub fn evolve(state: SessionState, event: &Event) -> SessionState;
 | 版本跟踪机器人 | Renovate，**仅作为外部服务**。它在同一个 PR 中更新 依赖目录（npm fixture 的精确版本）和 lockfile。绝不打包进 dui。提高支持基线仍只在 dui 主版本发布时进行 | 它能跟踪 `stacks.toml` 这类自定义文件。Renovate 是 AGPL-3.0，因此其代码绝不随 dui 发布 |
 | 黄金渲染用 Chromium | 黄金 CI 固定一个**精确的稳定版构建**。普通运行记录所用的 Chromium 版本 | 区分浏览器变化和应用变化。黄金运行还固定 OS、字体、时钟、随机数和动画；更新 PR 审查差异 |
 | salsa | 推迟到性能分析表明与变更无关的重复计算是主要瓶颈时（例如在 MCP 编辑循环中）。先用内容哈希缓存，键为阶段输入加工具和规则包版本 | 核心是纯的，所以以后可以加入增量查询而无需重写 |
-| SwiftUI 屏幕发现（2026-11-25 决定） | `adapters/native-map/swift` 中的 Swift 包（像 Dart 工具一样缓存）按源码位置结合官方构建的**索引库**与 **swift-syntax** 调用结构。dui 将所选 scheme 以 `COMPILER_INDEX_STORE_ENABLE=YES` 构建到自己的 DerivedData（iOS 模拟器），不修改项目。按[路线图规则](roadmap.md#swiftui-screen-discovery)输出声明而非截图 | 类型和调用目标来自编译器，连接来自代码自身结构。仅用 swift-syntax 会猜测类型，仅用索引无法区分跳转目标与标签，逐点 SourceKit 请求在批量处理时慢且不稳定。两个库均为 Apache-2.0 |
-| HTML 屏幕快照（2026-11-26 决定） | Web 截图在生成 PNG 的同一时刻，还会把渲染出的页面保存为不含脚本的自包含 HTML 快照：实际 DOM（包括开放的 shadow root）、浏览器解析后的 CSS 规则、表单状态，并内嵌同源的图片、字体和画布。截图结束后，截图浏览器以相同宽度重新渲染每个快照并与 PNG 比较，不同像素的比例作为保真度保存。当卡片在屏幕上足够大且保真度在限值内时，查看器在禁止脚本的沙箱框架中绘制快照，否则绘制 PNG。验证依据仍是 PNG。原生截图只使用 PNG | 任何缩放下文字都清晰，可以选择和检查元素。代码修改（v0.3.0）和 Figma 导出需要的也是这棵元素树。与从源码重绘屏幕不同，它是实际渲染的副本，不会臆造内容；副本不同时由保真度检查说明。与已移除的 live-mount iframe（#169）不同，它不需要运行中的应用服务器。它不会缩短截图时间：DOM 仍需运行应用才能得到 |
-| 渲染服务器（2026-11-27 决定） | 由实时会话所有者进程发展出每个项目、源码状态和运行一个的常驻渲染服务器。它保留已构建的主机和一个 Chromium，并为每个任务提供独立的浏览器上下文和标签页：地图发现访问、`dui run` 截图、查看器卡片和预览，以及保存屏幕上内容的截图。CDP 客户端改为异步，使一个浏览器能同时渲染多个标签页。对已渲染的卡片截图时，保存该页面（PNG、渲染树、HTML 快照、验证），不再重新渲染。源码变化时启动新服务器，旧服务器完成其会话。跳过重新加载的捷径（为另一宽度只调整尺寸而不重新加载、在已加载页面中设置状态）只在其图像与重新加载的图像一致时使用 | 以往每次运行和每次实时打开都要构建主机、启动浏览器并从头渲染（首次截图前 1–2 s，每次实时打开 2.3 s）。浏览器上下文在一个进程内隔离任务，因此并行工作时内存不随之增长。渲染仍由官方引擎完成，证据含义不变 |
-| dui 渲染器（2026-11-27 方向，研究） | 长期目标是在同一 `Renderer` 端口之后，以 `dui-render-<x>` 适配器的形式提供一个类似 GPUI、由 GPU 绘制并增量重绘的 dui 专用渲染器。在某个界面上，其帧与相同格子的 Chromium 帧在保真度限度内一致之前（按 HTML 快照保真度的方式测量）都只是预览，在此之前证据仍来自 Chromium。它从无需脚本引擎的内容（HTML 快照、静态页面）开始，只使用宽松许可的依赖 | 可即时绘制和重绘数百张卡片，这是每个标签页一个浏览器的方式无法达到的。与浏览器不同的重绘就是编造的证据，因此由保真度门槛决定它在哪里可以替代 Chromium |
+| SwiftUI 屏幕发现（2026-11-25 决定，2026-11-27 修订） | 默认路径仅使用语法，并可在任一操作系统上运行。结合官方 macOS 构建的编译器索引仍是可选的精度增强，不是卡片出现的前提。按[路线图规则](roadmap.md#swiftui-screen-discovery)输出声明而非截图 | 屏幕地图应在没有 Xcode 或模拟器的情况下出现。编译器类型稍后可以细化跳转，但结构和大多数目标仅凭语法即可得到 |
+| HTML 屏幕快照（2026-11-26 决定，2026-11-27 修订） | Web 截图仍可在 PNG 旁保存不含脚本的 HTML 快照并记录保真度。快照是校验证据，不是默认卡片，也不是 Figma 导出或代码修改的中间格式。默认地图使用带版本的模型和近似渲染器。原生截图只使用 PNG | 实际渲染的副本在比较像素时有用。它仍需要运行应用，因此不属于默认路径 |
+| 渲染服务器（2026-11-27 决定，改入校验轨道） | 常驻的官方引擎渲染服务器是可选的像素校验，而不是默认地图。启用时，它是 `--capture`、`dui run` 以及后续其他界面的任务分发器。默认的 `dui map` 和 `dui open` 不启动浏览器 | 默认地图必须保持快速、不绑定平台，并且占用较少内存。并行的官方引擎工作仍有助于可选校验 |
+| dui 渲染器（2026-11-27 修订） | v0.3.0 的默认画面是 dui 近似渲染器根据带版本模型（含样式属性）绘制的结果。帧会标注为近似。在保真度限度内与官方引擎帧对齐（包括 GPU 增量渲染器）仍是校验轨道上的研究 | 画布应在不使用浏览器的情况下展示屏幕和关系。若重绘声称是官方引擎证据，仍须通过保真度门槛 |
+| 默认地图流水线（2026-11-27 决定） | 默认路径是可在任一操作系统上运行的 AST 解析、带版本的 JSON 模型（屏幕、组件、跳转、代码位置、槽位、已声明状态与分支、列表项 schema、字段到 UI 的绑定、样式属性、token 名称），以及 dui 近似渲染器。文件变更后，只重新解析并重绘受影响的模型节点（热重载），无需重新构建应用或启动浏览器。评审者可在 UI 中更改槽位、状态和列表值，而无需运行业务逻辑。第一种语言是 TypeScript/TSX，然后是 Swift syntax only。截图和官方引擎渲染是可选的像素校验，绝不能作为填补卡片的回退 | 目标是屏幕和关系，而不是现场演示逻辑，且不得依赖特定操作系统或渲染引擎。截图之所以慢，是因为它要构建并加载应用；AST 路径预计更快，第 2 阶段会记录测量结果 |
+| 样式与设计 token（2026-11-27 决定） | 模型包含中立样式属性（spacing、color、typography、radius、size、layout），以及为日后 Figma 变量保留 token 名称的 token 层。每个适配器把自己的样式语法映射到这些属性。简单：Tailwind 类、SwiftUI modifier、Compose Modifier、内联样式。中等：定义文件中的主题、token 和 CSS 变量。困难：CSS 文件和 CSS Modules（层叠、优先级、媒体查询）由不使用浏览器的轻量 CSS 解析器做近似；运行时 CSS-in-JS 按槽位处理 | 近似渲染和 Figma 导出需要从源码读取样式，而不是从浏览器。未能解析的样式保持为占位 |
+| 语言适配器（2026-11-27 决定） | 一种新语言只需要一个适配器，把布局元素、已声明状态与数据、导航和样式语法映射到共享模型。模型、近似渲染器、热重载和 Figma 导出均可复用 | 一旦结构进入模型，默认路径上的平台依赖就会消失；添加一种语言不应再需要新的渲染器或浏览器 |
+
+当前默认路径与目标默认路径（可选像素校验不进入默认路径）：
+
+```mermaid
+flowchart TD
+  subgraph current [Current default]
+    CS[Source] --> CD[Route and type facts]
+    CD --> CP[Plan cells]
+    CP --> CC[Load pages in a browser to read links]
+    CC --> CV[Viewer]
+    CV --> CL[Live frames or HTML snapshots]
+  end
+  subgraph target [Target default]
+    TS[Source] --> TAST[AST parse on any OS]
+    TAST --> TM[Versioned model]
+    TM --> TR[Approximate renderer]
+    TR --> TV[Map of screens and relations]
+    TV --> TSlot[Toggle slots, state, and list counts]
+    TSlot --> TR
+    Watch[File watcher] --> TAST
+    TM --> TF[Figma export after v0.3.0]
+  end
+  subgraph opt [Optional pixel verification]
+    TM --> OJ[Render job]
+    OJ --> OW[Web]
+    OJ --> OA[Android]
+    OJ --> OI[iOS]
+    OJ --> OD[Desktop]
+    OW --> OE[Frame and fidelity]
+    OA --> OE
+    OI --> OE
+    OD --> OE
+  end
+```
+
+阶段与完成标准见[默认流水线](roadmap.md#default-pipeline)。
 
 ## 5. Monorepo 布局
 

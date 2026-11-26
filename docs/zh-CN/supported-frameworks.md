@@ -26,3 +26,23 @@
 设计以官方 TypeScript 7 为目标。当前 CLI 也为官方稳定版 6.x 项目提供兼容路径。运行 `dui check-ts PROJECT` 可检查项目的编译器。TypeScript 扫描会检查已安装的 React 和 React DOM 稳定版 18+、Vite 7+，在使用 Next 宿主且已安装 Next.js 时检查 16+。规则所用库的版本可能产生诊断提示，扫描会继续。[编译器检查](../../crates/dui/src/main.rs) · [扫描版本检查](../../adapters/typescript/facts.mts)
 
 `dui toolchains` 报告已安装的 `tsc`、`rustc`、`go`、`swiftc`、`kotlinc`、`dart` 版本。探测成功说明工具可用。上表分别列出了事实提取、界面发现和渲染的验证依据。后续工作见路线图。[工具链探测](../../crates/dui-app/src/compiler_oracle.rs) · [路线图](roadmap.md)
+
+
+## 语言适配器（默认流水线）
+
+上表描述的是今天 `main` 的行为。[默认流水线](roadmap.md#default-pipeline)会改变添加新语言的方式：一个适配器将该语言的源码映射到带版本的模型。模型、近似渲染器、热重载和 Figma 导出均可复用。
+
+适配器负责映射：
+
+- 将布局元素映射到模型中的布局类型
+- 已声明状态和数据槽位
+- 导航（路由、链接、目标）
+- 将样式语法映射到中立样式属性（spacing、color、typography、radius、size、layout），并在 token 层保留 token 名称
+
+样式难度：
+
+- 简单：Tailwind 类、SwiftUI modifier、Compose Modifier 和内联样式可直接映射。
+- 中等：主题、设计 token 和 CSS 变量根据定义文件解析。
+- 困难：CSS 文件和 CSS Modules 需要层叠、优先级和媒体查询。由不使用浏览器的轻量 CSS 解析器做近似。运行时 CSS-in-JS 值按槽位处理。
+
+默认适配器路径不得启动浏览器或仿真器，也不得用重型渲染器作为填补卡片的回退。见[绝不做的事](architecture.md#never-default-path)。
