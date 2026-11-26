@@ -2056,6 +2056,121 @@ pub struct LoginCapture {
     pub storage_state: Value,
 }
 
+/// How one screen's HTML snapshots lay out at its other captured widths
+/// (docs/en/web-viewer.md#width-preview): each snapshot is rendered back at every other captured
+/// width of the same screen, state, scenario and locale, and compared with that width's PNG.
+/// Agreement means the screen adapts with CSS alone; a snapshot carries no scripts, so layout
+/// chosen by scripts at another width shows up as a mismatch.
+pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -> Value {
+    let started = std::time::Instant::now();
+    let mut groups: BTreeMap<String, Vec<(u32, String, String)>> = BTreeMap::new();
+    for cell in cells {
+        let (Some(file), Some(image), Some(width)) = (
+            cell["observation"]["htmlSnapshot"]["file"].as_str(),
+            cell["image"].as_str(),
+            cell["width"].as_u64().and_then(|w| u32::try_from(w).ok()),
+        ) else {
+            continue;
+        };
+        if cell["observation"]["htmlSnapshot"]["fidelity"].is_null() {
+            continue;
+        }
+        let key = json!([
+            cell["path"],
+            cell["state"],
+            cell["scenario"],
+            cell["locale"]
+        ])
+        .to_string();
+        groups
+            .entry(key)
+            .or_default()
+            .push((width, file.to_owned(), image.to_owned()));
+    }
+    // One job per ordered pair of captured widths: (identity, from, snapshot, to, PNG).
+    let mut jobs = Vec::new();
+    for (key, mut widths) in groups {
+        widths.sort();
+        let identity: Value = serde_json::from_str(&key).unwrap_or(Value::Null);
+        for (from, file, _) in &widths {
+            for (to, _, image) in &widths {
+                if from != to {
+                    jobs.push((identity.clone(), *from, file.clone(), *to, image.clone()));
+                }
+            }
+        }
+    }
+    let results: std::sync::Mutex<Vec<Option<std::result::Result<f64, String>>>> =
+        std::sync::Mutex::new(vec![None; jobs.len()]);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let launch_error: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+    std::thread::scope(|scope| {
+        for _ in 0..concurrency.clamp(1, 4).min(jobs.len()) {
+            let (jobs, results, next, launch_error) = (&jobs, &results, &next, &launch_error);
+            scope.spawn(move || {
+                let launched = tempfile::tempdir()
+                    .map_err(|e| e.to_string())
+                    .and_then(|profile| {
+                        Browser::local(&executable(), profile.path(), 0)
+                            .map(|b| (profile, b))
+                            .map_err(|e| e.to_string())
+                    });
+                let (_profile, mut browser) = match launched {
+                    Ok(entry) => entry,
+                    Err(e) => {
+                        if let Ok(mut slot) = launch_error.lock() {
+                            *slot = Some(e);
+                        }
+                        return;
+                    }
+                };
+                loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let Some((_, _, file, to, image)) = jobs.get(i) else {
+                        break;
+                    };
+                    let measured = fs::read(out.join(image))
+                        .map_err(|e| e.to_string())
+                        .and_then(|png| {
+                            browser
+                                .render_back(&out.join(file), *to, &png)
+                                .map_err(|e| e.to_string())
+                        });
+                    if let Ok(mut slots) = results.lock() {
+                        slots[i] = Some(measured);
+                    }
+                }
+            });
+        }
+    });
+    let results = results.into_inner().unwrap_or_default();
+    let pairs: Vec<Value> = jobs
+        .iter()
+        .zip(results)
+        .filter_map(|((identity, from, _, to, _), measured)| {
+            let mut pair = json!({"path": identity[0], "from": from, "to": to});
+            for (i, name) in [(1, "state"), (2, "scenario"), (3, "locale")] {
+                if !identity[i].is_null() {
+                    pair[name] = identity[i].clone();
+                }
+            }
+            match measured? {
+                Ok(m) => pair["mismatch"] = json!((m * 1e4).round() / 1e4),
+                Err(e) => pair["error"] = json!(e),
+            }
+            Some(pair)
+        })
+        .collect();
+    let mut summary = json!({
+        "pairs": pairs,
+        "ms": u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+    });
+    if let Some(e) = launch_error.into_inner().ok().flatten() {
+        summary["error"] = json!(e);
+    }
+    summary
+}
+
 pub fn capture_login_session(
     executable: &Path,
     start_url: &str,

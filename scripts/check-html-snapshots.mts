@@ -53,6 +53,7 @@ type Snapshot = {
 };
 type Report = {
   output: string;
+  htmlReflow?: { pairs: { path: string; from: number; to: number; mismatch: number }[] };
   cells: {
     status: string;
     image: string;
@@ -167,6 +168,38 @@ ${Array.from({ length: 6 }, (_, i) => `<section><p>Section ${i} with centered te
   const tallSnap = tall.cells[0]!.observation.htmlSnapshot!;
   assert.ok(tallSnap.fidelity <= 0.005, `tall page fidelity ${tallSnap.fidelity}`);
 
+  // Each snapshot is laid out at the screen's other captured width and compared with its PNG
+  // (#323): this page adapts with CSS alone, so it agrees.
+  assert.deepEqual(
+    first.htmlReflow?.pairs.map((p) => [p.from, p.to, p.mismatch <= 0.005]),
+    [
+      [600, 800, true],
+      [800, 600, true],
+    ],
+    JSON.stringify(first.htmlReflow),
+  );
+  // A page whose script picks its layout by width disagrees: the snapshot has no scripts.
+  writeFileSync(
+    join(site, "script.html"),
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Script</title>
+<style>body{margin:0;font-family:sans-serif} nav{padding:16px;background:#642;color:#fff} .rows div{background:#edd;margin:16px;height:80px}</style></head>
+<body><nav id="nav"></nav><main class="rows" id="rows"></main><script>
+const narrow = innerWidth < 700;
+document.getElementById("nav").textContent = narrow ? "Menu" : "Shop · Orders · Reports";
+document.getElementById("rows").innerHTML = Array.from({ length: narrow ? 2 : 6 }, (_, i) => "<div>Order " + i + "</div>").join("");
+</script></body></html>`,
+  );
+  const scripted = capture(
+    { path: "/script.html", widths: [800, 600], readySelector: "#rows div" },
+    "home-script",
+  );
+  const scriptedPairs = scripted.htmlReflow?.pairs ?? [];
+  assert.equal(scriptedPairs.length, 2, JSON.stringify(scripted.htmlReflow));
+  assert.ok(
+    scriptedPairs.every((p) => p.mismatch > 0.005),
+    `script layout disagrees: ${JSON.stringify(scriptedPairs)}`,
+  );
+
   // A cache hit brings the snapshot along.
   const again = capture({ widths: [800, 600] }, "home");
   const reused = again.cells.find((c) => c.width === 800)!.observation.htmlSnapshot!;
@@ -185,6 +218,8 @@ ${Array.from({ length: 6 }, (_, i) => `<section><p>Section ${i} with centered te
       assets: snap.assets,
       fidelity: snap.fidelity,
       omitted: snap.omitted.length,
+      reflow: first.htmlReflow?.pairs.map((p) => p.mismatch),
+      scriptReflow: scriptedPairs.map((p) => p.mismatch),
     }),
   );
 } finally {

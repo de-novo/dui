@@ -257,6 +257,28 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
         .cloned()
         .unwrap_or_default();
 
+    // How each snapshot lays out at the screen's other captured widths (#323), by its capture.
+    let mut reflow: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for pair in report
+        .as_ref()
+        .and_then(|r| r["htmlReflow"]["pairs"].as_array())
+        .into_iter()
+        .flatten()
+    {
+        if let (Some(to), Some(mismatch)) = (pair["to"].as_u64(), pair["mismatch"].as_f64()) {
+            let key = json!([
+                pair["path"],
+                pair["state"],
+                pair["scenario"],
+                pair["locale"],
+                pair["from"]
+            ]);
+            reflow
+                .entry(key.to_string())
+                .or_default()
+                .push(json!({"width": to, "mismatch": mismatch}));
+        }
+    }
     let mut cells = Vec::with_capacity(captures.len());
     let mut images = BTreeSet::new();
     let mut dims_cache: BTreeMap<String, Option<(u32, u32)>> = BTreeMap::new();
@@ -325,6 +347,16 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
                 "fidelity": snapshot["fidelity"],
                 "omitted": snapshot["omitted"].as_array().map_or(0, Vec::len),
             });
+            let key = json!([
+                item["path"],
+                item["state"],
+                item["scenario"],
+                item["locale"],
+                item["width"]
+            ]);
+            if let Some(pairs) = reflow.get(&key.to_string()) {
+                cell["snapshot"]["reflow"] = json!(pairs);
+            }
         }
         cells.push(cell);
     }

@@ -1,10 +1,11 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { CellSnapshot } from "../../data/overview";
+import { SNAPSHOT_MAX_MISMATCH } from "../../model/snapshotFidelity";
+
+export { SNAPSHOT_MAX_MISMATCH };
 
 /** Cards at least this wide on screen draw their HTML snapshot (docs/en/web-viewer.md#html-cards). */
 export const SNAPSHOT_MIN_SCREEN_WIDTH = 320;
-/** Snapshots whose rendered copy differs from the PNG in more pixels than this keep the PNG. */
-export const SNAPSHOT_MAX_MISMATCH = 0.005;
 /** At most this many snapshot frames are mounted at once. */
 export const SNAPSHOT_MAX_FRAMES = 12;
 

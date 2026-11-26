@@ -104,10 +104,27 @@ export type Cell = {
   /** The script-free HTML copy of the capture (docs/en/web-viewer.md#html-cards). */
   snapshot?: CellSnapshot;
 };
-export type CellSnapshot = { file: string; fidelity?: number; omitted: number };
+export type CellSnapshot = {
+  file: string;
+  fidelity?: number;
+  omitted: number;
+  /** This snapshot rendered at the screen's other captured widths, against their PNGs. */
+  reflow?: { width: number; mismatch: number }[];
+};
 function decodeSnapshot(raw: unknown): CellSnapshot | undefined {
   if (!raw || typeof raw !== "object") return undefined;
-  const value = raw as { file?: unknown; fidelity?: unknown; omitted?: unknown };
+  const value = raw as { file?: unknown; fidelity?: unknown; omitted?: unknown; reflow?: unknown };
+  const reflow = Array.isArray(value.reflow)
+    ? value.reflow.filter(
+        (r): r is { width: number; mismatch: number } =>
+          record(r) &&
+          typeof r.width === "number" &&
+          Number.isInteger(r.width) &&
+          r.width > 0 &&
+          typeof r.mismatch === "number" &&
+          Number.isFinite(r.mismatch),
+      )
+    : [];
   if (typeof value.file !== "string" || !/^[0-9a-f]{64}-\d+\.html$/.test(value.file))
     return undefined;
   return {
@@ -117,6 +134,9 @@ function decodeSnapshot(raw: unknown): CellSnapshot | undefined {
         ? value.fidelity
         : undefined,
     omitted: typeof value.omitted === "number" ? value.omitted : 0,
+    ...(reflow.length > 0
+      ? { reflow: reflow.map(({ width, mismatch }) => ({ width, mismatch })) }
+      : {}),
   };
 }
 export type ScreenOrigin =

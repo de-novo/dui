@@ -46,6 +46,12 @@ A web capture saves `HASH-WIDTH.html` next to its PNG and records it in `observa
 The map draws a card from its snapshot when the card is at least 320 CSS px wide on screen and `fidelity` is at most 0.5 %. Otherwise it draws the PNG. At most 12 snapshot frames are mounted at once; cards outside the viewport go back to their PNG. A frame is sandboxed without scripts or same-origin access, and the viewer serves snapshots with a content security policy that allows only inline styles and images and fonts from `data:` or the run's shared assets on the viewer. Snapshots are served with a `<base>` under `/archive/r/RUN/`, so asset names resolve within their run. The PNG remains the verification evidence, and the inspector says which of the two a card is showing.
 
 
+### Width preview
+
+A snapshot keeps the page's style sheets with their media queries, so the browser can lay it out at any width. After capturing, each run renders every screen's snapshot at that screen's other captured widths (same state, scenario and locale) and compares it with the PNG taken at that width. `report.json` records each pair in `htmlReflow.pairs` with `path`, `from`, `to` and `mismatch`, and the time taken in `htmlReflow.ms`. A screen that adapts with CSS alone agrees; layout chosen by scripts at another width (for example a component that renders a different menu below a breakpoint) is not in a snapshot, so it shows up as a mismatch.
+
+In the inspector, **Width preview** lays the selected capture's snapshot out at any width from 320 CSS px, starting from the captured width nearest the chosen one. A captured width is labelled as captured. Any other width is labelled as an unverified CSS reflow preview: it adds no cell and does not count toward coverage. The dialog lists how this snapshot measured at the other captured widths. When any pair of the screen differs by more than 0.5 %, it warns that scripts also change the layout and points to **Responsive preview** for a running app.
+
 ### React Flow validation
 
 The development preview reads the entry captures and discovered links from a completed run. From the repository root, run the following with Node 26 and open the printed loopback URL. Replace the path with the output directory of a capture.

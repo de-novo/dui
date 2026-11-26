@@ -23,7 +23,7 @@
 | `routeSelector` | 선택자에 맞는 같은 출처 링크를 사이클 차단과 동적 ID 패턴 축약(`/orders/:id`)이 적용된 다단계 BFS로 재귀 탐색한다. |
 | `scenarios` | 기본 설정에서 달라지는 값만 담은 배열. 예를 들어 `[{"path":"/settings","readySelector":"form"}]`은 폼이 준비될 때까지 기다리는 설정 화면을 추가한다. |
 | `maxNoImprovementRounds` | 선택적 수렴 가드. 연속 N개 상태에서 새 분기나 새 슬롯이 관측되지 않으면 시나리오 탐색을 종료하며, 남은 계획 칸은 분모에 `unverified (not-rendered)`로 보존한다. |
-| `htmlSnapshots` | 웹 캡처마다 스크립트 없는 HTML 스냅샷을 PNG 옆에 저장하고(기본 `true`), 충실도를 `observation.htmlSnapshot`에 기록한다. [HTML 카드](web-viewer.md#html-카드) 참고. `false`로 두면 캡처마다 약 0.25초를 줄인다. |
+| `htmlSnapshots` | 웹 캡처마다 스크립트 없는 HTML 스냅샷을 PNG 옆에 저장하고(기본 `true`), 충실도를 `observation.htmlSnapshot`에 기록한다. [HTML 카드](web-viewer.md#html-카드) 참고. `false`로 두면 캡처마다 약 0.25초를 줄이고 [폭 재배치 비교](web-viewer.md#폭-미리보기)도 건너뛴다. |
 | `concurrency` | 동시에 캡처하는 브라우저 수(1~4). 기본값은 논리 CPU 수의 절반이며 최대 4다(`DUI_CONCURRENCY`로도 지정). 대기열에 있는 각 화면의 첫 상태와 한 상태의 여러 폭을 병렬로 캡처한다. 리포트의 셀과 순서는 같다. |
 | `requiredRequests` | 2xx 응답을 받아야 할 요청 경로. 생성한 목 응답을 지정한 요청은 실제로 그 응답을 받아야 한다. |
 | `settleTimeoutMs` | 화면이 변화를 멈추기까지 기다리는 시간 예산(밀리초, 기본 `10000`). dui는 약 100ms마다 페이지를 샘플링하고 같은 샘플이 네 번 연속 나와야 안정된 것으로 본다. 스스로 바뀌는 영역은 비교에서 빼고 `observation.ignoredChanges`에 기록한다. 대상은 `aria-busy`, 진행 표시줄, 타이머, 끝없이 반복되는 애니메이션 요소, 세 샘플 연속으로 텍스트나 위치가 바뀌는 노드다. 예산이 끝날 때까지 바뀌는 화면은 `unverified`가 되고 사유는 `unsettled: NODE CHANGE`이며, `observation.unsettled`에 마지막으로 바뀐 것을 기록한다. |

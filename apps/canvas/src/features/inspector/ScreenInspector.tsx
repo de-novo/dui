@@ -2,6 +2,8 @@ import { snapshotUsable, useSnapshotShown } from "../map/snapshotSlots";
 import { ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
 import { ResponsivePreview } from "./ResponsivePreview";
+import { WidthPreview } from "./WidthPreview";
+import { widthPreviewSources } from "../../model/widthPreview";
 import { SourcePreviewPanel } from "../../components/SourcePreviewPanel";
 import { NativeSourceEvidence } from "../../components/NativeSourceEvidence";
 import { CaptureStatus } from "../../components/ui/CaptureStatus";
@@ -100,6 +102,7 @@ export function ScreenInspector({
   const snapshotShown = useSnapshotShown(screen?.id);
   const percent = (value: number) => `${(value * 100).toFixed(2)} %`;
   const usable = snapshotUsable(cell?.snapshot);
+  const widthSources = widthPreviewSources(rawScreenCells, cell);
   const cardSourceText =
     snapshotShown && cell?.snapshot?.fidelity !== undefined
       ? t.snapshotShown(percent(cell.snapshot.fidelity))
@@ -153,6 +156,14 @@ export function ScreenInspector({
             cell={{ state: cell.state, width: cell.width }}
           />
         )}
+      {widthSources.length > 0 && cell && (
+        <WidthPreview
+          key={JSON.stringify([run.key, screen?.id, cell.state, cell.width])}
+          runKey={run.key}
+          sources={widthSources}
+          width={cell.width}
+        />
+      )}
       {screen?.nativeSource && !screen.sourcePreview && (
         <NativeSourceEvidence
           source={screen.nativeSource}

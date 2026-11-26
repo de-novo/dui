@@ -77,6 +77,14 @@ export type Messages = {
   backToOverview: string;
   backToArchive: string;
   responsivePreview: string;
+  widthPreview: string;
+  widthPreviewWidth: string;
+  capturedWidths: string;
+  widthCaptured: (width: number, percent: string) => string;
+  widthReflowed: (from: number, to: number) => string;
+  reflowAgreement: (pairs: string) => string;
+  reflowUnmeasured: string;
+  reflowWarning: string;
   viewport: string;
   constraint: string;
   height: string;
@@ -266,6 +274,18 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     backToOverview: "Back to overview",
     backToArchive: "Back to archive",
     responsivePreview: "Responsive preview",
+    widthPreview: "Width preview",
+    widthPreviewWidth: "Width (CSS px)",
+    capturedWidths: "Captured widths",
+    widthCaptured: (width, percent) =>
+      `Captured at ${width} px: its HTML snapshot, ${percent} of pixels differ from the PNG`,
+    widthReflowed: (from, to) =>
+      `CSS reflow preview, not verified: the ${from} px snapshot laid out at ${to} px`,
+    reflowAgreement: (pairs) =>
+      `This snapshot at the other captured widths, against their PNGs: ${pairs}`,
+    reflowUnmeasured: "Only one captured width, so reflow agreement is not measured.",
+    reflowWarning:
+      "Scripts also change this screen's layout with its width, so other widths may differ from the app. Use Responsive preview on a running app to see them.",
     viewport: "Viewport",
     constraint: "Resize target",
     height: "Height",
@@ -466,6 +486,16 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     backToOverview: "返回概览",
     backToArchive: "返回归档",
     responsivePreview: "响应式预览",
+    widthPreview: "宽度预览",
+    widthPreviewWidth: "宽度（CSS px）",
+    capturedWidths: "已捕获宽度",
+    widthCaptured: (width, percent) =>
+      `已在 ${width} px 捕获：其 HTML 快照，与 PNG 不同的像素占 ${percent}`,
+    widthReflowed: (from, to) => `CSS 重排预览，未验证：将 ${from} px 快照按 ${to} px 排版`,
+    reflowAgreement: (pairs) => `此快照按其他已捕获宽度排版，与其 PNG 对比：${pairs}`,
+    reflowUnmeasured: "只有一个已捕获宽度，无法测量重排一致度。",
+    reflowWarning:
+      "脚本也会随宽度改变此界面的布局，因此其他宽度可能与应用不同。可在运行中的应用上使用响应式预览查看。",
     viewport: "视口",
     constraint: "调整大小的对象",
     height: "高度",
@@ -659,6 +689,17 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     backToOverview: "개요로 돌아가기",
     backToArchive: "아카이브로 돌아가기",
     responsivePreview: "반응형 미리보기",
+    widthPreview: "폭 미리보기",
+    widthPreviewWidth: "폭(CSS px)",
+    capturedWidths: "캡처한 폭",
+    widthCaptured: (width, percent) =>
+      `${width} px에서 캡처함: 이 폭의 HTML 스냅샷, PNG와 다른 픽셀 ${percent}`,
+    widthReflowed: (from, to) =>
+      `CSS 재배치 미리보기 · 미검증: ${from} px 스냅샷을 ${to} px로 다시 그림`,
+    reflowAgreement: (pairs) => `이 스냅샷을 다른 캡처 폭으로 다시 그려 PNG와 비교: ${pairs}`,
+    reflowUnmeasured: "캡처한 폭이 하나뿐이라 재배치 일치도를 측정하지 못했습니다.",
+    reflowWarning:
+      "이 화면은 스크립트도 폭에 따라 레이아웃을 바꾸므로, 다른 폭은 실제 앱과 다를 수 있습니다. 실행 중인 앱에서는 반응형 미리보기로 확인하세요.",
     viewport: "화면 영역",
     constraint: "크기 조절 대상",
     height: "높이",

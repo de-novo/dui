@@ -225,12 +225,41 @@ try {
         "document.querySelector('[data-card-source]')?.textContent ?? null",
       );
       assert.match(source ?? "", /HTML snapshot|HTML 스냅샷|HTML 快照/, String(source));
+      // Width preview (#323): the selected screen's snapshot at a width that was not captured is
+      // an unverified reflow from the nearest capture; a captured width says so.
+      await ev("document.querySelector('[data-width-preview-open]').click(), true");
+      await new Promise((r) => setTimeout(r, 800));
+      const setWidth = (w: number) =>
+        ev(
+          `(() => { const i = document.querySelector('[data-width-preview-input]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '${w}'); i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`,
+        );
+      const preview = () =>
+        ev<{ status: string; frame: string; text: string; warning: boolean }>(
+          "({ status: document.querySelector('[data-width-preview-status]').dataset.widthPreviewStatus, frame: document.querySelector('.width-preview-frame').style.width, text: document.querySelector('.width-preview-agreement').textContent, warning: Boolean(document.querySelector('.width-preview-agreement[data-script-driven]')) })",
+        );
+      await setWidth(600);
+      await new Promise((r) => setTimeout(r, 800));
+      const reflowed = await preview();
+      assert.equal(reflowed.status, "reflow", JSON.stringify(reflowed));
+      assert.equal(reflowed.frame, "600px");
+      assert.ok(
+        /1280 px 0\.\d\d %/.test(reflowed.text) && !reflowed.warning,
+        JSON.stringify(reflowed),
+      );
+      await ev(
+        "[...document.querySelectorAll('.width-preview-captured button')].find(b => b.textContent === '375 px').click(), true",
+      );
+      await new Promise((r) => setTimeout(r, 800));
+      const capturedWidth = await preview();
+      assert.equal(capturedWidth.status, "captured", JSON.stringify(capturedWidth));
+      assert.equal(capturedWidth.frame, "375px");
       results.desktop = {
         overview,
         oneToOne,
         assetLoads: assetLoads.length,
         zoomedOut: { ...many, largeCardsInView: large },
         source,
+        widthPreview: { reflowed, captured: capturedWidth },
       };
     });
   }
