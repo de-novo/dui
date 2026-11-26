@@ -86,6 +86,8 @@ Open questions include which prop combinations to render when the set grows larg
 
 The first proof of concept uses a few obora design-system components (Button, Input, Badge) and a couple of obora screens.
 
+**Hosting direction.** A Sentry-like model is under consideration: the core CLI (`dui map`, diff, local rendering, and JSON export) would stay open source, while a later hosted service could store CI uploads with code-location mapping, show screen comparisons on each pull request, sync with the Figma plugin, and link design comments back to the code, with team access. This is a direction to explore, not a commitment.
+
 **Portable source preview (experimental).** From a checkout with Node 26 and Swift 6 or Kotlin 2/JDK, run one of the commands below on trusted local source. The exporter compiles and runs the selected entry against portable layout, text and Boolean-switch primitives. The standalone HTML replays the observed transitions offline. It labels the result as a source preview. Native appearance, platform services and runtime verification require a separate native run.
 
 The prototype takes one self-contained file and a parameterless entry. State must be deterministic, Boolean and declared in a stable order. It explores up to 32 reachable states and 16 switches per state. Unsupported APIs or exceeded limits fail the export. The standalone HTML opens in a browser. Project-declared entries also open in the [screen map](web-viewer.md#portable-source-map).
