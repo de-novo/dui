@@ -77,6 +77,10 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 | v0.2.0 | **框架无关路由树、全页真实比例节点、模态框自动捕获与客观事实核心。** 按页面完整高度（含嵌套滚动容器）捕获并按真实宽高比排列画布与桌面节点（[#147](https://github.com/de-novo/dui/issues/147)），通过 WAI-ARIA 导航展开与官方编译器路由注册表实现框架无关路由树发现、零配置 `dui scan` 与多宿主 `dui map`（[#149](https://github.com/de-novo/dui/issues/149)、[#153](https://github.com/de-novo/dui/issues/153)），对齐 GPUI 桌面原生 macOS `TitleBar` 与避障走廊连线（[#155](https://github.com/de-novo/dui/issues/155)、[#159](https://github.com/de-novo/dui/issues/159)），基于 WAI-ARIA 自动捕获模态框/抽屉并以子叠加层节点展示（[#157](https://github.com/de-novo/dui/issues/157)），并移除硬编码的全局设计缺陷启发式规则与过早的 iframe 实时挂载，使 `dui` 严格报告客观渲染证据（[#163](https://github.com/de-novo/dui/issues/163)、[#169](https://github.com/de-novo/dui/issues/169)）。 |
 | v0.3.0 | **插件化设计系统一致性校验（`DESIGN.md` / 插件）与基于代码的画布渲染。** 保持 `dui-core` 严格输出客观事实，在 `dui.json` 中提供可选插件架构接入自有 `DESIGN.md`、W3C Design Tokens 或自定义审计插件（[#167](https://github.com/de-novo/dui/issues/167)），并推动画布渲染从位图截图演进为直接基于代码的组件渲染。 |
 
+**渲染服务器（v0.2.x）。** 渲染迁移到每个项目一个常驻服务器（[决定](architecture.md#4-已确定的决定2026-11-20)）：已构建的主机和一个 Chromium 保持运行，每个任务使用一个浏览器上下文和标签页，CDP 客户端可同时渲染多个标签页。`dui map`、`dui run`、查看器卡片和预览共用它，截图保存屏幕上已渲染的页面。它由共享的实时会话所有者进程（[#333](https://github.com/de-novo/dui/issues/333)）发展而来。
+
+**dui 渲染器（研究）。** 在 `Renderer` 端口之后，构建一个类似 GPUI、由 GPU 绘制并增量重绘的 dui 专用渲染器。在某个界面上，其帧与相同格子的 Chromium 帧在保真度限度内一致之前，都只是预览。它从无需脚本引擎的 HTML 快照和静态页面开始。
+
 **Figma 导出（v0.3.0 之后）。** 在基于代码的画布闭环就位之后，把屏幕地图作为由代码生成的只读视图导出到 Figma。代码仍是唯一的事实来源。不把 Figma 中的修改写回代码；若同步回去，来源会再次分裂，因此目前不是目标。
 
 1. **以画板导出屏幕。** 将一次 `dui map` 运行中的屏幕导出到 Figma：把渲染得到的 DOM 与样式变成可编辑图层，每个屏幕一个画板，便于在 Figma 中直接查看。
