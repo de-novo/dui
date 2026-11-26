@@ -171,6 +171,14 @@ impl Renderer for LazyViteBrowser<'_> {
         };
         parallel_chromium_capture(&self.exe, host.port, concurrency, &mut self.pool, jobs)
     }
+
+    fn render_back_batch(
+        &mut self,
+        jobs: &[dui_ports::RenderBackJob<'_>],
+    ) -> Vec<Result<f64, String>> {
+        let concurrency = crate::host::resolve_capture_concurrency(&serde_json::Value::Null);
+        crate::chromium::render_back_in(&mut self.pool, self.browser.as_mut(), concurrency, jobs)
+    }
 }
 
 pub fn run_with_options(project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {

@@ -37,6 +37,14 @@ pub struct CaptureBatchJob<'a> {
     pub image: &'a Path,
 }
 
+/// A saved HTML snapshot to render back at `width` and compare with the PNG of the same width
+/// (docs/en/web-viewer.md#html-cards).
+pub struct RenderBackJob<'a> {
+    pub html: &'a Path,
+    pub width: u32,
+    pub png: &'a Path,
+}
+
 pub trait Renderer {
     fn capture(
         &mut self,
@@ -52,6 +60,14 @@ pub trait Renderer {
                 self.capture(job.spec, job.input, job.width, job.image)
                     .map_err(|e| e.to_string())
             })
+            .collect()
+    }
+
+    /// The share of pixels that differ between each snapshot rendered back and its PNG. A
+    /// renderer that cannot render HTML reports that for every job.
+    fn render_back_batch(&mut self, jobs: &[RenderBackJob<'_>]) -> Vec<Result<f64, String>> {
+        jobs.iter()
+            .map(|_| Err("this renderer does not render HTML snapshots".into()))
             .collect()
     }
 }

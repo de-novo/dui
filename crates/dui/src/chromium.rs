@@ -1182,10 +1182,10 @@ impl Browser {
         v["timing"]["totalMs"] = json!(visit_started.elapsed().as_millis() as u64);
         Ok((v, session.to_owned()))
     }
-    /// Save the page as a script-free HTML snapshot next to the PNG, render it back at the same
-    /// width in a separate tab and record how many pixels differ. Failures are recorded, never
-    /// fatal: the PNG is the evidence.
-    fn html_snapshot(&mut self, s: Option<&str>, width: u32, out_dir: &Path, png: &[u8]) -> Value {
+    /// Save the page as a script-free HTML snapshot next to the PNG. Its fidelity is measured
+    /// after capture, with the other snapshots of the run (`snapshot_render_back`). Failures are
+    /// recorded, never fatal: the PNG is the evidence.
+    fn html_snapshot(&mut self, s: Option<&str>, width: u32, out_dir: &Path) -> Value {
         let taken = self
             .call(
                 s,
@@ -1206,22 +1206,6 @@ impl Browser {
         };
         let inline = snapshot["html"].as_str().unwrap_or_default();
         use sha2::{Digest, Sha256};
-        // Rendered back while self-contained, so fidelity compares the same content the viewer
-        // shows; the file is then rewritten with large resources moved to shared assets.
-        // A name of its own per probe: the reused render-back tab waits for the probe's URL, so
-        // a URL shared with the previous probe would be taken for loaded before it navigates,
-        // and parallel captures writing into one run must not overwrite each other's probe.
-        static PROBES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        let probe = out_dir.join(format!(
-            ".render-back-{}-{}-{width}.html",
-            std::process::id(),
-            PROBES.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        ));
-        if let Err(e) = fs::write(&probe, inline) {
-            return json!({"error": e.to_string()});
-        }
-        let fidelity = self.render_back(&probe, width, png);
-        let _ = fs::remove_file(&probe);
         let (html, assets) = match crate::snapshot_assets::externalize(inline, out_dir) {
             Ok(split) => split,
             Err(e) => return json!({"error": e.to_string()}),
@@ -1238,16 +1222,12 @@ impl Browser {
         if !assets.is_empty() {
             record["assets"] = json!(assets);
         }
-        match fidelity {
-            Ok(fidelity) => record["fidelity"] = json!((fidelity * 1e4).round() / 1e4),
-            Err(e) => record["fidelityError"] = json!(e.to_string()),
-        }
         record
     }
 
-    /// Open `path` in a new tab at `width` × the PNG's height and return the share of pixels that
+    /// Open `path` in this browser's render-back tab at `width` × the PNG's height and return the share of pixels that
     /// differ from `png`.
-    fn render_back(&mut self, path: &Path, width: u32, png: &[u8]) -> Result<f64> {
+    pub(crate) fn render_back(&mut self, path: &Path, width: u32, png: &[u8]) -> Result<f64> {
         let height = u32::from_be_bytes(png.get(20..24).ok_or("short PNG")?.try_into()?);
         let session = match self.render_back_session.clone() {
             Some(session) => session,
@@ -1608,12 +1588,9 @@ impl Browser {
         let snapshot_started = std::time::Instant::now();
         if spec["htmlSnapshots"] != false
             && let Some(out_dir) = png.parent()
-            && let Ok(shot) = &screenshot
-            && let Some(bytes) = shot["data"].as_str().and_then(|d| STANDARD.decode(d).ok())
+            && screenshot.is_ok()
         {
-            v["htmlSnapshot"] = self.html_snapshot(s, width, out_dir, &bytes);
-            // Rendering it back used another tab; the page continues in front.
-            let _ = self.call(s, "Page.bringToFront", json!({}));
+            v["htmlSnapshot"] = self.html_snapshot(s, width, out_dir);
         }
         let snapshot_ms = ms(snapshot_started.elapsed());
         let _ = self.call(s, "Runtime.evaluate", caret(false));
@@ -2097,15 +2074,86 @@ pub struct LoginCapture {
     pub storage_state: Value,
 }
 
-/// How one screen's HTML snapshots lay out at its other captured widths
-/// (docs/en/web-viewer.md#width-preview): each snapshot is rendered back at every other captured
-/// width of the same screen, state, scenario and locale, and compared with that width's PNG.
-/// Agreement means the screen adapts with CSS alone; a snapshot carries no scripts, so layout
-/// chosen by scripts at another width shows up as a mismatch.
-pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -> Value {
+/// Renders HTML snapshots back in `browsers` and compares them with PNGs, `jobs` shared out to
+/// one thread per browser. With no browser at hand, up to `concurrency` are launched into `pool`.
+pub(crate) fn render_back_in(
+    pool: &mut crate::host::BrowserPool,
+    single: Option<&mut Browser>,
+    concurrency: usize,
+    jobs: &[dui_ports::RenderBackJob<'_>],
+) -> Vec<std::result::Result<f64, String>> {
+    if jobs.is_empty() {
+        return Vec::new();
+    }
+    if pool.is_empty() && single.is_none() {
+        while pool.len() < concurrency.clamp(1, 4).min(jobs.len()) {
+            let launched = tempfile::tempdir()
+                .map_err(|e| e.to_string())
+                .and_then(|profile| {
+                    Browser::local(&executable(), profile.path(), 0)
+                        .map(|b| (profile, b))
+                        .map_err(|e| e.to_string())
+                });
+            match launched {
+                Ok(entry) => pool.push(entry),
+                Err(e) if pool.is_empty() => return jobs.iter().map(|_| Err(e.clone())).collect(),
+                Err(_) => break,
+            }
+        }
+    }
+    let mut browsers: Vec<&mut Browser> = pool.iter_mut().map(|(_, b)| b).collect();
+    browsers.extend(single);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results: std::sync::Mutex<Vec<Option<std::result::Result<f64, String>>>> =
+        std::sync::Mutex::new(jobs.iter().map(|_| None).collect());
+    std::thread::scope(|scope| {
+        for browser in browsers.into_iter().take(jobs.len()) {
+            let (next, results) = (&next, &results);
+            scope.spawn(move || {
+                loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let Some(job) = jobs.get(i) else {
+                        break;
+                    };
+                    let measured = fs::read(job.png)
+                        .map_err(|e| e.to_string())
+                        .and_then(|png| {
+                            browser
+                                .render_back(job.html, job.width, &png)
+                                .map_err(|e| e.to_string())
+                        });
+                    if let Ok(mut slots) = results.lock() {
+                        slots[i] = Some(measured);
+                    }
+                }
+            });
+        }
+    });
+    results
+        .into_inner()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|r| r.unwrap_or_else(|| Err("render-back worker exited without result".into())))
+        .collect()
+}
+
+/// Renders this run's HTML snapshots back after capture (docs/en/web-viewer.md#html-cards).
+/// Each snapshot is rendered at its own width and the share of pixels that differ from its PNG
+/// becomes its `fidelity`. With `reflow` (docs/en/web-viewer.md#width-preview), each snapshot is
+/// also rendered at every other captured width of the same screen, state, scenario and locale and
+/// compared with that width's PNG: agreement means the screen adapts with CSS alone, while layout
+/// chosen by scripts shows up as a mismatch. `measure` renders the pairs not measured before.
+/// Returns the fidelity summary and, with `reflow`, the reflow pairs.
+pub(crate) fn snapshot_render_back(
+    cells: &mut [Value],
+    out: &Path,
+    reflow: bool,
+    measure: impl FnOnce(&[dui_ports::RenderBackJob<'_>]) -> Vec<std::result::Result<f64, String>>,
+) -> (Value, Option<Value>) {
     let started = std::time::Instant::now();
-    let mut groups: BTreeMap<String, Vec<(u32, String, String)>> = BTreeMap::new();
-    for cell in cells {
+    // Snapshots whose files are in this run: (cell, identity, width, snapshot, PNG).
+    let mut snapshots = Vec::new();
+    for (i, cell) in cells.iter().enumerate() {
         let (Some(file), Some(image), Some(width)) = (
             cell["observation"]["htmlSnapshot"]["file"].as_str(),
             cell["image"].as_str(),
@@ -2113,30 +2161,58 @@ pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -
         ) else {
             continue;
         };
-        if cell["observation"]["htmlSnapshot"]["fidelity"].is_null() {
+        if !out.join(file).is_file() || !out.join(image).is_file() {
             continue;
         }
-        let key = json!([
+        let identity = json!([
             cell["path"],
             cell["state"],
             cell["scenario"],
             cell["locale"]
-        ])
-        .to_string();
-        groups
-            .entry(key)
-            .or_default()
-            .push((width, file.to_owned(), image.to_owned()));
+        ]);
+        snapshots.push((i, identity, width, file.to_owned(), image.to_owned()));
     }
-    // One job per ordered pair of captured widths: (identity, from, snapshot, to, PNG).
-    let mut jobs = Vec::new();
-    for (key, mut widths) in groups {
-        widths.sort();
-        let identity: Value = serde_json::from_str(&key).unwrap_or(Value::Null);
-        for (from, file, _) in &widths {
-            for (to, _, image) in &widths {
-                if from != to {
-                    jobs.push((identity.clone(), *from, file.clone(), *to, image.clone()));
+    // One job per snapshot at its own width, then one per ordered pair of a screen's widths:
+    // (cell for fidelity, identity, from, snapshot, to, PNG).
+    type Job = (Option<usize>, Value, u32, String, u32, String);
+    let mut jobs: Vec<Job> = snapshots
+        .iter()
+        .filter(|(i, ..)| cells[*i]["observation"]["htmlSnapshot"]["fidelity"].is_null())
+        .map(|(i, identity, width, file, image)| {
+            (
+                Some(*i),
+                identity.clone(),
+                *width,
+                file.clone(),
+                *width,
+                image.clone(),
+            )
+        })
+        .collect();
+    if reflow {
+        let mut groups: BTreeMap<String, Vec<(u32, String, String)>> = BTreeMap::new();
+        for (_, identity, width, file, image) in &snapshots {
+            groups.entry(identity.to_string()).or_default().push((
+                *width,
+                file.clone(),
+                image.clone(),
+            ));
+        }
+        for (key, mut widths) in groups {
+            widths.sort();
+            let identity: Value = serde_json::from_str(&key).unwrap_or(Value::Null);
+            for (from, file, _) in &widths {
+                for (to, _, image) in &widths {
+                    if from != to {
+                        jobs.push((
+                            None,
+                            identity.clone(),
+                            *from,
+                            file.clone(),
+                            *to,
+                            image.clone(),
+                        ));
+                    }
                 }
             }
         }
@@ -2156,112 +2232,109 @@ pub(crate) fn snapshot_reflow(cells: &[Value], out: &Path, concurrency: usize) -
     let cache = crate::archive::home_dir()
         .ok()
         .map(|home| home.join("reflow"));
-    let cache_file = |(_, _, file, to, image): &(Value, u32, String, u32, String)| {
+    let cache_file = |(_, _, _, file, to, image): &Job| {
         use sha2::{Digest, Sha256};
         let key = json!([build, file, to, image]).to_string();
         cache
             .as_ref()
             .map(|dir| dir.join(format!("{:x}.json", Sha256::digest(key.as_bytes()))))
     };
-    let mut cached = 0;
-    let results: std::sync::Mutex<Vec<Option<std::result::Result<f64, String>>>> =
-        std::sync::Mutex::new(
-            jobs.iter()
-                .map(|job| {
-                    let hit = cache_file(job)
-                        .and_then(|path| fs::read(path).ok())
-                        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-                        .and_then(|v| v["mismatch"].as_f64());
-                    cached += usize::from(hit.is_some());
-                    hit.map(Ok)
-                })
-                .collect(),
-        );
-    let todo: Vec<usize> = results
-        .lock()
-        .map(|slots| (0..jobs.len()).filter(|i| slots[*i].is_none()).collect())
-        .unwrap_or_default();
-    let next = std::sync::atomic::AtomicUsize::new(0);
-    let launch_error: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-    std::thread::scope(|scope| {
-        for _ in 0..concurrency.clamp(1, 4).min(todo.len()) {
-            let (jobs, todo, results, next, launch_error) =
-                (&jobs, &todo, &results, &next, &launch_error);
-            scope.spawn(move || {
-                let launched = tempfile::tempdir()
-                    .map_err(|e| e.to_string())
-                    .and_then(|profile| {
-                        Browser::local(&executable(), profile.path(), 0)
-                            .map(|b| (profile, b))
-                            .map_err(|e| e.to_string())
-                    });
-                let (_profile, mut browser) = match launched {
-                    Ok(entry) => entry,
-                    Err(e) => {
-                        if let Ok(mut slot) = launch_error.lock() {
-                            *slot = Some(e);
-                        }
-                        return;
-                    }
-                };
-                loop {
-                    let at = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let Some(&i) = todo.get(at) else {
-                        break;
-                    };
-                    let Some((_, _, file, to, image)) = jobs.get(i) else {
-                        break;
-                    };
-                    let measured = fs::read(out.join(image))
-                        .map_err(|e| e.to_string())
-                        .and_then(|png| {
-                            browser
-                                .render_back(&out.join(file), *to, &png)
-                                .map_err(|e| e.to_string())
-                        });
-                    if let Ok(mut slots) = results.lock() {
-                        slots[i] = Some(measured);
-                    }
-                }
-            });
-        }
-    });
-    let results = results.into_inner().unwrap_or_default();
-    for &i in &todo {
-        if let (Some(Some(Ok(mismatch))), Some(path)) = (results.get(i), cache_file(&jobs[i]))
-            && let Some(dir) = path.parent()
-            && fs::create_dir_all(dir).is_ok()
-        {
-            let _ = fs::write(path, json!({"mismatch": mismatch}).to_string());
-        }
-    }
-    let pairs: Vec<Value> = jobs
+    let mut results: Vec<Option<std::result::Result<f64, String>>> = jobs
         .iter()
-        .zip(results)
-        .filter_map(|((identity, from, _, to, _), measured)| {
-            let mut pair = json!({"path": identity[0], "from": from, "to": to});
-            for (i, name) in [(1, "state"), (2, "scenario"), (3, "locale")] {
-                if !identity[i].is_null() {
-                    pair[name] = identity[i].clone();
-                }
-            }
-            match measured? {
-                Ok(m) => pair["mismatch"] = json!((m * 1e4).round() / 1e4),
-                Err(e) => pair["error"] = json!(e),
-            }
-            Some(pair)
+        .map(|job| {
+            cache_file(job)
+                .and_then(|path| fs::read(path).ok())
+                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                .and_then(|v| v["mismatch"].as_f64())
+                .map(Ok)
         })
         .collect();
-    let mut summary = json!({
-        "pairs": pairs,
-        "measured": todo.len(),
-        "reused": cached,
-        "ms": u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
-    });
-    if let Some(e) = launch_error.into_inner().ok().flatten() {
-        summary["error"] = json!(e);
+    let todo: Vec<usize> = (0..jobs.len()).filter(|i| results[*i].is_none()).collect();
+    let paths: Vec<(std::path::PathBuf, std::path::PathBuf)> = todo
+        .iter()
+        .map(|&i| (out.join(&jobs[i].3), out.join(&jobs[i].5)))
+        .collect();
+    let batch: Vec<dui_ports::RenderBackJob<'_>> = todo
+        .iter()
+        .zip(&paths)
+        .map(|(&i, (html, png))| dui_ports::RenderBackJob {
+            html,
+            width: jobs[i].4,
+            png,
+        })
+        .collect();
+    let measured = if batch.is_empty() {
+        Vec::new()
+    } else {
+        measure(&batch)
+    };
+    let mut first_error = None;
+    for (&i, outcome) in todo.iter().zip(measured) {
+        match &outcome {
+            Ok(mismatch) => {
+                if let Some(path) = cache_file(&jobs[i])
+                    && let Some(dir) = path.parent()
+                    && fs::create_dir_all(dir).is_ok()
+                {
+                    let _ = fs::write(path, json!({"mismatch": mismatch}).to_string());
+                }
+            }
+            Err(e) => {
+                first_error.get_or_insert_with(|| e.clone());
+            }
+        }
+        results[i] = Some(outcome);
     }
-    summary
+    let count = |fidelity: bool, set: &[usize]| {
+        set.iter()
+            .filter(|&&i| jobs[i].0.is_some() == fidelity)
+            .count()
+    };
+    let reused: Vec<usize> = (0..jobs.len()).filter(|i| !todo.contains(i)).collect();
+    let mut pairs = Vec::new();
+    for (job, result) in jobs.iter().zip(results) {
+        let (cell, identity, from, _, to, _) = job;
+        let Some(result) = result else {
+            continue;
+        };
+        if let Some(i) = cell {
+            let snapshot = &mut cells[*i]["observation"]["htmlSnapshot"];
+            match result {
+                Ok(m) => snapshot["fidelity"] = json!((m * 1e4).round() / 1e4),
+                Err(e) => snapshot["fidelityError"] = json!(e),
+            }
+            continue;
+        }
+        let mut pair = json!({"path": identity[0], "from": from, "to": to});
+        for (i, name) in [(1, "state"), (2, "scenario"), (3, "locale")] {
+            if !identity[i].is_null() {
+                pair[name] = identity[i].clone();
+            }
+        }
+        match result {
+            Ok(m) => pair["mismatch"] = json!((m * 1e4).round() / 1e4),
+            Err(e) => pair["error"] = json!(e),
+        }
+        pairs.push(pair);
+    }
+    let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    let mut fidelity = json!({
+        "measured": count(true, &todo),
+        "reused": count(true, &reused),
+        "ms": ms,
+    });
+    if let Some(e) = &first_error {
+        fidelity["error"] = json!(e);
+    }
+    let reflow = reflow.then(|| {
+        json!({
+            "pairs": pairs,
+            "measured": count(false, &todo),
+            "reused": count(false, &reused),
+            "ms": ms,
+        })
+    });
+    (fidelity, reflow)
 }
 
 pub fn capture_login_session(

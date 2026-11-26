@@ -150,6 +150,13 @@ impl Renderer for LazyElectronBrowser<'_> {
         let browser = self.browser.as_mut().ok_or("browser unavailable")?;
         browser.capture(&capture_spec, input, width, image)
     }
+
+    fn render_back_batch(
+        &mut self,
+        jobs: &[dui_ports::RenderBackJob<'_>],
+    ) -> Vec<Result<f64, String>> {
+        crate::chromium::render_back_in(&mut Vec::new(), self.browser.as_mut(), 1, jobs)
+    }
 }
 
 pub(crate) struct ElectronDesktopSurface;
