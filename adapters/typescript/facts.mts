@@ -725,6 +725,29 @@ try {
                 tagPath.includes("/node_modules/@types/" + r.package + "/")),
           );
           const attrNodes = n.attributes?.properties ?? [];
+          // A dialog-like element whose open state dui can set: the probe passes the prop
+          // through, so a capture can render the dialog open without clicking a trigger.
+          const pushOverlay = (pkg: string, prop: string, insertProp: boolean) => {
+            if (!tagNode) return;
+            const attr = attrNodes.find(
+              (a) => a.kind === K.JsxAttribute && a.name?.getText() === prop,
+            );
+            const init = attr?.initializer;
+            const expr =
+              init && init.kind === K.JsxExpression && init.expression
+                ? init.expression
+                : undefined;
+            if (attr && !expr) return;
+            if (!attr && !insertProp) return;
+            facts.push({
+              ...base,
+              kind: "overlay",
+              package: pkg,
+              label: tagText,
+              prop,
+              ...(expr ? { expr: [expr.getStart(sf), expr.end] } : { insertAt: tagNode.end }),
+            });
+          };
           let ariaRole: string | undefined;
           for (const attr of attrNodes) {
             if (attr.kind !== K.JsxAttribute || !attr.name || attr.name.getText() !== "role") {
@@ -791,6 +814,13 @@ try {
               ...(ariaRole ? { ariaRole } : {}),
               fields,
             });
+            if (
+              /dialog|popover/.test(controlRule.package) &&
+              /^(Root|Dialog|AlertDialog|Popover)$/.test(controlRule.symbol)
+            )
+              pushOverlay(controlRule.package, "open", true);
+            else if (controlRule.package === "react-native" && controlRule.symbol === "Modal")
+              pushOverlay(controlRule.package, "visible", false);
           } else if (tagText) {
             // Framework-level UI control extraction: works for any React component or native
             // HTML/WAI-ARIA element without coupling to a specific UI component library.
@@ -882,6 +912,11 @@ try {
                 ...(ariaRole ? { ariaRole } : {}),
                 fields,
               });
+              const openProp = fields.find((f) =>
+                isReactComponent ? f.name === "open" || f.name === "isOpen" : f.name === "open",
+              );
+              if (openProp && (isReactComponent || lowerTag === "dialog"))
+                pushOverlay(isReactComponent ? "react" : "html-aria", openProp.name, false);
             }
           }
         }

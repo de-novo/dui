@@ -91,5 +91,6 @@ jobs:
           npm run check:box-model
           npm run check:compiler-oracles
           npm run check:reliability
+          npm run check:fact-overlays
           npm run check:auth-pr-diff
           npm run check:vite7

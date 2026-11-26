@@ -34,6 +34,7 @@
     "check:box-model": "tsc --project scripts && cargo build --locked && node scripts/check-box-model.mts",
     "check:compiler-oracles": "tsc --project scripts && cargo build --locked && node scripts/check-compiler-oracles.mts",
     "check:reliability": "tsc --project scripts && cargo build --locked && node scripts/check-reliability.mts",
+    "check:fact-overlays": "tsc --project scripts && cargo build --locked && node scripts/check-fact-overlays.mts",
     "check:auth-pr-diff": "tsc --project scripts && cargo build --locked && node scripts/check-auth-and-pr-diff.mts",
     "check:vite7": "tsc --project scripts && cargo build --locked && node scripts/check-vite7.mts",
     "check:swift-map": "tsc --project scripts && cargo build --locked && node scripts/check-swift-map.mts",
