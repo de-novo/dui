@@ -8,6 +8,9 @@ pub struct Intent<'a> {
     pub inputs: &'a BTreeMap<String, Value>,
     pub assertions: &'a [Value],
     pub required_requests: &'a [Value],
+    /// Manifest `expectedApiErrors`: API paths (or `prefix*`) whose 401, 403 or 5xx is part of
+    /// the screen, so they do not fail it.
+    pub expected_api_errors: &'a [Value],
     pub analyzed: bool,
     pub expects_probe: bool,
 }
@@ -18,7 +21,30 @@ pub enum Failure {
     MissingStateAssertion,
     MissingScreenAssertion,
     HttpError,
+    ApiError,
     AssertFailed,
+}
+
+/// API responses that failed the screen: `observed["apiErrors"]` (path → 401, 403 or 5xx),
+/// minus the endpoints the manifest expects to fail. Sorted by path.
+pub fn unexpected_api_errors(observed: &Value, expected: &[Value]) -> Vec<(String, u64)> {
+    let expected_match = |path: &str| {
+        let (base, _) = parse_url_parts(path);
+        expected
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|e| match e.strip_suffix('*') {
+                Some(prefix) => base.starts_with(prefix),
+                None => base == e,
+            })
+    };
+    observed["apiErrors"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(path, status)| Some((path.clone(), status.as_u64()?)))
+        .filter(|(path, _)| !expected_match(path))
+        .collect()
 }
 
 /// Inspect `observed["responses"]` for the primary navigated document status code.
@@ -177,6 +203,9 @@ impl Intent<'_> {
         if document_http_error(self.path, observed).is_some() {
             return Some(Failure::HttpError);
         }
+        if !unexpected_api_errors(observed, self.expected_api_errors).is_empty() {
+            return Some(Failure::ApiError);
+        }
         let values = observed["slots"].as_object();
         let values_match = self
             .inputs
@@ -276,6 +305,7 @@ mod tests {
             inputs: &values,
             assertions: &assertions,
             required_requests: &requests,
+            expected_api_errors: &[],
             analyzed: true,
             expects_probe: true,
         };
@@ -297,6 +327,35 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_api_call_fails_the_screen_unless_the_manifest_expects_it() {
+        let values = BTreeMap::new();
+        let expected = [json!("/api/session"), json!("/api/admin/*")];
+        let intent = Intent {
+            path: "/account",
+            width: 375,
+            inputs: &values,
+            assertions: &[],
+            required_requests: &[],
+            expected_api_errors: &expected,
+            analyzed: true,
+            expects_probe: false,
+        };
+        let clean = json!({"ready":true,"width":375,"path":"/account","assertions":[],"slots":{},"responseChecks":{},"apiErrors":{}});
+        assert_eq!(intent.failure(&clean), None);
+        let mut allowed = clean.clone();
+        allowed["apiErrors"] = json!({"/api/session?x=1":401,"/api/admin/users":403});
+        assert_eq!(intent.failure(&allowed), None);
+        let mut failed = allowed.clone();
+        failed["apiErrors"]["/api/me"] = json!(401);
+        failed["apiErrors"]["/api/orders"] = json!(503);
+        assert_eq!(intent.failure(&failed), Some(Failure::ApiError));
+        assert_eq!(
+            unexpected_api_errors(&failed, &expected),
+            [("/api/me".to_owned(), 401), ("/api/orders".to_owned(), 503)]
+        );
+    }
+
+    #[test]
     fn entry_redirect_requires_document_and_render_evidence() {
         let intent = Intent {
             path: "/",
@@ -304,6 +363,7 @@ mod tests {
             inputs: &BTreeMap::new(),
             assertions: &[],
             required_requests: &[],
+            expected_api_errors: &[],
             analyzed: true,
             expects_probe: false,
         };
@@ -377,6 +437,7 @@ mod tests {
             inputs: &BTreeMap::new(),
             assertions: &[],
             required_requests: &[],
+            expected_api_errors: &[],
             analyzed: true,
             expects_probe: false,
         };

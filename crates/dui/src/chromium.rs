@@ -298,6 +298,8 @@ pub struct Browser {
     generated_get: BTreeMap<String, (&'static str, String)>,
     fulfilled: std::collections::BTreeSet<String>,
     responses: BTreeMap<String, u16>,
+    /// Fetch/XHR responses with 401, 403 or 5xx during this visit, by URL.
+    api_errors: BTreeMap<String, u16>,
     response_ids: BTreeMap<String, Value>,
     allowed_origin: String,
     api_mode: ApiMode,
@@ -360,6 +362,7 @@ impl Browser {
             generated_get: Default::default(),
             fulfilled: Default::default(),
             responses: Default::default(),
+            api_errors: Default::default(),
             response_ids: Default::default(),
             allowed_origin: format!("http://127.0.0.1:{port}"),
             api_mode: ApiMode::Mock,
@@ -405,6 +408,9 @@ impl Browser {
                     (response["url"].as_str(), response["status"].as_u64())
                 {
                     self.responses.insert(url.to_owned(), code as u16);
+                    if matches!(msg["params"]["type"].as_str(), Some("Fetch" | "XHR")) {
+                        self.note_api_status(url, code as u16);
+                    }
                     self.response_ids
                         .insert(url.to_owned(), msg["params"]["requestId"].clone());
                 }
@@ -507,6 +513,9 @@ impl Browser {
                         match forward_live_http(&rewritten, http_method, &self.api_headers) {
                             Ok((status, mime, body)) => {
                                 self.responses.insert(url.to_owned(), status);
+                                if is_api_resource {
+                                    self.note_api_status(url, status);
+                                }
                                 let reply = json!({
                                     "requestId": p["requestId"],
                                     "responseCode": status,
@@ -594,6 +603,11 @@ impl crate::ports::Renderer for Browser {
     }
 }
 impl Browser {
+    fn note_api_status(&mut self, url: &str, status: u16) {
+        if matches!(status, 401 | 403) || status >= 500 {
+            self.api_errors.insert(url.to_owned(), status);
+        }
+    }
     pub(crate) fn open_page(
         &mut self,
         spec: &Value,
@@ -691,6 +705,7 @@ impl Browser {
         self.requests.clear();
         self.fulfilled.clear();
         self.responses.clear();
+        self.api_errors.clear();
         self.response_ids.clear();
         self.live_api_requests.clear();
         self.blocked_mutations.clear();
@@ -1291,6 +1306,23 @@ impl Browser {
                     .map(|p| (p, *s)))
                 .collect::<BTreeMap<_, _>>()
         );
+        // Failed API calls of this screen: same-origin as a path, the live API origin as a URL.
+        v["apiErrors"] = json!(
+            self.api_errors
+                .iter()
+                .filter_map(|(u, s)| {
+                    let same_origin = u.strip_prefix(&origin).filter(|p| p.starts_with('/'));
+                    let live_api = self.api_base_url.as_deref().is_some_and(|base| {
+                        u.strip_prefix(base)
+                            .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+                    });
+                    same_origin
+                        .map(str::to_owned)
+                        .or_else(|| live_api.then(|| u.clone()))
+                        .map(|key| (key, *s))
+                })
+                .collect::<BTreeMap<_, _>>()
+        );
         v["fulfilledMocks"] = json!(
             self.fulfilled
                 .iter()
@@ -1520,6 +1552,7 @@ pub fn capture_login_session(
         generated_get: Default::default(),
         fulfilled: Default::default(),
         responses: Default::default(),
+        api_errors: Default::default(),
         response_ids: Default::default(),
         allowed_origin: String::new(),
         api_mode: ApiMode::Live,
