@@ -122,6 +122,17 @@ try {
       cards: await ev<number>("document.querySelectorAll('.react-flow__node').length"),
       edges: await ev<number>("document.querySelectorAll('.react-flow__edge').length"),
     };
+    // Link edges start at the anchor that leads to their target (#321): every anchor dot has an
+    // edge whose drawn path begins on it.
+    const anchors = await ev<{ dots: number; worst: number }>(`(() => {
+      const starts = [...document.querySelectorAll('.react-flow__edge path.react-flow__edge-path')].map(p => {
+        const m = p.getScreenCTM(); const pt = p.getPointAtLength(0);
+        return { x: m.a * pt.x + m.c * pt.y + m.e, y: m.b * pt.x + m.d * pt.y + m.f };
+      });
+      const dots = [...document.querySelectorAll('.link-anchor-dot')].map(d => { const r = d.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+      const worst = Math.max(0, ...dots.map(d => Math.min(...starts.map(s => Math.hypot(s.x - d.x, s.y - d.y)))));
+      return { dots: dots.length, worst };
+    })()`);
     const measure = async (act: () => Promise<void>) => {
       await ev("(window.__renders.commits = 0, window.__renders.renders = {}, true)");
       await act();
@@ -153,9 +164,35 @@ try {
       await mouse("mousePressed", card.x, card.y, { button: "left", clickCount: 1 });
       await mouse("mouseReleased", card.x, card.y, { button: "left", clickCount: 1 });
     });
-    return { counts, idle, sweep, select };
+    // Map options switch where links start: the card border, then the link element again.
+    const edgeStart = async (value: string) => {
+      await ev("document.querySelector('.map-options').click(), true");
+      await new Promise((r) => setTimeout(r, 500));
+      await ev(
+        `(() => { const s = document.querySelector('[data-map-edge-start]'); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`,
+      );
+      await page.call("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+      await page.call("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+      await new Promise((r) => setTimeout(r, 1500));
+      return ev<{ search: string; dots: number; edges: number }>(
+        "({ search: location.search, dots: document.querySelectorAll('.link-anchor-dot').length, edges: document.querySelectorAll('.react-flow__edge').length })",
+      );
+    };
+    const cardMode = await edgeStart("card");
+    const elementMode = await edgeStart("element");
+    return { counts, anchors, idle, sweep, select, cardMode, elementMode };
   });
-  const { counts, idle, sweep, select } = result;
+  const { counts, anchors, idle, sweep, select, cardMode, elementMode } = result;
+  assert.ok(
+    cardMode.search.includes("edges=card") && cardMode.dots === 0 && cardMode.edges > 0,
+    `card border mode: ${JSON.stringify(cardMode)}`,
+  );
+  assert.ok(
+    !elementMode.search.includes("edges=") && elementMode.dots === anchors.dots,
+    `link element mode: ${JSON.stringify(elementMode)}`,
+  );
+  assert.ok(anchors.dots > 0, `link edges leave from anchors: ${JSON.stringify(anchors)}`);
+  assert.ok(anchors.worst <= 1, `edges start on their anchors: ${JSON.stringify(anchors)}`);
   assert.ok(counts.cards >= 40 && counts.edges >= 20, JSON.stringify(counts));
   assert.equal(idle.commits, 0, "an idle map does not re-render");
   assert.ok(sweep.commits > 0, "moving over cards changes the hover focus");
@@ -173,6 +210,8 @@ try {
     JSON.stringify({
       ok: true,
       ...counts,
+      anchors,
+      edgeStart: { card: cardMode.dots, element: elementMode.dots },
       sweep: { commits: sweep.commits, edges: sweep.renders.GutterEdge ?? 0 },
       select: { commits: select.commits, cards: select.renders.CaptureCard ?? 0 },
     }),

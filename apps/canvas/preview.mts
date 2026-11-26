@@ -2,7 +2,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { access, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
+import { access, mkdtemp, open, readFile, readdir, realpath, rm } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -134,6 +134,7 @@ type Capture = {
   scenario?: string;
   observation?: {
     htmlSnapshot?: { file?: unknown; fidelity?: unknown; omitted?: unknown; assets?: unknown };
+    renderTree?: unknown;
   };
 };
 
@@ -150,6 +151,20 @@ const assetTypes: Record<string, string> = {
   avif: "image/avif",
   svg: "image/svg+xml",
 };
+
+/** Width and height from a PNG header, as `dui open` reads them (crates/dui/src/viewer.rs). */
+async function pngSize(path: string) {
+  const file = await open(path).catch(() => undefined);
+  if (!file) return undefined;
+  try {
+    const header = Buffer.alloc(24);
+    const { bytesRead } = await file.read(header, 0, 24, 0);
+    if (bytesRead < 24 || header.toString("latin1", 12, 16) !== "IHDR") return undefined;
+    return { imageWidth: header.readUInt32BE(16), imageHeight: header.readUInt32BE(20) };
+  } finally {
+    await file.close();
+  }
+}
 
 async function openArchive(root: string) {
   const graph = JSON.parse(await readFile(join(root, "graph.json"), "utf8"));
@@ -175,6 +190,8 @@ async function openArchive(root: string) {
         reason,
         state,
         scenario,
+        // Element rectangles, as `dui open` sends them (crates/dui/src/viewer.rs).
+        ...(Array.isArray(observation?.renderTree) ? { renderTree: observation.renderTree } : {}),
         ...(typeof snapshot?.file === "string" && snapshotName.test(snapshot.file)
           ? {
               snapshot: {
@@ -192,13 +209,26 @@ async function openArchive(root: string) {
     if (typeof image === "string" && basename(image) === image && image.endsWith(".png"))
       images.add(image);
   }
+  const sizes = new Map(
+    await Promise.all(
+      [...images]
+        .filter((name) => name.endsWith(".png"))
+        .map(async (name) => [name, await pngSize(join(root, name))] as const),
+    ),
+  );
+  const sized = <T extends { image?: string }>(item: T) => {
+    const size = item.image ? sizes.get(item.image) : undefined;
+    return size ? { ...item, ...size } : item;
+  };
   for (const cell of cells) if (cell.snapshot) images.add(cell.snapshot.file);
   // Overview entries are the map cards; they get the snapshot of the capture with their image.
   const byImage = new Map(cells.filter((c) => c.snapshot).map((c) => [c.image, c.snapshot]));
   const overview = graph.overview.map((item: { image?: string }) =>
-    item.image && byImage.has(item.image) ? { ...item, snapshot: byImage.get(item.image) } : item,
+    sized(
+      item.image && byImage.has(item.image) ? { ...item, snapshot: byImage.get(item.image) } : item,
+    ),
   );
-  return { graph: JSON.stringify({ ...graph, overview, cells }), images };
+  return { graph: JSON.stringify({ ...graph, overview, cells: cells.map(sized) }), images };
 }
 
 function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {

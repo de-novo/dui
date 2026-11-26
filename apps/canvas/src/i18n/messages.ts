@@ -176,6 +176,9 @@ export type Messages = {
   selectMapScreen: string;
   mapConnections: string;
   allMapLinks: string;
+  mapEdgeStart: string;
+  edgeStartElement: string;
+  edgeStartCard: string;
   screenMapLinks: string;
   mapCaptureWidth: string;
   allMapCards: string;
@@ -367,6 +370,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     selectMapScreen: "Select a screen",
     mapConnections: "Connections",
     allMapLinks: "All links",
+    mapEdgeStart: "Links start at",
+    edgeStartElement: "Link element",
+    edgeStartCard: "Card border",
     screenMapLinks: "Links to and from a screen",
     mapCaptureWidth: "Capture width",
     allMapCards: "All map cards",
@@ -559,6 +565,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     selectMapScreen: "选择屏幕",
     mapConnections: "连接",
     allMapLinks: "所有连接",
+    mapEdgeStart: "连接起点",
+    edgeStartElement: "链接元素",
+    edgeStartCard: "卡片边框",
     screenMapLinks: "与屏幕关联的连接",
     mapCaptureWidth: "捕获宽度",
     allMapCards: "全部地图卡片",
@@ -750,6 +759,9 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     selectMapScreen: "화면 선택",
     mapConnections: "연결선",
     allMapLinks: "모든 연결선",
+    mapEdgeStart: "연결선 시작점",
+    edgeStartElement: "링크 요소",
+    edgeStartCard: "카드 테두리",
     screenMapLinks: "화면에 연결된 경로",
     mapCaptureWidth: "캡처 폭",
     allMapCards: "지도 전체 카드",
