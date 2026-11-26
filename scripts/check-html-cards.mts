@@ -33,7 +33,7 @@ for (const i of pages) {
 }
 let server: ReturnType<typeof spawn> | undefined;
 try {
-  const run = spawnSync(binary, ["map", site, "--build-dir", site], {
+  const run = spawnSync(binary, ["map", site, "--build-dir", site, "--capture"], {
     encoding: "utf8",
     env: { ...process.env, HOME: home },
   });

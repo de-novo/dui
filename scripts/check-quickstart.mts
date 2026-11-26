@@ -126,7 +126,7 @@ try {
     const binary = resolve(executable);
     const home = join(root, name);
     mkdirSync(home);
-    const options = { cwd, env: { ...process.env, HOME: home } };
+    let options = { cwd, env: { ...process.env, HOME: home } };
     function run(args: string[]) {
       return JSON.parse(
         execFileSync(binary, args, {
@@ -155,7 +155,21 @@ try {
         .split("\n");
       assert.ok(tags.includes(version.tag), "release binary must match the checkout");
     }
-    const report = run(capture) as { output: string; cells: Cell[] };
+    let report = run(capture) as { output: string; cells: Cell[] };
+    // From the development build on, `dui map` plans cells without capturing them
+    // (docs/en/web-viewer.md#shared-screen-maps); the viewer is then checked on a captured map.
+    if (report.cells.length && report.cells.every((c) => c.status === "unverified" && !c.image)) {
+      assert.notEqual(name, "installed", "the default release still captures");
+      assert.ok(
+        report.cells.every((c) => (c as { reason?: string }).reason === "not-rendered"),
+        "a map without capture plans its cells",
+      );
+      // A home of its own, so the viewer lists just the captured run.
+      const captured = home + "-captured";
+      mkdirSync(captured);
+      options = { cwd, env: { ...process.env, HOME: captured } };
+      report = run([...capture, "--capture"]) as { output: string; cells: Cell[] };
+    }
     assert.ok(
       report.cells.length &&
         report.cells.every(

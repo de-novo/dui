@@ -137,7 +137,7 @@ async function check(media: number, container: number) {
     JSON.stringify({ readySelector: "main h1", widths: [media + 79] }),
   );
   const report = JSON.parse(
-    execFileSync(binary, ["map", "."], { cwd: project, env, encoding: "utf8" }),
+    execFileSync(binary, ["map", ".", "--capture"], { cwd: project, env, encoding: "utf8" }),
   );
   const row = report.cells[0];
   assert.equal(row.status, "verified");

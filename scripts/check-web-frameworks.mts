@@ -59,7 +59,7 @@ try {
     });
     const buildDir = name === "sveltekit" ? "build" : "dist";
     const report: Report = JSON.parse(
-      execFileSync(dui, ["map", app, "--build-dir", buildDir], {
+      execFileSync(dui, ["map", app, "--build-dir", buildDir, "--capture"], {
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
         env: { ...process.env, HOME: temp },

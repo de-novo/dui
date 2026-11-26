@@ -413,7 +413,7 @@ async function captureOssProject(
     };
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     try {
-      const res = await runCommandAsync(binary, ["map", distDir], {
+      const res = await runCommandAsync(binary, ["map", distDir, "--capture"], {
         env: { ...process.env, HOME: tmpHome },
         timeoutMs: 180_000,
       });
@@ -453,7 +453,7 @@ async function captureOssProject(
       maxRoutes: spec.maxRoutes ?? 10,
     };
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-    const res = await runCommandAsync(binary, ["map", repoDir], {
+    const res = await runCommandAsync(binary, ["map", repoDir, "--capture"], {
       env: { ...process.env, HOME: tmpHome },
       timeoutMs: 240_000,
     });
@@ -559,7 +559,7 @@ async function main() {
       });
       const siteHome = path.join(tmpHome, "home-dui-site");
       fs.mkdirSync(siteHome, { recursive: true });
-      const res = await runCommandAsync(binary, ["map", currentSiteDir], {
+      const res = await runCommandAsync(binary, ["map", currentSiteDir, "--capture"], {
         env: { ...process.env, HOME: siteHome },
         timeoutMs: 120_000,
       });
@@ -599,7 +599,7 @@ async function main() {
 
       const baseHome = path.join(tmpHome, "home-dui-site-baseline");
       fs.mkdirSync(baseHome, { recursive: true });
-      const baseRes = await runCommandAsync(binary, ["map", baselineSiteDir], {
+      const baseRes = await runCommandAsync(binary, ["map", baselineSiteDir, "--capture"], {
         env: { ...process.env, HOME: baseHome },
         timeoutMs: 120_000,
       });
@@ -714,7 +714,7 @@ async function main() {
       const previewEnv: NodeJS.ProcessEnv = { ...process.env, HOME: previewHome };
       delete previewEnv.ANDROID_HOME;
       delete previewEnv.ANDROID_SDK_ROOT;
-      const previewRes = await runCommandAsync(binary, ["map", previewProjectDir], {
+      const previewRes = await runCommandAsync(binary, ["map", previewProjectDir, "--capture"], {
         env: previewEnv,
         timeoutMs: 180_000,
       });

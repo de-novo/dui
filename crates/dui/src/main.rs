@@ -368,7 +368,7 @@ const CLI_HELP: &str = "\
 dui — real UI state capture, screen map, and diff
 
 CAPTURE
-  dui map [PROJECT] [--url URL | --build-dir DIR]   Map source, a running app or built web pages
+  dui map [PROJECT] [--url URL | --build-dir DIR] [--capture]   Map source, a running app or built web pages (--capture saves evidence)
   dui map attach SOURCE_RUN RECORDINGS_JSON  Attach identified runtime PNGs to native source cards
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
@@ -449,19 +449,22 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
             .ok_or_else(|| failure(2, "expected live REQUEST_JSON"))?;
         return live::command(&request);
     }
-    if let [cmd, rest @ ..] = args.as_slice()
+    if let [cmd, all @ ..] = args.as_slice()
         && cmd == "map"
     {
-        return match rest {
+        // Maps hold no evidence unless asked (docs/en/web-viewer.md#shared-screen-maps).
+        let capture = all.iter().any(|a| a == "--capture");
+        let rest: Vec<_> = all.iter().filter(|a| *a != "--capture").cloned().collect();
+        return match rest.as_slice() {
             [cmd, source, recordings] if cmd == "attach" => {
                 native_capture::attach(Path::new(source), Path::new(recordings))
             }
             [cmd, ..] if cmd == "attach" => {
                 Err(failure(2, "expected map attach SOURCE_RUN RECORDINGS_JSON"))
             }
-            [] => screen_map::capture(Path::new(".")),
+            [] => screen_map::capture(Path::new("."), capture),
             [root] if root != "--url" && root != "--build-dir" => {
-                screen_map::capture(Path::new(root))
+                screen_map::capture(Path::new(root), capture)
             }
             [flag, raw] | [_, flag, raw] if flag == "--url" || flag == "--build-dir" => {
                 let project = if rest.len() == 3 {
@@ -477,11 +480,11 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
                             .ok_or_else(|| failure(2, "expected a UTF-8 URL"))?,
                     )
                 };
-                screen_map::capture_target(project, Some(target))
+                screen_map::capture_target(project, Some(target), capture)
             }
             _ => Err(failure(
                 2,
-                "expected map [PROJECT] [--url URL | --build-dir DIR]",
+                "expected map [PROJECT] [--url URL | --build-dir DIR] [--capture]",
             )),
         };
     }
@@ -919,10 +922,10 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
                 let default_spec = root.join("dui.json");
                 if !force && changed_since.is_none() && !manifest_has_explicit_target(&default_spec)
                 {
-                    return screen_map::capture(&root);
+                    return screen_map::capture(&root, true);
                 }
                 if !default_spec.is_file() {
-                    return screen_map::capture(&root);
+                    return screen_map::capture(&root, true);
                 }
                 (root, default_spec, None)
             }
@@ -931,10 +934,10 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
                 let default_spec = root.join("dui.json");
                 if !force && changed_since.is_none() && !manifest_has_explicit_target(&default_spec)
                 {
-                    return screen_map::capture(&root);
+                    return screen_map::capture(&root, true);
                 }
                 if !default_spec.is_file() {
-                    return screen_map::capture(&root);
+                    return screen_map::capture(&root, true);
                 }
                 (root, default_spec, None)
             }

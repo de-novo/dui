@@ -105,7 +105,7 @@ fn dispatch(r: &Value) -> Result<Value, (i32, String)> {
                 Some("comment_resolve") => crate::comments::resolve(args),
                 Some("comment_reopen") => crate::comments::reopen(args),
                 Some("audit") => crate::audit::command(args),
-                Some("map") => crate::screen_map::capture(path("project")?),
+                Some("map") => crate::screen_map::capture(path("project")?, true),
                 Some("scan") => analysis::analyze(path("project")?, path("manifest")?),
                 Some("replay_report") => {
                     replay::summarize(path("manifest")?, path("plan")?, path("output")?)

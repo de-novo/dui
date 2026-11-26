@@ -79,11 +79,13 @@ dui open --no-open
 
 개발판은 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`로 설치한다. 아래 예제와 명령 표는 개발판 기준이다. 홈페이지에서 [기본 설치판의 릴리스 문서](https://dui.sh/?lang=ko#release-guide)도 열 수 있다.
 
-정적 사이트를 이미 `dist/`에 빌드했다면 프로젝트 루트에서 아래 명령을 실행한다. 결과는 위의 뷰어 명령으로 연다.
+개발판의 `dui map`은 화면·상태·폭을 캡처 없이 계획하고, `dui map --capture`는 계획한 모든 셀의 PNG·렌더 트리·HTML 스냅샷 근거를 저장한다. [공통 화면 지도](docs/ko/web-viewer.md#공통-화면-지도)를 참고한다.
+
+정적 사이트를 이미 `dist/`에 빌드했다면 프로젝트 루트에서 아래 명령으로 캡처한다. 결과는 위의 뷰어 명령으로 연다.
 
 <!-- quickstart:static -->
 ```sh
-dui map . --build-dir dist
+dui map . --build-dir dist --capture
 ```
 
 ### `dui map` vs `dui run`
