@@ -12,6 +12,7 @@ function __duiToolsCreate() {
           commit(id: string, instance: string, value: unknown, setter: unknown): () => void;
           branch(id: string, truth: boolean): void;
           slot(id: string, value: unknown, setter: unknown): void;
+          overlay?(id: string, open: boolean): void;
         };
       }
     ).__duiProbe;
@@ -30,6 +31,16 @@ function __duiToolsCreate() {
       const evaluated = typeof value === "object" && value !== null && boxes.has(value);
       probe()?.branch(id, evaluated ? and : !and);
       return evaluated ? (value as ReturnType<typeof right<R>>).value : (value as L);
+    },
+    // A dialog's open prop: dui's requested value when it set one, otherwise the app's own.
+    // Rendering the element registers the dialog with the probe.
+    overlay<T>(id: string, fallback: () => T): T {
+      const p = probe();
+      const inputs = p?.input;
+      const value =
+        inputs && Object.prototype.hasOwnProperty.call(inputs, id) ? (inputs[id] as T) : fallback();
+      p?.overlay?.(id, Boolean(value));
+      return value;
     },
     initial<T>(id: string, fallback: () => T): T {
       const inputs = probe()?.input;

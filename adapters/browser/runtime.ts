@@ -21,6 +21,8 @@ declare var __duiProbe: {
   edit(id: string, instance: string, value: unknown): boolean;
   apply(values: SlotValues): boolean;
   slot(id: string, value: unknown, set?: Setter): void;
+  overlay(id: string, open: boolean): void;
+  overlays: Set<string>;
 };
 
 (() => {
@@ -29,6 +31,7 @@ declare var __duiProbe: {
     const targets = new Map<string, Setter>();
     const hits = new Set<string>();
     const setters = new Map<string, Set<Setter>>();
+    const overlays = new Set<string>();
     function recordable(value: unknown): boolean {
       return (
         value === null ||
@@ -86,6 +89,12 @@ declare var __duiProbe: {
           setters.get(id)!.add(set);
         }
         if (recordable(value)) slots[id] = value;
+      },
+      overlays,
+      // A dialog from the compiler's facts rendered; its open state is a slot dui can set.
+      overlay(id, open) {
+        overlays.add(id);
+        slots[id] = open;
       },
     };
   }
@@ -643,6 +652,56 @@ declare var __duiProbe: {
     }
   }
 
+  function visibleDialogs(): HTMLElement[] {
+    const found: HTMLElement[] = [];
+    for (const el of document.querySelectorAll(
+      '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], [popover]:popover-open',
+    )) {
+      if (!(el instanceof HTMLElement)) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
+      const r = el.getBoundingClientRect();
+      const isExplicitModal = el.matches('dialog[open], [role="alertdialog"], [aria-modal="true"]');
+      if (isExplicitModal) {
+        if (r.width >= 120 && r.height >= 80) found.push(el);
+        continue;
+      }
+      // Non-modal dialogs/popovers: skip tiny filter dropdowns/listboxes without headings or forms.
+      if (r.width < 260 || r.height < 160) continue;
+      const hasListboxOrMenu = Boolean(el.querySelector('[role="listbox"], [role="menu"]'));
+      const hasHeadingOrForm = Boolean(el.querySelector('h1, h2, h3, h4, [role="heading"], form'));
+      if (hasListboxOrMenu && !hasHeadingOrForm) continue;
+      found.push(el);
+    }
+    return found;
+  }
+
+  /** Title and slug of an open dialog: its label, its first heading, or `fallback`. */
+  function dialogTitle(dialog: HTMLElement, fallback: string) {
+    let title = (dialog.getAttribute("aria-label") || "").trim();
+    if (!title) {
+      const lby = dialog.getAttribute("aria-labelledby");
+      if (lby) {
+        title = lby
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+          .filter(Boolean)
+          .join(" ");
+      }
+    }
+    if (!title) {
+      const heading = dialog.querySelector('h1, h2, h3, h4, [role="heading"]');
+      if (heading) title = (heading.textContent || "").replace(/\s+/g, " ").trim();
+    }
+    title = (title || fallback).slice(0, 80);
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40);
+    return { title, slug };
+  }
+
   /** Resolve as soon as `done()` holds (checked every 16 ms), or after `ms`. */
   async function waitUntil(done: () => boolean, ms: number) {
     const deadline = performance.now() + ms;
@@ -766,6 +825,7 @@ declare var __duiProbe: {
       ...(selectOptions.length > 0 ? { selectOptions } : {}),
       ...(renderTree.length > 0 ? { renderTree } : {}),
       ...(volatile.length > 0 ? { volatile } : {}),
+      ...(p.overlays?.size ? { overlaySlots: [...p.overlays].sort() } : {}),
     };
   }
   function visibleText(selector: string) {
@@ -1141,34 +1201,6 @@ declare var __duiProbe: {
         const entry = triggers[index];
         if (!entry || !entry.el.isConnected) return { opened: false };
 
-        const visibleDialogs = (): HTMLElement[] => {
-          const found: HTMLElement[] = [];
-          for (const el of document.querySelectorAll(
-            '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], [popover]:popover-open',
-          )) {
-            if (!(el instanceof HTMLElement)) continue;
-            const cs = getComputedStyle(el);
-            if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
-            const r = el.getBoundingClientRect();
-            const isExplicitModal = el.matches(
-              'dialog[open], [role="alertdialog"], [aria-modal="true"]',
-            );
-            if (isExplicitModal) {
-              if (r.width >= 120 && r.height >= 80) found.push(el);
-              continue;
-            }
-            // Non-modal dialogs/popovers: skip tiny filter dropdowns/listboxes without headings or forms.
-            if (r.width < 260 || r.height < 160) continue;
-            const hasListboxOrMenu = Boolean(el.querySelector('[role="listbox"], [role="menu"]'));
-            const hasHeadingOrForm = Boolean(
-              el.querySelector('h1, h2, h3, h4, [role="heading"], form'),
-            );
-            if (hasListboxOrMenu && !hasHeadingOrForm) continue;
-            found.push(el);
-          }
-          return found;
-        };
-
         const before = new Set(visibleDialogs());
         const startHref = location.href;
         try {
@@ -1226,29 +1258,8 @@ declare var __duiProbe: {
           return unchanged >= 2;
         }, 300);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        let title = (dialog.getAttribute("aria-label") || "").trim();
-        if (!title) {
-          const lby = dialog.getAttribute("aria-labelledby");
-          if (lby) {
-            title = lby
-              .split(/\s+/)
-              .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
-              .filter(Boolean)
-              .join(" ");
-          }
-        }
-        if (!title) {
-          const heading = dialog.querySelector('h1, h2, h3, h4, [role="heading"]');
-          if (heading) title = (heading.textContent || "").replace(/\s+/g, " ").trim();
-        }
-        if (!title) title = entry.label;
-        title = title.slice(0, 80);
-        const slug =
-          title
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .slice(0, 40) || `dialog-${index}`;
+        const { title, slug: named } = dialogTitle(dialog, entry.label);
+        const slug = named || `dialog-${index}`;
         // Scope renderTree to the active dialog/overlay subtree so obscured background page
         // elements behind the modal backdrop do not generate false overlap findings.
         const renderTree = collectRenderTree(dialog);
@@ -1331,6 +1342,13 @@ declare var __duiProbe: {
       resetFocus() {
         (document.activeElement as HTMLElement | null)?.blur?.();
         window.scrollTo(0, 0);
+      },
+      /** The dialog dui opened from a compiler fact: its title, slug and render tree. */
+      openDialog() {
+        const dialog = visibleDialogs().at(-1);
+        if (!dialog) return null;
+        const { title, slug } = dialogTitle(dialog, "Dialog");
+        return { title, slug: slug || "dialog", renderTree: collectRenderTree(dialog) };
       },
       async closeOverlay() {
         const open = (globalThis as Record<string, unknown>).__duiActiveOverlay as

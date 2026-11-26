@@ -110,6 +110,42 @@ fn timing_summary(cells: &Value, wall: std::time::Duration) -> Value {
     })
 }
 
+/// A capture that opened a compiler-found dialog becomes that screen's overlay node
+/// (`<path>#overlay:<slug>`), like a dialog found by clicking, with its source location.
+fn present_fact_overlay(
+    cell: &mut Value,
+    row: &BTreeMap<String, Value>,
+    overlay_facts: &BTreeMap<String, &Value>,
+) {
+    let Some(open) = cell["observation"]["forcedOverlay"]
+        .as_object()
+        .filter(|o| o["slug"].is_string())
+        .cloned()
+    else {
+        return;
+    };
+    let Some(parent) = cell["path"].as_str().map(str::to_owned) else {
+        return;
+    };
+    let slug = open["slug"].as_str().unwrap_or("dialog");
+    let source: Vec<Value> = row
+        .keys()
+        .filter_map(|id| overlay_facts.get(id))
+        .map(|f| json!({"file": f["file"], "line": f["line"], "element": f["label"]}))
+        .collect();
+    cell["path"] = json!(format!("{parent}#overlay:{slug}"));
+    cell["overlay"] = json!({
+        "kind": "dialog",
+        "parentPath": parent,
+        "slug": slug,
+        "title": open["title"],
+        "triggerLabel": open["title"],
+        "scope": "main",
+        "method": "compiler",
+        "source": source,
+    });
+}
+
 pub fn analyze(project: &Path, spec: &Path) -> Reply {
     if let Ok(bytes) = fs::read(spec)
         && let Ok(manifest) = serde_json::from_slice::<Value>(&bytes)
@@ -382,6 +418,19 @@ fn execute_with_locales(
     let facts = analysis["facts"]
         .as_array()
         .ok_or_else(|| failure(3, "invalid facts"))?;
+    // Dialogs from the compiler's facts are opened by setting their open prop, not by
+    // clicking guessed triggers. Runtime trigger probing stays for projects without a compiler.
+    let overlay_facts: BTreeMap<String, &Value> = facts
+        .iter()
+        .filter(|f| f["kind"] == "overlay")
+        .map(|f| (key(f), f))
+        .collect();
+    // Only the Vite host instruments the app's source, so only there can the probe open them.
+    let compiler_overlays = analysis["compiler"].as_str().is_some_and(|c| c != "none")
+        && dui_core::surface::resolve_surface_id(spec) == dui_core::surface::SURFACE_VITE_WEB;
+    // Each dialog in the code is captured once per run, from the first screen that renders it.
+    let mut overlays_captured: BTreeSet<String> = BTreeSet::new();
+    let mut overlays_found: BTreeSet<String> = BTreeSet::new();
     let mut cells = Vec::new();
     let mut hits = BTreeSet::new();
     let mut verified = 0;
@@ -462,6 +511,10 @@ fn execute_with_locales(
         .or_else(|| scenarios.pop_front().map(|(name, case)| (name, case, None)))
     {
         apply_generated(&mut spec, &analysis["autoMocks"]);
+        if compiler_overlays {
+            spec["discoverOverlays"] = json!(false);
+        }
+        let mut scenario_overlays: BTreeSet<String> = BTreeSet::new();
         let scenario_path = spec["path"].as_str().unwrap_or_default().to_owned();
         let concurrency = crate::host::resolve_capture_concurrency(&spec);
         if target.is_none()
@@ -482,6 +535,9 @@ fn execute_with_locales(
                 }
                 if !current {
                     apply_generated(&mut case, &analysis["autoMocks"]);
+                    if compiler_overlays {
+                        case["discoverOverlays"] = json!(false);
+                    }
                 }
                 let path = case["path"].as_str().unwrap_or_default().to_owned();
                 if !prefetched_scenarios.insert((name.clone(), path.clone())) {
@@ -574,6 +630,9 @@ fn execute_with_locales(
             let prev_active = active.len();
             done.insert(serde_json::to_string(&row).map_err(|e| failure(3, &e.to_string()))?);
             let checks = assertions(facts, &row, &spec);
+            // A state that opens compiler-found dialogs: the capture reports the open dialog.
+            let forced_overlay =
+                !row.is_empty() && row.keys().all(|k| overlay_facts.contains_key(k));
             let locale_slots: Vec<Option<&str>> = if let Some(t) = &target {
                 vec![t.locale.as_deref()]
             } else if locales.is_empty() {
@@ -616,6 +675,9 @@ fn execute_with_locales(
                         }
                         let mut capture_spec = locale_spec.clone();
                         capture_spec["assertions"] = checks.clone();
+                        if forced_overlay {
+                            capture_spec["forcedOverlay"] = json!(true);
+                        }
                         if index != 0
                             && let Some(obj) = capture_spec.as_object_mut()
                         {
@@ -668,6 +730,9 @@ fn execute_with_locales(
 
                     let mut capture_spec = locale_spec.clone();
                     capture_spec["assertions"] = checks.clone();
+                    if forced_overlay {
+                        capture_spec["forcedOverlay"] = json!(true);
+                    }
                     if index != 0 {
                         capture_spec
                             .as_object_mut()
@@ -980,10 +1045,40 @@ fn execute_with_locales(
                 pending.clear();
                 break;
             }
+            // This state's cells are the most recent ones.
+            let this_state = |c: &Value| c["scenario"] == *scenario && c["planIndex"] == index;
+            if index == 0 {
+                for cell in cells.iter().rev().take_while(|c| this_state(c)) {
+                    for id in cell["observation"]["overlaySlots"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str)
+                        .filter(|id| overlay_facts.contains_key(*id))
+                    {
+                        scenario_overlays.insert(id.to_owned());
+                    }
+                }
+                overlays_found.extend(scenario_overlays.iter().cloned());
+            }
+            if forced_overlay {
+                overlays_captured.extend(row.keys().cloned());
+                for cell in cells.iter_mut().rev().take_while(|c| this_state(c)) {
+                    present_fact_overlay(cell, &row, &overlay_facts);
+                }
+            }
             pending = candidates_with_observed(facts, &active, &observed_slot_values)
                 .into_iter()
                 .filter(|r| !done.contains(&json!(r).to_string()))
                 .collect();
+            // One open state per dialog the screen rendered, unless another screen already
+            // captured that dialog.
+            for id in scenario_overlays.difference(&overlays_captured) {
+                let open = BTreeMap::from([(id.clone(), json!(true))]);
+                if !done.contains(&json!(open).to_string()) {
+                    pending.push(open);
+                }
+            }
             pending.sort_by_cached_key(|candidate| {
                 let checks = assertions(facts, candidate, &spec);
                 let list = checks.as_array().map(Vec::as_slice).unwrap_or_default();
@@ -1204,6 +1299,15 @@ fn execute_with_locales(
     let renderable = cells.len() - unrenderable;
     let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
     report["timings"] = timing_summary(&report["cells"], run_started.elapsed());
+    report["overlayDiscovery"] = json!({
+        "method": if compiler_overlays { "compiler" } else { "runtime" },
+        "declared": overlay_facts.len(),
+        "rendered": overlays_found.len(),
+        "captured": report["cells"].as_array().map_or(0, |cells| cells
+            .iter()
+            .filter(|c| c["overlay"]["method"] == "compiler")
+            .count()),
+    });
     if !locales.is_empty() {
         report["locales"] = summarize_by_locale(&cells, missing_by_locale);
     }

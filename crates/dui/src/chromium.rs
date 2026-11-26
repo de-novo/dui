@@ -1246,6 +1246,17 @@ impl Browser {
         let settle_ms = ms(observe_started.elapsed());
         let shot_started = std::time::Instant::now();
         let mut keyboard_ms = 0;
+        // A state that set a compiler-found dialog open: record the dialog it shows.
+        if spec["forcedOverlay"] == true
+            && let Ok(open) = self.call(
+                s,
+                "Runtime.evaluate",
+                json!({"expression": "globalThis.__duiRuntime.openDialog()", "returnByValue": true}),
+            )
+            && v.is_object()
+        {
+            v["forcedOverlay"] = open["result"]["value"].clone();
+        }
         let ignored = settle.ignored();
         if !ignored.is_empty() {
             v["ignoredChanges"] = json!(ignored);

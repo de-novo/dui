@@ -32,6 +32,10 @@ export type InstrumentFact = {
   statementStart?: number;
   shape: { kind: string };
   setter?: string;
+  // `overlay` facts: the open prop's expression, or where to add the prop when it is absent.
+  prop?: string;
+  expr?: Span;
+  insertAt?: number;
 };
 
 interface Call {
@@ -100,6 +104,13 @@ export function instrument(text: string, facts: InstrumentFact[], oxc: Oxc) {
         // Tag only the evaluated RHS. A skipped operand keeps its original value.
         wrap([f.start, f.end], `${name}().logical(${key},${arm.and},(`, "))");
         wrap(arm.right, `${name}().right((`, "))");
+      }
+    }
+    if (f.kind === "overlay" && f.prop) {
+      if (f.expr) {
+        wrap(f.expr, `${name}().overlay(${key},()=>(`, "))");
+      } else if (f.insertAt != null) {
+        insert(f.insertAt, false, ` ${f.prop}={${name}().overlay(${key},()=>undefined)}`);
       }
     }
     if (f.kind === "slot" && f.init && f.after && f.shape.kind !== "unknown") {
