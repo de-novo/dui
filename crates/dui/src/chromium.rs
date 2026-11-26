@@ -1065,7 +1065,11 @@ impl Browser {
         };
         let screenshot = self.call(s, "Page.captureScreenshot", shot_params);
         // Keyboard evidence in the render tree's layout: trusted Tab presses walk the focus order.
-        if let Some(keyboard) = self.keyboard_walk(s) {
+        // It costs a CDP round trip per focus stop, so it runs only when an audit asks for it.
+        if (spec["keyboardEvidence"] == true
+            || std::env::var("DUI_KEYBOARD_EVIDENCE").is_ok_and(|v| v == "1"))
+            && let Some(keyboard) = self.keyboard_walk(s)
+        {
             v["keyboard"] = keyboard;
         }
         if target_h > vp_h {
