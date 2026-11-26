@@ -304,6 +304,9 @@ fn collect_auth_session(
     Ok(bundle)
 }
 
+/// How long one Chrome DevTools command may wait for its answer.
+const CDP_TIMEOUT: Duration = Duration::from_secs(15);
+
 /// How long the live API proxy waits for an upstream response.
 const LIVE_PROXY_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -518,7 +521,7 @@ impl Drop for Browser {
 impl Browser {
     pub fn local(executable: &Path, profile: &Path, port: u16) -> Result<Self> {
         let (stream, chrome) = UnixStream::pair()?;
-        stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+        stream.set_read_timeout(Some(CDP_TIMEOUT))?;
         stream.set_write_timeout(Some(Duration::from_secs(15)))?;
         let reader = BufReader::new(stream.try_clone()?);
         let child = Command::new("/bin/sh")
@@ -614,8 +617,21 @@ impl Browser {
         loop {
             self.drain_proxy();
             let mut bytes = Vec::new();
-            if self.reader.read_until(0, &mut bytes)? == 0 {
-                return Err("Chromium disconnected".into());
+            let read = self.reader.read_until(0, &mut bytes).map_err(|e| {
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) {
+                    format!(
+                        "Chromium did not answer {method} within {} s",
+                        CDP_TIMEOUT.as_secs()
+                    )
+                } else {
+                    format!("{method}: {e}")
+                }
+            })?;
+            if read == 0 {
+                return Err(format!("Chromium disconnected during {method}").into());
             }
             bytes.pop();
             let mut msg: Value = serde_json::from_slice(&bytes)?;
@@ -1884,7 +1900,7 @@ pub fn capture_login_session(
     }
     let profile = tempfile::tempdir()?;
     let (stream, chrome) = UnixStream::pair()?;
-    stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+    stream.set_read_timeout(Some(CDP_TIMEOUT))?;
     stream.set_write_timeout(Some(Duration::from_secs(15)))?;
     let reader = BufReader::new(stream.try_clone()?);
     let mut args: Vec<&str> = vec![
