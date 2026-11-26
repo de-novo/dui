@@ -80,6 +80,32 @@ declare var __duiProbe: {
       mountTimers.delete(id);
       nativeClearTimeout.call(globalThis, id);
     } as typeof clearTimeout;
+    // A short interval started while mounting (a feed, a ticker) is waited for until it first
+    // runs, so a change it makes is seen before the screen can count as stable.
+    const nativeSetInterval = globalThis.setInterval as unknown as (
+      handler: TimerHandler,
+      delay?: number,
+      ...args: unknown[]
+    ) => unknown;
+    const nativeClearInterval = globalThis.clearInterval;
+    globalThis.setInterval = function (handler: TimerHandler, delay?: number, ...args: unknown[]) {
+      const track =
+        typeof handler === "function" && (delay ?? 0) <= 1000 && performance.now() - mounted < 1500;
+      let id: unknown;
+      const run = track
+        ? (...values: unknown[]) => {
+            mountTimers.delete(id);
+            (handler as (...v: unknown[]) => void)(...values);
+          }
+        : handler;
+      id = nativeSetInterval.call(globalThis, run, delay, ...args);
+      if (track) mountTimers.add(id);
+      return id;
+    } as typeof setInterval;
+    globalThis.clearInterval = function (id?: Parameters<typeof clearInterval>[0]) {
+      mountTimers.delete(id);
+      nativeClearInterval.call(globalThis, id);
+    } as typeof clearInterval;
     globalThis.__duiProbe = {
       pendingTimers: () => mountTimers.size,
       instances: Object.create(null),

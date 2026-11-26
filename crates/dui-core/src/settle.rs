@@ -1,8 +1,10 @@
 //! When a captured screen has stopped changing.
 //!
-//! The browser samples the page about every 40 ms. A screen is stable after
-//! [`STABLE_SAMPLES`] identical samples in a row (and, in the capture, once its tab has no
-//! recent request in flight). Regions that change on their own do not
+//! The browser samples the page about every 40 ms. A screen that has not changed since the
+//! first sample is stable after [`STABLE_SAMPLES`] identical samples in a row; once it has
+//! changed, it needs [`STABLE_SAMPLES_AFTER_CHANGE`], so a page that keeps changing (a feed
+//! growing every 150 ms) never counts as stable in a gap between changes. In the capture, its
+//! tab must also have no recent request in flight. Regions that change on their own do not
 //! hold it back:
 //! - nodes the page marks as busy (`volatile`: `aria-busy`, progress bars, timers and endlessly
 //!   animated spinners);
@@ -16,6 +18,8 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const STABLE_SAMPLES: u32 = 3;
+/// Identical samples in a row needed after the screen has changed: about a third of a second.
+pub const STABLE_SAMPLES_AFTER_CHANGE: u32 = 8;
 pub const CHURN_SAMPLES: u32 = 3;
 /// Default `settleTimeoutMs`.
 pub const DEFAULT_TIMEOUT_MS: u64 = 10_000;
@@ -76,7 +80,12 @@ impl Settle {
         {
             self.changed = Some((previous, sample.clone()));
         }
-        self.stable >= STABLE_SAMPLES
+        let needed = if self.changed.is_some() {
+            STABLE_SAMPLES_AFTER_CHANGE
+        } else {
+            STABLE_SAMPLES
+        };
+        self.stable >= needed
     }
 
     /// The sample without ignored nodes, their text, or the raw `volatile` list.
@@ -176,7 +185,10 @@ mod tests {
         let stable_at = (0..20u32)
             .position(|tick| settle.sample(&sample(&format!("12:00:0{tick}"), tick * 7, 3), 375))
             .expect("settles");
-        assert!(stable_at < 10, "settled after {stable_at} samples");
+        assert!(
+            (stable_at as u32) < CHURN_SAMPLES + STABLE_SAMPLES_AFTER_CHANGE + 2,
+            "settled after {stable_at} samples"
+        );
         assert_eq!(
             settle.ignored(),
             [
@@ -184,6 +196,30 @@ mod tests {
                 json!({"node":"svg#0","reason":"busy"}),
             ]
         );
+    }
+
+    #[test]
+    fn a_screen_ready_at_the_first_sample_settles_after_three() {
+        let mut settle = Settle::default();
+        let stable_at = (0..10)
+            .position(|_| settle.sample(&sample("12:00:00", 0, 3), 375))
+            .expect("settles");
+        // The first sample is the reference; then three identical ones.
+        assert_eq!(stable_at as u32, STABLE_SAMPLES);
+    }
+
+    #[test]
+    fn a_feed_growing_between_samples_never_settles_in_its_gaps() {
+        // A row every four samples (150 ms at 40 ms per sample): each gap holds three identical
+        // samples, which would be enough for a screen that never changed. The page's own interval
+        // holds the capture until its first row (`pendingTimers`), so the change is seen.
+        let mut settle = Settle::default();
+        for tick in 0..40usize {
+            assert!(
+                !settle.sample(&sample("12:00:00", 0, (tick + 1) / 4), 375),
+                "settled at sample {tick}"
+            );
+        }
     }
 
     #[test]
