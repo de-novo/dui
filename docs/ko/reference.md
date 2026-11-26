@@ -69,6 +69,8 @@
 
 **한 칸**은 시나리오 하나의 상태 하나를 한 가지 폭으로 캡처할 자리다. `verified`는 경로, 폭, 준비 조건, 필수 요청과 해당 상태에 대한 검사를 통과한 칸이다. `unverified`에는 검사에 실패한 칸과 예산 한도로 시도하지 못한 칸(`not-rendered`)이 포함된다. `unrenderable`에는 렌더 환경의 한계를 기록한다. 미지원 프로젝트는 캡처 전에 거절한다.
 
+**검증 실패 사유.** `reason`은 실패 종류로 시작하고 무엇이 실패했는지가 뒤따른다: `http-error`(문서가 4xx/5xx), `api-error: 401 /api/me`, `redirected: /a → /b`, `not-ready: SELECTOR`(페이지가 계속 바뀌었으면 `+ unsettled: NODE CHANGE`), `unsettled: NODE CHANGE`, `width-mismatch: observed W (expected W)`, `request-failed: /path STATUS`, `not-analyzed: compiler diagnostics`, `assert-failed: slot NAME is VALUE (expected VALUE)`(또는 실패한 상태 단언, 실행되지 않은 분기 프로브), `missing-state-assertion`, `missing-screen-assertion`, `not-rendered`. `dui map`은 stderr 요약에서 검증되지 않은 셀을 종류별로 센다.
+
 **칸 검증률**은 `coverage.verified / coverage.renderable`이다. 화면 여섯 개를 폭 세 가지에서 모두 캡처하면 기본 상태 18칸을 채운 것이다. 추가로 계획된 상태도 분모에 포함한다. 분기 커버리지는 `observedBranchOutcomes`와 `branchOutcomes`로 따로 확인한다.
 
 **소요 시간.** 캡처한 각 셀에는 밀리초 단위 `timing`이 있다: `navigateMs`, `settleMs`(`settlePolls` 포함), `screenshotMs`, `overlaysMs`, `keyboardMs`, `totalMs`. 캐시에서 가져온 셀에는 없다. 리포트의 `timings`에는 `wallMs`, 단계별 `totals`, `slowestPhase`, 가장 느린 셀 다섯 개(`slowestCells`)가 있다. `dui map`은 셀 수, 전체 시간, 가장 느린 단계를 stderr에 한 줄로 출력한다.
