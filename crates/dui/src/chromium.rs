@@ -473,6 +473,8 @@ fn decode_chunked(input: &[u8]) -> Vec<u8> {
 
 pub struct Browser {
     child: Child,
+    /// The Chrome process and its profile, killed and removed if dui is interrupted.
+    _interrupt: [crate::interrupt::Guard; 2],
     cdp: std::sync::Arc<CdpWriter>,
     reader: BufReader<UnixStream>,
     visit: u64,
@@ -545,8 +547,13 @@ impl Browser {
             .stderr(Stdio::null())
             .spawn()?;
         BROWSER_LAUNCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let interrupt = [
+            crate::interrupt::kill_on_interrupt(child.id()),
+            crate::interrupt::remove_on_interrupt(profile),
+        ];
         Ok(Self {
             child,
+            _interrupt: interrupt,
             cdp: std::sync::Arc::new(CdpWriter {
                 stream: std::sync::Mutex::new(stream),
                 next_id: Default::default(),
@@ -1899,8 +1906,13 @@ pub fn capture_login_session(
         .stderr(Stdio::null())
         .spawn()?;
     BROWSER_LAUNCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let interrupt = [
+        crate::interrupt::kill_on_interrupt(child.id()),
+        crate::interrupt::remove_on_interrupt(profile.path()),
+    ];
     let mut browser = Browser {
         child,
+        _interrupt: interrupt,
         cdp: std::sync::Arc::new(CdpWriter {
             stream: std::sync::Mutex::new(stream),
             next_id: Default::default(),

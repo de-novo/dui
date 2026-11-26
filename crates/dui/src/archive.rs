@@ -209,6 +209,49 @@ pub(crate) fn capture(
     result
 }
 
+/// The file in a staging directory that names the process writing it.
+const OWNER: &str = ".owner";
+/// A staging directory without an owner file is left alone for this long (a run may have
+/// just created it).
+const UNOWNED_GRACE: std::time::Duration = std::time::Duration::from_secs(3600);
+
+fn process_alive(pid: u32) -> bool {
+    pid == std::process::id()
+        || Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+}
+
+/// Remove `.pending-*` directories left by runs that were killed: their owner process is gone,
+/// or they have no owner file and are older than an hour. Returns how many were removed.
+pub(crate) fn remove_abandoned_staging(runs: &Path) -> usize {
+    let Ok(entries) = fs::read_dir(runs) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !entry.file_name().to_string_lossy().starts_with(".pending-") || !path.is_dir() {
+            continue;
+        }
+        let abandoned = match fs::read_to_string(path.join(OWNER)) {
+            Ok(owner) => owner.trim().parse().is_ok_and(|pid| !process_alive(pid)),
+            Err(_) => entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|modified| modified.elapsed().ok())
+                .is_some_and(|age| age > UNOWNED_GRACE),
+        };
+        if abandoned && fs::remove_dir_all(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
+}
+
 pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -> Reply {
     let home = root()?;
     let archive = home.join("projects");
@@ -218,10 +261,13 @@ pub(crate) fn publish(mut metadata: Value, write: impl FnOnce(&Path) -> Reply) -
     let directory = archive.join(id);
     let runs = directory.join("runs");
     fs::create_dir_all(&runs).map_err(io)?;
+    remove_abandoned_staging(&runs);
     let stage = tempfile::Builder::new()
         .prefix(".pending-")
         .tempdir_in(&runs)
         .map_err(io)?;
+    fs::write(stage.path().join(OWNER), std::process::id().to_string()).map_err(io)?;
+    let _staged = crate::interrupt::remove_on_interrupt(stage.path());
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(io)?
@@ -632,6 +678,29 @@ mod tests {
     use dui_core::storage::{
         ArtifactStore, MemoryStore, RunFilter, RunRepository, WorkspaceRepository,
     };
+
+    #[test]
+    fn abandoned_staging_is_removed_and_live_staging_is_kept() {
+        let runs = tempfile::tempdir().expect("runs");
+        let stage = |name: &str, owner: Option<String>| {
+            let dir = runs.path().join(name);
+            fs::create_dir_all(dir.join("artifacts")).expect("stage");
+            if let Some(owner) = owner {
+                fs::write(dir.join(OWNER), owner).expect("owner");
+            }
+            dir
+        };
+        // A process id that is not running: one past the highest id the system has handed out
+        // is not guaranteed, so pick an id far above any default pid_max.
+        let dead = stage(".pending-dead", Some("4194302".into()));
+        let live = stage(".pending-live", Some(std::process::id().to_string()));
+        let fresh = stage(".pending-fresh", None);
+        let published = runs.path().join("0001-run");
+        fs::create_dir_all(&published).expect("run");
+        assert_eq!(remove_abandoned_staging(runs.path()), 1);
+        assert!(!dead.exists());
+        assert!(live.exists() && fresh.exists() && published.exists());
+    }
 
     #[test]
     fn project_name_survives_manifest_and_branch_changes() {

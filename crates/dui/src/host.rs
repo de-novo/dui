@@ -97,11 +97,14 @@ pub(crate) fn parallel_chromium_capture(
             .collect(),
     }
 }
-struct Server(Child);
+struct Server {
+    child: Child,
+    _interrupt: crate::interrupt::Guard,
+}
 impl Drop for Server {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 
@@ -276,7 +279,11 @@ impl Host for ViteHost {
             .stderr(log)
             .spawn()
             .map_err(|e| failure(3, &e.to_string()))?;
-        let mut server = Server(child);
+        let guard = crate::interrupt::kill_on_interrupt(child.id());
+        let mut server = Server {
+            child,
+            _interrupt: guard,
+        };
         let start = Instant::now();
         let port = loop {
             if let Ok(port) = fs::read_to_string(file("port"))
@@ -293,7 +300,7 @@ impl Host for ViteHost {
                 break port;
             }
             if server
-                .0
+                .child
                 .try_wait()
                 .map_err(|e| failure(3, &e.to_string()))?
                 .is_some()

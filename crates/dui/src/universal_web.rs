@@ -42,12 +42,15 @@ impl Drop for StaticServer {
     }
 }
 
-pub(crate) struct ManagedChild(Child);
+pub(crate) struct ManagedChild {
+    child: Child,
+    _interrupt: crate::interrupt::Guard,
+}
 
 impl Drop for ManagedChild {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 
@@ -365,7 +368,13 @@ fn start_command_server(project: &Path, spec: &Value) -> Result<UniversalSession
         return Err(failure(3, &msg));
     }
     Ok(UniversalSession::Command {
-        _child: ManagedChild(child),
+        _child: {
+            let guard = crate::interrupt::kill_on_interrupt(child.id());
+            ManagedChild {
+                child,
+                _interrupt: guard,
+            }
+        },
         port,
     })
 }
