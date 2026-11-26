@@ -492,6 +492,8 @@ pub struct Browser {
     generated_get: BTreeMap<String, (&'static str, String)>,
     fulfilled: std::collections::BTreeSet<String>,
     responses: BTreeMap<String, u16>,
+    /// The tab that renders HTML snapshots back for their fidelity, reused across captures.
+    render_back_session: Option<String>,
     /// Shared header triggers already probed in this run, by width, label and rectangle:
     /// the overlay they opened, or `None` when they opened nothing worth capturing.
     overlay_probes: BTreeMap<String, Option<Value>>,
@@ -571,6 +573,7 @@ impl Browser {
             fulfilled: Default::default(),
             responses: Default::default(),
             overlay_probes: Default::default(),
+            render_back_session: None,
             api_errors: Default::default(),
             response_ids: Default::default(),
             allowed_origin: format!("http://127.0.0.1:{port}"),
@@ -1154,6 +1157,134 @@ impl Browser {
         v["timing"]["totalMs"] = json!(visit_started.elapsed().as_millis() as u64);
         Ok((v, session.to_owned()))
     }
+    /// Save the page as a script-free HTML snapshot next to the PNG, render it back at the same
+    /// width in a separate tab and record how many pixels differ. Failures are recorded, never
+    /// fatal: the PNG is the evidence.
+    fn html_snapshot(&mut self, s: Option<&str>, width: u32, out_dir: &Path, png: &[u8]) -> Value {
+        let taken = self
+            .call(
+                s,
+                "Runtime.evaluate",
+                json!({
+                    "expression": format!("globalThis.__duiRuntime.htmlSnapshot({width})"),
+                    "awaitPromise": true,
+                    "returnByValue": true
+                }),
+            )
+            .map(|r| r["result"]["value"].clone());
+        let snapshot = match taken {
+            Ok(value) if value["html"].is_string() => value,
+            Ok(value) => {
+                return json!({"error": value["error"].as_str().unwrap_or("not serializable")});
+            }
+            Err(e) => return json!({"error": e.to_string()}),
+        };
+        let html = snapshot["html"].as_str().unwrap_or_default();
+        use sha2::{Digest, Sha256};
+        let file = format!("{:x}-{width}.html", Sha256::digest(html.as_bytes()));
+        let path = out_dir.join(&file);
+        if let Err(e) = fs::write(&path, html) {
+            return json!({"error": e.to_string()});
+        }
+        let mut record = json!({
+            "file": file,
+            "bytes": html.len(),
+            "omitted": snapshot["omitted"],
+        });
+        match self.render_back(&path, width, png) {
+            Ok(fidelity) => record["fidelity"] = json!((fidelity * 1e4).round() / 1e4),
+            Err(e) => record["fidelityError"] = json!(e.to_string()),
+        }
+        record
+    }
+
+    /// Open `path` in a new tab at `width` × the PNG's height and return the share of pixels that
+    /// differ from `png`.
+    fn render_back(&mut self, path: &Path, width: u32, png: &[u8]) -> Result<f64> {
+        let height = u32::from_be_bytes(png.get(20..24).ok_or("short PNG")?.try_into()?);
+        let session = match self.render_back_session.clone() {
+            Some(session) => session,
+            None => {
+                let target = self.call(
+                    None,
+                    "Target.createTarget",
+                    json!({"url": "about:blank"}),
+                )?["targetId"]
+                    .as_str()
+                    .ok_or("missing target")?
+                    .to_owned();
+                let session = self.call(
+                    None,
+                    "Target.attachToTarget",
+                    json!({"targetId": target, "flatten": true}),
+                )?["sessionId"]
+                    .as_str()
+                    .ok_or("missing session")?
+                    .to_owned();
+                self.call(Some(&session), "Page.enable", json!({}))?;
+                self.render_back_session = Some(session.clone());
+                session
+            }
+        };
+        let result = (|| -> Result<f64> {
+            let s = Some(session.as_str());
+            // A hidden tab neither paints nor runs animation frames.
+            self.call(s, "Page.bringToFront", json!({}))?;
+            self.call(
+                s,
+                "Emulation.setDeviceMetricsOverride",
+                json!({"width": width, "height": height, "deviceScaleFactor": 1, "mobile": false}),
+            )?;
+            let url = format!("file://{}", path.display());
+            self.call(s, "Page.navigate", json!({"url": url}))?;
+            // The tab is reused: wait until it shows this snapshot, fully loaded.
+            let loaded = format!(
+                "document.URL === {} && document.readyState === 'complete'",
+                serde_json::to_string(&url)?
+            );
+            let started = std::time::Instant::now();
+            while self
+                .call(
+                    s,
+                    "Runtime.evaluate",
+                    json!({"expression": loaded, "returnByValue": true}),
+                )
+                .ok()
+                .and_then(|r| r["result"]["value"].as_bool())
+                != Some(true)
+            {
+                if started.elapsed() > Duration::from_secs(10) {
+                    return Err("the snapshot did not load within 10 s".into());
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            self.call(
+                s,
+                "Runtime.evaluate",
+                json!({
+                    "expression": "document.fonts.ready.then(() => Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })))).then(() => new Promise(r => setTimeout(r, 30)))",
+                    "awaitPromise": true,
+                }),
+            )?;
+            let shot = self.call(
+                s,
+                "Page.captureScreenshot",
+                json!({
+                    "format": "png",
+                    "captureBeyondViewport": true,
+                    "clip": {"x": 0, "y": 0, "width": width, "height": height, "scale": 1}
+                }),
+            )?;
+            let bytes = STANDARD.decode(shot["data"].as_str().ok_or("missing image")?)?;
+            Ok(dui_app::diff::png_mismatch(png, &bytes, 24)?)
+        })();
+        if result.is_err() {
+            // A broken tab is replaced on the next capture.
+            self.render_back_session = None;
+        }
+        result
+    }
+
     /// Walks the focus order with trusted Tab presses and records each stop, so audits can check
     /// that every keyboard target is reached and shows a focus indicator.
     fn keyboard_walk(&mut self, s: Option<&str>) -> Option<Value> {
@@ -1434,11 +1565,17 @@ impl Browser {
             );
         }
         let data = screenshot?;
-        fs::write(
-            png,
-            STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?,
-        )?;
+        let png_bytes = STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?;
+        fs::write(png, &png_bytes)?;
         let screenshot_ms = ms(shot_started.elapsed()).saturating_sub(keyboard_ms);
+        // The same moment as the PNG, as HTML (docs/en/web-viewer.md#html-cards).
+        let snapshot_started = std::time::Instant::now();
+        if spec["htmlSnapshots"] != false
+            && let Some(out_dir) = png.parent()
+        {
+            v["htmlSnapshot"] = self.html_snapshot(s, width, out_dir, &png_bytes);
+        }
+        let snapshot_ms = ms(snapshot_started.elapsed());
         let mut overlays_ms = 0;
         // After screenshot capture, safely expand collapsed WAI-ARIA nav disclosures to
         // discover hidden submenu links without mutating the captured image.
@@ -1732,6 +1869,7 @@ impl Browser {
             "screenshotMs": screenshot_ms,
             "overlaysMs": overlays_ms,
             "keyboardMs": keyboard_ms,
+            "snapshotMs": snapshot_ms,
         });
         Ok(v)
     }
@@ -1954,6 +2092,7 @@ pub fn capture_login_session(
         fulfilled: Default::default(),
         responses: Default::default(),
         overlay_probes: Default::default(),
+        render_back_session: None,
         api_errors: Default::default(),
         response_ids: Default::default(),
         allowed_origin: String::new(),

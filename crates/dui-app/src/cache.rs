@@ -456,6 +456,20 @@ impl<S: AppStore> CellCache<S> {
                     }
                     *overlays = restored;
                 }
+                // The HTML snapshot travels with the cell; without its blob the card uses the PNG.
+                let restored_snapshot = match (
+                    obs["htmlSnapshot"]["file"].as_str(),
+                    obs["htmlSnapshot"]["blobId"].as_str(),
+                ) {
+                    (Some(file), Some(raw)) => dui_core::model::BlobId::parse(raw)
+                        .ok()
+                        .filter(|id| store.blob_path(id).is_file())
+                        .is_some_and(|id| store.link_or_copy_blob(&id, &out.join(file)).is_ok()),
+                    _ => true,
+                };
+                if !restored_snapshot && let Some(fields) = obs.as_object_mut() {
+                    fields.remove("htmlSnapshot");
+                }
                 let _ = entry.record_hit(now_epoch_ms());
                 let _ = store.put_cache(&entry);
                 return CacheLookup::Hit {
@@ -514,6 +528,14 @@ impl<S: AppStore> CellCache<S> {
                         }
                     }
                 }
+            }
+            if let Some(out_dir) = out_image.parent()
+                && let Some(file) = obs_for_cache["htmlSnapshot"]["file"].as_str()
+                && let Ok(html) = fs::read(out_dir.join(file))
+                && let Ok(html_blob) = ImageBlob::from_bytes("text/html", &html, 0, 0)
+                && store.put_blob(&html_blob, &html).is_ok()
+            {
+                obs_for_cache["htmlSnapshot"]["blobId"] = json!(html_blob.id().as_str());
             }
             let evidence = observation_to_evidence(&obs_for_cache);
             let ev_id = evidence.id().clone();

@@ -54,10 +54,11 @@ fn verification_intent<'a>(
 }
 
 /// Capture phases in `cell.timing`, in the order a capture runs them.
-const TIMING_PHASES: [&str; 5] = [
+const TIMING_PHASES: [&str; 6] = [
     "navigateMs",
     "settleMs",
     "screenshotMs",
+    "snapshotMs",
     "overlaysMs",
     "keyboardMs",
 ];
