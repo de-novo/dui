@@ -6,6 +6,9 @@ export { SNAPSHOT_MAX_MISMATCH };
 
 /** Cards at least this wide on screen draw their HTML snapshot (docs/en/web-viewer.md#html-cards). */
 export const SNAPSHOT_MIN_SCREEN_WIDTH = 320;
+/** Pixels across a capture thumbnail, as `dui` writes them (`dui_app::thumbnail::WIDTH`). Cards
+ * at most this many device pixels wide on screen draw the thumbnail instead of the PNG. */
+export const THUMBNAIL_WIDTH = 200;
 /** At most this many snapshot frames are mounted at once. */
 export const SNAPSHOT_MAX_FRAMES = 12;
 

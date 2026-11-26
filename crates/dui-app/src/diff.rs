@@ -136,7 +136,7 @@ fn decode_png_rgba(path: &Path) -> Result<(u32, u32, Vec<u8>), String> {
     decode_png_rgba_bytes(&fs::read(path).map_err(|e| e.to_string())?)
 }
 
-fn decode_png_rgba_bytes(png_bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
+pub(crate) fn decode_png_rgba_bytes(png_bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
     let mut decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = decoder.read_info().map_err(|e| e.to_string())?;

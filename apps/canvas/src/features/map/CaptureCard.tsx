@@ -38,6 +38,7 @@ export function CaptureCard({
   beforeRunKey,
   afterRunKey,
   snapshotUrl,
+  small = false,
   overlay,
   live,
 }: {
@@ -46,6 +47,8 @@ export function CaptureCard({
   imageUrl: (name: string) => string;
   /** The capture's HTML snapshot, drawn over the PNG once it has loaded. */
   snapshotUrl?: string;
+  /** Drawn small on screen: the capture's thumbnail stands in for the PNG when it has one. */
+  small?: boolean;
   /** Drawn over the capture in its own coordinates, such as where link edges start. */
   overlay?: ReactNode;
   /** A card without a capture, rendered from source in the running app. */
@@ -72,7 +75,12 @@ export function CaptureCard({
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
   const large = Boolean(cardWidth && cardWidth >= 800);
-  const fallbackSrc = cell?.image ? imageUrl(cell.image) : undefined;
+  const thumbnail = small && !screenDiff ? cell?.thumbnail : undefined;
+  const fallbackSrc = thumbnail
+    ? imageUrl(thumbnail)
+    : cell?.image
+      ? imageUrl(cell.image)
+      : undefined;
   const resolvedSrc = resolveCardDiffImageUrl(
     diffVisualMode,
     screenDiff,
@@ -88,8 +96,9 @@ export function CaptureCard({
         ? screenDiff.afterImage
         : undefined;
   const activeLoaded = resolvedSrc && loadedSize?.src === resolvedSrc ? loadedSize : null;
-  const naturalW = activeLoaded?.w ?? cell?.imageWidth;
-  const naturalH = activeLoaded?.h ?? cell?.imageHeight;
+  // A thumbnail's own pixels are not the capture's: the capture keeps its recorded size.
+  const naturalW = thumbnail ? cell?.imageWidth : (activeLoaded?.w ?? cell?.imageWidth);
+  const naturalH = thumbnail ? cell?.imageHeight : (activeLoaded?.h ?? cell?.imageHeight);
   const diffClass = screenDiff ? ` diff-${screenDiff.kind}` : "";
   const renderChangeCount = screenDiff?.renderDiff?.changes.length ?? 0;
   const diffBadgeText = screenDiff
@@ -165,6 +174,8 @@ export function CaptureCard({
           <img
             alt=""
             src={resolvedSrc}
+            loading="lazy"
+            decoding="async"
             onError={() => setLoadedSize(null)}
             onLoad={(event) => {
               const img = event.currentTarget;
