@@ -192,7 +192,7 @@ impl SurfaceAdapter for NextJsWebSurface {
         } else {
             Err(UnrenderableReason::new(
                 "no-browser",
-                "Chromium/Chrome executable not found for Next.js capture",
+                crate::chromium::missing_detail(),
             ))
         }
     }

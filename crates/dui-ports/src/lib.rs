@@ -156,10 +156,11 @@ impl SurfaceRegistry {
                 "unsupported-surface",
                 format!("no surface adapter registered for `{surface_id}`"),
             );
-            return Ok(unrenderable_reply(surface_id, &reason));
+            return Err((5, unrenderable_reply(surface_id, &reason)));
         };
+        // Nothing can be captured, so the run must not pass: exit 5 with the same JSON.
         if let Err(reason) = adapter.check_env() {
-            return Ok(unrenderable_reply(surface_id, &reason));
+            return Err((5, unrenderable_reply(surface_id, &reason)));
         }
         adapter.run(project, spec, out, force)
     }

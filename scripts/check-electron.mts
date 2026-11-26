@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -54,6 +54,16 @@ function runDui(args: string[], envOverrides: Record<string, string>): unknown {
     env: { ...process.env, ...envOverrides },
   });
   return JSON.parse(stdout) as unknown;
+}
+
+// A missing environment captures nothing, so dui exits 5 with the unrenderable reply.
+function runDuiMissingEnv(args: string[], envOverrides: Record<string, string>): unknown {
+  const result = spawnSync(duiBin, args, {
+    encoding: "utf8",
+    env: { ...process.env, ...envOverrides },
+  });
+  assert.equal(result.status, 5, result.stderr);
+  return JSON.parse(result.stdout) as unknown;
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dui-electron-"));
@@ -150,10 +160,13 @@ try {
       widths: [1024],
     }),
   );
-  const missingReply = runDui(["run", appDir, binManifest, path.join(tmp, "out-missing")], {
-    HOME: duiHome,
-    DUI_ELECTRON: "/nonexistent/electron",
-  }) as { status: string; surface: string; reason: string };
+  const missingReply = runDuiMissingEnv(
+    ["run", appDir, binManifest, path.join(tmp, "out-missing")],
+    {
+      HOME: duiHome,
+      DUI_ELECTRON: "/nonexistent/electron",
+    },
+  ) as { status: string; surface: string; reason: string };
   assert.equal(missingReply.status, "unrenderable");
   assert.equal(missingReply.surface, "electron-desktop");
   assert.equal(missingReply.reason, "no-electron-binary");
