@@ -33,6 +33,8 @@ for (const i of pages) {
 }
 let server: ReturnType<typeof spawn> | undefined;
 try {
+  // Width preview lists the reflow comparison, which runs only when the manifest asks for it.
+  writeFileSync(join(site, "dui.json"), JSON.stringify({ htmlReflow: true }));
   const run = spawnSync(binary, ["map", site, "--build-dir", site, "--capture"], {
     encoding: "utf8",
     env: { ...process.env, HOME: home },
