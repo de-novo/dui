@@ -148,6 +148,16 @@ fn open(request: &Value) -> Reply {
             return send(&record, &json!({"op":"opened","session":record["session"]}));
         }
     }
+    // A warm owner for the same project, run and source state adds the session to its browser.
+    if let Some(pool) = pool_key(&r) {
+        let path = dir.join(format!("pool-{pool}"));
+        if active(&path)
+            && let Ok(record) = read(&path)
+            && let Ok(opened) = send(&record, &json!({"op":"attach","open":r}))
+        {
+            return Ok(opened);
+        }
+    }
     let mut child = Command::new(std::env::current_exe().map_err(io)?)
         .arg("live-owner")
         .process_group(0)
@@ -185,25 +195,121 @@ pub fn owner() -> Reply {
     }
     Ok(Value::Null)
 }
-fn serve() -> Result<(), (u8, Value)> {
-    let open: Value = serde_json::from_reader(std::io::stdin().lock()).map_err(io)?;
-    let id = random()?;
-    let token = random()?;
-    let mut session = Session::open(&id, &open)?;
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(io)?;
+/// Sessions sharing one workbench: same project, run, manifest choice and source state.
+/// `None` when the source state is unknown, so nothing is reused across edits.
+fn pool_key(open: &Value) -> Option<String> {
+    let project = open["project"].as_str()?;
+    let state = source_state(std::path::Path::new(project))?;
+    let identity = json!([
+        project,
+        open["run"],
+        open["manifest"],
+        open["webLayoutOnly"],
+        state
+    ]);
+    Some(format!("{:x}", Sha256::digest(identity.to_string())))
+}
 
+/// The project's commit and every changed or untracked file with its size and modification
+/// time, from git. A different value means the host must be built again.
+fn source_state(project: &std::path::Path) -> Option<Value> {
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(project)
+            .args(args)
+            .stderr(Stdio::null())
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| o.stdout)
+    };
+    // A repository without commits has no HEAD; its files all show as untracked.
+    let status = git(&["status", "--porcelain=v1", "-z", "--untracked-files=all"])?;
+    let head = git(&["rev-parse", "HEAD"])
+        .and_then(|out| String::from_utf8(out).ok())
+        .unwrap_or_default();
+    let changed: Vec<Value> = status
+        .split(|b| *b == 0)
+        .filter(|entry| entry.len() > 3)
+        .map(|entry| {
+            let path = String::from_utf8_lossy(&entry[3..]).into_owned();
+            let meta = fs::metadata(project.join(&path)).ok();
+            json!([
+                path,
+                meta.as_ref().map(fs::Metadata::len),
+                meta.and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_nanos().to_string())
+            ])
+        })
+        .collect();
+    Some(json!([head.trim(), changed]))
+}
+
+/// A session of this owner, with its registration and lease.
+struct Live {
+    session: Session,
+    _lease: File,
+    _file: Registration,
+    last: Instant,
+}
+
+/// Open a session for `open` in this owner and register it for its clients.
+fn attach(
+    open: &Value,
+    bench: &mut Option<std::rc::Rc<session::Workbench>>,
+    port: u16,
+    token: &str,
+) -> Result<(String, Live, Value), (u8, Value)> {
+    let id = random()?;
+    let session = Session::open(&id, open, bench)?;
     let file = Registration(root()?.join(&id));
-    let key = format!(
-        "{:x}",
-        Sha256::digest(field(&open, "requestId")?.as_bytes())
-    );
+    let key = format!("{:x}", Sha256::digest(field(open, "requestId")?.as_bytes()));
     analysis::store(
         &file.0,
-        &json!({"port":listener.local_addr().map_err(io)?.port(),"token":token,"key":key,"open":open,"session":id}),
+        &json!({"port":port,"token":token,"key":key,"open":open,"session":id}),
     )?;
     let lease = File::open(&file.0).map_err(io)?;
     lease.lock().map_err(io)?;
     let opened = json!({"session":id,"revision":0,"cell":session.cell,"provenance":session.provenance,"environment":session.environment,"launches":launches()});
+    Ok((
+        id,
+        Live {
+            session,
+            _lease: lease,
+            _file: file,
+            last: Instant::now(),
+        },
+        opened,
+    ))
+}
+
+/// How long an owner with a workbench and no sessions stays warm for the next one.
+const POOL_IDLE: Duration = Duration::from_secs(120);
+
+fn serve() -> Result<(), (u8, Value)> {
+    let open: Value = serde_json::from_reader(std::io::stdin().lock()).map_err(io)?;
+    let token = random()?;
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(io)?;
+    let port = listener.local_addr().map_err(io)?.port();
+    let mut bench = None;
+    let mut sessions: std::collections::HashMap<String, Live> = Default::default();
+    let mut opened = std::collections::HashMap::new();
+    let (first, live, reply) = attach(&open, &mut bench, port, &token)?;
+    sessions.insert(first.clone(), live);
+    opened.insert(first, reply.clone());
+    // Only web sessions share a workbench; other owners serve their one session.
+    let pool = match (&bench, pool_key(&open)) {
+        (Some(_), Some(pool)) => {
+            let file = Registration(root()?.join(format!("pool-{pool}")));
+            analysis::store(&file.0, &json!({"port":port,"token":token,"pool":pool}))?;
+            let lease = File::open(&file.0).map_err(io)?;
+            lease.lock().map_err(io)?;
+            Some((file, lease))
+        }
+        _ => None,
+    };
     let (tx, connections) = std::sync::mpsc::sync_channel(1);
     thread::spawn(move || {
         for connection in listener.incoming() {
@@ -212,18 +318,27 @@ fn serve() -> Result<(), (u8, Value)> {
             }
         }
     });
-    writeln!(std::io::stdout(), "{}", encode(Ok(opened.clone()))).map_err(io)?;
-    let mut last = Instant::now();
-    while last.elapsed() < Duration::from_secs(1800) {
+    writeln!(std::io::stdout(), "{}", encode(Ok(reply))).map_err(io)?;
+    let mut empty_since = None;
+    loop {
+        // Sessions idle for half an hour close; an owner without sessions ends, after a warm
+        // period when it holds a workbench.
+        sessions.retain(|_, live| live.last.elapsed() < Duration::from_secs(1800));
+        if sessions.is_empty() {
+            let since = *empty_since.get_or_insert_with(Instant::now);
+            if pool.is_none() || since.elapsed() >= POOL_IDLE {
+                return Ok(());
+            }
+        } else {
+            empty_since = None;
+        }
         let stream = match connections.recv_timeout(Duration::from_secs(1)) {
             Ok(connection) => connection.map_err(io)?,
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                if session.tick().is_err() {
-                    break;
-                }
+                sessions.retain(|_, live| live.session.tick().is_ok());
                 continue;
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return Ok(()),
         };
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
@@ -242,29 +357,81 @@ fn serve() -> Result<(), (u8, Value)> {
         let Ok(frame) = serde_json::from_slice::<Value>(&bytes) else {
             continue;
         };
-        let r = &frame["request"];
-        if frame["token"] != token || r["session"] != id {
+        if frame["token"] != token {
             continue;
         }
-        last = Instant::now();
+        let r = &frame["request"];
+        if r["op"] == "attach" && r.get("session").is_none() {
+            let result = if bench.is_some() {
+                attach(&r["open"], &mut bench, port, &token).map(|(id, live, reply)| {
+                    sessions.insert(id.clone(), live);
+                    opened.insert(id, reply.clone());
+                    reply
+                })
+            } else {
+                Err(invalid("pool-unavailable"))
+            };
+            let _ = serde_json::to_writer(stream, &encode(result));
+            continue;
+        }
+        let Some(id) = r["session"].as_str().map(str::to_owned) else {
+            continue;
+        };
+        let Some(live) = sessions.get_mut(&id) else {
+            continue;
+        };
+        live.last = Instant::now();
         let close = r["op"] == "close";
         let result = if close {
             Ok(json!({"session":id,"closed":true}))
         } else if r["op"] == "opened" {
-            Ok(opened.clone())
+            Ok(opened.get(&id).cloned().unwrap_or(Value::Null))
         } else {
-            session.handle(r)
+            live.session.handle(r)
         };
         let terminate = close
-            || (matches!(result, Err((3, _))) && (r["op"] != "save" || session.tick().is_err()));
+            || (matches!(result, Err((3, _)))
+                && (r["op"] != "save" || live.session.tick().is_err()));
         let response = encode(result);
         if terminate {
-            drop(session);
-            drop(file);
-            let _ = serde_json::to_writer(stream, &response);
-            return Ok(());
+            sessions.remove(&id);
+            opened.remove(&id);
         }
         let _ = serde_json::to_writer(stream, &response);
     }
-    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_source_change_starts_a_new_workbench() {
+        let dir = tempfile::tempdir().expect("dir");
+        let project = dir.path();
+        let open = json!({"project": project, "run": "/run", "webLayoutOnly": true});
+        // Outside a repository the source state is unknown: no workbench is shared.
+        assert_eq!(pool_key(&open), None);
+        let git = |args: &[&str]| {
+            let ok = Command::new("git")
+                .arg("-C")
+                .arg(project)
+                .args(args)
+                .output()
+                .is_ok_and(|o| o.status.success());
+            assert!(ok, "git {args:?}");
+        };
+        git(&["init", "-q"]);
+        fs::write(project.join("main.tsx"), "export {}").expect("write");
+        let first = pool_key(&open).expect("key in a repository without commits");
+        assert_eq!(pool_key(&open).as_deref(), Some(first.as_str()));
+        // Same size, later time: still a different source state.
+        std::thread::sleep(Duration::from_millis(20));
+        fs::write(project.join("main.tsx"), "export {}").expect("rewrite");
+        let edited = pool_key(&open).expect("key");
+        assert_ne!(edited, first);
+        // Another run of the same project is another workbench.
+        let other = json!({"project": project, "run": "/other", "webLayoutOnly": true});
+        assert_ne!(pool_key(&other), Some(edited));
+    }
 }

@@ -15,11 +15,13 @@ use dui_core::inspect::{Selection, inspect};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    cell::RefCell,
     collections::HashMap,
     fs,
     io::{BufRead, BufReader, Write},
     path::Path,
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    rc::Rc,
     sync::atomic::Ordering,
 };
 use tempfile::TempDir;
@@ -103,13 +105,34 @@ impl Drop for GpuiProcess {
     }
 }
 
+/// What the web sessions of one project, run and source state share: the analysis, the built
+/// host and one browser. Opening another session only adds a browser context and tab.
+pub struct Workbench {
+    browser: RefCell<Browser>,
+    _host: RunningHost,
+    analysis: Value,
+    spec: Value,
+    report: Value,
+    archived: Value,
+    provenance: Value,
+    // The browser profile and the generated manifest, kept for the host and browser.
+    _files: TempDir,
+}
+
 struct WebBackend {
     viewport_width: u64,
-    browser: Browser,
-    _host: RunningHost,
+    bench: Rc<Workbench>,
+    context: String,
     page: String,
     facts: Vec<Value>,
     baseline: Value,
+}
+
+impl Drop for WebBackend {
+    fn drop(&mut self) {
+        // The context's tab closes with it; the browser stays for the other sessions.
+        let _ = self.bench.browser.borrow_mut().close_control(&self.context);
+    }
 }
 
 enum Backend {
@@ -132,7 +155,13 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn open(id: &str, request: &Value) -> Result<Self, (u8, Value)> {
+    /// Open a session. A web session reuses `bench` when given one and otherwise creates it;
+    /// the caller keeps it for the next session of the same project, run and source state.
+    pub fn open(
+        id: &str,
+        request: &Value,
+        bench: &mut Option<Rc<Workbench>>,
+    ) -> Result<Self, (u8, Value)> {
         let project = Path::new(field(request, "project")?);
         let directory = Path::new(field(request, "run")?);
         let cell = &request["cell"];
@@ -142,6 +171,9 @@ impl Session {
             .and_then(|w| u32::try_from(w).ok())
             .filter(|w| *w > 0)
             .ok_or_else(|| invalid("invalid-width"))?;
+        if let Some(shared) = bench {
+            return Self::attach(id, cell, state, width, Rc::clone(shared));
+        }
         let archived = read(&directory.join("snapshot.json"))?;
         let current = crate::archive::provenance(project)?;
         if archived["projectId"] != current["projectId"] || archived["app"] != current["app"] {
@@ -177,7 +209,7 @@ impl Session {
             return Err(invalid("open-source-cell-for-live-editing"));
         }
 
-        let mut spec = read(manifest)?;
+        let spec = read(manifest)?;
         if request["webLayoutOnly"] == true
             && (gpui::is_gpui_manifest(&spec)
                 || !matches!(spec["host"].as_str(), None | Some("vite")))
@@ -224,16 +256,56 @@ impl Session {
 
         let analysis = analysis::analyze(project, manifest)?;
         let host = ViteHost.start(project, manifest, &analysis)?;
-        if let Some(index) = field(row, "scenario")?.strip_prefix("link-") {
+        let browser =
+            Browser::local(&chromium::executable(), profile.path(), host.port).map_err(io)?;
+        let shared = Rc::new(Workbench {
+            browser: RefCell::new(browser),
+            _host: host,
+            analysis,
+            spec,
+            report,
+            archived,
+            provenance,
+            _files: profile,
+        });
+        *bench = Some(Rc::clone(&shared));
+        Self::attach(id, cell, state, width, shared)
+    }
+
+    /// A web session in `bench`: its own browser context and tab, mounted at the cell's state.
+    fn attach(
+        id: &str,
+        cell: &Value,
+        state: &str,
+        width: u32,
+        bench: Rc<Workbench>,
+    ) -> Result<Self, (u8, Value)> {
+        let mut rows = bench.report["cells"]
+            .as_array()
+            .ok_or_else(|| invalid("invalid-report"))?
+            .iter()
+            .filter(|c| c["state"] == state && c["width"] == width);
+        let row = rows
+            .next()
+            .ok_or_else(|| invalid("cell-not-found"))?
+            .clone();
+        if rows.next().is_some() {
+            return Err(invalid("ambiguous-cell"));
+        }
+        if row["scenario"] == "live" {
+            return Err(invalid("open-source-cell-for-live-editing"));
+        }
+        let mut spec = bench.spec.clone();
+        if let Some(index) = field(&row, "scenario")?.strip_prefix("link-") {
             let index = index
                 .parse::<usize>()
                 .map_err(|_| invalid("unknown-scenario"))?;
-            let path = report["discoveredRoutes"][index]
+            let path = bench.report["discoveredRoutes"][index]
                 .as_str()
                 .ok_or_else(|| invalid("unknown-route"))?;
             spec = analysis::linked_spec(&spec, path);
         } else if row["scenario"] != "default" {
-            let index = field(row, "scenario")?
+            let index = field(&row, "scenario")?
                 .strip_prefix("case-")
                 .and_then(|s| s.parse::<usize>().ok())
                 .and_then(|n| n.checked_sub(1))
@@ -249,11 +321,14 @@ impl Session {
         if spec["path"] != row["path"] || !row["input"].is_object() {
             return Err(invalid("cell-manifest-mismatch"));
         }
-        analysis::apply_generated(&mut spec, &analysis["autoMocks"]);
+        analysis::apply_generated(&mut spec, &bench.analysis["autoMocks"]);
+        // A live page is not evidence: no HTML snapshot or fidelity check on mount.
+        spec["htmlSnapshots"] = json!(false);
 
-        let mut browser =
-            Browser::local(&chromium::executable(), profile.path(), host.port).map_err(io)?;
-        let (_, page, baseline) = browser
+        let profile = tempfile::tempdir().map_err(io)?;
+        let (context, page, baseline) = bench
+            .browser
+            .borrow_mut()
             .open_page(
                 &spec,
                 &row["input"],
@@ -267,24 +342,29 @@ impl Session {
             || baseline["width"] != width
             || !baseline["instances"].is_object()
         {
+            let _ = bench.browser.borrow_mut().close_control(&context);
             return Err(invalid("cell-not-ready"));
         }
-        let environment = json!({"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"compiler":analysis["compiler"],"versions":analysis["versions"],"resizeTargets":["viewport","css-query-container"],"renderer":browser.version().map_err(io)?["product"]});
+        let renderer = bench.browser.borrow_mut().version().map_err(io)?["product"].clone();
+        let environment = json!({"os":std::env::consts::OS,"arch":std::env::consts::ARCH,"compiler":bench.analysis["compiler"],"versions":bench.analysis["versions"],"resizeTargets":["viewport","css-query-container"],"renderer":renderer});
+        let facts = bench.analysis["facts"]
+            .as_array()
+            .cloned()
+            .ok_or_else(|| invalid("invalid-facts"))?;
+        let source_run = bench.archived["id"].clone();
+        let provenance = bench.provenance.clone();
         let mut session = Self {
             backend: Backend::Web(Box::new(WebBackend {
                 viewport_width: u64::from(width),
-                browser,
-                _host: host,
+                bench,
+                context,
                 page,
-                facts: analysis["facts"]
-                    .as_array()
-                    .cloned()
-                    .ok_or_else(|| invalid("invalid-facts"))?,
+                facts,
                 baseline,
             })),
             profile,
             environment,
-            source_run: archived["id"].clone(),
+            source_run,
             path: row["path"].clone(),
             edits: vec![],
             cell: cell.clone(),
@@ -302,7 +382,9 @@ impl Session {
             return Err(io("not-a-web-session"));
         };
         let result = web
+            .bench
             .browser
+            .borrow_mut()
             .call(
                 Some(&web.page),
                 "Runtime.evaluate",
@@ -381,7 +463,9 @@ impl Session {
                     return Err(io("not-a-web-session"));
                 };
                 let image = web
+                    .bench
                     .browser
+                    .borrow_mut()
                     .call(
                         Some(&web.page),
                         "Page.captureScreenshot",
@@ -690,7 +774,9 @@ impl Session {
                     return Err(io("not-a-web-session"));
                 };
                 let image = web
+                    .bench
                     .browser
+                    .borrow_mut()
                     .call(
                         Some(&web.page),
                         "Page.captureScreenshot",
