@@ -3,11 +3,11 @@
   "branch": null,
   "commit": "5c5ad97555a58f818bbd557021b8d18d8225950e",
   "dirty": true,
-  "duiVersion": "0.2.0-dev+d6638330e107",
-  "id": "0001795628595553-qyimti",
+  "duiVersion": "0.2.0-dev+deca4b336a8a",
+  "id": "0001795661045807-8iTbUI",
   "projectId": "e5a9d06cf02ec4ca5c4d5595334a2d3d2373e58b703c29c3b2be22b2ad7e8e29",
   "projectName": ".ha-ios",
   "projectRoot": "/Users/runner/work/dui/dui/.ha-ios",
-  "timestampMs": 1795628595553,
+  "timestampMs": 1795661045807,
   "worktree": "/Users/runner/work/dui/dui/.ha-ios"
 }

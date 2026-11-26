@@ -21,6 +21,50 @@
       "state": "f0d5bde70f672268f0cd1bb884e34beae6710c78f2537fd66d11e26a5ffbcb21",
       "status": "unverified",
       "width": 402
+    },
+    {
+      "image": "8628cf6471608b9f96e0461495111a0be6c777956e6da7432022048662fdc436-ios-402.png",
+      "imageHeight": 2622,
+      "imageWidth": 1206,
+      "input": {
+        "observedPath": "HomeAssistant/OnboardingServersListView.swift#OnboardingServersListView"
+      },
+      "observation": {
+        "path": "HomeAssistant/OnboardingServersListView.swift#OnboardingServersListView",
+        "width": 402
+      },
+      "observedPath": "HomeAssistant/OnboardingServersListView.swift#OnboardingServersListView",
+      "path": "HomeAssistant/OnboardingServersListView.swift#OnboardingServersListView",
+      "planIndex": 0,
+      "reason": "Imported ios recording without automated verification",
+      "runtime": "ios",
+      "scenario": "ios",
+      "screenId": "8628cf6471608b9f96e0461495111a0be6c777956e6da7432022048662fdc436",
+      "state": "d9d29804e2c3bb4ccf42ed976a3541ed75377678386eff2ace15190c45200ba8",
+      "status": "unverified",
+      "width": 402
+    },
+    {
+      "image": "206671494d400b9d1b5ad642c2fb81cfb5770742795b9465283de526da66a11f-ios-402.png",
+      "imageHeight": 2622,
+      "imageWidth": 1206,
+      "input": {
+        "observedPath": "HomeAssistant/ManualURLEntryView.swift#ManualURLEntryView"
+      },
+      "observation": {
+        "path": "HomeAssistant/ManualURLEntryView.swift#ManualURLEntryView",
+        "width": 402
+      },
+      "observedPath": "HomeAssistant/ManualURLEntryView.swift#ManualURLEntryView",
+      "path": "HomeAssistant/ManualURLEntryView.swift#ManualURLEntryView",
+      "planIndex": 0,
+      "reason": "Imported ios recording without automated verification",
+      "runtime": "ios",
+      "scenario": "ios",
+      "screenId": "206671494d400b9d1b5ad642c2fb81cfb5770742795b9465283de526da66a11f",
+      "state": "92adf69717ae0d89340e6713766ec893aa0d13e218b9f9b6cbd5b26df5ee550a",
+      "status": "unverified",
+      "width": 402
     }
   ],
   "coverage": {
@@ -249,5 +293,5 @@
     "Sources/WatchApp/WatchServerDetailView.swift",
     "Sources/WatchApp/WatchSettingsView.swift"
   ],
-  "sourceSnapshot": "0001795628216251-9DuO8y"
+  "sourceSnapshot": "0001795659960662-unz4dL"
 }
