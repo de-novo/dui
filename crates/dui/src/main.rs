@@ -184,6 +184,7 @@ mod cache {
             browser_version,
             force,
         )
+        .built_by(crate::update::VERSION)
     }
 }
 

@@ -79,7 +79,7 @@ erDiagram
 |---|---|
 | 界面地图（[#7](https://github.com/de-novo/dui/issues/7)） | `RunAggregate` → `Screen`（`origin`）、`State`、`Width`、`Cell`（`CellStatus`、`ImageBlob`、`Evidence`）及 `Edge::discovered`（`EdgeSource::Extracted`、`selector`、`observed_widths`）。 |
 | 保存实时捕获（[#3](https://github.com/de-novo/dui/issues/3)） | 发布包含 `RunKind::LiveSave { source_run, source_state, source_width, revision }` 的新不可变 `RunAggregate`、1 个 `Cell`、对应 `ImageBlob` 以及携带 `live_edits` 和断言的 `Evidence`。 |
-| 内容寻址缓存（[#8](https://github.com/de-novo/dui/issues/8)） | `CacheEntry` 将 `CacheKey`（`CacheInputs`）映射到已有 `ImageBlob` + `Evidence` + `CellStatus`；`Cell.cache()` 记录 `Hit` 或 `Miss(changed)`。 |
+| 内容寻址缓存（[#8](https://github.com/de-novo/dui/issues/8)） | `CacheEntry` 将 `CacheKey`（`CacheInputs`）映射到已有 `ImageBlob` + `Evidence` + `CellStatus`；`Cell.cache()` 记录 `Hit` 或 `Miss(changed)`。缓存键包含正在运行的构建（`dui --version`，开发构建含提交），命中格子的 `CellStatus` 会由当前构建的验证器根据存储的观测重新判定；判定改变的格子数记录在报告的 `cache.recomputedVerdicts` 中。 |
 | SQLite + Drizzle 存储（[#10](https://github.com/de-novo/dui/issues/10)） | 在 5 个仓储端口后按聚合/产物建表；文本 ID/哈希、整数 epoch 毫秒时间戳与 JSON 字段保持对 Postgres 的可移植性。大体积 PNG 字节按 `BlobId` 存于磁盘文件。 |
 | 捕获差异对比（[#11](https://github.com/de-novo/dui/issues/11)） | 按 `Cell::diff_key()`（`screen_id`、`state_id`、`width`、`locale`）对比两次 `RunAggregate`；`(status, image_blob, evidence_id)` 相同的格子视为未变化。 |
 | 多语言捕获（[#12](https://github.com/de-novo/dui/issues/12)） | `State.locale()`、`Cell.locale()` 与 `CacheInputs.locale` 将语言维度纳入 ID 与缓存键。 |
