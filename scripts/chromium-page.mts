@@ -115,6 +115,8 @@ export async function withChromiumPage<T>(verify: (page: ChromiumPage) => Promis
     }
   } finally {
     chrome.kill("SIGTERM");
+    // Chrome's crash handler can outlive it holding stderr open, which would keep node alive.
+    chrome.stderr.destroy();
     await new Promise((r) => setTimeout(r, 250));
     try {
       fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 3 });
