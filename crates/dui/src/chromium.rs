@@ -808,6 +808,7 @@ impl Browser {
         width: u32,
         png: &Path,
     ) -> Result<(Value, String)> {
+        let visit_started = std::time::Instant::now();
         self.requests.clear();
         self.fulfilled.clear();
         self.responses.clear();
@@ -967,7 +968,11 @@ impl Browser {
         self.call(s, "Fetch.enable", json!({"patterns":[{"urlPattern":"*"}]}))?;
         self.call(s, "Page.navigate", json!({"url":format!("{origin}{path}")}))?;
         let session = s.ok_or("missing session")?;
-        Ok((self.observe(session, spec, width, png)?, session.to_owned()))
+        let navigated = visit_started.elapsed();
+        let mut v = self.observe(session, spec, width, png)?;
+        v["timing"]["navigateMs"] = json!(navigated.as_millis() as u64);
+        v["timing"]["totalMs"] = json!(visit_started.elapsed().as_millis() as u64);
+        Ok((v, session.to_owned()))
     }
     /// Walks the focus order with trusted Tab presses and records each stop, so audits can check
     /// that every keyboard target is reached and shows a focus indicator.
@@ -1018,6 +1023,8 @@ impl Browser {
     }
 
     fn observe(&mut self, session: &str, spec: &Value, width: u32, png: &Path) -> Result<Value> {
+        let observe_started = std::time::Instant::now();
+        let ms = |d: Duration| d.as_millis() as u64;
         let s = Some(session);
         let origin = self.allowed_origin.clone();
         let selector = spec["readySelector"]
@@ -1079,6 +1086,9 @@ impl Browser {
         if let Some(fields) = v.as_object_mut() {
             fields.remove("volatile");
         }
+        let settle_ms = ms(observe_started.elapsed());
+        let shot_started = std::time::Instant::now();
+        let mut keyboard_ms = 0;
         let ignored = settle.ignored();
         if !ignored.is_empty() {
             v["ignoredChanges"] = json!(ignored);
@@ -1118,6 +1128,11 @@ impl Browser {
             )?;
             v["localeAudit"] = audit["result"]["value"].clone();
         }
+        // A blinking caret would make identical screens differ; hidden before geometry is
+        // measured so the render tree and the image see the same document.
+        let caret =
+            |on: bool| json!({"expression": format!("globalThis.__duiRuntime.hideCaret({on})")});
+        let _ = self.call(s, "Runtime.evaluate", caret(true));
         const MAX_FULL_PAGE_HEIGHT: u32 = 12_000;
         let reveal_info = self
             .call(
@@ -1202,13 +1217,16 @@ impl Browser {
             json!({"format": "png"})
         };
         let screenshot = self.call(s, "Page.captureScreenshot", shot_params);
+        let _ = self.call(s, "Runtime.evaluate", caret(false));
         // Keyboard evidence in the render tree's layout: trusted Tab presses walk the focus order.
         // It costs a CDP round trip per focus stop, so it runs only when an audit asks for it.
+        let keyboard_started = std::time::Instant::now();
         if (spec["keyboardEvidence"] == true
             || std::env::var("DUI_KEYBOARD_EVIDENCE").is_ok_and(|v| v == "1"))
             && let Some(keyboard) = self.keyboard_walk(s)
         {
             v["keyboard"] = keyboard;
+            keyboard_ms = ms(keyboard_started.elapsed());
         }
         if target_h > vp_h {
             self.call(
@@ -1229,6 +1247,8 @@ impl Browser {
             png,
             STANDARD.decode(data["data"].as_str().ok_or("missing image")?)?,
         )?;
+        let screenshot_ms = ms(shot_started.elapsed()).saturating_sub(keyboard_ms);
+        let mut overlays_ms = 0;
         // After screenshot capture, safely expand collapsed WAI-ARIA nav disclosures to
         // discover hidden submenu links without mutating the captured image.
         if spec["routeSelector"].is_string()
@@ -1245,6 +1265,7 @@ impl Browser {
         {
             v["links"] = arr.clone().into();
         }
+        let overlays_started = std::time::Instant::now();
         if spec["discoverOverlays"] == true
             && let Some(out_dir) = png.parent()
             && let Ok(listed) = self.call(
@@ -1304,8 +1325,10 @@ impl Browser {
                 if res["imagePreview"] != true
                     && let Some(slug) = res["slug"].as_str()
                     && seen_slugs.insert(slug.to_owned())
+                    && self.call(s, "Runtime.evaluate", caret(true)).is_ok()
                     && let Ok(shot) =
                         self.call(s, "Page.captureScreenshot", json!({"format": "png"}))
+                    && self.call(s, "Runtime.evaluate", caret(false)).is_ok()
                     && let Some(b64) = shot["data"].as_str()
                     && let Ok(bytes) = STANDARD.decode(b64)
                 {
@@ -1394,6 +1417,7 @@ impl Browser {
             if !overlays.is_empty() {
                 v["overlays"] = json!(overlays);
             }
+            overlays_ms = ms(overlays_started.elapsed());
         }
         if !v.is_object() {
             v = json!({"ready":false});
@@ -1495,6 +1519,14 @@ impl Browser {
             v["apiProvenance"] = json!(self.api_provenance);
         }
         v["screenEvidence"] = dui_core::verification::screen_evidence(spec, &v);
+        // Where this capture spent its time; `navigateMs` and `totalMs` are added by the visit.
+        v["timing"] = json!({
+            "settleMs": settle_ms,
+            "settlePolls": polls,
+            "screenshotMs": screenshot_ms,
+            "overlaysMs": overlays_ms,
+            "keyboardMs": keyboard_ms,
+        });
         Ok(v)
     }
     pub fn version(&mut self) -> Result<Value> {

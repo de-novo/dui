@@ -23,6 +23,7 @@ Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the ta
 | `routeSelector` | Collect matching same-origin anchors recursively via loop-free BFS with visited-URL cycle blocking and dynamic ID pattern collapsing (`/orders/:id`). |
 | `scenarios` | Array of overrides for extra cases. For example, `[{"path":"/settings","readySelector":"form"}]` adds a screen with its own readiness check. |
 | `maxNoImprovementRounds` | Optional convergence guard. Stops exploring additional states in a scenario after N consecutive states produce no new branch outcomes or slots; remaining planned cells stay in the denominator as `unverified (not-rendered)`. |
+| `concurrency` | Browsers capturing at once, 1 to 4. Default: half the logical CPUs, at most 4 (`DUI_CONCURRENCY` also sets it). The first state of each queued screen and the widths of a state run in parallel. The report keeps the same cells in the same order. |
 | `requiredRequests` | Paths that must return a 2xx response. A required request with a generated mock must receive that mock. |
 | `settleTimeoutMs` | Time budget for a screen to stop changing, in milliseconds (default `10000`). dui samples the page about every 100 ms and needs four identical samples in a row. Regions that change on their own are left out and listed in `observation.ignoredChanges`: `aria-busy`, progress bars, timers, endlessly animated elements, and nodes whose text or position changes in three samples in a row. A screen still changing at the budget is `unverified` with `unsettled: NODE CHANGE`, and `observation.unsettled` lists what changed last. |
 | `expectedApiErrors` | API paths (or `prefix*`) whose 401, 403 or 5xx response is part of the screen, such as a signed-out state. Any other same-origin or `apiBaseUrl` Fetch/XHR response with those statuses leaves the cell `unverified` with the reason `api-error: STATUS PATH`. Failed calls are listed in `observation.apiErrors`. |
@@ -63,6 +64,8 @@ Pass a JSON manifest to `dui run PROJECT MANIFEST [OUTPUT]`. `PROJECT` is the ta
 A **cell** represents one scenario, state, and width. `verified` means the observed route, width, readiness, required requests, and applicable state checks passed. `unverified` includes failed checks and queued states left beyond the budget (`not-rendered`). `unrenderable` records an environment limitation. An unsupported project is rejected before capture.
 
 **Cell coverage** is `coverage.verified / coverage.renderable`. If all six routes are captured at three widths, that accounts for 18 baseline cells. Additional planned states still count in the denominator. Use `observedBranchOutcomes` and `branchOutcomes` to inspect branch coverage separately.
+
+**Timing.** Each captured cell has `timing` in milliseconds: `navigateMs`, `settleMs` with `settlePolls`, `screenshotMs`, `overlaysMs`, `keyboardMs` and `totalMs`. Cells served from the cache have none. `timings` in the report gives `wallMs`, per-phase `totals`, the `slowestPhase` and the five `slowestCells`. `dui map` also prints one line to stderr with the cell count, the wall time and the slowest phase.
 
 ## Local capture history
 

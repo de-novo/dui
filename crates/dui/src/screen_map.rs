@@ -30,12 +30,38 @@ pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> R
             fs::write(&manifest, serde_json::to_vec(&profile).map_err(io)?).map_err(io)?;
         }
     }
-    archive::capture(
+    let result = archive::capture(
         &project,
         &manifest,
         None,
         archive::Capture::Run { force: explicit },
-    )
+    );
+    if let Ok(report) | Err((5, report)) = &result
+        && let Some(line) = summary_line(report)
+    {
+        eprintln!("{line}");
+    }
+    result
+}
+
+/// One line for a person watching `dui map`: cells, wall time and the slowest phase.
+fn summary_line(report: &Value) -> Option<String> {
+    let timings = report.get("timings")?;
+    let seconds = |ms: &Value| format!("{:.1} s", ms.as_u64().unwrap_or(0) as f64 / 1000.0);
+    let cells = report["cells"].as_array().map_or(0, Vec::len);
+    let mut line = format!(
+        "dui map: {cells} cells ({} verified) in {}",
+        report["coverage"]["verified"],
+        seconds(&timings["wallMs"])
+    );
+    if let Some(phase) = timings["slowestPhase"].as_str() {
+        line.push_str(&format!(
+            "; slowest phase {phase} ({} over {} captures)",
+            seconds(&timings["totals"][format!("{phase}Ms")]),
+            timings["capturedCells"]
+        ));
+    }
+    Some(line)
 }
 
 fn web_manifest(project: &Path, target: WebTarget<'_>) -> Reply {

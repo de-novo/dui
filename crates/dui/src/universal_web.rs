@@ -482,6 +482,7 @@ struct LazyUniversalBrowser<'a> {
     profile: Option<tempfile::TempDir>,
     session: Option<UniversalSession>,
     browser: Option<Browser>,
+    pool: crate::host::BrowserPool,
 }
 
 impl Renderer for LazyUniversalBrowser<'_> {
@@ -534,7 +535,13 @@ impl Renderer for LazyUniversalBrowser<'_> {
                 .map(|_| Err("host unavailable".into()))
                 .collect();
         };
-        crate::host::parallel_chromium_capture(&self.exe, session.port(), concurrency, jobs)
+        crate::host::parallel_chromium_capture(
+            &self.exe,
+            session.port(),
+            concurrency,
+            &mut self.pool,
+            jobs,
+        )
     }
 }
 
@@ -586,6 +593,7 @@ impl SurfaceAdapter for UniversalWebSurface {
             profile: None,
             session: None,
             browser: None,
+            pool: Vec::new(),
         };
         let renderer = exe.is_file().then_some(&mut lazy as &mut dyn Renderer);
         analysis::exercise_with_renderer(

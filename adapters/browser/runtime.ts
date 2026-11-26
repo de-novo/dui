@@ -779,6 +779,16 @@ declare var __duiProbe: {
   // Full-page screenshots can hide a classic scrollbar and reflow the page after
   // its rectangles have been measured. Reserve the existing gutter while painting.
   let restoreGutter: (() => void) | undefined;
+  // A blinking text caret makes otherwise identical screenshots differ; hide it while painting.
+  function hideCaret(hidden: boolean) {
+    const id = "__dui-hide-caret";
+    document.getElementById(id)?.remove();
+    if (!hidden) return;
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = "*, *::before, *::after { caret-color: transparent !important; }";
+    document.head?.append(style);
+  }
   function setCaptureGutter(enabled: boolean) {
     if (!enabled) {
       restoreGutter?.();
@@ -916,6 +926,7 @@ declare var __duiProbe: {
         return true;
       },
       setCaptureGutter,
+      hideCaret,
       install,
       visibleText,
       async liveEdit(

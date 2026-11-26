@@ -16,6 +16,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Upper bound on browsers capturing at once.
+const MAX_CONCURRENCY: usize = 4;
+
 pub(crate) fn resolve_capture_concurrency(spec: &Value) -> usize {
     let raw = spec["concurrency"]
         .as_u64()
@@ -24,56 +27,47 @@ pub(crate) fn resolve_capture_concurrency(spec: &Value) -> usize {
                 .ok()
                 .and_then(|v| v.parse::<u64>().ok())
         })
-        .unwrap_or(1);
-    (raw as usize).clamp(1, 4)
+        .map(|n| n as usize)
+        // Measured on a 24-page map with dialogs: 1 → 53 s, 2 → 30 s, 3 → 24 s, 4 → 21 s,
+        // with identical cells. Half the logical CPUs leaves room for the app's own server.
+        .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get() / 2));
+    raw.clamp(1, MAX_CONCURRENCY)
 }
+
+/// Browsers kept for parallel capture. Each has its own profile and lives for the whole run,
+/// so later batches skip the launch and keep per-browser state such as probed header overlays.
+pub(crate) type BrowserPool = Vec<(tempfile::TempDir, Browser)>;
 
 pub(crate) fn parallel_chromium_capture(
     exe: &Path,
     port: u16,
     concurrency: usize,
+    pool: &mut BrowserPool,
     jobs: &[CaptureBatchJob<'_>],
 ) -> Vec<Result<Value, String>> {
-    let workers = concurrency.clamp(1, 4).min(jobs.len());
+    let workers = concurrency.clamp(1, MAX_CONCURRENCY).min(jobs.len());
+    while pool.len() < workers {
+        let launched = tempfile::tempdir()
+            .map_err(|e| e.to_string())
+            .and_then(|profile| {
+                Browser::local(exe, profile.path(), port)
+                    .map(|browser| (profile, browser))
+                    .map_err(|e| e.to_string())
+            });
+        match launched {
+            Ok(entry) => pool.push(entry),
+            Err(msg) if pool.is_empty() => return jobs.iter().map(|_| Err(msg.clone())).collect(),
+            Err(_) => break,
+        }
+    }
     let next_idx = AtomicUsize::new(0);
     let results: Mutex<Vec<Option<Result<Value, String>>>> =
         Mutex::new((0..jobs.len()).map(|_| None).collect());
 
     std::thread::scope(|scope| {
-        for _ in 0..workers {
-            scope.spawn(|| {
-                let profile = match tempfile::tempdir() {
-                    Ok(dir) => dir,
-                    Err(e) => {
-                        let msg = e.to_string();
-                        loop {
-                            let idx = next_idx.fetch_add(1, Ordering::SeqCst);
-                            if idx >= jobs.len() {
-                                break;
-                            }
-                            if let Ok(mut guard) = results.lock() {
-                                guard[idx] = Some(Err(msg.clone()));
-                            }
-                        }
-                        return;
-                    }
-                };
-                let mut browser = match Browser::local(exe, profile.path(), port) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        let msg = e.to_string();
-                        loop {
-                            let idx = next_idx.fetch_add(1, Ordering::SeqCst);
-                            if idx >= jobs.len() {
-                                break;
-                            }
-                            if let Ok(mut guard) = results.lock() {
-                                guard[idx] = Some(Err(msg.clone()));
-                            }
-                        }
-                        return;
-                    }
-                };
+        for (_, browser) in pool.iter_mut().take(workers) {
+            let (next_idx, results) = (&next_idx, &results);
+            scope.spawn(move || {
                 loop {
                     let idx = next_idx.fetch_add(1, Ordering::SeqCst);
                     if idx >= jobs.len() {
@@ -119,6 +113,7 @@ struct LazyViteBrowser<'a> {
     profile: Option<tempfile::TempDir>,
     host: Option<RunningHost>,
     browser: Option<Browser>,
+    pool: BrowserPool,
 }
 
 impl Renderer for LazyViteBrowser<'_> {
@@ -171,7 +166,7 @@ impl Renderer for LazyViteBrowser<'_> {
                 .map(|_| Err("host unavailable".into()))
                 .collect();
         };
-        parallel_chromium_capture(&self.exe, host.port, concurrency, jobs)
+        parallel_chromium_capture(&self.exe, host.port, concurrency, &mut self.pool, jobs)
     }
 }
 
@@ -196,6 +191,7 @@ pub(crate) fn run_vite_web_with_facts(
         profile: None,
         host: None,
         browser: None,
+        pool: Vec::new(),
     };
     let renderer = exe.is_file().then_some(&mut lazy as &mut dyn Renderer);
     analysis::exercise_with_renderer(
