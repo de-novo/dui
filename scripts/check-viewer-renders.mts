@@ -67,7 +67,7 @@ for (const i of pages) {
 let server: ReturnType<typeof spawn> | undefined;
 try {
   // Exit 5 is fine here: the map only needs to exist.
-  const run = spawnSync(binary, ["map", site, "--build-dir", site], {
+  const run = spawnSync(binary, ["map", site, "--build-dir", site, "--capture"], {
     encoding: "utf8",
     env: { ...process.env, HOME: home },
   });

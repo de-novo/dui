@@ -13,7 +13,7 @@ const exec = promisify(execFile);
 const binary = resolve("target/debug/dui");
 const dir = await mkdtemp(join(tmpdir(), "dui-map-url-"));
 const run = (...args: string[]) =>
-  exec(binary, ["map", ...args], { cwd: dir, env: { ...process.env, HOME: dir } });
+  exec(binary, ["map", ...args, "--capture"], { cwd: dir, env: { ...process.env, HOME: dir } });
 
 const paths = ["entry", "second", "third"].map((label) => "/" + label + "-" + randomUUID());
 const pages = new Map(paths.map((path, i) => [path, i]));
@@ -119,7 +119,7 @@ createRoot(document.getElementById("root")!).render(<RouterProvider router={rout
     cells: { path: string; status: string; observation: { text?: string } }[];
   };
   const mapped = async (...args: string[]) => {
-    const out = await exec(binary, ["map", app, ...args], {
+    const out = await exec(binary, ["map", app, ...args, "--capture"], {
       cwd: dir,
       env: { ...process.env, HOME: dir },
     }).catch((e: { stdout: string }) => e);

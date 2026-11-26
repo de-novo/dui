@@ -2,8 +2,11 @@ use crate::{Reply, archive, failure, replay::io};
 use serde_json::{Value, json};
 use std::{fs, path::Path, process::Command};
 
-pub fn capture(project: &Path) -> Reply {
-    capture_target(project, None)
+/// Map a project. Without `capture` the map holds no evidence: screens, states and widths are
+/// planned, each screen is loaded once to read its links, and cells stay `not-rendered` until
+/// captured (docs/en/web-viewer.md#shared-screen-maps). `dui run` and MCP always capture.
+pub fn capture(project: &Path, capture: bool) -> Reply {
+    capture_target(project, None, capture)
 }
 
 pub(crate) enum WebTarget<'a> {
@@ -11,7 +14,11 @@ pub(crate) enum WebTarget<'a> {
     BuildDir(&'a Path),
 }
 
-pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> Reply {
+pub(crate) fn capture_target(
+    project: &Path,
+    target: Option<WebTarget<'_>>,
+    capture: bool,
+) -> Reply {
     let project = project.canonicalize().map_err(io)?;
     if target.is_none()
         && let Some((app, adapter)) = crate::native_map::target(&project)?
@@ -33,6 +40,9 @@ pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> R
             fs::write(&manifest, serde_json::to_vec(&profile).map_err(io)?).map_err(io)?;
         }
     }
+    if !capture {
+        plan_only(&manifest)?;
+    }
     let result = archive::capture(
         &project,
         &manifest,
@@ -47,13 +57,26 @@ pub(crate) fn capture_target(project: &Path, target: Option<WebTarget<'_>>) -> R
     result
 }
 
+/// A map without evidence: no images, HTML snapshots or dialog probing; the analysis loads each
+/// screen once at its widest width to read links and leaves every other cell `not-rendered`.
+fn plan_only(manifest: &Path) -> Result<(), (u8, Value)> {
+    let mut spec: Value = serde_json::from_slice(&fs::read(manifest).map_err(io)?).map_err(io)?;
+    spec["capture"] = json!(false);
+    spec["htmlSnapshots"] = json!(false);
+    spec["discoverOverlays"] = json!(false);
+    fs::write(manifest, serde_json::to_vec(&spec).map_err(io)?).map_err(io)
+}
+
 /// One line for a person watching `dui map`: cells, wall time and the slowest phase.
 fn summary_line(report: &Value) -> Option<String> {
     let timings = report.get("timings")?;
     let seconds = |ms: &Value| format!("{:.1} s", ms.as_u64().unwrap_or(0) as f64 / 1000.0);
     let cells = report["cells"].as_array().map_or(0, Vec::len);
+    let captured = report["cells"]
+        .as_array()
+        .map_or(0, |c| c.iter().filter(|c| c["image"].is_string()).count());
     let mut line = format!(
-        "dui map: {cells} cells ({} verified) in {}",
+        "dui map: {cells} cells, {captured} captured ({} verified) in {}",
         report["coverage"]["verified"],
         seconds(&timings["wallMs"])
     );
@@ -391,7 +414,7 @@ mod tests {
 
     #[test]
     fn the_summary_groups_unverified_cells_by_reason() {
-        let cell = |status: &str, reason: Option<&str>| json!({"status": status, "reason": reason});
+        let cell = |status: &str, reason: Option<&str>| json!({"status": status, "reason": reason, "image": "x.png"});
         let report = json!({
             "coverage": {"verified": 1},
             "timings": {"wallMs": 12_300, "slowestPhase": "settle", "capturedCells": 5,
@@ -406,8 +429,22 @@ mod tests {
         });
         assert_eq!(
             summary_line(&report).expect("line"),
-            "dui map: 5 cells (1 verified) in 12.3 s; slowest phase settle (9.0 s over 5 captures); \
-             unverified: 2 not-ready, 1 api-error, 1 redirected"
+            "dui map: 5 cells, 5 captured (1 verified) in 12.3 s; slowest phase settle (9.0 s over \
+             5 captures); unverified: 2 not-ready, 1 api-error, 1 redirected"
+        );
+        // A map without capture plans its cells: none captured, none counted as a failure kind
+        // other than not-rendered.
+        let planned = json!({
+            "coverage": {"verified": 0},
+            "timings": {"wallMs": 1_000},
+            "cells": [
+                {"status": "unverified", "reason": "not-rendered"},
+                {"status": "unverified", "reason": "not-rendered"},
+            ],
+        });
+        assert_eq!(
+            summary_line(&planned).expect("line"),
+            "dui map: 2 cells, 0 captured (0 verified) in 1.0 s; unverified: 2 not-rendered"
         );
     }
 

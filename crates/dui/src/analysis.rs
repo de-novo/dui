@@ -400,6 +400,11 @@ fn execute_with_locales(
     mut cache: Option<&mut CellCache>,
 ) -> Reply {
     let run_started = std::time::Instant::now();
+    // A map without evidence (docs/en/web-viewer.md#shared-screen-maps): cached captures are
+    // reused, each screen's first state is loaded once at the widest width to read its links,
+    // and every other cell is planned as `not-rendered`.
+    let plan_only = spec["capture"] == false;
+    let discovery_width = widths.iter().next_back().copied().unwrap_or(0);
     let facts = analysis["facts"]
         .as_array()
         .ok_or_else(|| failure(3, "invalid facts"))?;
@@ -543,6 +548,9 @@ fn execute_with_locales(
                     }
                     capture_spec["assertions"] = checks.clone();
                     for width in widths {
+                        if plan_only && *width != discovery_width {
+                            continue;
+                        }
                         let cached = cache
                             .as_deref()
                             .and_then(|c| {
@@ -651,6 +659,7 @@ fn execute_with_locales(
                     }
                 }
                 if widths.len() >= 2
+                    && !plan_only
                     && crate::host::resolve_capture_concurrency(&locale_spec) > 1
                     && let Some(browser) = renderer.as_deref_mut()
                 {
@@ -836,6 +845,14 @@ fn execute_with_locales(
                         continue;
                     }
 
+                    if plan_only && (index != 0 || *width != discovery_width) {
+                        let mut cell = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"status":"unverified","reason":"not-rendered"});
+                        if let Some(loc) = locale {
+                            cell["locale"] = json!(loc);
+                        }
+                        cells.push(cell);
+                        continue;
+                    }
                     let miss_outcome = match cached_lookup {
                         Some(CacheLookup::Miss { outcome }) => {
                             cache_misses += 1;
@@ -958,7 +975,7 @@ fn execute_with_locales(
                             });
                             let cell_status = match &reason {
                                 None => {
-                                    verified += 1;
+                                    verified += usize::from(!plan_only);
                                     CellStatus::verified()
                                 }
                                 Some(f) => {
@@ -969,7 +986,9 @@ fn execute_with_locales(
                                 }
                             };
                             let target_png = out.join(&name);
-                            if let Some(c) = cache.as_deref_mut() {
+                            if plan_only {
+                                // A visit to read links, not evidence: nothing is kept.
+                            } else if let Some(c) = cache.as_deref_mut() {
                                 c.store_rendered(
                                     cache_inputs.as_ref(),
                                     &bytes,
@@ -986,6 +1005,13 @@ fn execute_with_locales(
                             let mut entry = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"image":name,"status":if reason.is_none(){"verified"}else{"unverified"},"checks":checks,"reason":reason.as_ref().map(|f| intent.describe(f, &obs, spec["readySelector"].as_str())),"observation":obs});
                             if let Some(timing) = timing {
                                 entry["timing"] = timing;
+                            }
+                            if plan_only && let Some(fields) = entry.as_object_mut() {
+                                for key in ["image", "checks"] {
+                                    fields.remove(key);
+                                }
+                                fields.insert("status".into(), json!("unverified"));
+                                fields.insert("reason".into(), json!("not-rendered"));
                             }
                             if let Some(expected_p) = spec["path"].as_str()
                                 && let Some(obs_p) = entry["observation"]["path"].as_str()
@@ -1577,6 +1603,56 @@ mod tests {
         assert_eq!(report["screenDiscovery"]["capturedCells"], 1);
         assert_eq!(report["coverage"]["verified"], 0);
         assert_eq!(report["cells"][0]["reason"], "missing-screen-assertion");
+    }
+
+    /// Counts the widths it is asked to render.
+    struct CountingPage(Vec<u32>);
+    impl Renderer for CountingPage {
+        fn capture(
+            &mut self,
+            spec: &Value,
+            input: &Value,
+            width: u32,
+            image: &Path,
+        ) -> Result<Value, Box<dyn std::error::Error>> {
+            self.0.push(width);
+            StaticPage.capture(spec, input, width, image)
+        }
+    }
+
+    #[test]
+    fn a_map_without_capture_plans_cells_and_loads_each_screen_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let facts = json!({"facts":[{"file":"file","start":1,"end":2,"kind":"slot","owner":"Screen","shape":{"kind":"boolean"},"after":3,"init":[1,2]}],"diagnostics":[]});
+        let mut page = CountingPage(Vec::new());
+        let (code, report) = execute_with(
+            Some(&mut page),
+            &facts,
+            &json!({"path": "/", "capture": false, "maxNoImprovementRounds": 1}),
+            dir.path(),
+            &BTreeSet::from([375, 1280]),
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(code, 5);
+        // The first state, once, at the widest width, to read the screen's links.
+        assert_eq!(page.0, vec![1280]);
+        let cells = report["cells"].as_array().unwrap();
+        assert!(cells.len() >= 2, "{cells:?}");
+        assert!(
+            cells
+                .iter()
+                .all(|c| c["reason"] == "not-rendered" && c.get("image").is_none())
+        );
+        assert_eq!(report["coverage"]["attempted"], 0);
+        assert_eq!(report["coverage"]["verified"], 0);
+        // No evidence is written.
+        assert!(
+            fs::read_dir(dir.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .all(|e| !e.file_name().to_string_lossy().ends_with(".png"))
+        );
     }
 
     #[test]

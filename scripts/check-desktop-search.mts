@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 
 const home = mkdtempSync(join(tmpdir(), "dui-search-"));
 try {
-  execFileSync(resolve("target/debug/dui"), ["map", "examples/dispatch"], {
+  execFileSync(resolve("target/debug/dui"), ["map", "examples/dispatch", "--capture"], {
     env: { ...process.env, HOME: home },
     stdio: ["ignore", "ignore", "inherit"],
   });

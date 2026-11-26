@@ -660,7 +660,7 @@ async function dogfoodAudit(port: number, keys: string[]) {
   try {
     for (const key of keys) {
       const url = `http://127.0.0.1:${port}/demo/?run=${encodeURIComponent(key)}`;
-      const mapped = await dui(binary, ["map", project, "--url", url], env);
+      const mapped = await dui(binary, ["map", project, "--url", url, "--capture"], env);
       if (mapped.status !== 0 && !mapped.stdout.trim())
         throw new Error(`dui map failed for ${key}: ${mapped.stderr}`);
       const run = JSON.parse(mapped.stdout);
