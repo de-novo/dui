@@ -638,6 +638,23 @@ declare var __duiProbe: {
     }
   }
 
+  /** Resolve as soon as `done()` holds (checked every 16 ms), or after `ms`. */
+  async function waitUntil(done: () => boolean, ms: number) {
+    const deadline = performance.now() + ms;
+    while (!done() && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 16));
+    }
+    return done();
+  }
+
+  function overlayClosed(active: HTMLElement) {
+    return (
+      !active.isConnected ||
+      (active instanceof HTMLDialogElement && !active.open) ||
+      !active.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+    );
+  }
+
   function isImagePreview(dialog: HTMLElement) {
     if (
       !dialog.querySelector("img") ||
@@ -1072,7 +1089,12 @@ declare var __duiProbe: {
           pushCandidate(el, false);
         }
         (globalThis as Record<string, unknown>).__duiOverlayTriggers = triggers;
-        return triggers.map((t, index) => ({ index, label: t.label, scope: t.scope }));
+        // The rectangle identifies a shared header trigger across screens (probed once per run).
+        return triggers.map((t, index) => {
+          const r = t.el.getBoundingClientRect();
+          const rect = [r.x, r.y, r.width, r.height].map(Math.round);
+          return { index, label: t.label, scope: t.scope, rect };
+        });
       },
       async openOverlayTrigger(index: number) {
         const triggers = ((globalThis as Record<string, unknown>).__duiOverlayTriggers ?? []) as {
@@ -1121,7 +1143,12 @@ declare var __duiProbe: {
         } catch {
           return { opened: false };
         }
-        await new Promise((resolve) => setTimeout(resolve, 380));
+        // Continue as soon as a dialog appears or the page navigates; a trigger that does
+        // neither within 380 ms opened nothing.
+        await waitUntil(
+          () => location.href !== startHref || visibleDialogs().some((d) => !before.has(d)),
+          380,
+        );
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         if (location.href !== startHref) {
           try {
@@ -1152,6 +1179,16 @@ declare var __duiProbe: {
         } catch {
           // Ignore animation API errors.
         }
+        // Content that arrives after the dialog opens (lazy sections): wait until the dialog's
+        // markup is unchanged across two checks, for at most 300 ms.
+        let markup = dialog.innerHTML;
+        let unchanged = 0;
+        await waitUntil(() => {
+          const next = dialog.innerHTML;
+          unchanged = next === markup ? unchanged + 1 : 0;
+          markup = next;
+          return unchanged >= 2;
+        }, 300);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         let title = (dialog.getAttribute("aria-label") || "").trim();
         if (!title) {
@@ -1190,7 +1227,6 @@ declare var __duiProbe: {
       },
       /** After a trusted Escape: did the overlay close, and did focus go back to its trigger? */
       async overlayDismissal() {
-        await new Promise((resolve) => setTimeout(resolve, 320));
         const active = (globalThis as Record<string, unknown>).__duiActiveOverlay as
           | HTMLElement
           | undefined;
@@ -1198,10 +1234,9 @@ declare var __duiProbe: {
           | HTMLElement
           | undefined;
         if (!active) return null;
-        const closed =
-          !active.isConnected ||
-          (active instanceof HTMLDialogElement && !active.open) ||
-          !active.checkVisibility({ visibilityProperty: true, opacityProperty: true });
+        // An exit animation can keep the overlay visible briefly; wait up to 320 ms for it.
+        const closed = await waitUntil(() => overlayClosed(active), 320);
+        if (closed) await new Promise((resolve) => requestAnimationFrame(resolve));
         const focused = document.activeElement;
         return {
           closedByEscape: closed,
@@ -1262,6 +1297,13 @@ declare var __duiProbe: {
         window.scrollTo(0, 0);
       },
       async closeOverlay() {
+        const open = (globalThis as Record<string, unknown>).__duiActiveOverlay as
+          | HTMLElement
+          | undefined;
+        if (!open || overlayClosed(open)) {
+          (globalThis as Record<string, unknown>).__duiActiveOverlay = undefined;
+          return;
+        }
         const target = (document.activeElement as HTMLElement | null) ?? document.body;
         try {
           target?.dispatchEvent(
@@ -1273,23 +1315,16 @@ declare var __duiProbe: {
         } catch {
           // Ignore synthetic keyboard event failures.
         }
-        await new Promise((resolve) => setTimeout(resolve, 260));
-        const active = (globalThis as Record<string, unknown>).__duiActiveOverlay as
-          | HTMLElement
-          | undefined;
-        if (active && active.isConnected) {
-          const cs = getComputedStyle(active);
-          if (cs.display !== "none" && cs.visibility !== "hidden") {
-            if (active instanceof HTMLDialogElement && active.open) {
-              active.close();
-            } else {
-              const closeBtn = active.querySelector<HTMLElement>(
-                'button[aria-label*="close" i], button[title*="close" i]',
-              );
-              closeBtn?.click();
-            }
-            await new Promise((resolve) => setTimeout(resolve, 220));
+        if (!(await waitUntil(() => overlayClosed(open), 260))) {
+          if (open instanceof HTMLDialogElement && open.open) {
+            open.close();
+          } else {
+            const closeBtn = open.querySelector<HTMLElement>(
+              'button[aria-label*="close" i], button[title*="close" i]',
+            );
+            closeBtn?.click();
           }
+          await waitUntil(() => overlayClosed(open), 220);
         }
         (globalThis as Record<string, unknown>).__duiActiveOverlay = undefined;
       },

@@ -298,6 +298,9 @@ pub struct Browser {
     generated_get: BTreeMap<String, (&'static str, String)>,
     fulfilled: std::collections::BTreeSet<String>,
     responses: BTreeMap<String, u16>,
+    /// Shared header triggers already probed in this run, by width, label and rectangle:
+    /// the overlay they opened, or `None` when they opened nothing worth capturing.
+    overlay_probes: BTreeMap<String, Option<Value>>,
     response_ids: BTreeMap<String, Value>,
     allowed_origin: String,
     api_mode: ApiMode,
@@ -360,6 +363,7 @@ impl Browser {
             generated_get: Default::default(),
             fulfilled: Default::default(),
             responses: Default::default(),
+            overlay_probes: Default::default(),
             response_ids: Default::default(),
             allowed_origin: format!("http://127.0.0.1:{port}"),
             api_mode: ApiMode::Mock,
@@ -1128,6 +1132,23 @@ impl Browser {
                 let Some(idx) = trigger["index"].as_u64() else {
                     continue;
                 };
+                // A header trigger (same label and rectangle) opens the same overlay on every
+                // screen, so it is probed once per width and later screens reuse the result.
+                let probe_key = (trigger["scope"] == "header")
+                    .then(|| format!("{width}|{}|{}", trigger["label"], trigger["rect"]));
+                if let Some(cached) = probe_key.as_ref().and_then(|k| self.overlay_probes.get(k)) {
+                    if let Some(overlay) = cached
+                        && overlay["slug"]
+                            .as_str()
+                            .is_some_and(|slug| seen_slugs.insert(slug.to_owned()))
+                    {
+                        let mut overlay = overlay.clone();
+                        overlay["probe"] = json!("reused");
+                        overlays.push(overlay);
+                    }
+                    continue;
+                }
+                let captured_before = overlays.len();
                 let Ok(opened) = self.call(
                     s,
                     "Runtime.evaluate",
@@ -1141,6 +1162,9 @@ impl Browser {
                 };
                 let res = &opened["result"]["value"];
                 if res["opened"] != true {
+                    if let Some(key) = probe_key {
+                        self.overlay_probes.insert(key, None);
+                    }
                     continue;
                 }
                 if res["imagePreview"] != true
@@ -1223,6 +1247,15 @@ impl Browser {
                         "returnByValue": true
                     }),
                 );
+                // Remember a captured overlay or an image preview. A repeated slug on this
+                // screen says nothing about the trigger, so it is probed again next time.
+                if let Some(key) = probe_key {
+                    if overlays.len() > captured_before {
+                        self.overlay_probes.insert(key, overlays.last().cloned());
+                    } else if res["imagePreview"] == true {
+                        self.overlay_probes.insert(key, None);
+                    }
+                }
             }
             if !overlays.is_empty() {
                 v["overlays"] = json!(overlays);
@@ -1520,6 +1553,7 @@ pub fn capture_login_session(
         generated_get: Default::default(),
         fulfilled: Default::default(),
         responses: Default::default(),
+        overlay_probes: Default::default(),
         response_ids: Default::default(),
         allowed_origin: String::new(),
         api_mode: ApiMode::Live,
