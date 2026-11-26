@@ -16,7 +16,7 @@ Today, the sources of truth for making a product are split across planning docum
 - A standalone design tool with its own file format.
 - Support for every platform at once. The priority is to deepen the capture and editing paths needed for this goal.
 
-**Current focus.** Close the loop: generate the map from code, and write UI edits back into that code (the code-based canvas work planned for v0.3.0). Broader platform coverage and packaging can wait.
+**Current focus.** Close the loop: generate the map from code, and write UI edits back into that code (the code-based canvas work planned for v0.3.0). Broader platform coverage and packaging can wait. The first step is drawing web cards from HTML snapshots of the real render ([decision](architecture.md#4-finalized-decisions-2026-11-20)); rendering components directly from code follows.
 
 dui maps the screens an app actually renders so a reviewer can follow a task from start to finish. Screens are the landmarks. Each screen opens into its states and viewport widths. A connection records the action that leads to another screen or state.
 
