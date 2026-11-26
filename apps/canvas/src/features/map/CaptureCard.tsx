@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SourceCardBody } from "../../components/NativeSourceEvidence";
 import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
@@ -37,12 +37,15 @@ export function CaptureCard({
   beforeRunKey,
   afterRunKey,
   snapshotUrl,
+  overlay,
 }: {
   screen: Screen;
   cell?: Cell;
   imageUrl: (name: string) => string;
   /** The capture's HTML snapshot, drawn over the PNG once it has loaded. */
   snapshotUrl?: string;
+  /** Drawn over the capture in its own coordinates, such as where link edges start. */
+  overlay?: ReactNode;
   selected?: boolean;
   related?: boolean;
   dimmed?: boolean;
@@ -227,6 +230,7 @@ export function CaptureCard({
             {diffBadgeText}
           </span>
         )}
+        {resolvedSrc && overlay}
       </div>
       <div className="card-caption">
         <strong>{screen.nativeSource?.name ?? routeName(screen.path)}</strong>

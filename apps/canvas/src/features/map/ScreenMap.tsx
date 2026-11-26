@@ -19,6 +19,7 @@ import { MapGuideOptions } from "./MapCardGuides";
 import { CaptureCard } from "./CaptureCard";
 import { clearLane, layoutMap } from "./layout";
 import { cardCell } from "../../model/selection";
+import { anchorsTo, treeCell, type AnchorBox } from "../../model/linkAnchors";
 import { SNAPSHOT_MIN_SCREEN_WIDTH, snapshotUsable, useSnapshotFrame } from "./snapshotSlots";
 import {
   Background,
@@ -48,9 +49,19 @@ import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
 
+/** Where an outgoing link edge starts on a card: the first anchor to its target, and the others. */
+type CardAnchor = {
+  id: string;
+  /** The card border the edge leaves through: the nearer of top and bottom. */
+  exit: "up" | "down";
+  box: AnchorBox;
+  others: AnchorBox[];
+};
+
 type CardNode = Node<
   {
     screen: Screen;
+    anchors?: CardAnchor[];
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -269,6 +280,7 @@ function Card({
         cell={cell}
         imageUrl={data.imageUrl}
         snapshotUrl={granted && cell?.snapshot ? data.imageUrl(cell.snapshot.file) : undefined}
+        overlay={data.anchors && <LinkAnchors anchors={data.anchors} selected={data.selected} />}
         selected={data.selected}
         related={data.related}
         dimmed={data.dimmed}
@@ -284,7 +296,57 @@ function Card({
   );
 }
 
+const percent = (fraction: number) => `${fraction * 100}%`;
+const anchorBoxStyle = (box: AnchorBox) => ({
+  left: percent(box.x),
+  top: percent(box.y),
+  width: percent(box.width),
+  height: percent(box.height),
+});
+
+/** The points link edges leave a card from, placed in the capture's coordinates so they sit on
+ * the anchor in the PNG and in the HTML snapshot alike. A selected card outlines every anchor
+ * of its outgoing links. */
+function LinkAnchors({ anchors, selected }: { anchors: CardAnchor[]; selected: boolean }) {
+  return (
+    <div className="link-anchor-layer" aria-hidden="true">
+      {anchors.map(({ id, exit, box, others }) => {
+        const x = box.x + box.width / 2;
+        const y = exit === "up" ? box.y : box.y + box.height;
+        return (
+          <Fragment key={id}>
+            {selected && (
+              <>
+                <span className="link-anchor-box" style={anchorBoxStyle(box)} />
+                {others.map((other, i) => (
+                  <span
+                    key={i}
+                    className="link-anchor-box link-anchor-box-other"
+                    style={anchorBoxStyle(other)}
+                  />
+                ))}
+              </>
+            )}
+            <span className="link-anchor-dot" style={{ left: percent(x), top: percent(y) }} />
+            <Handle
+              type="source"
+              id={id}
+              position={exit === "up" ? Position.Top : Position.Bottom}
+              className="link-anchor-handle"
+              style={{ left: percent(x), top: percent(y) }}
+              isConnectable={false}
+            />
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 type GutterEdgeData = {
+  /** An edge leaving from an anchor inside the card goes straight out through the top or
+   * bottom border to `outY`, then beside the card to `sideX`, the border facing its target. */
+  anchored?: { outY: number; sideX: number };
   colGap: number;
   gutterY?: number;
   multiColumn: boolean;
@@ -327,7 +389,7 @@ function buildRoundedPolyline(pts: { x: number; y: number }[], radius = 24): str
 
 function GutterEdge({
   id,
-  sourceX,
+  sourceX: handleX,
   sourceY,
   targetX,
   targetY,
@@ -344,8 +406,36 @@ function GutterEdge({
   let edgePath: string;
   let labelX: number;
   let labelY: number;
+  const sourceX = handleX;
+  const anchored = data?.anchored;
 
-  if (multiColumn && gutterY !== undefined) {
+  if (anchored) {
+    // Out of the card beside the anchor, never across the capture's content.
+    const dir = targetX >= anchored.sideX ? 1 : -1;
+    const stub = Math.min(88, Math.max(44, colGap * 0.34));
+    const exitX = anchored.sideX + dir * stub;
+    const entryX = targetX - dir * stub;
+    const route =
+      multiColumn && gutterY !== undefined
+        ? [
+            { x: exitX, y: gutterY },
+            { x: entryX, y: gutterY },
+            { x: entryX, y: targetY },
+          ]
+        : [{ x: exitX, y: targetY }];
+    edgePath = buildRoundedPolyline(
+      [
+        { x: sourceX, y: sourceY },
+        { x: sourceX, y: anchored.outY },
+        { x: exitX, y: anchored.outY },
+        ...route,
+        { x: targetX, y: targetY },
+      ],
+      28,
+    );
+    labelX = multiColumn && gutterY !== undefined ? (exitX + entryX) / 2 : exitX;
+    labelY = multiColumn && gutterY !== undefined ? gutterY : (anchored.outY + targetY) / 2;
+  } else if (multiColumn && gutterY !== undefined) {
     const dir = targetX >= sourceX ? 1 : -1;
     const stub = Math.min(88, Math.max(44, colGap * 0.34));
     const exitX = sourceX + dir * stub;
@@ -481,6 +571,35 @@ export function ScreenMap({
     }
     return set;
   }, [focusActive, selectedId, layout.links]);
+  // Where each link edge leaves its card: the anchor to the target on the capture the card
+  // shows. Diff mode can show another capture, so it keeps edges on the card border.
+  const anchors = useMemo(() => {
+    const placed = new Map(layout.nodes.map((n) => [n.screen.id, n]));
+    const bySource = new Map<string, CardAnchor[]>();
+    if (diffActive) return bySource;
+    for (const link of layout.links) {
+      const from = placed.get(link.source);
+      const to = placed.get(link.target);
+      if (!from || !to || link.origin === "overlay") continue;
+      const shown = cardCell(from.screen, width);
+      if (!shown?.image) continue;
+      const [box, ...others] = anchorsTo(
+        treeCell(from.screen, shown),
+        from.screen.path,
+        to.screen.path,
+      );
+      if (!box) continue;
+      const list = bySource.get(link.source) ?? [];
+      list.push({
+        id: `anchor:${link.target}`,
+        exit: box.y + box.height / 2 < 0.5 ? "up" : "down",
+        box,
+        others,
+      });
+      bySource.set(link.source, list);
+    }
+    return bySource;
+  }, [layout, width, diffActive]);
   // React Flow remeasures and re-renders a node whenever its object changes. Node objects are
   // built without selection; selecting then replaces only the selected and related cards.
   // Fading the other cards during selection focus is done in CSS (`data-node-focus`).
@@ -503,6 +622,7 @@ export function ScreenMap({
           selected: false,
           data: {
             screen,
+            anchors: anchors.get(screen.id),
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -522,6 +642,7 @@ export function ScreenMap({
       }),
     [
       layout.nodes,
+      anchors,
       diffsByPath,
       diffActive,
       mode,
@@ -557,6 +678,30 @@ export function ScreenMap({
   // objects for every edge they do not touch, so React Flow re-renders only the changed edges.
   const baseEdges = useMemo<MapEdge[]>(() => {
     const positions = new Map(layout.nodes.map((n) => [n.screen.id, n.position]));
+    const cardHeights = new Map(
+      layout.nodes.map((n) => [n.screen.id, heights.get(n.screen.id) ?? n.frameHeight]),
+    );
+    // Anchored edges leave a card at staggered distances: of the edges leaving one border
+    // toward one side, the one nearest that side stays closest, so their lines never cross.
+    const sideOf = (source: string, target: string) =>
+      positions.get(target)!.x >= positions.get(source)!.x ? 1 : -1;
+    const outRank = new Map<string, number>();
+    for (const [source, list] of anchors) {
+      for (const anchor of list) {
+        const target = anchor.id.slice("anchor:".length);
+        const dir = sideOf(source, target);
+        const centre = (x: CardAnchor) => x.box.x + x.box.width / 2;
+        const rank = list.filter(
+          (other) =>
+            other.exit === anchor.exit &&
+            sideOf(source, other.id.slice("anchor:".length)) === dir &&
+            (centre(other) - centre(anchor)) * dir > 0,
+        ).length;
+        outRank.set(JSON.stringify([source, target]), rank);
+      }
+    }
+    const liftBase = Math.max(16, cardWidth / 32);
+    const liftStep = Math.max(8, cardWidth / 48);
     const cardRects = layout.nodes.map((n) => ({
       x: n.position.x,
       y: n.position.y,
@@ -585,15 +730,22 @@ export function ScreenMap({
           cardRects.some(
             (r) => r.x === a.x && r.y > Math.min(a.y, b.y) && r.y < Math.max(a.y, b.y),
           );
-        const [out, into] = interveningSibling
-          ? [Position.Right, Position.Right]
-          : a.x === b.x
-            ? a.y < b.y
-              ? [Position.Bottom, Position.Top]
-              : [Position.Top, Position.Bottom]
-            : a.x < b.x
-              ? [Position.Right, Position.Left]
-              : [Position.Left, Position.Right];
+        const anchor = anchors.get(source)?.find((x) => x.id === `anchor:${target}`);
+        const anchorDir = sideOf(source, target);
+        const [out, into] = anchor
+          ? [
+              anchor.exit === "up" ? Position.Top : Position.Bottom,
+              anchorDir < 0 ? Position.Right : a.x === b.x ? Position.Right : Position.Left,
+            ]
+          : interveningSibling
+            ? [Position.Right, Position.Right]
+            : a.x === b.x
+              ? a.y < b.y
+                ? [Position.Bottom, Position.Top]
+                : [Position.Top, Position.Bottom]
+              : a.x < b.x
+                ? [Position.Right, Position.Left]
+                : [Position.Left, Position.Right];
         const originText =
           origin === "overlay"
             ? "Discovered overlay"
@@ -628,11 +780,27 @@ export function ScreenMap({
           source,
           target,
           type: "gutter",
-          zIndex: 0,
-          sourceHandle: out,
+          // An anchored edge starts on the card, so it is drawn above it.
+          zIndex: anchor ? 1 : 0,
+          sourceHandle: anchor?.id ?? out,
           targetHandle: into,
           label: edgeLabel,
           data: {
+            ...(anchor
+              ? (() => {
+                  const lift = Math.min(
+                    rowGap * 0.4,
+                    liftBase + liftStep * (outRank.get(JSON.stringify([source, target])) ?? 0),
+                  );
+                  return {
+                    anchored: {
+                      outY:
+                        anchor.exit === "up" ? a.y - lift : a.y + cardHeights.get(source)! + lift,
+                      sideX: anchorDir > 0 ? a.x + cardWidth : a.x,
+                    },
+                  };
+                })()
+              : {}),
             colGap,
             gutterY,
             multiColumn,
@@ -653,7 +821,7 @@ export function ScreenMap({
         } satisfies MapEdge;
       },
     );
-  }, [layout, heights, cardWidth, column, rowGap, colGap, strokeWidth, labelFontSize]);
+  }, [layout, anchors, heights, cardWidth, column, rowGap, colGap, strokeWidth, labelFontSize]);
   // The focused card's edges are drawn on top in full strength. Every other edge keeps its
   // object and is dimmed by the `data-edge-focus` rule in preview.css.
   const edges = useMemo<MapEdge[]>(() => {

@@ -122,6 +122,17 @@ try {
       cards: await ev<number>("document.querySelectorAll('.react-flow__node').length"),
       edges: await ev<number>("document.querySelectorAll('.react-flow__edge').length"),
     };
+    // Link edges start at the anchor that leads to their target (#321): every anchor dot has an
+    // edge whose drawn path begins on it.
+    const anchors = await ev<{ dots: number; worst: number }>(`(() => {
+      const starts = [...document.querySelectorAll('.react-flow__edge path.react-flow__edge-path')].map(p => {
+        const m = p.getScreenCTM(); const pt = p.getPointAtLength(0);
+        return { x: m.a * pt.x + m.c * pt.y + m.e, y: m.b * pt.x + m.d * pt.y + m.f };
+      });
+      const dots = [...document.querySelectorAll('.link-anchor-dot')].map(d => { const r = d.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+      const worst = Math.max(0, ...dots.map(d => Math.min(...starts.map(s => Math.hypot(s.x - d.x, s.y - d.y)))));
+      return { dots: dots.length, worst };
+    })()`);
     const measure = async (act: () => Promise<void>) => {
       await ev("(window.__renders.commits = 0, window.__renders.renders = {}, true)");
       await act();
@@ -153,9 +164,11 @@ try {
       await mouse("mousePressed", card.x, card.y, { button: "left", clickCount: 1 });
       await mouse("mouseReleased", card.x, card.y, { button: "left", clickCount: 1 });
     });
-    return { counts, idle, sweep, select };
+    return { counts, anchors, idle, sweep, select };
   });
-  const { counts, idle, sweep, select } = result;
+  const { counts, anchors, idle, sweep, select } = result;
+  assert.ok(anchors.dots > 0, `link edges leave from anchors: ${JSON.stringify(anchors)}`);
+  assert.ok(anchors.worst <= 1, `edges start on their anchors: ${JSON.stringify(anchors)}`);
   assert.ok(counts.cards >= 40 && counts.edges >= 20, JSON.stringify(counts));
   assert.equal(idle.commits, 0, "an idle map does not re-render");
   assert.ok(sweep.commits > 0, "moving over cards changes the hover focus");
@@ -173,6 +186,7 @@ try {
     JSON.stringify({
       ok: true,
       ...counts,
+      anchors,
       sweep: { commits: sweep.commits, edges: sweep.renders.GutterEdge ?? 0 },
       select: { commits: select.commits, cards: select.renders.CaptureCard ?? 0 },
     }),

@@ -2775,3 +2775,38 @@ h2 {
 .source-preview-reason code {
   font-family: var(--font-mono);
 }
+/* Where link edges leave a card: the anchor on the capture (docs/en/web-viewer.md, links). */
+.link-anchor-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.map .react-flow__handle.link-anchor-handle {
+  width: 0;
+  height: 0;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  right: auto;
+  bottom: auto;
+  transform: none;
+}
+.link-anchor-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--map-link);
+  box-shadow: 0 0 0 2px var(--capture-surface);
+  transform: translate(-50%, -50%);
+}
+.link-anchor-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--primary);
+  border-radius: 3px;
+}
+.link-anchor-box-other {
+  border-style: dashed;
+  opacity: 0.7;
+}
