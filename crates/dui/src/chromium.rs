@@ -1179,11 +1179,30 @@ impl Browser {
             }
             Err(e) => return json!({"error": e.to_string()}),
         };
-        let html = snapshot["html"].as_str().unwrap_or_default();
+        let inline = snapshot["html"].as_str().unwrap_or_default();
         use sha2::{Digest, Sha256};
+        // Rendered back while self-contained, so fidelity compares the same content the viewer
+        // shows; the file is then rewritten with large resources moved to shared assets.
+        // A name of its own per probe: the reused render-back tab waits for the probe's URL, so
+        // a URL shared with the previous probe would be taken for loaded before it navigates,
+        // and parallel captures writing into one run must not overwrite each other's probe.
+        static PROBES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let probe = out_dir.join(format!(
+            ".render-back-{}-{}-{width}.html",
+            std::process::id(),
+            PROBES.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        if let Err(e) = fs::write(&probe, inline) {
+            return json!({"error": e.to_string()});
+        }
+        let fidelity = self.render_back(&probe, width, png);
+        let _ = fs::remove_file(&probe);
+        let (html, assets) = match crate::snapshot_assets::externalize(inline, out_dir) {
+            Ok(split) => split,
+            Err(e) => return json!({"error": e.to_string()}),
+        };
         let file = format!("{:x}-{width}.html", Sha256::digest(html.as_bytes()));
-        let path = out_dir.join(&file);
-        if let Err(e) = fs::write(&path, html) {
+        if let Err(e) = fs::write(out_dir.join(&file), &html) {
             return json!({"error": e.to_string()});
         }
         let mut record = json!({
@@ -1191,7 +1210,10 @@ impl Browser {
             "bytes": html.len(),
             "omitted": snapshot["omitted"],
         });
-        match self.render_back(&path, width, png) {
+        if !assets.is_empty() {
+            record["assets"] = json!(assets);
+        }
+        match fidelity {
             Ok(fidelity) => record["fidelity"] = json!((fidelity * 1e4).round() / 1e4),
             Err(e) => record["fidelityError"] = json!(e.to_string()),
         }

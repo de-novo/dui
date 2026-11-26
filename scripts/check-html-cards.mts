@@ -16,10 +16,17 @@ const home = join(stage, "home");
 const site = join(stage, "site");
 mkdirSync(site);
 const pages = Array.from({ length: 24 }, (_, i) => i);
+// Every page uses one large font: the snapshots share it, and the viewer must serve it to the
+// sandboxed frames.
+writeFileSync(
+  join(site, "large.woff2"),
+  Buffer.from(Array.from({ length: 24 * 1024 }, (_, i) => (i * 7919) % 251)),
+);
 for (const i of pages) {
   writeFileSync(
     join(site, i === 0 ? "index.html" : `p${i}.html`),
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page ${i}</title></head>
+<style>@font-face{font-family:Large;src:url(/large.woff2) format("woff2")} h1{font-family:Large,sans-serif}</style>
 <body style="font-family:sans-serif"><nav>${pages.map((p) => `<a href="/p${p}.html">Page ${p}</a>`).join(" ")}</nav>
 <main><h1>Page ${i}</h1><p>Orders for page ${i}.</p></main></body></html>`,
   );
@@ -71,6 +78,44 @@ try {
         ev<Frames>(
           "({ frames: document.querySelectorAll('iframe.card-snapshot').length, loaded: document.querySelectorAll('iframe.card-snapshot-loaded').length, showing: [...new Set([...document.querySelectorAll('.capture-frame')].map(f => f.dataset.showing))], overflow: document.scrollingElement.scrollWidth - innerWidth })",
         );
+      // Requests from every frame, including the sandboxed snapshot frames when they run in
+      // their own process.
+      const assetLoads: { url: string; status?: number; failed?: string }[] = [];
+      page.ws.addEventListener("message", (event) => {
+        const msg = JSON.parse(String(event.data)) as {
+          method?: string;
+          params?: Record<string, any>;
+          sessionId?: string;
+        };
+        if (msg.method === "Target.attachedToTarget") {
+          const sessionId = msg.params!.sessionId as string;
+          for (const method of ["Network.enable", "Runtime.runIfWaitingForDebugger"])
+            page.ws.send(
+              JSON.stringify({ id: Math.floor(Math.random() * 1e9), sessionId, method }),
+            );
+        }
+        if (
+          msg.method === "Network.requestWillBeSent" &&
+          /\/asset-[0-9a-f]{64}\./.test(msg.params!.request.url)
+        )
+          assetLoads.push({ url: msg.params!.request.url, id: msg.params!.requestId } as never);
+        const load = assetLoads.find(
+          (l) => (l as never as { id: string }).id === msg.params?.requestId,
+        );
+        if (load && msg.method === "Network.responseReceived")
+          load.status = msg.params!.response.status;
+        if (load && msg.method === "Network.loadingFailed")
+          load.failed =
+            msg.params!.blockedReason ??
+            msg.params!.corsErrorStatus?.corsError ??
+            msg.params!.errorText;
+      });
+      await page.call("Network.enable");
+      await page.call("Target.setAutoAttach", {
+        autoAttach: true,
+        waitForDebuggerOnStart: true,
+        flatten: true,
+      });
       await page.call("Page.enable");
       await page.call("Emulation.setDeviceMetricsOverride", {
         width: vw,
@@ -108,6 +153,25 @@ try {
       );
       assert.equal(policy.type, "text/html; charset=utf-8");
       assert.match(policy.csp, /default-src 'none'.*sandbox/);
+      // The frames load the run's shared font from the viewer, allowed by policy and CORS.
+      // A frame can unmount while its font is in flight; finished loads must succeed and none
+      // may be blocked.
+      assert.ok(
+        assetLoads.some((l) => l.status === 200),
+        `snapshot frames load the shared font: ${JSON.stringify(assetLoads)}`,
+      );
+      assert.ok(
+        assetLoads.every(
+          (l) =>
+            (l.status === undefined || l.status === 200) &&
+            (!l.failed || l.failed === "net::ERR_ABORTED"),
+        ),
+        JSON.stringify(assetLoads),
+      );
+      assert.equal(
+        new Set(assetLoads.map((l) => new URL(l.url).pathname.split("/").pop())).size,
+        1,
+      );
       assert.equal(
         await ev<string>("document.querySelector('iframe.card-snapshot').getAttribute('sandbox')"),
         "",
@@ -164,6 +228,7 @@ try {
       results.desktop = {
         overview,
         oneToOne,
+        assetLoads: assetLoads.length,
         zoomedOut: { ...many, largeCardsInView: large },
         source,
       };

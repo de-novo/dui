@@ -19,6 +19,7 @@ mod reference;
 mod replay;
 mod retry;
 mod screen_map;
+mod snapshot_assets;
 mod surface;
 mod transition;
 mod tui;

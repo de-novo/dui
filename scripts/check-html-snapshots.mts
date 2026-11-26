@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { deflateSync } from "node:zlib";
+import { createHash } from "node:crypto";
 
 const root = resolve(import.meta.dirname, "..");
 const binary = resolve(process.env.DUI_BIN ?? join(root, "target/debug/dui"));
@@ -48,10 +49,16 @@ type Snapshot = {
   bytes: number;
   fidelity: number;
   omitted: { resource: string; reason: string }[];
+  assets?: string[];
 };
 type Report = {
   output: string;
-  cells: { status: string; image: string; observation: { htmlSnapshot?: Snapshot } }[];
+  cells: {
+    status: string;
+    image: string;
+    width: number;
+    observation: { htmlSnapshot?: Snapshot };
+  }[];
 };
 
 try {
@@ -59,9 +66,15 @@ try {
   mkdirSync(join(site, "fonts"), { recursive: true });
   writeFileSync(join(site, "logo.png"), solidPng(40, 40, [200, 40, 60]));
   writeFileSync(join(site, "fonts/brand.woff2"), Buffer.from("not a real font, only inlined"));
+  // A large resource every screen uses is stored once per run, not inlined in each snapshot.
+  const large = Buffer.from(Array.from({ length: 24 * 1024 }, (_, i) => (i * 7919) % 251));
+  writeFileSync(join(site, "fonts/large.woff2"), large);
+  const largeName = `asset-${createHash("sha256").update(large).digest("hex")}.woff2`;
   writeFileSync(
     join(site, "site.css"),
     `@font-face { font-family: Brand; src: url("fonts/brand.woff2") format("woff2"); }
+@font-face { font-family: Large; src: url("fonts/large.woff2") format("woff2"); }
+h1 { font-family: Large, sans-serif }
 body { font-family: sans-serif; margin: 16px }
 h1 { color: #333; border-bottom: 4px solid #c22 }
 label { display: block; margin: 8px 0 }`,
@@ -104,12 +117,10 @@ document.getElementById("d").show();
     return JSON.parse(run.stdout) as Report;
   };
 
-  const first = capture({}, "home");
-  const snap = first.cells[0]!.observation.htmlSnapshot!;
-  assert.ok(
-    snap?.file?.endsWith("-800.html"),
-    JSON.stringify(first.cells[0]!.observation.htmlSnapshot),
-  );
+  const first = capture({ widths: [800, 600] }, "home");
+  const at800 = first.cells.find((c) => c.width === 800)!;
+  const snap = at800.observation.htmlSnapshot!;
+  assert.ok(snap?.file?.endsWith("-800.html"), JSON.stringify(at800.observation.htmlSnapshot));
   const html = readFileSync(join(first.output, snap.file), "utf8");
   assert.doesNotMatch(html, /<script|onclick=/i, "no scripts or handlers");
   assert.doesNotMatch(html, /<link[^>]+stylesheet/i, "styles are inlined, not linked");
@@ -129,6 +140,12 @@ document.getElementById("d").show();
   );
   assert.match(html, /<dialog[^>]*open/, "open dialog stays open");
   assert.match(html, /src: url\("data:[^"]*base64,[^"]+"\) format\("woff2"\)/, "font inlined");
+  // Both widths refer to the one shared copy of the large font.
+  assert.ok(html.includes(`url("${largeName}")`), "large font shared by name");
+  for (const cell of first.cells)
+    assert.deepEqual(cell.observation.htmlSnapshot?.assets, [largeName], JSON.stringify(cell));
+  assert.ok(readFileSync(join(first.output, largeName)).equals(large), "asset bytes kept");
+  assert.ok(snap.bytes < large.length, `snapshot ${snap.bytes} bytes without the font`);
   assert.deepEqual(
     snap.omitted.map((o) => [o.resource, o.reason]),
     [["http://cdn.example.com/x.png", "cross-origin"]],
@@ -151,10 +168,11 @@ ${Array.from({ length: 6 }, (_, i) => `<section><p>Section ${i} with centered te
   assert.ok(tallSnap.fidelity <= 0.005, `tall page fidelity ${tallSnap.fidelity}`);
 
   // A cache hit brings the snapshot along.
-  const again = capture({}, "home");
-  const reused = again.cells[0]!.observation.htmlSnapshot!;
+  const again = capture({ widths: [800, 600] }, "home");
+  const reused = again.cells.find((c) => c.width === 800)!.observation.htmlSnapshot!;
   assert.equal(reused?.file, snap.file);
   assert.ok(existsSync(join(again.output, reused.file)), "snapshot restored from the cache");
+  assert.ok(existsSync(join(again.output, largeName)), "shared asset restored from the cache");
 
   // The manifest can turn snapshots off.
   const off = capture({ htmlSnapshots: false }, "home-off");
@@ -164,6 +182,7 @@ ${Array.from({ length: 6 }, (_, i) => `<section><p>Section ${i} with centered te
     JSON.stringify({
       ok: true,
       bytes: snap.bytes,
+      assets: snap.assets,
       fidelity: snap.fidelity,
       omitted: snap.omitted.length,
     }),
