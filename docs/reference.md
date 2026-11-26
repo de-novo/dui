@@ -62,7 +62,7 @@ A proxied request still waiting when the screen is captured is listed in `observ
 
 | File in `OUTPUT` | What to inspect |
 | --- | --- |
-| `graph.html` | Default captures by route and width, with a graph for exploring individual states and their evidence. Open locally alongside the PNG files. |
+| PNG files | One image per captured cell. Open the run with `dui open RUN_DIR`: a local server shows the screen map with these images, states and evidence until you stop it. |
 | `report.json` | Cell status and reason, screenshot path, compiler diagnostics, and coverage counts. `cells[].observation.fulfilledMocks` lists generated mocks actually served. |
 | `facts.json` | Compiler facts, state candidates’ source locations, and generated responses. |
 | `graph.json` | Nodes and edges for tools that consume the graph. |
