@@ -65,7 +65,7 @@ try {
   assert.equal(readFileSync(join(project, "View.tsx")).subarray(start, end).toString(), "안녕🌿");
   writeFileSync(
     join(project, "View.tsx"),
-    `import "./theme.css"; export const View = () => <p className="text-brand bg-loop rounded-card">Preview</p>;`,
+    `import "./theme.css"; export const View = () => <p className="text-brand bg-loop rounded-card px-card gap-4">Preview</p>;`,
   );
   writeFileSync(
     join(project, "theme.css"),
@@ -77,6 +77,9 @@ try {
   --color-loop: var(--color-cycle);
   --color-cycle: var(--color-loop);
   --radius-card: var(--radius-missing);
+  --spacing-card: var(--spacing-edge);
+  --spacing-edge: 0.75rem;
+  --spacing-4: 6px;
 }`,
   );
   const themed = JSON.parse(extract(project, "View.tsx"));
@@ -91,6 +94,30 @@ try {
   assert.deepEqual(color.value, { kind: "token", token: brand.id, resolved: brand.value.resolved });
   assert.equal(background.value.resolved, undefined);
   assert.equal(radius.value.resolved, undefined);
+  const spacingToken = themed.tokens.find((t: { name: string }) => t.name === "--spacing-card");
+  assert.equal(spacingToken.group, "spacing");
+  assert.equal(spacingToken.location.file, "theme.css");
+  assert.deepEqual(spacingToken.value, {
+    kind: "token",
+    token: "theme.css#--spacing-edge",
+    resolved: { kind: "length", unit: "rem", value: 0.75 },
+  });
+  const spacingStyles = themed.components[0].root.style.slice(3);
+  assert.deepEqual(
+    spacingStyles.map((s: { property: string }) => s.property),
+    ["paddingStart", "paddingEnd", "gap"],
+  );
+  for (const side of spacingStyles.slice(0, 2))
+    assert.deepEqual(side.value, {
+      kind: "token",
+      token: spacingToken.id,
+      resolved: spacingToken.value.resolved,
+    });
+  assert.deepEqual(spacingStyles[2].value, {
+    kind: "token",
+    token: "theme.css#--spacing-4",
+    resolved: { kind: "length", unit: "px", value: 6 },
+  });
   assert.equal(
     themed.tokens.find((t: { name: string }) => t.name === "--color-loop").value.text,
     "var(--color-cycle)",

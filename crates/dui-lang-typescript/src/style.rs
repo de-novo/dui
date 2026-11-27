@@ -143,6 +143,8 @@ pub fn theme(f: &File) -> Vec<m::Token> {
             let val = f.text(*value);
             let group = if name.starts_with("--color-") {
                 m::TokenGroup::Color
+            } else if name.starts_with("--spacing-") {
+                m::TokenGroup::Spacing
             } else if name.starts_with("--radius-") {
                 m::TokenGroup::Radius
             } else {
@@ -323,14 +325,22 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
         "justify-between" => (P::JustifyContent, "spaceBetween"),
         _ => {
             let (prefix, key) = s.split_once('-')?;
-            let props: &[P] = match prefix {
-                "gap" => &[P::Gap],
-                "p" => PADDING,
-                "px" => &[P::PaddingStart, P::PaddingEnd],
-                "py" => &[P::PaddingTop, P::PaddingBottom],
-                _ => &[],
+            let (props, group): (&[P], &str) = match prefix {
+                "gap" => (&[P::Gap], "spacing"),
+                "p" => (PADDING, "spacing"),
+                "px" => (&[P::PaddingStart, P::PaddingEnd], "spacing"),
+                "py" => (&[P::PaddingTop, P::PaddingBottom], "spacing"),
+                "text" => (&[P::Color], "color"),
+                "bg" => (&[P::Background], "color"),
+                "rounded" => (&[P::BorderRadius], "radius"),
+                _ => return None,
             };
-            if !props.is_empty() {
+            let name = format!("--{group}-{key}");
+            let mut matches = tokens.iter().filter(|t| t.name == name);
+            let Some(token) = matches.next() else {
+                if group != "spacing" {
+                    return None;
+                }
                 let step = key.parse::<u16>().ok()?;
                 return Some((
                     props.into(),
@@ -339,21 +349,12 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
                         unit: m::LengthUnit::Rem,
                     },
                 ));
-            }
-            let (prop, group) = match prefix {
-                "text" => (P::Color, "color"),
-                "bg" => (P::Background, "color"),
-                "rounded" => (P::BorderRadius, "radius"),
-                _ => return None,
             };
-            let name = format!("--{group}-{key}");
-            let mut matches = tokens.iter().filter(|t| t.name == name);
-            let token = matches.next()?;
             if matches.next().is_some() {
                 return None;
             }
             return Some((
-                vec![prop],
+                props.into(),
                 V::Token {
                     token: token.id.clone(),
                     resolved: match &token.value {
