@@ -1,6 +1,7 @@
 //! Map static style syntax and retain the source of each unsupported declaration.
 use crate::syntax::{File, children, field, first, unwrap_expr};
 use dui_core::source_model::{self as m, StyleProperty as P, StyleValue as V};
+use std::collections::{BTreeMap, BTreeSet};
 use tree_sitter::Node as Ast;
 
 fn color(s: &str) -> Option<V> {
@@ -35,7 +36,7 @@ fn length(s: &str) -> Option<V> {
     None
 }
 pub fn theme(f: &File) -> Vec<m::Token> {
-    let mut tokens = std::collections::BTreeMap::new();
+    let mut tokens = BTreeMap::new();
     for rule in children(f.tree.root_node()) {
         let parts = children(rule);
         if parts.first().is_none_or(|n| f.text(*n) != "@theme") {
@@ -85,7 +86,68 @@ pub fn theme(f: &File) -> Vec<m::Token> {
             );
         }
     }
+    resolve_aliases(&mut tokens);
     tokens.into_values().collect()
+}
+
+// Resolve only single-argument var() references inside one parsed @theme stylesheet.
+// Cache the terminal value, but keep the immediate target ID for consumers editing tokens.
+fn resolve_aliases(tokens: &mut BTreeMap<String, m::Token>) {
+    let mut links = BTreeMap::new();
+    for (name, token) in tokens.iter() {
+        let V::Unresolved { text, .. } = &token.value else {
+            continue;
+        };
+        let Some(target) = text
+            .strip_prefix("var(")
+            .and_then(|s| s.strip_suffix(')'))
+            .map(str::trim)
+        else {
+            continue;
+        };
+        if let Some(other) = tokens.get(target)
+            && other.group == token.group
+        {
+            links.insert(name.clone(), target.to_owned());
+        }
+    }
+    let mut resolved: BTreeMap<String, Option<V>> = BTreeMap::new();
+    for start in links.keys() {
+        let mut seen = BTreeSet::new();
+        let mut current = start;
+        let terminal = loop {
+            if let Some(cached) = resolved.get(current) {
+                break cached.clone();
+            }
+            let Some(next) = links.get(current) else {
+                break tokens.get(current).and_then(|t| match &t.value {
+                    v @ (V::Color { .. } | V::Length { .. }) => Some(v.clone()),
+                    V::Number { .. }
+                    | V::Keyword { .. }
+                    | V::Token { .. }
+                    | V::Unresolved { .. } => None,
+                });
+            };
+            if !seen.insert(current.clone()) {
+                break None;
+            }
+            current = next;
+        };
+        for name in seen {
+            resolved.insert(name, terminal.clone());
+        }
+    }
+    for (name, target) in links {
+        if let Some(Some(value)) = resolved.remove(&name) {
+            let id = tokens[&target].id.clone();
+            if let Some(token) = tokens.get_mut(&name) {
+                token.value = V::Token {
+                    token: id,
+                    resolved: Some(Box::new(value)),
+                };
+            }
+        }
+    }
 }
 const PADDING: &[P] = &[
     P::PaddingTop,
@@ -134,7 +196,14 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
                 vec![prop],
                 V::Token {
                     token: token.id.clone(),
-                    resolved: Some(Box::new(token.value.clone())),
+                    resolved: match &token.value {
+                        V::Token { resolved, .. } => resolved.clone(),
+                        V::Unresolved { .. } => None,
+                        value @ (V::Length { .. }
+                        | V::Color { .. }
+                        | V::Number { .. }
+                        | V::Keyword { .. }) => Some(Box::new(value.clone())),
+                    },
                 },
             ));
         }

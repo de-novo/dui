@@ -149,6 +149,8 @@ The reference maps easy syntax: Tailwind classes and inline styles. Tailwind spa
 
 A token keeps the name the source uses (`--color-brand`, `--text-2xl`) so it can later become a design variable. `group` is `color`, `spacing`, `typography`, `radius`, `size` or `other`. `value` is a final value, or a `token` value that aliases another token. Aliases must not form a cycle. `modes` holds values per mode, such as `dark`. A project token has a `location`. A framework default has a `package` (`tailwindcss`) and no location.
 
+Within one imported theme stylesheet, a color or radius token can refer to another token of the same group with `var(--name)`. The model keeps the immediate reference and resolved value. Cycles, missing definitions and fallback expressions retain their source as unresolved values.
+
 ## 8. Edges
 
 `kind` is `link` (a declarative link such as `<Link>` or `NavigationLink`), `navigate` (an imperative call) or `present` (a sheet or dialog over the current screen). `to` is a `screen`, a `route` path that matches no screen in the model, or an `opaque` expression. An edge starts at the node that triggers it. Its screens follow from the screens that draw that node, including through component instances (`SourceModel::screen_edges`).

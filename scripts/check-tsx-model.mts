@@ -62,6 +62,38 @@ try {
   assert.equal(view.unresolvedStyle[0].text, "p-6");
   const { start, end } = view.children[0].location;
   assert.equal(readFileSync(join(project, "View.tsx")).subarray(start, end).toString(), "안녕🌿");
+  writeFileSync(
+    join(project, "View.tsx"),
+    `import "./theme.css"; export const View = () => <p className="text-brand bg-loop rounded-card">Preview</p>;`,
+  );
+  writeFileSync(
+    join(project, "theme.css"),
+    `@import "tailwindcss";
+@theme {
+  --color-brand: var(--color-primary);
+  --color-primary: var(--color-base);
+  --color-base: #AbC;
+  --color-loop: var(--color-cycle);
+  --color-cycle: var(--color-loop);
+  --radius-card: var(--radius-missing);
+}`,
+  );
+  const themed = JSON.parse(extract(project, "View.tsx"));
+  assert.ok(validate(themed));
+  const brand = themed.tokens.find((t: { name: string }) => t.name === "--color-brand");
+  assert.deepEqual(brand.value, {
+    kind: "token",
+    token: "theme.css#--color-primary",
+    resolved: { kind: "color", value: "#aabbcc" },
+  });
+  const [color, background, radius] = themed.components[0].root.style;
+  assert.deepEqual(color.value, { kind: "token", token: brand.id, resolved: brand.value.resolved });
+  assert.equal(background.value.resolved, undefined);
+  assert.equal(radius.value.resolved, undefined);
+  assert.equal(
+    themed.tokens.find((t: { name: string }) => t.name === "--color-loop").value.text,
+    "var(--color-cycle)",
+  );
 } finally {
   rmSync(project, { recursive: true, force: true });
 }
