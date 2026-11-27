@@ -1,0 +1,1360 @@
+{
+  "layout": {
+    "samples": [
+      [
+        86.079208,
+        72.734375
+      ],
+      [
+        86.609334,
+        72.453125
+      ],
+      [
+        85.784292,
+        72.515625
+      ],
+      [
+        85.890959,
+        72.734375
+      ],
+      [
+        91.157625,
+        72.765625
+      ],
+      [
+        86.238958,
+        72.59375
+      ],
+      [
+        87.194958,
+        73.265625
+      ]
+    ],
+    "pairs": {
+      "todo": {
+        "owners": [
+          "/#/",
+          "/#/active",
+          "/#/completed"
+        ],
+        "pairs": {
+          "[\"/#/\",\"/#/active\"]": [
+            [
+              "js/footer.tsx",
+              1245
+            ]
+          ],
+          "[\"/#/\",\"/#/completed\"]": [
+            [
+              "js/footer.tsx",
+              1456
+            ]
+          ],
+          "[\"/#/active\",\"/#/\"]": [
+            [
+              "js/footer.tsx",
+              1046
+            ]
+          ],
+          "[\"/#/active\",\"/#/completed\"]": [
+            [
+              "js/footer.tsx",
+              1456
+            ]
+          ],
+          "[\"/#/completed\",\"/#/\"]": [
+            [
+              "js/footer.tsx",
+              1046
+            ]
+          ],
+          "[\"/#/completed\",\"/#/active\"]": [
+            [
+              "js/footer.tsx",
+              1245
+            ]
+          ]
+        }
+      },
+      "bp": {
+        "owners": [
+          "/",
+          "/auth/register",
+          "/auth/login",
+          "/app/discussions",
+          "/app/discussions/:discussionId",
+          "/app/users",
+          "/app/profile",
+          "/app",
+          "*"
+        ],
+        "pairs": {
+          "[\"/\",\"/app\"]": [
+            [
+              "src/app/routes/landing.tsx",
+              408
+            ]
+          ],
+          "[\"/\",\"/auth/login\"]": [
+            [
+              "src/app/routes/landing.tsx",
+              468
+            ]
+          ],
+          "[\"/auth/register\",\"/app\"]": [
+            [
+              "src/app/routes/auth/register.tsx",
+              812
+            ],
+            [
+              "src/components/layouts/auth-layout.tsx",
+              710
+            ]
+          ],
+          "[\"/auth/register\",\"/\"]": [
+            [
+              "src/components/layouts/auth-layout.tsx",
+              1168
+            ]
+          ],
+          "[\"/auth/register\",\"/auth/login\"]": [
+            [
+              "src/features/auth/components/register-form.tsx",
+              3343
+            ]
+          ],
+          "[\"/auth/login\",\"/app\"]": [
+            [
+              "src/app/routes/auth/login.tsx",
+              561
+            ],
+            [
+              "src/components/layouts/auth-layout.tsx",
+              710
+            ]
+          ],
+          "[\"/auth/login\",\"/\"]": [
+            [
+              "src/components/layouts/auth-layout.tsx",
+              1168
+            ]
+          ],
+          "[\"/auth/login\",\"/auth/register\"]": [
+            [
+              "src/features/auth/components/login-form.tsx",
+              1501
+            ]
+          ],
+          "[\"/app/discussions\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/discussions/:discussionId\"]": [
+            [
+              "src/features/discussions/components/discussions-list.tsx",
+              1922
+            ]
+          ],
+          "[\"/app/discussions\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/discussions\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/users\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/users\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/users\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/users\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/users\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/profile\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/profile\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/profile\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/profile\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/profile\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"*\",\"/\"]": [
+            [
+              "src/app/routes/not-found.tsx",
+              308
+            ]
+          ]
+        }
+      },
+      "canvas": {
+        "owners": [
+          "/",
+          "/?view=diff",
+          "/?view=model"
+        ],
+        "pairs": {
+          "[\"/\",\"/?view=diff\"]": [
+            [
+              "src/preview.tsx",
+              28701
+            ]
+          ],
+          "[\"/\",\"/?view=model\"]": [
+            [
+              "src/features/workspace/EmptyWorkspace.tsx",
+              276
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              539
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              2165
+            ]
+          ],
+          "[\"/?view=diff\",\"/\"]": [
+            [
+              "src/preview.tsx",
+              28926
+            ]
+          ],
+          "[\"/?view=diff\",\"/?view=model\"]": [
+            [
+              "src/features/workspace/EmptyWorkspace.tsx",
+              276
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              539
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              2165
+            ]
+          ],
+          "[\"/?view=model\",\"/\"]": [
+            [
+              "src/features/model/ModelView.tsx",
+              1280
+            ]
+          ]
+        }
+      },
+      "external": {
+        "owners": [
+          "/invoices/:id/edit",
+          "/invoices/add",
+          "/invoices"
+        ],
+        "pairs": {
+          "[\"/invoices/:id/edit\",\"/invoices\"]": [
+            [
+              "app/root.tsx",
+              473
+            ]
+          ],
+          "[\"/invoices/:id/edit\",\"/invoices/add\"]": [
+            [
+              "app/routes/invoices.tsx",
+              675
+            ]
+          ],
+          "[\"/invoices/add\",\"/invoices\"]": [
+            [
+              "app/root.tsx",
+              473
+            ]
+          ],
+          "[\"/invoices\",\"/invoices/add\"]": [
+            [
+              "app/routes/invoices.tsx",
+              675
+            ]
+          ]
+        }
+      }
+    },
+    "medianMs": 86.238958,
+    "medianMiB": 72.734375,
+    "score": {
+      "todo": [
+        6,
+        0,
+        0
+      ],
+      "bp": [
+        36,
+        0,
+        0
+      ],
+      "canvas": [
+        5,
+        0,
+        0
+      ],
+      "external": [
+        3,
+        1,
+        1
+      ]
+    },
+    "falseControls": [
+      "/app/users",
+      "/app/profile"
+    ]
+  },
+  "referenced": {
+    "samples": [
+      [
+        97.972167,
+        74.046875
+      ],
+      [
+        96.788292,
+        73.9375
+      ],
+      [
+        97.112583,
+        73.53125
+      ],
+      [
+        97.233083,
+        74.09375
+      ],
+      [
+        98.075125,
+        73.453125
+      ],
+      [
+        97.406333,
+        73.53125
+      ],
+      [
+        98.299584,
+        74.1875
+      ]
+    ],
+    "pairs": {
+      "todo": {
+        "owners": [
+          "/#/",
+          "/#/active",
+          "/#/completed"
+        ],
+        "pairs": {
+          "[\"/#/\",\"/#/active\"]": [
+            [
+              "js/footer.tsx",
+              1245
+            ]
+          ],
+          "[\"/#/\",\"/#/completed\"]": [
+            [
+              "js/footer.tsx",
+              1456
+            ]
+          ],
+          "[\"/#/active\",\"/#/\"]": [
+            [
+              "js/footer.tsx",
+              1046
+            ]
+          ],
+          "[\"/#/active\",\"/#/completed\"]": [
+            [
+              "js/footer.tsx",
+              1456
+            ]
+          ],
+          "[\"/#/completed\",\"/#/\"]": [
+            [
+              "js/footer.tsx",
+              1046
+            ]
+          ],
+          "[\"/#/completed\",\"/#/active\"]": [
+            [
+              "js/footer.tsx",
+              1245
+            ]
+          ]
+        }
+      },
+      "bp": {
+        "owners": [
+          "/",
+          "/auth/register",
+          "/auth/login",
+          "/app/discussions",
+          "/app/discussions/:discussionId",
+          "/app/users",
+          "/app/profile",
+          "/app",
+          "*"
+        ],
+        "pairs": {
+          "[\"/\",\"/app\"]": [
+            [
+              "src/app/routes/landing.tsx",
+              408
+            ]
+          ],
+          "[\"/\",\"/auth/login\"]": [
+            [
+              "src/app/routes/landing.tsx",
+              468
+            ]
+          ],
+          "[\"/auth/register\",\"/app\"]": [
+            [
+              "src/app/routes/auth/register.tsx",
+              812
+            ],
+            [
+              "src/components/layouts/auth-layout.tsx",
+              710
+            ]
+          ],
+          "[\"/auth/register\",\"/\"]": [
+            [
+              "src/components/layouts/auth-layout.tsx",
+              1168
+            ]
+          ],
+          "[\"/auth/register\",\"/auth/login\"]": [
+            [
+              "src/features/auth/components/register-form.tsx",
+              3343
+            ]
+          ],
+          "[\"/auth/login\",\"/app\"]": [
+            [
+              "src/app/routes/auth/login.tsx",
+              561
+            ],
+            [
+              "src/components/layouts/auth-layout.tsx",
+              710
+            ]
+          ],
+          "[\"/auth/login\",\"/\"]": [
+            [
+              "src/components/layouts/auth-layout.tsx",
+              1168
+            ]
+          ],
+          "[\"/auth/login\",\"/auth/register\"]": [
+            [
+              "src/features/auth/components/login-form.tsx",
+              1501
+            ]
+          ],
+          "[\"/app/discussions\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/discussions/:discussionId\"]": [
+            [
+              "src/features/discussions/components/discussions-list.tsx",
+              1922
+            ]
+          ],
+          "[\"/app/discussions\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/discussions\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/users\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/users\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/users\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/users\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/users\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/profile\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/profile\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/profile\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/profile\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/profile\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"*\",\"/\"]": [
+            [
+              "src/app/routes/not-found.tsx",
+              308
+            ]
+          ]
+        }
+      },
+      "canvas": {
+        "owners": [
+          "/",
+          "/?view=diff",
+          "/?view=model"
+        ],
+        "pairs": {
+          "[\"/\",\"/?view=diff\"]": [
+            [
+              "src/preview.tsx",
+              28701
+            ]
+          ],
+          "[\"/\",\"/?view=model\"]": [
+            [
+              "src/features/workspace/EmptyWorkspace.tsx",
+              276
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              539
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              2165
+            ]
+          ],
+          "[\"/?view=diff\",\"/\"]": [
+            [
+              "src/preview.tsx",
+              28926
+            ]
+          ],
+          "[\"/?view=diff\",\"/?view=model\"]": [
+            [
+              "src/features/workspace/EmptyWorkspace.tsx",
+              276
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              539
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              2165
+            ]
+          ],
+          "[\"/?view=model\",\"/\"]": [
+            [
+              "src/features/model/ModelView.tsx",
+              1280
+            ]
+          ]
+        }
+      },
+      "external": {
+        "owners": [
+          "/invoices/:id/edit",
+          "/invoices/add",
+          "/invoices"
+        ],
+        "pairs": {
+          "[\"/invoices/:id/edit\",\"/invoices\"]": [
+            [
+              "app/root.tsx",
+              473
+            ]
+          ],
+          "[\"/invoices/:id/edit\",\"/invoices/add\"]": [
+            [
+              "app/routes/invoices.tsx",
+              675
+            ]
+          ],
+          "[\"/invoices/add\",\"/invoices\"]": [
+            [
+              "app/root.tsx",
+              473
+            ]
+          ],
+          "[\"/invoices\",\"/invoices/add\"]": [
+            [
+              "app/routes/invoices.tsx",
+              675
+            ]
+          ]
+        }
+      }
+    },
+    "medianMs": 97.406333,
+    "medianMiB": 73.9375,
+    "score": {
+      "todo": [
+        6,
+        0,
+        0
+      ],
+      "bp": [
+        36,
+        0,
+        0
+      ],
+      "canvas": [
+        5,
+        0,
+        0
+      ],
+      "external": [
+        3,
+        1,
+        1
+      ]
+    },
+    "falseControls": [
+      "/app/profile"
+    ]
+  },
+  "reachable": {
+    "samples": [
+      [
+        96.517416,
+        73.921875
+      ],
+      [
+        101.846333,
+        73.578125
+      ],
+      [
+        102.213583,
+        73.453125
+      ],
+      [
+        96.843708,
+        74.09375
+      ],
+      [
+        102.257666,
+        73.671875
+      ],
+      [
+        97.548042,
+        73.546875
+      ],
+      [
+        101.120166,
+        73.96875
+      ]
+    ],
+    "pairs": {
+      "todo": {
+        "owners": [
+          "/#/",
+          "/#/active",
+          "/#/completed"
+        ],
+        "pairs": {
+          "[\"/#/\",\"/#/active\"]": [
+            [
+              "js/footer.tsx",
+              1245
+            ]
+          ],
+          "[\"/#/\",\"/#/completed\"]": [
+            [
+              "js/footer.tsx",
+              1456
+            ]
+          ],
+          "[\"/#/active\",\"/#/\"]": [
+            [
+              "js/footer.tsx",
+              1046
+            ]
+          ],
+          "[\"/#/active\",\"/#/completed\"]": [
+            [
+              "js/footer.tsx",
+              1456
+            ]
+          ],
+          "[\"/#/completed\",\"/#/\"]": [
+            [
+              "js/footer.tsx",
+              1046
+            ]
+          ],
+          "[\"/#/completed\",\"/#/active\"]": [
+            [
+              "js/footer.tsx",
+              1245
+            ]
+          ]
+        }
+      },
+      "bp": {
+        "owners": [
+          "/",
+          "/auth/register",
+          "/auth/login",
+          "/app/discussions",
+          "/app/discussions/:discussionId",
+          "/app/users",
+          "/app/profile",
+          "/app",
+          "*"
+        ],
+        "pairs": {
+          "[\"/\",\"/app\"]": [
+            [
+              "src/app/routes/landing.tsx",
+              408
+            ]
+          ],
+          "[\"/\",\"/auth/login\"]": [
+            [
+              "src/app/routes/landing.tsx",
+              468
+            ]
+          ],
+          "[\"/auth/register\",\"/app\"]": [
+            [
+              "src/app/routes/auth/register.tsx",
+              812
+            ],
+            [
+              "src/components/layouts/auth-layout.tsx",
+              710
+            ]
+          ],
+          "[\"/auth/register\",\"/\"]": [
+            [
+              "src/components/layouts/auth-layout.tsx",
+              1168
+            ]
+          ],
+          "[\"/auth/register\",\"/auth/login\"]": [
+            [
+              "src/features/auth/components/register-form.tsx",
+              3343
+            ]
+          ],
+          "[\"/auth/login\",\"/app\"]": [
+            [
+              "src/app/routes/auth/login.tsx",
+              561
+            ],
+            [
+              "src/components/layouts/auth-layout.tsx",
+              710
+            ]
+          ],
+          "[\"/auth/login\",\"/\"]": [
+            [
+              "src/components/layouts/auth-layout.tsx",
+              1168
+            ]
+          ],
+          "[\"/auth/login\",\"/auth/register\"]": [
+            [
+              "src/features/auth/components/login-form.tsx",
+              1501
+            ]
+          ],
+          "[\"/app/discussions\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/discussions/:discussionId\"]": [
+            [
+              "src/features/discussions/components/discussions-list.tsx",
+              1922
+            ]
+          ],
+          "[\"/app/discussions\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/discussions\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app/discussions\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app/discussions/:discussionId\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/users\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/users\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/users\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/users\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/users\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"/app/profile\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app/profile\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app/profile\",\"/app\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2309
+            ]
+          ],
+          "[\"/app/profile\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app/profile\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app\",\"/auth/login\"]": [
+            [
+              "src/lib/auth.tsx",
+              2282
+            ],
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2159
+            ]
+          ],
+          "[\"/app\",\"/\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              916
+            ]
+          ],
+          "[\"/app\",\"/app/discussions\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2385
+            ]
+          ],
+          "[\"/app\",\"/app/users\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              2519
+            ]
+          ],
+          "[\"/app\",\"/app/profile\"]": [
+            [
+              "src/components/layouts/dashboard-layout.tsx",
+              6169
+            ]
+          ],
+          "[\"*\",\"/\"]": [
+            [
+              "src/app/routes/not-found.tsx",
+              308
+            ]
+          ]
+        }
+      },
+      "canvas": {
+        "owners": [
+          "/",
+          "/?view=diff",
+          "/?view=model"
+        ],
+        "pairs": {
+          "[\"/\",\"/?view=diff\"]": [
+            [
+              "src/preview.tsx",
+              28701
+            ]
+          ],
+          "[\"/\",\"/?view=model\"]": [
+            [
+              "src/features/workspace/EmptyWorkspace.tsx",
+              276
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              539
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              2165
+            ]
+          ],
+          "[\"/?view=diff\",\"/\"]": [
+            [
+              "src/preview.tsx",
+              28926
+            ]
+          ],
+          "[\"/?view=diff\",\"/?view=model\"]": [
+            [
+              "src/features/workspace/EmptyWorkspace.tsx",
+              276
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              539
+            ],
+            [
+              "src/features/workspace/WorkPicker.tsx",
+              2165
+            ]
+          ],
+          "[\"/?view=model\",\"/\"]": [
+            [
+              "src/features/model/ModelView.tsx",
+              1280
+            ]
+          ]
+        }
+      },
+      "external": {
+        "owners": [
+          "/invoices/:id/edit",
+          "/invoices/add",
+          "/invoices"
+        ],
+        "pairs": {
+          "[\"/invoices/:id/edit\",\"/invoices\"]": [
+            [
+              "app/root.tsx",
+              473
+            ]
+          ],
+          "[\"/invoices/:id/edit\",\"/invoices/add\"]": [
+            [
+              "app/routes/invoices.tsx",
+              675
+            ]
+          ],
+          "[\"/invoices/add\",\"/invoices\"]": [
+            [
+              "app/root.tsx",
+              473
+            ]
+          ],
+          "[\"/invoices\",\"/invoices/add\"]": [
+            [
+              "app/routes/invoices.tsx",
+              675
+            ]
+          ]
+        }
+      }
+    },
+    "medianMs": 101.120166,
+    "medianMiB": 73.671875,
+    "score": {
+      "todo": [
+        6,
+        0,
+        0
+      ],
+      "bp": [
+        36,
+        0,
+        0
+      ],
+      "canvas": [
+        5,
+        0,
+        0
+      ],
+      "external": [
+        3,
+        1,
+        1
+      ]
+    },
+    "falseControls": []
+  }
+}

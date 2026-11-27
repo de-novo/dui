@@ -119,6 +119,27 @@ export function project(root) {
       if (n.type === "Property" && typeof n.key.value === "string" && n.key.value.startsWith("/"))
         owners.push({ id: "/#" + n.key.value, file, layouts: [] });
     });
+  } else if (fs.existsSync(root + "/app/routes")) {
+    const dir = root + "/app/routes";
+    const names = fs.readdirSync(dir).filter((f) => f.endsWith(".tsx"));
+    for (const f of names) {
+      const parts = f.slice(0, -4).split(".");
+      const id =
+        "/" +
+        parts
+          .filter((s) => !s.startsWith("_"))
+          .map((s) => s.replace(/^\$/, ":"))
+          .join("/");
+      const parents = parts
+        .slice(0, -1)
+        .map((_, i) => parts.slice(0, i + 1).join(".") + ".tsx")
+        .filter((s) => names.includes(s));
+      owners.push({
+        id,
+        file: dir + "/" + f,
+        layouts: [root + "/app/root.tsx", ...parents.map((s) => dir + "/" + s)],
+      });
+    }
   } else {
     for (const [id, rel] of [
       ["/", "src/preview.tsx"],
