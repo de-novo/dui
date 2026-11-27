@@ -149,6 +149,8 @@ flowchart LR
 
 对于 `.module.css` 的默认导入，`className={styles.card}` 读取匹配的 `.card` 和 `tag.card` 规则。适配器按选择器优先级及源码顺序排列声明，最后应用内联样式，并记录简单的 `min-width` 或 `max-width` 媒体条件。每条声明都指向 CSS 源码位置。未支持的值和属性保留原文。若模块使用此范围之外的选择器或 at-rule、类组合或 `!important`，则类引用保留为未解析。
 
+样式表中的 `padding-inline-start: 12px` 和内联的 `paddingInlineStart: 12` 都输出 `paddingStart`，长度为 `12px`。两种书写方向均保留逻辑起点和终点。外边距也支持负长度和 `auto`。
+
 ## 7. Token
 
 token 保留源码使用的名称（`--color-brand`、`--text-2xl`），以便之后成为设计变量。`group` 是 `color`、`spacing`、`typography`、`radius`、`size` 或 `other`。`value` 是最终值，或指向另一个 token 的 `token` 值（别名）。别名不得形成循环。`modes` 保存各模式的值，例如 `dark`。项目 token 有 `location`。框架默认值有 `package`（`tailwindcss`），没有位置。

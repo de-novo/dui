@@ -156,6 +156,43 @@ const PADDING: &[P] = &[
     P::PaddingBottom,
     P::PaddingStart,
 ];
+// Both spellings use CSS property names here. Start/end stay logical, including in RTL.
+fn spacing(name: &str) -> Option<&'static [P]> {
+    Some(match name {
+        "padding" => PADDING,
+        "padding-top" => &[P::PaddingTop],
+        "padding-bottom" => &[P::PaddingBottom],
+        "padding-inline-start" => &[P::PaddingStart],
+        "padding-inline-end" => &[P::PaddingEnd],
+        "margin" => &[P::MarginTop, P::MarginEnd, P::MarginBottom, P::MarginStart],
+        "margin-top" => &[P::MarginTop],
+        "margin-bottom" => &[P::MarginBottom],
+        "margin-inline-start" => &[P::MarginStart],
+        "margin-inline-end" => &[P::MarginEnd],
+        _ => return None,
+    })
+}
+
+fn spacing_value(name: &str, raw: &str) -> Option<V> {
+    if name.starts_with("margin") && raw == "auto" {
+        return Some(V::Keyword {
+            value: "auto".into(),
+        });
+    }
+    let value = if raw == "0" {
+        V::Length {
+            value: 0.,
+            unit: m::LengthUnit::Px,
+        }
+    } else {
+        length(raw)?
+    };
+    if name.starts_with("padding") && matches!(value,V::Length{value,..} if value<0.) {
+        return None;
+    }
+    Some(value)
+}
+
 fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
     let (prop, keyword) = match s {
         "flex" | "flex-row" => (P::Direction, "row"),
@@ -219,9 +256,35 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
 fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
     let name = f.name(pair, "key")?;
     let raw = field(pair, "value")?;
+    // React spells standard CSS properties in camelCase and numeric lengths in logical pixels.
+    let mut css_name = String::new();
+    for c in name.chars() {
+        if c.is_ascii_uppercase() {
+            css_name.push('-');
+            css_name.push(c.to_ascii_lowercase());
+        } else {
+            css_name.push(c);
+        }
+    }
+    if let Some(props) = spacing(&css_name) {
+        let value = match crate::literal(f, raw) {
+            Some(serde_json::Value::String(text)) => spacing_value(&css_name, &text)?,
+            _ if matches!(raw.kind(), "number" | "unary_expression") => {
+                let n = f.text(raw).parse::<f64>().ok().filter(|v| v.is_finite())?;
+                if css_name.starts_with("padding") && n < 0. {
+                    return None;
+                }
+                V::Length {
+                    value: n,
+                    unit: m::LengthUnit::Px,
+                }
+            }
+            _ => return None,
+        };
+        return Some((props.to_vec(), value));
+    }
     let val = crate::literal(f, raw)?;
     let props = match name {
-        "padding" => PADDING.to_vec(),
         "gap" => vec![P::Gap],
         "width" => vec![P::Width],
         "height" => vec![P::Height],

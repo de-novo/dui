@@ -149,6 +149,8 @@ flowchart LR
 
 `.module.css`의 기본 가져오기에서 `className={styles.card}`는 일치하는 `.card` 및 `tag.card` 규칙을 읽는다. 선택자 명시도와 소스 순서에 따라 선언을 정렬하고 인라인 스타일을 마지막에 적용하며 단순한 `min-width` 또는 `max-width` 미디어 조건을 기록한다. 각 선언은 CSS 원본 위치를 가리킨다. 지원하지 않는 값과 속성은 원문을 보존한다. 지원 범위 밖의 선택자나 at-rule, 클래스 합성 또는 `!important`가 있는 모듈은 클래스 참조를 미해결 상태로 남긴다.
 
+스타일시트의 `padding-inline-start: 12px`와 인라인의 `paddingInlineStart: 12`는 모두 `paddingStart`에 길이 `12px`를 기록한다. 쓰기 방향에 관계없이 논리적 시작과 끝을 보존한다. 마진에는 음수 길이와 `auto`도 사용할 수 있다.
+
 ## 7. 토큰
 
 토큰은 소스가 쓰는 이름(`--color-brand`, `--text-2xl`)을 그대로 남겨 나중에 디자인 변수가 될 수 있게 한다. `group`은 `color`, `spacing`, `typography`, `radius`, `size`, `other` 중 하나다. `value`는 최종 값이거나, 다른 토큰을 가리키는 `token` 값(별칭)이다. 별칭은 순환하면 안 된다. `modes`는 `dark` 같은 모드별 값을 담는다. 프로젝트 토큰은 `location`을 가진다. 프레임워크 기본값은 `package`(`tailwindcss`)를 가지고 위치는 없다.
