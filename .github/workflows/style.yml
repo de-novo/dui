@@ -42,6 +42,8 @@ jobs:
       - run: npm run check:deps
       - run: npm ci
       - run: npm run check:style
+      - name: Validate the versioned source model
+        run: npm run check:source-model
       - run: npm ci --prefix apps/canvas
       - run: npm test --prefix apps/canvas
       - run: npm run build --prefix apps/canvas

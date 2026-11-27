@@ -106,6 +106,7 @@ pub mod locale;
 pub mod model;
 pub mod nextjs;
 pub mod settle;
+pub mod source_model;
 pub mod storage;
 pub mod surface;
 pub mod transition;

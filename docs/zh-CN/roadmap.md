@@ -133,7 +133,7 @@ flowchart TD
 
 | 阶段 | 时间 | 目标 | 完成标准 |
 | --- | --- | --- | --- |
-| 1. Schema | v0.2.x | 将屏幕、组件、跳转、代码位置、槽位、已声明状态与分支、列表项 schema、字段到 UI 的绑定、中立样式属性（spacing、color、typography、radius、size、layout），以及保留 token 名称的 token 层，冻结为带版本的 JSON 模型。 | 一个包含样式属性和 token 名称的示例通过 schema 校验。 |
+| 1. Schema | v0.2.x | 将屏幕、组件、跳转、代码位置、槽位、已声明状态与分支、列表项 schema、字段到 UI 的绑定、中立样式属性（spacing、color、typography、radius、size、layout），以及保留 token 名称的 token 层，冻结为带版本的 JSON 模型。 | 一个包含样式属性和 token 名称的示例通过 schema 校验。已完成：[源码模型，schema 版本 1](source-model.md)。 |
 | 2. Browserless default map | v0.2.x | 默认情况下 `dui map` 和 `dui open` 不再启动浏览器。`--capture` 和 `dui run` 仍用于校验。 | 无浏览器的 CI 运行能给出屏幕和跳转，且现有截图检查仍然通过。在同一示例上测量截图路径与 AST 路径的端到端地图生成时间（冷启动和增量），并记录数字。AST 默认路径必须明显更快。在测量之前不要公布目标时间。 |
 | 3. AST extractors | v0.2.x–v0.3.0 | 从源码提取模型。先做 TypeScript/TSX，再做可在任一操作系统上运行的 Swift syntax only。类型检查器或编译器索引是可选项。每个适配器把布局、状态、导航和样式语法映射到模型。 | 在 Linux 上，不启动浏览器、不使用 Xcode，一个 TSX fixture 和一个 Swift fixture 能输出模型，包括简单样式映射。 |
 | 4. Approximate renderer | v0.3.0 | 仅根据模型绘制卡片，包括其样式属性。标注为近似。 | 卡片非空；文本、堆叠和样式与模型一致；不启动浏览器。 |

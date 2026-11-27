@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Versioned source model, schema version 1: screens, components, slots, branches, lists, item schemas, navigation edges, neutral style properties and design tokens, with a JSON Schema, a Rust reader that checks references, and a TSX reference example (`npm run check:source-model`) ([#353](https://github.com/de-novo/dui/issues/353)).
 - Map reachable web pages from a local URL or static build, discover native routes from source, and attach simulator recordings. ([#238](https://github.com/de-novo/dui/pull/238), [#241](https://github.com/de-novo/dui/pull/241), [#243](https://github.com/de-novo/dui/pull/243)).
 - Check capture evidence, retry failed cells, and compare captured screens in pull requests. ([#199](https://github.com/de-novo/dui/pull/199), [#201](https://github.com/de-novo/dui/pull/201), [#205](https://github.com/de-novo/dui/pull/205)).
 

@@ -1,0 +1,1985 @@
+{
+  "schemaVersion": 1,
+  "extractor": {
+    "name": "hand-written reference",
+    "version": "1.0.0"
+  },
+  "files": [
+    {
+      "path": "src/App.tsx",
+      "language": "typescript",
+      "sha256": "9a14a5c28b4d9de7b93028f8afaaf7fe23018d746a3859029f253e0d9033939b",
+      "imports": [
+        "src/Orders.tsx",
+        "src/Settings.tsx",
+        "src/theme.css"
+      ]
+    },
+    {
+      "path": "src/Orders.module.css",
+      "language": "css",
+      "sha256": "eef4c7f938b979a5f9c113bdd2db24d3f1f7b88d582f0806b13cc6d15935bf90"
+    },
+    {
+      "path": "src/Orders.tsx",
+      "language": "typescript",
+      "sha256": "ab97be043e7f21d7d991fb9b41e9257508ca537dd880f5d54e3f320d72d9cefc",
+      "imports": [
+        "src/Orders.module.css",
+        "src/api.ts"
+      ]
+    },
+    {
+      "path": "src/Settings.tsx",
+      "language": "typescript",
+      "sha256": "1941765da987c1cd91ac361d28291c3f9bf26ba828896026d7747b53fa57c48e"
+    },
+    {
+      "path": "src/api.ts",
+      "language": "typescript",
+      "sha256": "4ff0746de1062796ed8b35f5e3b41fb6a65e918e754efd8d0531baa03fecfce4"
+    },
+    {
+      "path": "src/theme.css",
+      "language": "css",
+      "sha256": "757736eefee5b1178b050c9467b8a12e1298d0abc34eacf47912eff6e7abba43"
+    }
+  ],
+  "screens": [
+    {
+      "id": "route:/",
+      "name": "Orders",
+      "route": "/",
+      "component": "src/Orders.tsx#Orders",
+      "origin": "syntax",
+      "location": {
+        "file": "src/App.tsx",
+        "line": 10,
+        "column": 9,
+        "start": 236,
+        "end": 275
+      }
+    },
+    {
+      "id": "route:/settings",
+      "name": "Settings",
+      "route": "/settings",
+      "component": "src/Settings.tsx#Settings",
+      "origin": "syntax",
+      "location": {
+        "file": "src/App.tsx",
+        "line": 11,
+        "column": 9,
+        "start": 284,
+        "end": 333
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "src/Orders.tsx#Orders",
+      "name": "Orders",
+      "location": {
+        "file": "src/Orders.tsx",
+        "line": 6,
+        "column": 1,
+        "start": 149,
+        "end": 1125
+      },
+      "slots": [
+        {
+          "id": "src/Orders.tsx#Orders.orders",
+          "name": "orders",
+          "kind": "external",
+          "type": {
+            "kind": "array",
+            "item": {
+              "kind": "object",
+              "schema": "src/api.ts#Order"
+            }
+          },
+          "source": "useOrders()",
+          "origin": "syntax",
+          "location": {
+            "file": "src/Orders.tsx",
+            "line": 7,
+            "column": 3,
+            "start": 178,
+            "end": 205
+          }
+        },
+        {
+          "id": "src/Orders.tsx#Orders.filter",
+          "name": "filter",
+          "kind": "local",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "all",
+              "open"
+            ]
+          },
+          "initial": {
+            "kind": "literal",
+            "value": "all"
+          },
+          "origin": "syntax",
+          "location": {
+            "file": "src/Orders.tsx",
+            "line": 8,
+            "column": 3,
+            "start": 208,
+            "end": 268
+          }
+        }
+      ],
+      "root": {
+        "kind": "element",
+        "id": "src/Orders.tsx#Orders@0",
+        "tag": "main",
+        "style": [
+          {
+            "property": "direction",
+            "value": {
+              "kind": "keyword",
+              "value": "row"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "flex",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 22,
+                "start": 301,
+                "end": 305
+              }
+            }
+          },
+          {
+            "property": "direction",
+            "value": {
+              "kind": "keyword",
+              "value": "column"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "flex-col",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 27,
+                "start": 306,
+                "end": 314
+              }
+            }
+          },
+          {
+            "property": "gap",
+            "value": {
+              "kind": "length",
+              "value": 1,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "gap-4",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 36,
+                "start": 315,
+                "end": 320
+              }
+            }
+          },
+          {
+            "property": "paddingTop",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 42,
+                "start": 321,
+                "end": 324
+              }
+            }
+          },
+          {
+            "property": "paddingBottom",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 42,
+                "start": 321,
+                "end": 324
+              }
+            }
+          },
+          {
+            "property": "paddingStart",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 42,
+                "start": 321,
+                "end": 324
+              }
+            }
+          },
+          {
+            "property": "paddingEnd",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 42,
+                "start": 321,
+                "end": 324
+              }
+            }
+          },
+          {
+            "property": "paddingTop",
+            "value": {
+              "kind": "length",
+              "value": 2,
+              "unit": "rem"
+            },
+            "when": {
+              "minWidth": {
+                "value": 48,
+                "unit": "rem"
+              }
+            },
+            "from": {
+              "syntax": "class",
+              "text": "md:p-8",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 46,
+                "start": 325,
+                "end": 331
+              }
+            }
+          },
+          {
+            "property": "paddingBottom",
+            "value": {
+              "kind": "length",
+              "value": 2,
+              "unit": "rem"
+            },
+            "when": {
+              "minWidth": {
+                "value": 48,
+                "unit": "rem"
+              }
+            },
+            "from": {
+              "syntax": "class",
+              "text": "md:p-8",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 46,
+                "start": 325,
+                "end": 331
+              }
+            }
+          },
+          {
+            "property": "paddingStart",
+            "value": {
+              "kind": "length",
+              "value": 2,
+              "unit": "rem"
+            },
+            "when": {
+              "minWidth": {
+                "value": 48,
+                "unit": "rem"
+              }
+            },
+            "from": {
+              "syntax": "class",
+              "text": "md:p-8",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 46,
+                "start": 325,
+                "end": 331
+              }
+            }
+          },
+          {
+            "property": "paddingEnd",
+            "value": {
+              "kind": "length",
+              "value": 2,
+              "unit": "rem"
+            },
+            "when": {
+              "minWidth": {
+                "value": 48,
+                "unit": "rem"
+              }
+            },
+            "from": {
+              "syntax": "class",
+              "text": "md:p-8",
+              "location": {
+                "file": "src/Orders.tsx",
+                "line": 10,
+                "column": 46,
+                "start": 325,
+                "end": 331
+              }
+            }
+          }
+        ],
+        "children": [
+          {
+            "kind": "element",
+            "id": "src/Orders.tsx#Orders@0.0",
+            "tag": "h1",
+            "style": [
+              {
+                "property": "fontSize",
+                "value": {
+                  "kind": "token",
+                  "token": "tailwindcss#--text-2xl",
+                  "resolved": {
+                    "kind": "length",
+                    "value": 1.5,
+                    "unit": "rem"
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "text-2xl",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 11,
+                    "column": 22,
+                    "start": 355,
+                    "end": 363
+                  }
+                }
+              },
+              {
+                "property": "lineHeight",
+                "value": {
+                  "kind": "token",
+                  "token": "tailwindcss#--text-2xl--line-height",
+                  "resolved": {
+                    "kind": "number",
+                    "value": 1.3333333333333333
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "text-2xl",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 11,
+                    "column": 22,
+                    "start": 355,
+                    "end": 363
+                  }
+                }
+              },
+              {
+                "property": "fontWeight",
+                "value": {
+                  "kind": "token",
+                  "token": "tailwindcss#--font-weight-semibold",
+                  "resolved": {
+                    "kind": "number",
+                    "value": 600
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "font-semibold",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 11,
+                    "column": 31,
+                    "start": 364,
+                    "end": 377
+                  }
+                }
+              },
+              {
+                "property": "color",
+                "value": {
+                  "kind": "token",
+                  "token": "src/theme.css#--color-brand",
+                  "resolved": {
+                    "kind": "color",
+                    "value": "#1d4ed8"
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "text-brand",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 11,
+                    "column": 45,
+                    "start": 378,
+                    "end": 388
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "text",
+                "id": "src/Orders.tsx#Orders@0.0.0",
+                "parts": [
+                  {
+                    "kind": "literal",
+                    "value": "Orders"
+                  }
+                ],
+                "location": {
+                  "file": "src/Orders.tsx",
+                  "line": 11,
+                  "column": 57,
+                  "start": 390,
+                  "end": 397
+                }
+              }
+            ],
+            "location": {
+              "file": "src/Orders.tsx",
+              "line": 11,
+              "column": 7,
+              "start": 340,
+              "end": 401
+            }
+          },
+          {
+            "kind": "element",
+            "id": "src/Orders.tsx#Orders@0.1",
+            "tag": "button",
+            "props": {
+              "onClick": {
+                "kind": "opaque",
+                "text": "() => setFilter(filter === \"all\" ? \"open\" : \"all\")",
+                "reads": [
+                  {
+                    "kind": "slot",
+                    "slot": "src/Orders.tsx#Orders.filter"
+                  }
+                ]
+              },
+              "type": {
+                "kind": "literal",
+                "value": "button"
+              }
+            },
+            "style": [
+              {
+                "property": "borderRadius",
+                "value": {
+                  "kind": "token",
+                  "token": "src/theme.css#--radius-card",
+                  "resolved": {
+                    "kind": "length",
+                    "value": 0.75,
+                    "unit": "rem"
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "rounded-card",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 20,
+                    "start": 457,
+                    "end": 469
+                  }
+                }
+              },
+              {
+                "property": "background",
+                "value": {
+                  "kind": "token",
+                  "token": "src/theme.css#--color-brand",
+                  "resolved": {
+                    "kind": "color",
+                    "value": "#1d4ed8"
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "bg-brand",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 33,
+                    "start": 470,
+                    "end": 478
+                  }
+                }
+              },
+              {
+                "property": "paddingStart",
+                "value": {
+                  "kind": "length",
+                  "value": 0.75,
+                  "unit": "rem"
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "px-3",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 42,
+                    "start": 479,
+                    "end": 483
+                  }
+                }
+              },
+              {
+                "property": "paddingEnd",
+                "value": {
+                  "kind": "length",
+                  "value": 0.75,
+                  "unit": "rem"
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "px-3",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 42,
+                    "start": 479,
+                    "end": 483
+                  }
+                }
+              },
+              {
+                "property": "paddingTop",
+                "value": {
+                  "kind": "length",
+                  "value": 0.5,
+                  "unit": "rem"
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "py-2",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 47,
+                    "start": 484,
+                    "end": 488
+                  }
+                }
+              },
+              {
+                "property": "paddingBottom",
+                "value": {
+                  "kind": "length",
+                  "value": 0.5,
+                  "unit": "rem"
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "py-2",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 47,
+                    "start": 484,
+                    "end": 488
+                  }
+                }
+              },
+              {
+                "property": "color",
+                "value": {
+                  "kind": "token",
+                  "token": "src/theme.css#--color-on-brand",
+                  "resolved": {
+                    "kind": "color",
+                    "value": "#ffffff"
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "text-on-brand",
+                  "location": {
+                    "file": "src/Orders.tsx",
+                    "line": 14,
+                    "column": 52,
+                    "start": 489,
+                    "end": 502
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "branch",
+                "id": "src/Orders.tsx#Orders@0.1.0",
+                "on": {
+                  "kind": "slot",
+                  "slot": "src/Orders.tsx#Orders.filter"
+                },
+                "arms": [
+                  {
+                    "when": {
+                      "equals": "all"
+                    },
+                    "children": [
+                      {
+                        "kind": "text",
+                        "id": "src/Orders.tsx#Orders@0.1.0.0.0",
+                        "parts": [
+                          {
+                            "kind": "literal",
+                            "value": "Show open"
+                          }
+                        ],
+                        "location": {
+                          "file": "src/Orders.tsx",
+                          "line": 17,
+                          "column": 29,
+                          "start": 609,
+                          "end": 620
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "when": "otherwise",
+                    "children": [
+                      {
+                        "kind": "text",
+                        "id": "src/Orders.tsx#Orders@0.1.0.1.0",
+                        "parts": [
+                          {
+                            "kind": "literal",
+                            "value": "Show all"
+                          }
+                        ],
+                        "location": {
+                          "file": "src/Orders.tsx",
+                          "line": 17,
+                          "column": 43,
+                          "start": 623,
+                          "end": 633
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "location": {
+                  "file": "src/Orders.tsx",
+                  "line": 17,
+                  "column": 9,
+                  "start": 589,
+                  "end": 634
+                }
+              }
+            ],
+            "location": {
+              "file": "src/Orders.tsx",
+              "line": 12,
+              "column": 7,
+              "start": 408,
+              "end": 650
+            }
+          },
+          {
+            "kind": "branch",
+            "id": "src/Orders.tsx#Orders@0.2",
+            "on": {
+              "kind": "slot",
+              "slot": "src/Orders.tsx#Orders.orders",
+              "path": [
+                "length"
+              ]
+            },
+            "arms": [
+              {
+                "when": {
+                  "equals": 0
+                },
+                "children": [
+                  {
+                    "kind": "element",
+                    "id": "src/Orders.tsx#Orders@0.2.0.0",
+                    "tag": "p",
+                    "style": [
+                      {
+                        "property": "color",
+                        "value": {
+                          "kind": "token",
+                          "token": "src/theme.css#--color-muted",
+                          "resolved": {
+                            "kind": "color",
+                            "value": "#6b7280"
+                          }
+                        },
+                        "from": {
+                          "syntax": "class",
+                          "text": "text-muted",
+                          "location": {
+                            "file": "src/Orders.tsx",
+                            "line": 20,
+                            "column": 23,
+                            "start": 704,
+                            "end": 714
+                          }
+                        }
+                      }
+                    ],
+                    "children": [
+                      {
+                        "kind": "text",
+                        "id": "src/Orders.tsx#Orders@0.2.0.0.0",
+                        "parts": [
+                          {
+                            "kind": "literal",
+                            "value": "No orders yet"
+                          }
+                        ],
+                        "location": {
+                          "file": "src/Orders.tsx",
+                          "line": 20,
+                          "column": 35,
+                          "start": 716,
+                          "end": 729
+                        }
+                      }
+                    ],
+                    "location": {
+                      "file": "src/Orders.tsx",
+                      "line": 20,
+                      "column": 9,
+                      "start": 690,
+                      "end": 733
+                    }
+                  }
+                ]
+              },
+              {
+                "when": "otherwise",
+                "children": [
+                  {
+                    "kind": "element",
+                    "id": "src/Orders.tsx#Orders@0.2.1.0",
+                    "tag": "ul",
+                    "style": [
+                      {
+                        "property": "direction",
+                        "value": {
+                          "kind": "keyword",
+                          "value": "row"
+                        },
+                        "from": {
+                          "syntax": "class",
+                          "text": "flex",
+                          "location": {
+                            "file": "src/Orders.tsx",
+                            "line": 22,
+                            "column": 24,
+                            "start": 769,
+                            "end": 773
+                          }
+                        }
+                      },
+                      {
+                        "property": "direction",
+                        "value": {
+                          "kind": "keyword",
+                          "value": "column"
+                        },
+                        "from": {
+                          "syntax": "class",
+                          "text": "flex-col",
+                          "location": {
+                            "file": "src/Orders.tsx",
+                            "line": 22,
+                            "column": 29,
+                            "start": 774,
+                            "end": 782
+                          }
+                        }
+                      },
+                      {
+                        "property": "gap",
+                        "value": {
+                          "kind": "length",
+                          "value": 0.5,
+                          "unit": "rem"
+                        },
+                        "from": {
+                          "syntax": "class",
+                          "text": "gap-2",
+                          "location": {
+                            "file": "src/Orders.tsx",
+                            "line": 22,
+                            "column": 38,
+                            "start": 783,
+                            "end": 788
+                          }
+                        }
+                      }
+                    ],
+                    "children": [
+                      {
+                        "kind": "list",
+                        "id": "src/Orders.tsx#Orders@0.2.1.0.0",
+                        "source": {
+                          "kind": "slot",
+                          "slot": "src/Orders.tsx#Orders.orders"
+                        },
+                        "item": "order",
+                        "itemType": {
+                          "kind": "object",
+                          "schema": "src/api.ts#Order"
+                        },
+                        "key": {
+                          "kind": "item",
+                          "list": "src/Orders.tsx#Orders@0.2.1.0.0",
+                          "path": [
+                            "id"
+                          ]
+                        },
+                        "children": [
+                          {
+                            "kind": "element",
+                            "id": "src/Orders.tsx#Orders@0.2.1.0.0.0",
+                            "tag": "li",
+                            "style": [
+                              {
+                                "property": "paddingTop",
+                                "value": {
+                                  "kind": "length",
+                                  "value": 12,
+                                  "unit": "px"
+                                },
+                                "from": {
+                                  "syntax": "inline",
+                                  "text": "padding: 12",
+                                  "location": {
+                                    "file": "src/Orders.tsx",
+                                    "line": 24,
+                                    "column": 41,
+                                    "start": 866,
+                                    "end": 877
+                                  }
+                                }
+                              },
+                              {
+                                "property": "paddingBottom",
+                                "value": {
+                                  "kind": "length",
+                                  "value": 12,
+                                  "unit": "px"
+                                },
+                                "from": {
+                                  "syntax": "inline",
+                                  "text": "padding: 12",
+                                  "location": {
+                                    "file": "src/Orders.tsx",
+                                    "line": 24,
+                                    "column": 41,
+                                    "start": 866,
+                                    "end": 877
+                                  }
+                                }
+                              },
+                              {
+                                "property": "paddingStart",
+                                "value": {
+                                  "kind": "length",
+                                  "value": 12,
+                                  "unit": "px"
+                                },
+                                "from": {
+                                  "syntax": "inline",
+                                  "text": "padding: 12",
+                                  "location": {
+                                    "file": "src/Orders.tsx",
+                                    "line": 24,
+                                    "column": 41,
+                                    "start": 866,
+                                    "end": 877
+                                  }
+                                }
+                              },
+                              {
+                                "property": "paddingEnd",
+                                "value": {
+                                  "kind": "length",
+                                  "value": 12,
+                                  "unit": "px"
+                                },
+                                "from": {
+                                  "syntax": "inline",
+                                  "text": "padding: 12",
+                                  "location": {
+                                    "file": "src/Orders.tsx",
+                                    "line": 24,
+                                    "column": 41,
+                                    "start": 866,
+                                    "end": 877
+                                  }
+                                }
+                              },
+                              {
+                                "property": "borderRadius",
+                                "value": {
+                                  "kind": "length",
+                                  "value": 8,
+                                  "unit": "px"
+                                },
+                                "from": {
+                                  "syntax": "inline",
+                                  "text": "borderRadius: 8",
+                                  "location": {
+                                    "file": "src/Orders.tsx",
+                                    "line": 24,
+                                    "column": 54,
+                                    "start": 879,
+                                    "end": 894
+                                  }
+                                }
+                              }
+                            ],
+                            "children": [
+                              {
+                                "kind": "element",
+                                "id": "src/Orders.tsx#Orders@0.2.1.0.0.0.0",
+                                "tag": "span",
+                                "children": [
+                                  {
+                                    "kind": "text",
+                                    "id": "src/Orders.tsx#Orders@0.2.1.0.0.0.0.0",
+                                    "parts": [
+                                      {
+                                        "kind": "item",
+                                        "list": "src/Orders.tsx#Orders@0.2.1.0.0",
+                                        "path": [
+                                          "title"
+                                        ]
+                                      }
+                                    ],
+                                    "location": {
+                                      "file": "src/Orders.tsx",
+                                      "line": 25,
+                                      "column": 21,
+                                      "start": 919,
+                                      "end": 932
+                                    }
+                                  }
+                                ],
+                                "location": {
+                                  "file": "src/Orders.tsx",
+                                  "line": 25,
+                                  "column": 15,
+                                  "start": 913,
+                                  "end": 939
+                                }
+                              },
+                              {
+                                "kind": "element",
+                                "id": "src/Orders.tsx#Orders@0.2.1.0.0.0.1",
+                                "tag": "span",
+                                "unresolvedStyle": [
+                                  {
+                                    "syntax": "stylesheet",
+                                    "text": "styles.status",
+                                    "reason": "css-module",
+                                    "location": {
+                                      "file": "src/Orders.tsx",
+                                      "line": 26,
+                                      "column": 32,
+                                      "start": 971,
+                                      "end": 984
+                                    }
+                                  }
+                                ],
+                                "children": [
+                                  {
+                                    "kind": "text",
+                                    "id": "src/Orders.tsx#Orders@0.2.1.0.0.0.1.0",
+                                    "parts": [
+                                      {
+                                        "kind": "item",
+                                        "list": "src/Orders.tsx#Orders@0.2.1.0.0",
+                                        "path": [
+                                          "status"
+                                        ]
+                                      }
+                                    ],
+                                    "location": {
+                                      "file": "src/Orders.tsx",
+                                      "line": 26,
+                                      "column": 47,
+                                      "start": 986,
+                                      "end": 1000
+                                    }
+                                  }
+                                ],
+                                "location": {
+                                  "file": "src/Orders.tsx",
+                                  "line": 26,
+                                  "column": 15,
+                                  "start": 954,
+                                  "end": 1007
+                                }
+                              }
+                            ],
+                            "location": {
+                              "file": "src/Orders.tsx",
+                              "line": 24,
+                              "column": 13,
+                              "start": 838,
+                              "end": 1025
+                            }
+                          }
+                        ],
+                        "location": {
+                          "file": "src/Orders.tsx",
+                          "line": 23,
+                          "column": 11,
+                          "start": 801,
+                          "end": 1039
+                        }
+                      }
+                    ],
+                    "location": {
+                      "file": "src/Orders.tsx",
+                      "line": 22,
+                      "column": 9,
+                      "start": 754,
+                      "end": 1053
+                    }
+                  }
+                ]
+              }
+            ],
+            "location": {
+              "file": "src/Orders.tsx",
+              "line": 19,
+              "column": 7,
+              "start": 657,
+              "end": 1062
+            }
+          },
+          {
+            "kind": "element",
+            "id": "src/Orders.tsx#Orders@0.3",
+            "tag": "Link",
+            "module": "react-router",
+            "props": {
+              "to": {
+                "kind": "literal",
+                "value": "/settings"
+              }
+            },
+            "children": [
+              {
+                "kind": "text",
+                "id": "src/Orders.tsx#Orders@0.3.0",
+                "parts": [
+                  {
+                    "kind": "literal",
+                    "value": "Settings"
+                  }
+                ],
+                "location": {
+                  "file": "src/Orders.tsx",
+                  "line": 31,
+                  "column": 28,
+                  "start": 1090,
+                  "end": 1099
+                }
+              }
+            ],
+            "location": {
+              "file": "src/Orders.tsx",
+              "line": 31,
+              "column": 7,
+              "start": 1069,
+              "end": 1105
+            }
+          }
+        ],
+        "location": {
+          "file": "src/Orders.tsx",
+          "line": 10,
+          "column": 5,
+          "start": 284,
+          "end": 1117
+        }
+      }
+    },
+    {
+      "id": "src/Settings.tsx#Settings",
+      "name": "Settings",
+      "location": {
+        "file": "src/Settings.tsx",
+        "line": 25,
+        "column": 1,
+        "start": 469,
+        "end": 919
+      },
+      "slots": [
+        {
+          "id": "src/Settings.tsx#Settings.notifications",
+          "name": "notifications",
+          "kind": "local",
+          "type": {
+            "kind": "boolean"
+          },
+          "initial": {
+            "kind": "literal",
+            "value": true
+          },
+          "origin": "syntax",
+          "location": {
+            "file": "src/Settings.tsx",
+            "line": 26,
+            "column": 3,
+            "start": 500,
+            "end": 557
+          }
+        }
+      ],
+      "root": {
+        "kind": "element",
+        "id": "src/Settings.tsx#Settings@0",
+        "tag": "main",
+        "style": [
+          {
+            "property": "direction",
+            "value": {
+              "kind": "keyword",
+              "value": "row"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "flex",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 22,
+                "start": 590,
+                "end": 594
+              }
+            }
+          },
+          {
+            "property": "direction",
+            "value": {
+              "kind": "keyword",
+              "value": "column"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "flex-col",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 27,
+                "start": 595,
+                "end": 603
+              }
+            }
+          },
+          {
+            "property": "gap",
+            "value": {
+              "kind": "length",
+              "value": 1,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "gap-4",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 36,
+                "start": 604,
+                "end": 609
+              }
+            }
+          },
+          {
+            "property": "paddingTop",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 42,
+                "start": 610,
+                "end": 613
+              }
+            }
+          },
+          {
+            "property": "paddingBottom",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 42,
+                "start": 610,
+                "end": 613
+              }
+            }
+          },
+          {
+            "property": "paddingStart",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 42,
+                "start": 610,
+                "end": 613
+              }
+            }
+          },
+          {
+            "property": "paddingEnd",
+            "value": {
+              "kind": "length",
+              "value": 1.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "p-6",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 28,
+                "column": 42,
+                "start": 610,
+                "end": 613
+              }
+            }
+          }
+        ],
+        "children": [
+          {
+            "kind": "element",
+            "id": "src/Settings.tsx#Settings@0.0",
+            "tag": "h1",
+            "style": [
+              {
+                "property": "fontSize",
+                "value": {
+                  "kind": "token",
+                  "token": "tailwindcss#--text-2xl",
+                  "resolved": {
+                    "kind": "length",
+                    "value": 1.5,
+                    "unit": "rem"
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "text-2xl",
+                  "location": {
+                    "file": "src/Settings.tsx",
+                    "line": 29,
+                    "column": 22,
+                    "start": 637,
+                    "end": 645
+                  }
+                }
+              },
+              {
+                "property": "lineHeight",
+                "value": {
+                  "kind": "token",
+                  "token": "tailwindcss#--text-2xl--line-height",
+                  "resolved": {
+                    "kind": "number",
+                    "value": 1.3333333333333333
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "text-2xl",
+                  "location": {
+                    "file": "src/Settings.tsx",
+                    "line": 29,
+                    "column": 22,
+                    "start": 637,
+                    "end": 645
+                  }
+                }
+              },
+              {
+                "property": "fontWeight",
+                "value": {
+                  "kind": "token",
+                  "token": "tailwindcss#--font-weight-semibold",
+                  "resolved": {
+                    "kind": "number",
+                    "value": 600
+                  }
+                },
+                "from": {
+                  "syntax": "class",
+                  "text": "font-semibold",
+                  "location": {
+                    "file": "src/Settings.tsx",
+                    "line": 29,
+                    "column": 31,
+                    "start": 646,
+                    "end": 659
+                  }
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "text",
+                "id": "src/Settings.tsx#Settings@0.0.0",
+                "parts": [
+                  {
+                    "kind": "literal",
+                    "value": "Settings"
+                  }
+                ],
+                "location": {
+                  "file": "src/Settings.tsx",
+                  "line": 29,
+                  "column": 46,
+                  "start": 661,
+                  "end": 670
+                }
+              }
+            ],
+            "location": {
+              "file": "src/Settings.tsx",
+              "line": 29,
+              "column": 7,
+              "start": 622,
+              "end": 674
+            }
+          },
+          {
+            "kind": "instance",
+            "id": "src/Settings.tsx#Settings@0.1",
+            "component": "src/Settings.tsx#Toggle",
+            "props": {
+              "checked": {
+                "kind": "slot",
+                "slot": "src/Settings.tsx#Settings.notifications"
+              },
+              "label": {
+                "kind": "literal",
+                "value": "Notifications"
+              },
+              "onChange": {
+                "kind": "opaque",
+                "text": "setNotifications"
+              }
+            },
+            "location": {
+              "file": "src/Settings.tsx",
+              "line": 30,
+              "column": 7,
+              "start": 681,
+              "end": 765
+            }
+          },
+          {
+            "kind": "branch",
+            "id": "src/Settings.tsx#Settings@0.2",
+            "on": {
+              "kind": "slot",
+              "slot": "src/Settings.tsx#Settings.notifications"
+            },
+            "arms": [
+              {
+                "when": {
+                  "truthy": true
+                },
+                "children": [
+                  {
+                    "kind": "element",
+                    "id": "src/Settings.tsx#Settings@0.2.0.0",
+                    "tag": "p",
+                    "style": [
+                      {
+                        "property": "color",
+                        "value": {
+                          "kind": "token",
+                          "token": "src/theme.css#--color-muted",
+                          "resolved": {
+                            "kind": "color",
+                            "value": "#6b7280"
+                          }
+                        },
+                        "from": {
+                          "syntax": "class",
+                          "text": "text-muted",
+                          "location": {
+                            "file": "src/Settings.tsx",
+                            "line": 31,
+                            "column": 39,
+                            "start": 804,
+                            "end": 814
+                          }
+                        }
+                      }
+                    ],
+                    "children": [
+                      {
+                        "kind": "text",
+                        "id": "src/Settings.tsx#Settings@0.2.0.0.0",
+                        "parts": [
+                          {
+                            "kind": "literal",
+                            "value": "You will get an email for each order."
+                          }
+                        ],
+                        "location": {
+                          "file": "src/Settings.tsx",
+                          "line": 31,
+                          "column": 51,
+                          "start": 816,
+                          "end": 853
+                        }
+                      }
+                    ],
+                    "location": {
+                      "file": "src/Settings.tsx",
+                      "line": 31,
+                      "column": 25,
+                      "start": 790,
+                      "end": 857
+                    }
+                  }
+                ]
+              }
+            ],
+            "location": {
+              "file": "src/Settings.tsx",
+              "line": 31,
+              "column": 7,
+              "start": 772,
+              "end": 858
+            }
+          },
+          {
+            "kind": "element",
+            "id": "src/Settings.tsx#Settings@0.3",
+            "tag": "Link",
+            "module": "react-router",
+            "props": {
+              "to": {
+                "kind": "literal",
+                "value": "/"
+              }
+            },
+            "children": [
+              {
+                "kind": "text",
+                "id": "src/Settings.tsx#Settings@0.3.0",
+                "parts": [
+                  {
+                    "kind": "literal",
+                    "value": "Back to orders"
+                  }
+                ],
+                "location": {
+                  "file": "src/Settings.tsx",
+                  "line": 32,
+                  "column": 20,
+                  "start": 878,
+                  "end": 892
+                }
+              }
+            ],
+            "location": {
+              "file": "src/Settings.tsx",
+              "line": 32,
+              "column": 7,
+              "start": 865,
+              "end": 899
+            }
+          }
+        ],
+        "location": {
+          "file": "src/Settings.tsx",
+          "line": 28,
+          "column": 5,
+          "start": 573,
+          "end": 911
+        }
+      }
+    },
+    {
+      "id": "src/Settings.tsx#Toggle",
+      "name": "Toggle",
+      "location": {
+        "file": "src/Settings.tsx",
+        "line": 4,
+        "column": 1,
+        "start": 72,
+        "end": 468
+      },
+      "slots": [
+        {
+          "id": "src/Settings.tsx#Toggle.label",
+          "name": "label",
+          "kind": "prop",
+          "type": {
+            "kind": "string"
+          },
+          "origin": "syntax",
+          "location": {
+            "file": "src/Settings.tsx",
+            "line": 5,
+            "column": 3,
+            "start": 99,
+            "end": 104
+          }
+        },
+        {
+          "id": "src/Settings.tsx#Toggle.checked",
+          "name": "checked",
+          "kind": "prop",
+          "type": {
+            "kind": "boolean"
+          },
+          "origin": "syntax",
+          "location": {
+            "file": "src/Settings.tsx",
+            "line": 6,
+            "column": 3,
+            "start": 108,
+            "end": 115
+          }
+        },
+        {
+          "id": "src/Settings.tsx#Toggle.onChange",
+          "name": "onChange",
+          "kind": "prop",
+          "type": {
+            "kind": "function"
+          },
+          "origin": "syntax",
+          "location": {
+            "file": "src/Settings.tsx",
+            "line": 7,
+            "column": 3,
+            "start": 119,
+            "end": 127
+          }
+        }
+      ],
+      "root": {
+        "kind": "element",
+        "id": "src/Settings.tsx#Toggle@0",
+        "tag": "label",
+        "style": [
+          {
+            "property": "direction",
+            "value": {
+              "kind": "keyword",
+              "value": "row"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "flex",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 14,
+                "column": 23,
+                "start": 246,
+                "end": 250
+              }
+            }
+          },
+          {
+            "property": "alignItems",
+            "value": {
+              "kind": "keyword",
+              "value": "center"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "items-center",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 14,
+                "column": 28,
+                "start": 251,
+                "end": 263
+              }
+            }
+          },
+          {
+            "property": "justifyContent",
+            "value": {
+              "kind": "keyword",
+              "value": "spaceBetween"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "justify-between",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 14,
+                "column": 41,
+                "start": 264,
+                "end": 279
+              }
+            }
+          },
+          {
+            "property": "gap",
+            "value": {
+              "kind": "length",
+              "value": 0.5,
+              "unit": "rem"
+            },
+            "from": {
+              "syntax": "class",
+              "text": "gap-2",
+              "location": {
+                "file": "src/Settings.tsx",
+                "line": 14,
+                "column": 57,
+                "start": 280,
+                "end": 285
+              }
+            }
+          }
+        ],
+        "children": [
+          {
+            "kind": "element",
+            "id": "src/Settings.tsx#Toggle@0.0",
+            "tag": "span",
+            "children": [
+              {
+                "kind": "text",
+                "id": "src/Settings.tsx#Toggle@0.0.0",
+                "parts": [
+                  {
+                    "kind": "slot",
+                    "slot": "src/Settings.tsx#Toggle.label"
+                  }
+                ],
+                "location": {
+                  "file": "src/Settings.tsx",
+                  "line": 15,
+                  "column": 13,
+                  "start": 300,
+                  "end": 307
+                }
+              }
+            ],
+            "location": {
+              "file": "src/Settings.tsx",
+              "line": 15,
+              "column": 7,
+              "start": 294,
+              "end": 314
+            }
+          },
+          {
+            "kind": "element",
+            "id": "src/Settings.tsx#Toggle@0.1",
+            "tag": "input",
+            "props": {
+              "checked": {
+                "kind": "slot",
+                "slot": "src/Settings.tsx#Toggle.checked"
+              },
+              "onChange": {
+                "kind": "opaque",
+                "text": "(event) => onChange(event.target.checked)",
+                "reads": [
+                  {
+                    "kind": "slot",
+                    "slot": "src/Settings.tsx#Toggle.onChange"
+                  }
+                ]
+              },
+              "type": {
+                "kind": "literal",
+                "value": "checkbox"
+              }
+            },
+            "location": {
+              "file": "src/Settings.tsx",
+              "line": 16,
+              "column": 7,
+              "start": 321,
+              "end": 447
+            }
+          }
+        ],
+        "location": {
+          "file": "src/Settings.tsx",
+          "line": 14,
+          "column": 5,
+          "start": 228,
+          "end": 460
+        }
+      }
+    }
+  ],
+  "itemSchemas": [
+    {
+      "id": "src/api.ts#Order",
+      "name": "Order",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "open",
+              "shipped"
+            ]
+          }
+        },
+        {
+          "name": "total",
+          "type": {
+            "kind": "number"
+          },
+          "optional": true
+        }
+      ],
+      "origin": "syntax",
+      "location": {
+        "file": "src/api.ts",
+        "line": 1,
+        "column": 1,
+        "start": 0,
+        "end": 105
+      }
+    }
+  ],
+  "tokens": [
+    {
+      "id": "src/theme.css#--color-brand",
+      "name": "--color-brand",
+      "group": "color",
+      "value": {
+        "kind": "color",
+        "value": "#1d4ed8"
+      },
+      "syntax": "theme",
+      "location": {
+        "file": "src/theme.css",
+        "line": 4,
+        "column": 3,
+        "start": 35,
+        "end": 48
+      }
+    },
+    {
+      "id": "src/theme.css#--color-muted",
+      "name": "--color-muted",
+      "group": "color",
+      "value": {
+        "kind": "color",
+        "value": "#6b7280"
+      },
+      "syntax": "theme",
+      "location": {
+        "file": "src/theme.css",
+        "line": 6,
+        "column": 3,
+        "start": 90,
+        "end": 103
+      }
+    },
+    {
+      "id": "src/theme.css#--color-on-brand",
+      "name": "--color-on-brand",
+      "group": "color",
+      "value": {
+        "kind": "color",
+        "value": "#ffffff"
+      },
+      "syntax": "theme",
+      "location": {
+        "file": "src/theme.css",
+        "line": 5,
+        "column": 3,
+        "start": 61,
+        "end": 77
+      }
+    },
+    {
+      "id": "src/theme.css#--radius-card",
+      "name": "--radius-card",
+      "group": "radius",
+      "value": {
+        "kind": "length",
+        "value": 0.75,
+        "unit": "rem"
+      },
+      "syntax": "theme",
+      "location": {
+        "file": "src/theme.css",
+        "line": 7,
+        "column": 3,
+        "start": 116,
+        "end": 129
+      }
+    },
+    {
+      "id": "tailwindcss#--font-weight-semibold",
+      "name": "--font-weight-semibold",
+      "group": "typography",
+      "value": {
+        "kind": "number",
+        "value": 600
+      },
+      "syntax": "theme",
+      "package": "tailwindcss"
+    },
+    {
+      "id": "tailwindcss#--text-2xl",
+      "name": "--text-2xl",
+      "group": "typography",
+      "value": {
+        "kind": "length",
+        "value": 1.5,
+        "unit": "rem"
+      },
+      "syntax": "theme",
+      "package": "tailwindcss"
+    },
+    {
+      "id": "tailwindcss#--text-2xl--line-height",
+      "name": "--text-2xl--line-height",
+      "group": "typography",
+      "value": {
+        "kind": "number",
+        "value": 1.3333333333333333
+      },
+      "syntax": "theme",
+      "package": "tailwindcss"
+    }
+  ],
+  "edges": [
+    {
+      "id": "src/Orders.tsx#Orders@0.3:link",
+      "from": "src/Orders.tsx#Orders@0.3",
+      "kind": "link",
+      "to": {
+        "kind": "screen",
+        "screen": "route:/settings"
+      },
+      "origin": "syntax",
+      "location": {
+        "file": "src/Orders.tsx",
+        "line": 31,
+        "column": 7,
+        "start": 1069,
+        "end": 1105
+      }
+    },
+    {
+      "id": "src/Settings.tsx#Settings@0.3:link",
+      "from": "src/Settings.tsx#Settings@0.3",
+      "kind": "link",
+      "to": {
+        "kind": "screen",
+        "screen": "route:/"
+      },
+      "origin": "syntax",
+      "location": {
+        "file": "src/Settings.tsx",
+        "line": 32,
+        "column": 7,
+        "start": 865,
+        "end": 899
+      }
+    }
+  ]
+}
