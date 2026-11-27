@@ -12,6 +12,7 @@ pub struct Context<'a> {
     pub file: &'a File,
     pub files: &'a Files,
     pub slots: &'a [m::Slot],
+    pub class_render: bool,
     pub signatures: &'a BTreeMap<String, Vec<m::Slot>>,
     pub modules: style::modules::Bindings<'a>,
     pub tailwind: bool,
@@ -41,6 +42,19 @@ impl Context<'_> {
             path.push(self.file.name(n, "property")?.into());
             n = field(n, "object")?;
         }
+        if self.class_render && n.kind() == "this" {
+            path.reverse();
+            if let [props, name, rest @ ..] = path.as_slice()
+                && props == "props"
+                && let Some(slot) = self.slots.iter().find(|s| &s.name == name)
+            {
+                return Some(m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: rest.to_vec(),
+                });
+            }
+            return None;
+        }
         if n.kind() != "identifier" {
             return None;
         }
@@ -51,6 +65,8 @@ impl Context<'_> {
                 list: list.clone(),
                 path,
             })
+        } else if self.class_render {
+            None
         } else {
             self.slots
                 .iter()
@@ -102,6 +118,27 @@ impl Context<'_> {
             return self.placeholder(n, id, "Nesting limit reached");
         }
         let loc = self.file.loc(n);
+        if n.kind() == "identifier"
+            && node.kind() == "jsx_expression"
+            && let Some((condition, content)) = crate::class_view::conditional_local(self.file, n)
+        {
+            let on = self.expr(condition);
+            return m::Node::Branch(m::Branch {
+                on,
+                arms: vec![
+                    m::Arm {
+                        when: m::Match::Truthy(true),
+                        children: vec![self.node(content, format!("{id}.0.0"))],
+                    },
+                    m::Arm {
+                        when: m::Match::Otherwise,
+                        children: vec![],
+                    },
+                ],
+                id,
+                location: loc,
+            });
+        }
         match n.kind() {
             "jsx_element" | "jsx_self_closing_element" => self.element(n, id),
             "ternary_expression" | "binary_expression"

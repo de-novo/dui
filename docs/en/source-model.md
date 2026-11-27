@@ -17,6 +17,8 @@ Run `dui model PROJECT ENTRY.tsx` to print schema-v1 JSON from a TSX entry and i
 
 Literal URL query selection is also source evidence. When a strict `URLSearchParams` equality controls a branch that resolves to one component, the adapter records the `/` or `/?name=value` screen. Literal dynamic imports that select those components are read as source. Query-only links such as `?name=value` or `?` resolve only when their source screen is a root query screen and the destination exists; runtime gates and `history` writes stay opaque or unresolved.
 
+For React class components the adapter reads the instance `render()` method. It preserves a conditional child assigned once inside an `if` block and used in the returned JSX. An initialized literal `Router({...})` table in `componentDidMount()` can identify hash views when its paths also occur as literal hash links reachable from the class screen. Locations point to the route key and the link, and a conditional link remains conditional in the model.
+
 Pass `--built-css FILE` to read a single bundled stylesheet inside the project. For static HTML elements, the adapter resolves flex direction, wrapping, growth and alignment, gap, padding, margins, dimensions and their limits, foreground and background color, opacity, border width, color and radius, font size, line height and letter spacing. It applies supported rules by layer, selector specificity and declaration order, and records the winning declaration’s byte range. A potentially winning rule with an unknown condition or unsupported value stays unresolved. The model records declarations on the element; inherited or browser-default computed values are outside this extraction.
 
 Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
@@ -29,11 +31,11 @@ The built CSS reader maps display mode, horizontal overflow and auto-fit grids w
 
 The bundled CSS reader resolves independent row and column gaps and common flex shorthands into growth, shrinkage and basis.
 
-The reader also preserves simple font-family lists and text-decoration lines, expands block spacing in horizontal layouts, and evaluates two-argument px/vw minimums in spacing at the supplied viewport width.
+The reader expands block spacing in horizontal layouts. Built font-family lists, text-decoration lines, viewport minimums in spacing and ID selectors remain unresolved.
 
 Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
 
-Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports simple ID selectors, positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
+Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
 
 ## 1. Principles
 

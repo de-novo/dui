@@ -152,6 +152,44 @@ try {
   );
   assert.equal(unresolvedRoute.location.file, "App.tsx");
   assert.equal(unresolvedRoute.location.line, 2);
+  const filters = join(stage, "filters");
+  mkdirSync(filters);
+  writeFileSync(
+    join(filters, "Links.tsx"),
+    `import {Component} from "react";
+class Menu extends Component { render(){return <nav><a href="#/one">{this.props.title}</a><a href="#/two">Two</a></nav>} }
+export {Menu as Links};`,
+  );
+  const classEntry = `import * as UI from "react"; import {Links} from "./Links";
+declare var Router;
+export class Filter extends UI.Component {
+  componentDidMount(){const routes=Router({'/one': selectOne, '/two': selectTwo}); routes.init('/one');}
+  render(){let menu; if(this.props.enabled){menu=<Links title="One"/>;} return <main>{menu}</main>;}
+}`;
+  function extractFilters(source: string) {
+    writeFileSync(join(filters, "App.tsx"), source);
+    return JSON.parse(
+      execFileSync(binary, ["map", filters, "--entry", "App.tsx"], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          HOME: join(stage, "filter-home"),
+          PATH: "",
+          DUI_CHROMIUM: "/absent",
+        },
+      }),
+    ).screenDiscovery;
+  }
+  assert.equal(extractFilters(classEntry).declared, 2);
+  assert.equal(extractFilters(classEntry).resolvedRelations, 4);
+  for (const source of [
+    classEntry.replace("declare var Router;", "function Router(x){return x}"),
+    classEntry.replace("routes.init('/one');", ""),
+    classEntry.replace("'/two': selectTwo", "'/unknown': selectTwo"),
+    classEntry.replace("return <main>{menu}", "menu = null; return <main>{menu}"),
+  ]) {
+    assert.equal(extractFilters(source).resolvedRelations, 0);
+  }
   const built = await map([site, "--build-dir", site], "home-build");
   check("--build-dir", built.report);
   const again = await map([site, "--build-dir", site], "home-build");

@@ -869,18 +869,17 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
       unit: "px",
     });
     assert.deepEqual(prop(root.style, "borderTopWidth"), { kind: "length", value: 2, unit: "px" });
-    assert.deepEqual(prop(root.style, "paddingStart"), {
-      kind: "length",
-      value: width === 390 ? 3.9 : 10,
-      unit: "px",
-    });
     assert.deepEqual(prop(root.style, "paddingTop"), { kind: "length", value: 12, unit: "px" });
     assert.deepEqual(prop(root.style, "paddingBottom"), { kind: "length", value: 18, unit: "px" });
-    assert.deepEqual(prop(root.style, "fontFamily"), {
-      kind: "keyword",
-      value: "system-ui,sans-serif",
-    });
-    assert.deepEqual(prop(root.style, "textDecorationLine"), { kind: "keyword", value: "none" });
+    for (const [property, text] of Object.entries({
+      paddingStart: "4px min(10px,1vw)",
+      fontFamily: "system-ui,sans-serif",
+      textDecorationLine: "none",
+    })) {
+      const output = prop(root.style, property) as { kind: string; text: string };
+      assert.equal(output.kind, "unresolved");
+      assert.ok(output.text.includes(text));
+    }
     assert.deepEqual(prop(root.style, "rowGap"), { kind: "length", value: 8, unit: "px" });
     assert.deepEqual(prop(root.style, "columnGap"), { kind: "length", value: 12, unit: "px" });
     assert.deepEqual(prop(root.children[0].style, "shrink"), { kind: "number", value: 0 });
@@ -922,8 +921,9 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   writeFileSync(
     join(builtProject, bundle),
     `
-  #catalog{position:relative;inset:2px 4px 6px;z-index:-3;background-image:radial-gradient(#123456 2px,transparent 2px);background-size:12px 16px}
-  #catalog aside{position:sticky;box-shadow:-1px 2px 3px -4px #aabbcc80;border-radius:2px 3px 4px 5px;border-bottom-left-radius:9px}
+  #catalog{color:#123456} #catalog aside{letter-spacing:4px}
+  section{position:relative;inset:2px 4px 6px;z-index:-3;background-image:radial-gradient(#123456 2px,transparent 2px);background-size:12px 16px}
+  section aside{position:sticky;box-shadow:-1px 2px 3px -4px #aabbcc80;border-radius:2px 3px 4px 5px;border-bottom-left-radius:9px}
   `,
   );
   const grouped = readBuilt().components[0].root;
@@ -932,6 +932,8 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   const styles = (n: { style: { property: string; value: { value: unknown } }[] }) =>
     Object.fromEntries(n.style.map((d) => [d.property, d.value.value]));
   const section = styles(grouped.children[0]);
+  assert.equal(section.color, undefined);
+  assert.equal(styles(grouped.children[0].children[0]).letterSpacing, undefined);
   for (const [name, value] of Object.entries({
     position: "relative",
     zIndex: -3,
