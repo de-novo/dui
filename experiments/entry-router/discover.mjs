@@ -3,6 +3,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { queryViews } from "./query-views.mjs";
 import { parseSync, Visitor } from "oxc-parser";
 import { ResolverFactory } from "oxc-resolver";
 
@@ -27,6 +28,7 @@ const resolver = new ResolverFactory({
 const parents = new Map([[entry, null]]);
 const diagnostics = [];
 const routers = [];
+const queryBranches = [];
 const extract = fileURLToPath(new URL("../renderer-geometry/discover.py", import.meta.url));
 for (const file of parents.keys()) {
   const parsed = parseSync(file, readFileSync(file, "utf8"));
@@ -34,6 +36,9 @@ for (const file of parents.keys()) {
     diagnostics.push({ file: path.relative(root, file), parseErrors: parsed.errors.length });
     continue;
   }
+  const branches = queryViews(parsed.program);
+  if (Object.keys(branches).length)
+    queryBranches.push({ file: path.relative(root, file), branches });
   const bindings = new Map();
   function follow(request) {
     const target = resolver.resolveFileSync(file, request).path;
@@ -99,4 +104,4 @@ for (const file of parents.keys()) {
     routes: JSON.parse(result.stdout),
   });
 }
-console.log(JSON.stringify({ modules: parents.size, routers, diagnostics }));
+console.log(JSON.stringify({ modules: parents.size, routers, queryBranches, diagnostics }));
