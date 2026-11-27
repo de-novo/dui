@@ -5,7 +5,12 @@ use std::{error::Error, io};
 use taffy::prelude::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let model: Value = serde_json::from_reader(io::stdin().lock())?;
+    let input: Value = serde_json::from_reader(io::stdin().lock())?;
+    let model = input.get("model").unwrap_or(&input);
+    let offset: [f32; 2] = match input.get("translatePx") {
+        Some(value) => serde_json::from_value(value.clone())?,
+        None => [0., 0.],
+    };
     if model["schemaVersion"] != 1 {
         return Err("expected schemaVersion 1".into());
     }
@@ -25,11 +30,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             unsupported.push(prop);
             continue;
         }
-        let length =
-            Dimension::from_length(value["value"].as_f64().ok_or("invalid length")? as f32);
+        let length = value["value"].as_f64().ok_or("invalid length")? as f32;
         match prop {
-            "width" => style.size.width = length,
-            "height" => style.size.height = length,
+            "width" => style.size.width = Dimension::from_length(length),
+            "height" => style.size.height = Dimension::from_length(length),
+            "maxWidth" => style.max_size.width = LengthPercentageAuto::from_length(length),
             _ => unsupported.push(prop),
         }
     }
@@ -45,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let layout = tree.layout(node)?;
     println!(
         "{}",
-        json!({"id":id, "rect":[layout.location.x,layout.location.y,layout.size.width,layout.size.height],"unsupported":unsupported,"unresolvedStyle":root["unresolvedStyle"]})
+        json!({"id":id, "rect":[layout.location.x+offset[0],layout.location.y+offset[1],layout.size.width,layout.size.height],"unsupported":unsupported,"unresolvedStyle":root["unresolvedStyle"]})
     );
     Ok(())
 }

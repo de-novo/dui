@@ -6,8 +6,10 @@ import re
 import subprocess
 import tempfile
 
+from translate import translation
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--dui", required=True, type=Path)
+parser.add_argument("--dui", required=False, type=Path)
 parser.add_argument("--capture", required=True, metavar="CHROME", type=Path)
 args = parser.parse_args()
 renderer = Path(__file__).resolve().parent / "target/release/renderer-geometry"
@@ -21,7 +23,12 @@ with tempfile.TemporaryDirectory() as tmp:
     (project / "App.tsx").write_text('export function App(){return <div id="box"/>}')
     for name, css in cases.items():
         (project / "built.css").write_text("#box{" + css + "}")
-        model = subprocess.check_output([args.dui, "model", project, "App.tsx", "--built-css", "built.css"])
+        command = [args.dui, "model", project, "App.tsx", "--built-css", "built.css"] if args.dui else [renderer.with_name("fixture-model"), project]
+        model = subprocess.check_output(command)
+        extracted = json.loads(model)
+        offset = translation(extracted, (project / "built.css").read_bytes())
+        if offset is not None:
+            model = json.dumps({"model": extracted, "translatePx": offset}).encode()
         predicted = json.loads(subprocess.check_output([renderer], input=model))
         page = project / "index.html"
         page.write_text('<!doctype html><style>body{margin:0}#box{' + css +

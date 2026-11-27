@@ -10,3 +10,4 @@ license = "Apache-2.0"
 [dependencies]
 taffy = "0.16.0"
 serde_json = "1"
+dui-lang-typescript = { path = "../../crates/dui-lang-typescript" }
