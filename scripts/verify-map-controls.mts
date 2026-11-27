@@ -129,10 +129,10 @@ async function checkMapControls(mobile: boolean) {
     if (document.querySelector(".screen-card .layout-overlay"))
       throw Error("Map guide overlay did not switch off");
   }
+  await waitFor(mobile ? ".mobile-deck-card img" : ".screen-card img");
   const language = await waitFor<HTMLSelectElement>(
     '.rail select:has(option[value="' + CSS.escape(document.documentElement.lang) + '"])',
   );
-  await waitFor(mobile ? ".mobile-deck-card img" : ".screen-card img");
   await document.fonts.ready;
   const original = language.value;
   const locales = [...language.options].map((option) => option.value);
