@@ -87,6 +87,8 @@ Existing paths include local web URLs, native route discovery and captures on se
 
 A new language needs one adapter that maps that language onto this model: layout elements, declared state and data, navigation, and style syntax. The model, the approximate renderer, hot reload, and Figma export are reused.
 
+**Web CSS compatibility goal.** Target full CSS rendering compatibility across websites and authoring stacks. Read the project’s built stylesheets, resolve the cascade and inheritance for the declared document, viewport and state, and map the result into the versioned model. Track selectors, values and units, typography, box layout, flex and grid, painting, responsive conditions, interaction states and motion separately. For each feature verify the extracted model on isolated fixtures and compare geometry, computed values and captures on independent pages at multiple widths. Record the browser version, rendering context and unresolved cases with the evidence. Browser captures run only during explicit verification.
+
 <a id="swappable-renderers"></a>
 
 **Renderers are swappable.** The durable asset is the AST extraction and the versioned model. A renderer only reads that model and contains no model or business logic, so it can be replaced without changing the extractors or the schema.
