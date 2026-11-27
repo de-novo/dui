@@ -6,6 +6,7 @@
   "type": "commonjs",
   "private": true,
   "dependencies": {
+    "bezier-easing": "3.2.0",
     "css-tree": "3.2.1",
     "d3-interpolate": "3.0.2",
     "esbuild": "0.28.2",
