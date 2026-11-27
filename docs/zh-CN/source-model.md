@@ -165,3 +165,25 @@ JSON Schema 检查形状、枚举、模式和必填字段。Rust 读取器（`So
 `npm run check:source-model` 用 schema 校验参考示例，检查错误形状会被拒绝，并运行读取器的测试。这些测试还会检查参考示例中的每个位置都指向 fixture 源码，并且文件摘要一致。
 
 版本 1 已冻结。对字段、种类或含义的任何改动都会产生带有新 schema 文件的 `schemaVersion` 2。版本 1 的文件和读取器不会改变。读取器拒绝它不认识的版本。
+
+## 10. 绘制模型
+
+渲染器读取 `dui-core` 中的 `SourceModel`。`dui-core` 没有 I/O，并且可以构建为 `wasm32-unknown-unknown`，因此桌面查看器和网页画布共用同一个读取器。所有属性都映射到 flexbox 引擎。参考目标 [GPUI](roadmap.md#default-pipeline) 的映射如下。以这种方式绘制的卡片标注为近似。
+
+| 模型 | GPUI |
+| --- | --- |
+| `direction` `row`、`column` | `flex_row`、`flex_col` |
+| `direction` `overlay` | 子节点以 `absolute` 相互叠放 |
+| `alignItems`、`justifyContent`、`wrap`、`grow` | 同名的 Taffy flexbox 值 |
+| Spacing 和 size 属性 | 同名的 padding、margin、gap 和 size。GPUI 从左到右布局，因此 `start` 和 `end` 对应 left 和 right |
+| `fill`、`fit`、`auto` | `relative(1.)`、内容尺寸、`auto` |
+| `px`、`rem`、`percent` | `px`、`rems`、`relative` |
+| `pt`、`dp` | `px`。三者都是逻辑像素 |
+| `em` | 乘以元素字号后的 `px` |
+| `color` | `rgba` |
+| `lineHeight` number | `line_height(relative(n))` |
+| `textAlign` `justify` | `start`。GPUI 只有 left、center 和 right |
+| 带 `minWidth` 或 `maxWidth` 的 `when` | 在布局前按格子宽度判定 |
+| 带 `interaction`、`colorScheme` 或 `expr` 的 `when` | 审阅者选择该状态时应用 |
+| `token` | 其 `resolved` 值。没有该值的 token 按 `unresolved` 绘制 |
+| `unresolved`、`unresolvedStyle`、`placeholder`、`opaque` 文本 | 带标签的占位符。绝不由浏览器填充 |

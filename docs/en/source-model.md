@@ -163,3 +163,25 @@ The JSON Schema checks shapes, enums, patterns and required fields. The Rust rea
 `npm run check:source-model` validates the reference against the schema, checks that bad shapes are rejected, and runs the reader's tests. Those tests also check that every reference location points at the fixture source and that the file digests match.
 
 Version 1 is frozen. Any change to fields, kinds or meaning creates `schemaVersion` 2 with a new schema file. The version 1 file and reader do not change. Readers reject versions they do not know.
+
+## 10. Drawing the model
+
+A renderer reads `SourceModel` from `dui-core`, which has no I/O and builds for `wasm32-unknown-unknown`, so the desktop viewer and a web canvas share one reader. Every property maps onto a flexbox engine. [GPUI](roadmap.md#default-pipeline), the reference target, maps them as follows. Cards drawn this way are labeled approximate.
+
+| Model | GPUI |
+| --- | --- |
+| `direction` `row`, `column` | `flex_row`, `flex_col` |
+| `direction` `overlay` | Children positioned `absolute` over each other |
+| `alignItems`, `justifyContent`, `wrap`, `grow` | The Taffy flexbox values of the same names |
+| Spacing and size properties | Padding, margin, gap and size of the same names. `start` and `end` map to left and right, because GPUI lays out left to right |
+| `fill`, `fit`, `auto` | `relative(1.)`, content size, `auto` |
+| `px`, `rem`, `percent` | `px`, `rems`, `relative` |
+| `pt`, `dp` | `px`. All three are logical pixels |
+| `em` | `px`, multiplied by the element's font size |
+| `color` | `rgba` |
+| `lineHeight` number | `line_height(relative(n))` |
+| `textAlign` `justify` | `start`. GPUI has left, center and right only |
+| `when` with `minWidth` or `maxWidth` | Resolved against the cell width before layout |
+| `when` with `interaction`, `colorScheme` or `expr` | Applied when the reviewer selects that state |
+| `token` | Its `resolved` value. A token without one is drawn like `unresolved` |
+| `unresolved`, `unresolvedStyle`, `placeholder`, `opaque` text | A labeled placeholder. Never filled by a browser |

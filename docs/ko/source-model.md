@@ -165,3 +165,25 @@ JSON Schema는 모양, enum, 패턴, 필수 필드를 검사한다. Rust 리더(
 `npm run check:source-model`은 참조 예제를 스키마로 검증하고, 잘못된 모양이 거부되는지 확인하고, 리더 테스트를 실행한다. 이 테스트는 참조 예제의 모든 위치가 fixture 소스를 가리키는지와 파일 다이제스트가 맞는지도 확인한다.
 
 버전 1은 고정이다. 필드, 종류, 의미가 바뀌면 새 스키마 파일과 함께 `schemaVersion` 2가 된다. 버전 1 파일과 리더는 바뀌지 않는다. 리더는 모르는 버전을 거부한다.
+
+## 10. 모델 그리기
+
+렌더러는 `dui-core`의 `SourceModel`을 읽는다. `dui-core`는 I/O가 없고 `wasm32-unknown-unknown`으로 빌드되므로 데스크톱 뷰어와 웹 캔버스가 리더 하나를 함께 쓴다. 모든 속성은 flexbox 엔진에 매핑된다. 참조 대상인 [GPUI](roadmap.md#default-pipeline)는 아래와 같이 매핑한다. 이렇게 그린 카드에는 근사 표시가 붙는다.
+
+| 모델 | GPUI |
+| --- | --- |
+| `direction` `row`, `column` | `flex_row`, `flex_col` |
+| `direction` `overlay` | 자식을 `absolute`로 겹쳐 배치한다 |
+| `alignItems`, `justifyContent`, `wrap`, `grow` | 같은 이름의 Taffy flexbox 값 |
+| Spacing과 size 속성 | 같은 이름의 padding, margin, gap, size. GPUI는 왼쪽에서 오른쪽으로 배치하므로 `start`와 `end`는 left와 right가 된다 |
+| `fill`, `fit`, `auto` | `relative(1.)`, 내용 크기, `auto` |
+| `px`, `rem`, `percent` | `px`, `rems`, `relative` |
+| `pt`, `dp` | `px`. 셋 다 논리 픽셀이다 |
+| `em` | 요소의 글자 크기를 곱한 `px` |
+| `color` | `rgba` |
+| `lineHeight` number | `line_height(relative(n))` |
+| `textAlign` `justify` | `start`. GPUI에는 left, center, right만 있다 |
+| `minWidth`나 `maxWidth`가 있는 `when` | 레이아웃 전에 칸 너비로 판정한다 |
+| `interaction`, `colorScheme`, `expr`가 있는 `when` | 리뷰어가 그 상태를 고르면 적용한다 |
+| `token` | `resolved` 값. 값이 없는 토큰은 `unresolved`처럼 그린다 |
+| `unresolved`, `unresolvedStyle`, `placeholder`, `opaque` 텍스트 | 라벨이 붙은 placeholder. 브라우저로 채우지 않는다 |
