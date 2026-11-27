@@ -246,6 +246,48 @@ export default function View(){return <section><p className={sheet.card}/><p sty
       );
     }
   }
+  writeFileSync(
+    cssPath,
+    ".panel {flex-direction: column; align-items: flex-end; justify-content: space-evenly; flex-wrap: wrap;} .unknown {align-items: safe center; flex-direction: row-reverse;}",
+  );
+  writeFileSync(
+    join(project, "Flex.tsx"),
+    `import s from "./View.module.css"; export function Flex({center}){return <main><p className={s.panel}/><p style={{flexDirection:"column",alignItems:"flex-end",justifyContent:"space-evenly",flexWrap:"wrap"}}/><p className={s.unknown}/><p style={{alignItems:center,justifyContent:"stretch"}}/></main>}`,
+  );
+  const flex = JSON.parse(extract(project, "Flex.tsx"));
+  assert.ok(validate(flex));
+  const [sheet, inline, unsupported, dynamic] = flex.components[0].root.children;
+  for (const [i, node] of [sheet, inline].entries()) {
+    assert.deepEqual(
+      node.style.map((d: { property: string; value: unknown }) => [d.property, d.value]),
+      [
+        ["direction", { kind: "keyword", value: "column" }],
+        ["alignItems", { kind: "keyword", value: "end" }],
+        ["justifyContent", { kind: "keyword", value: "spaceEvenly" }],
+        ["wrap", { kind: "keyword", value: "wrap" }],
+      ],
+    );
+    for (const d of node.style) {
+      assert.equal(d.from.syntax, i === 0 ? "stylesheet" : "inline");
+      const loc = d.from.location;
+      assert.equal(
+        readFileSync(join(project, loc.file)).subarray(loc.start, loc.end).toString(),
+        d.from.text,
+      );
+    }
+  }
+  for (const [node, texts] of [
+    [unsupported, ["safe center", "row-reverse"]],
+    [dynamic, ["center", '"stretch"']],
+  ] as const) {
+    assert.deepEqual(
+      node.style.map((d: { value: { kind: string; text: string } }) => [
+        d.value.kind,
+        d.value.text,
+      ]),
+      texts.map((t) => ["unresolved", t]),
+    );
+  }
 } finally {
   rmSync(project, { recursive: true, force: true });
 }

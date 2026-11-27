@@ -320,6 +320,37 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
         },
     ))
 }
+fn flex_keyword(name: &str, literal: Option<&str>, source: &str) -> Option<(Vec<P>, V)> {
+    let property = match name {
+        "align-items" => P::AlignItems,
+        "justify-content" => P::JustifyContent,
+        "flex-direction" => P::Direction,
+        "flex-wrap" => P::Wrap,
+        _ => return None,
+    };
+    let value = literal.map(str::trim).map(str::to_ascii_lowercase);
+    let keyword = match (name, value.as_deref()) {
+        ("align-items" | "justify-content", Some("start" | "flex-start")) => Some("start"),
+        ("align-items" | "justify-content", Some("end" | "flex-end")) => Some("end"),
+        ("align-items" | "justify-content", Some("center")) => Some("center"),
+        ("align-items", Some(v @ ("stretch" | "baseline"))) => Some(v),
+        ("justify-content", Some("space-between")) => Some("spaceBetween"),
+        ("justify-content", Some("space-around")) => Some("spaceAround"),
+        ("justify-content", Some("space-evenly")) => Some("spaceEvenly"),
+        ("flex-direction", Some(v @ ("row" | "column"))) => Some(v),
+        ("flex-wrap", Some(v @ ("wrap" | "nowrap"))) => Some(v),
+        _ => None,
+    };
+    let value = match keyword {
+        Some(v) => V::Keyword { value: v.into() },
+        None => V::Unresolved {
+            text: source.into(),
+            reason: "Unsupported flex layout value".into(),
+        },
+    };
+    Some((vec![property], value))
+}
+
 fn css_property_name(name: &str) -> String {
     let mut css_name = String::new();
     for c in name.chars() {
@@ -354,8 +385,15 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         };
         return Some((props.to_vec(), value));
     }
+    let literal = crate::literal(f, raw);
+    if let Some(mapped) = flex_keyword(
+        &css_name,
+        literal.as_ref().and_then(|v| v.as_str()),
+        f.text(raw),
+    ) {
+        return Some(mapped);
+    }
     if name == "lineHeight" {
-        let literal = crate::literal(f, raw);
         let value = line_height(
             literal
                 .as_ref()
@@ -368,7 +406,7 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         });
         return Some((vec![P::LineHeight], value));
     }
-    let val = crate::literal(f, raw)?;
+    let val = literal?;
     let props = match name {
         "gap" => {
             let value = if let Some(n) = val.as_f64().filter(|n| *n >= 0.) {
