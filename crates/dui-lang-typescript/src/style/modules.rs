@@ -231,6 +231,7 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
         (props.to_vec(), spacing_value(name, raw))
     } else {
         match name {
+            "letter-spacing" => (vec![P::LetterSpacing], super::letter_spacing(raw)),
             "line-height" => (vec![P::LineHeight], super::line_height(raw)),
             "gap" => (vec![P::Gap], super::uniform_gap(raw)),
             "color" => (vec![P::Color], color(raw)),
