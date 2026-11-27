@@ -23,6 +23,7 @@ mod screen_map;
 mod snapshot_assets;
 mod surface;
 mod transition;
+mod tsx_map;
 mod tui;
 mod typescript;
 mod universal_web;
@@ -369,7 +370,7 @@ const CLI_HELP: &str = "\
 dui — real UI state capture, screen map, and diff
 
 CAPTURE
-  dui map [PROJECT] [--url URL | --build-dir DIR] [--capture]   Map source, a running app or built web pages without a browser (--capture captures every cell)
+  dui map [PROJECT] [--entry ENTRY.tsx | --url URL | --build-dir DIR] [--capture]   Map source, a running app or built web pages without a browser (--capture captures every cell)
   dui map attach SOURCE_RUN RECORDINGS_JSON  Attach identified runtime PNGs to native source cards
   dui run [PROJECT] [MANIFEST] [OUTPUT]   Capture with dui.json (or auto-discover if omitted)
       --force | --no-cache                Bypass content-addressed cache
@@ -519,8 +520,22 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
                 Err(failure(2, "expected map attach SOURCE_RUN RECORDINGS_JSON"))
             }
             [] => screen_map::capture(Path::new("."), capture),
-            [root] if root != "--url" && root != "--build-dir" => {
+            [root] if root != "--url" && root != "--entry" && root != "--build-dir" => {
                 screen_map::capture(Path::new(root), capture)
+            }
+            [flag, raw] | [_, flag, raw] if flag == "--entry" => {
+                if capture {
+                    return Err(failure(
+                        2,
+                        "--entry maps TSX source; use --capture with a runnable project",
+                    ));
+                }
+                let project = if rest.len() == 3 {
+                    Path::new(&rest[0])
+                } else {
+                    Path::new(".")
+                };
+                tsx_map::publish(project, Path::new(raw))
             }
             [flag, raw] | [_, flag, raw] if flag == "--url" || flag == "--build-dir" => {
                 let project = if rest.len() == 3 {
@@ -540,7 +555,7 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
             }
             _ => Err(failure(
                 2,
-                "expected map [PROJECT] [--url URL | --build-dir DIR] [--capture]",
+                "expected map [PROJECT] [--entry ENTRY.tsx | --url URL | --build-dir DIR] [--capture]",
             )),
         };
     }

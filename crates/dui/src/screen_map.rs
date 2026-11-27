@@ -28,6 +28,14 @@ pub(crate) fn capture_target(
         let provenance = archive::provenance(&app)?;
         return archive::publish(provenance, |out| inventory.archive(out, &project));
     }
+    // An explicit host/profile keeps its existing route discovery and capture contract.
+    if !capture
+        && target.is_none()
+        && !project.join("dui.json").exists()
+        && let Some(entry) = crate::tsx_map::entry(&project)?
+    {
+        return crate::tsx_map::publish(&project, &entry);
+    }
     let work = tempfile::tempdir().map_err(io)?;
     let manifest = work.path().join("map.json");
     let explicit = target.is_some();

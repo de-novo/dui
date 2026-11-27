@@ -393,6 +393,8 @@ impl SqliteStore {
         );
 
         let mut native_screens = BTreeMap::new();
+        let mut screens_by_path: BTreeMap<String, Screen> = BTreeMap::new();
+        let mut source_paths = BTreeMap::new();
         for node in graph["nodes"].as_array().into_iter().flatten() {
             if node["kind"] == "screen"
                 && let Some(source) = node.get("nativeSource")
@@ -404,9 +406,28 @@ impl SqliteStore {
                 let screen =
                     Screen::new(path, ScreenOrigin::Native { declaration }).map_err(db_err)?;
                 native_screens.insert(screen.id().clone(), screen);
+            } else if node["kind"] == "screen" && graph["screenDiscovery"]["kind"] == "tsx-source" {
+                let id = node["id"]
+                    .as_str()
+                    .ok_or_else(|| db_err("missing source screen id"))?;
+                let path = node["label"]
+                    .as_str()
+                    .ok_or_else(|| db_err("missing source screen label"))?;
+                let origin = if id.starts_with("route:") {
+                    ScreenOrigin::Router {
+                        file: node["location"]["file"]
+                            .as_str()
+                            .ok_or_else(|| db_err("missing route location"))?
+                            .to_owned(),
+                    }
+                } else {
+                    ScreenOrigin::Entry
+                };
+                source_paths.insert(id, path);
+                screens_by_path.insert(path.to_owned(), Screen::new(path, origin).map_err(db_err)?);
             }
         }
-        let mut screens_by_path: BTreeMap<String, Screen> = BTreeMap::new();
+
         let mut states_by_id: BTreeMap<StateId, State> = BTreeMap::new();
         let mut cells = Vec::new();
         let mut seen_cell_ids = BTreeSet::new();
@@ -574,23 +595,32 @@ impl SqliteStore {
         }
 
         let mut edges = Vec::new();
+        let mut source_pairs = BTreeSet::new();
         for raw in graph["edges"].as_array().into_iter().flatten() {
             if raw["kind"] != "linksTo" {
                 continue;
             }
-            let Some(from_path) = raw["source"]
-                .as_str()
-                .and_then(|s| s.strip_prefix("route:"))
-            else {
+            let Some(from_path) = raw["source"].as_str().and_then(|id| {
+                source_paths
+                    .get(id)
+                    .copied()
+                    .or_else(|| id.strip_prefix("route:"))
+            }) else {
                 continue;
             };
-            let Some(to_path) = raw["target"]
-                .as_str()
-                .and_then(|s| s.strip_prefix("route:"))
-            else {
+            let Some(to_path) = raw["target"].as_str().and_then(|id| {
+                source_paths
+                    .get(id)
+                    .copied()
+                    .or_else(|| id.strip_prefix("route:"))
+            }) else {
                 continue;
             };
             if !screens_by_path.contains_key(from_path) || !screens_by_path.contains_key(to_path) {
+                continue;
+            }
+            // SQLite stores one extracted relation per pair. The archive keeps each TSX trigger.
+            if !source_paths.is_empty() && !source_pairs.insert((from_path, to_path)) {
                 continue;
             }
             let mut observed_widths = BTreeSet::new();
