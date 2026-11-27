@@ -44,6 +44,7 @@ Do not guess specs, terms, versions, or API names. Check the docs. If the docs d
 5. **No audience declaration.** Do not add "who it's for" or similar audience lines to any doc.
 6. **No other products' names or trademarks** in dui product or package names, and none in the positioning line.
 7. **No memory-heavy rendering on the default path.** See [Never](#never).
+8. **Renderers read only the versioned model.** They contain no model or business logic, so a renderer can be replaced. See [Architecture](docs/en/architecture.md#swappable-renderers).
 
 ## Never
 

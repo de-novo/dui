@@ -79,13 +79,17 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 | v0.0.9 | **Android · 桌面 · 设计缺陷检测与开发者工具级元素检查器。** 新增 Android 适配器（`adb screencap` + `uiautomator`/Semantics → `RenderNodeSnapshot`，[#102](https://github.com/de-novo/dui/issues/102)）、Electron 45 宿主 + GPUI AccessKit 渲染树 Diff（[#103](https://github.com/de-novo/dui/issues/103)）、Radix UI / shadcn 规则包 + Next.js 16 宿主（[#104](https://github.com/de-novo/dui/issues/104)）、多标签页并行捕获 + 基于 `renderTree` 的自动设计缺陷与无障碍诊断（溢出、重叠、文本截断、对比度不足、触控目标过小、间距与对齐偏差——人类在画布上直观查看，AI 通过 CLI/MCP 获取结构化 JSON，[#105](https://github.com/de-novo/dui/issues/105)），以及在画布上查看任意元素属性、宽高、外边距、内边距与间距标尺的开发者工具级元素检查器（[#106](https://github.com/de-novo/dui/issues/106)）。 |
 | v0.1.0 | **跨平台移动端捕获与编译器预言机基础。** 新增 iOS Simulator（`xcrun simctl` + XCUI）捕获、通用认证会话（`storageState.json` / `POST authFlow`）、PR Markdown Diff 输出、React Native / Expo Router / Ink `tsc` 规则包、共享编译器预言机 IR 与 6 个官方工具链探测（`dui toolchains`：`tsc`、`rustc`、`go`、`swiftc`、`kotlinc`、`dart`）。 |
 | v0.2.0 | **框架无关路由树、全页真实比例节点、模态框自动捕获与客观事实核心。** 按页面完整高度（含嵌套滚动容器）捕获并按真实宽高比排列画布与桌面节点（[#147](https://github.com/de-novo/dui/issues/147)），通过 WAI-ARIA 导航展开与官方编译器路由注册表实现框架无关路由树发现、零配置 `dui scan` 与多宿主 `dui map`（[#149](https://github.com/de-novo/dui/issues/149)、[#153](https://github.com/de-novo/dui/issues/153)），对齐 GPUI 桌面原生 macOS `TitleBar` 与避障走廊连线（[#155](https://github.com/de-novo/dui/issues/155)、[#159](https://github.com/de-novo/dui/issues/159)），基于 WAI-ARIA 自动捕获模态框/抽屉并以子叠加层节点展示（[#157](https://github.com/de-novo/dui/issues/157)），并移除硬编码的全局设计缺陷启发式规则与过早的 iframe 实时挂载，使 `dui` 严格报告客观渲染证据（[#163](https://github.com/de-novo/dui/issues/163)、[#169](https://github.com/de-novo/dui/issues/169)）。 |
-| v0.3.0 | **插件化设计系统一致性校验（`DESIGN.md` / 插件）与基于代码的画布渲染。** 保持 `dui-core` 严格输出客观事实，在 `dui.json` 中提供可选插件架构接入自有 `DESIGN.md`、W3C Design Tokens 或自定义审计插件（[#167](https://github.com/de-novo/dui/issues/167)）。画布的默认画面是 dui 近似渲染器根据带版本模型绘制的结果，而不是位图截图。 |
+| v0.3.0 | **插件化设计系统一致性校验（`DESIGN.md` / 插件）与基于代码的画布渲染。** 保持 `dui-core` 严格输出客观事实，在 `dui.json` 中提供可选插件架构接入自有 `DESIGN.md`、W3C Design Tokens 或自定义审计插件（[#167](https://github.com/de-novo/dui/issues/167)）。画布的默认画面是 dui 近似渲染器根据带版本模型绘制的结果，而不是位图截图。该渲染器是置于小型接口之后的最小 TypeScript/DOM 实现，因此之后可以替换。 |
 
 <a id="default-pipeline"></a>
 
 **默认流水线（2026-11-27 决定）。** 目标是屏幕及其关系的地图，而不是现场演示业务逻辑。默认路径必须能在任一操作系统上运行，且不得依赖特定渲染引擎。源码被解析为抽象语法树，再组装为带版本的 JSON 模型，并由 dui 自己的近似渲染器绘制。模型包含屏幕、组件及其 props、跳转、代码位置、数据槽位、已声明状态及其依赖的 UI 分支、列表项 schema、字段到 UI 的绑定、中立样式属性，以及保留 token 名称的 token 层（供日后映射为 Figma 变量）。仅在运行时可知的值保持为占位。评审者可以在 UI 中更改槽位、状态和列表数量，而无需运行处理函数或访问网络。保存的值集日后可以成为 Figma 变体。
 
 一种新语言只需要一个适配器，把它映射到该模型：布局元素、已声明状态与数据、导航，以及样式语法。模型、近似渲染器、热重载和 Figma 导出均可复用。
+
+<a id="swappable-renderers"></a>
+
+**渲染器可替换。** 可长期保留的资产是 AST 提取和带版本的模型。渲染器只读取该模型，不包含模型或业务逻辑，因此可以在不改动提取器或 schema 的情况下替换渲染器。
 
 **样式与设计 token。** 中立样式属性为 spacing、color、typography、radius、size 和 layout。每个适配器把自己的样式语法映射到这些属性，并把 token 名称保留在 token 层。
 
@@ -136,12 +140,12 @@ flowchart TD
 | 1. Schema | v0.2.x | 将屏幕、组件、跳转、代码位置、槽位、已声明状态与分支、列表项 schema、字段到 UI 的绑定、中立样式属性（spacing、color、typography、radius、size、layout），以及保留 token 名称的 token 层，冻结为带版本的 JSON 模型。 | 一个包含样式属性和 token 名称的示例通过 schema 校验。 |
 | 2. Browserless default map | v0.2.x | 默认情况下 `dui map` 和 `dui open` 不再启动浏览器。`--capture` 和 `dui run` 仍用于校验。 | 无浏览器的 CI 运行能给出屏幕和跳转，且现有截图检查仍然通过。在同一示例上测量截图路径与 AST 路径的端到端地图生成时间（冷启动和增量），并记录数字。AST 默认路径必须明显更快。在测量之前不要公布目标时间。 |
 | 3. AST extractors | v0.2.x–v0.3.0 | 从源码提取模型。先做 TypeScript/TSX，再做可在任一操作系统上运行的 Swift syntax only。类型检查器或编译器索引是可选项。每个适配器把布局、状态、导航和样式语法映射到模型。 | 在 Linux 上，不启动浏览器、不使用 Xcode，一个 TSX fixture 和一个 Swift fixture 能输出模型，包括简单样式映射。 |
-| 4. Approximate renderer | v0.3.0 | 仅根据模型绘制卡片，包括其样式属性。标注为近似。 | 卡片非空；文本、堆叠和样式与模型一致；不启动浏览器。 |
+| 4. Approximate renderer | v0.3.0 | 仅根据模型绘制卡片，包括其样式属性。使用置于小型渲染器接口之后的最小 TypeScript/DOM 渲染器。标注为近似。不要把模型或业务逻辑放进渲染器。 | 卡片非空；文本、堆叠和样式与模型一致；不启动浏览器；渲染器只读取已冻结的模型，并且可以在不改动提取器或 schema 的情况下被替换。 |
 | 5. Hot reload | v0.3.0 | 监视文件（与 Vite 同一思路），只重新解析变更部分，只补丁受影响的模型节点，再用近似渲染器重绘。跟踪 import 图，使依赖所改文件的屏幕一并更新。无需重新构建应用，也不启动浏览器。 | 在同一示例上测量从编辑到更新的延迟并记录。修改文件后，依赖卡片会更新，且不重新构建应用、不启动浏览器。 |
 | 6. Slots, state, and lists | v0.3.0 | 在 UI 中切换槽位值、已声明状态和列表数量（0、1、many）。根据列表项 schema 自动生成 mock 项。隐藏或未知类型保持为占位。 | 切换 `isOpen` 或列表数量时，画面在无网络、无处理函数的情况下变化。已保存的值集会保留。 |
 | 7. Optional render machine | v0.3.x | 通用校验任务：输入 surface、cell、state、size，输出 frame、render tree 和 fidelity。关于常驻渲染服务器和并发浏览器工作的议题（[#343](https://github.com/de-novo/dui/issues/343)、[#344](https://github.com/de-novo/dui/issues/344)）属于这条轨道，而不是默认地图。 | 任务运行时记录保真度。默认地图 CI 仍不使用浏览器。 |
 | 8. Figma export | after v0.3.0 | 仅根据模型创建画板和变体。在可能时把 token 名称映射为 Figma 变量。 | 只读导出不需要快照。 |
-| 9. GPUI web canvas | from v1.0.0 | 从优化出发，尝试用 GPUI（wasm32 网页后端，WebGPU，回退为 WebGL2）绘制应用内画布——仅限屏幕渲染器。React 外壳保持不变。 | 前提：包含网页后端的稳定官方 `gpui` crate；已验证韩语 IME 和文本选择。对照 TypeScript 渲染器测量打包体积和标签页内存并记录数字（已公布的参考值是 Zed 的 Delta 网页打包，约 23MB）。在这些测量上胜出之前，GPUI 画布保持为可选项。在此之前，默认屏幕渲染器仍是 TypeScript/DOM 或轻量画布。 |
+| 9. GPUI canvas | from v1.0.0 | 尝试单一的 Rust/GPUI 画布渲染器：在桌面上以原生方式运行，在 Web 应用画布中以 WASM 运行（WebGPU，回退为 WebGL2）。React 外壳（列表、设置、表单）留在画布之外。基础组件使用 GPUI Kit。 | 前提：包含网页后端的稳定官方 `gpui` crate；已验证韩语 IME 和文本选择。规划仅存在于 Web 的缺口：用于无障碍、文本选择和查找的 DOM 覆盖层；打包字体；在上游提供稳定版退出选项之前，默认 Web 构建需要 nightly Rust；单一画布窗口。对照 TypeScript 渲染器测量打包体积和标签页内存并记录数字（已公布的参考值是 Zed 的 Delta 网页打包，约 23MB）。在这些测量上胜出之前，GPUI 画布保持为可选项。在此之前，默认屏幕渲染器仍是最小 TypeScript/DOM 渲染器。 |
 
 **第 2 阶段测量（2026-11-27）。** 在一台笔记本上用发布构建端到端运行 `dui map --build-dir`，每项在同一主目录中运行两次（[#368](https://github.com/de-novo/dui/issues/368)）。对显式目标的第二次运行会重新渲染所有格子，因此截图路径从中得不到加速。文件变更后的真正增量更新属于第 5 阶段。
 
@@ -154,7 +158,7 @@ flowchart TD
 
 **像素校验与渲染服务器（可选，v0.3.x）。** 常驻的官方引擎渲染服务器是可选的像素校验，而不是默认地图（[决定](architecture.md#4-已确定的决定2026-11-20)）。默认的 `dui map` 和 `dui open` 不启动浏览器。启用时，它是 `--capture`、`dui run` 以及后续其他界面的任务分发器。[#343](https://github.com/de-novo/dui/issues/343) 和 [#344](https://github.com/de-novo/dui/issues/344) 中的工作属于这条轨道。它仍可由共享的实时会话所有者进程（[#333](https://github.com/de-novo/dui/issues/333)）发展而来，但只能放在显式选择之后。
 
-**dui 近似渲染器（v0.3.0）。** 基于代码的画布的默认画面，是 dui 近似渲染器根据带版本模型（含样式属性）绘制的结果。不需要浏览器，也不需要平台构建。帧会标注为近似。为可选保真度而与官方引擎帧对齐，仍是校验轨道上的研究；在此之前，那些帧是校验证据，而不是默认卡片。
+**dui 近似渲染器（v0.3.0）。** 基于代码的画布的默认画面，是 dui 近似渲染器根据带版本模型（含样式属性）绘制的结果。它是只读取已冻结模型的最小 TypeScript/DOM 实现，渲染器内不包含模型或业务逻辑，并置于小型渲染器接口之后，以便替换。不需要浏览器，也不需要平台构建。帧会标注为近似。为可选保真度而与官方引擎帧对齐，仍是校验轨道上的研究；在此之前，那些帧是校验证据，而不是默认卡片。
 
 **Figma 导出（v0.3.0 之后）。** 在基于代码的画布闭环就位之后，把屏幕地图作为由代码生成的只读视图导出到 Figma。代码仍是唯一的事实来源。不把 Figma 中的修改写回代码；若同步回去，来源会再次分裂，因此目前不是目标。
 
@@ -165,9 +169,9 @@ flowchart TD
 
 首个概念验证使用若干 obora 设计系统组件（Button、Input、Badge）和两三个 obora 屏幕。
 
-**GPUI 网页画布（自 v1.0.0）。** 在默认近似渲染器就位之后，从优化出发，尝试用 GPUI 的 wasm32 网页后端（WebGPU，回退为 WebGL2）绘制应用内画布。仅替换屏幕渲染器，React 外壳保持不变。这是页面内运行的渲染器，不是无头浏览器，也不改变默认地图路径的[绝不做的事](#never)规则。
+**GPUI 画布（自 v1.0.0）。** 在默认近似渲染器就位之后，从优化出发，尝试单一的 Rust/GPUI 画布渲染器：同一份代码在桌面上以原生方式运行，在 Web 应用画布中以 WASM 运行（WebGPU，回退为 WebGL2）。React 外壳（列表、设置、表单）留在画布之外。基础组件来自 GPUI Kit。这是在应用内运行的渲染器，不是无头浏览器，也不改变默认地图路径的[绝不做的事](#never)规则。
 
-此尝试须等到官方 `gpui` crate 稳定且包含网页后端，并在该后端上验证韩语 IME 和文本选择之后再开始。必须对照 TypeScript 渲染器测量打包体积和标签页内存并记录数字。已公布的参考值是 Zed 的 Delta 网页打包，约 23MB；该数字既不是 dui 的测量结果，也不是目标。在这些测量上胜出之前，GPUI 画布保持为可选项。在此之前，默认屏幕渲染器是 TypeScript/DOM 或轻量画布。
+GPUI Kit 的 Web 路径是组件展示，而非经过验证的生产 Web 应用路径，因此这仍是一次尝试。须等到官方 `gpui` crate 稳定且包含网页后端，并在该后端上验证韩语 IME 和文本选择之后再开始。需要预先规划的仅存在于 Web 的缺口如下：浏览器后端没有无障碍树（桌面端使用 AccessKit），因此用 DOM 覆盖层补齐无障碍、文本选择和查找；无法读取系统字体，必须打包字体；在上游提供稳定版退出选项之前，默认 Web 构建需要 nightly Rust；网页后端只使用一个画布窗口。应用内搜索、选择和快捷键在 GPUI 中实现一次，供桌面和 Web 共用。必须对照 TypeScript 渲染器测量打包体积和标签页内存并记录数字。已公布的参考值是 Zed 的 Delta 网页打包，约 23MB；该数字既不是 dui 的测量结果，也不是目标。在这些测量上胜出之前，GPUI 画布保持为可选项。在此之前，默认屏幕渲染器是最小 TypeScript/DOM 渲染器。
 
 **托管方向。** 正在考虑类似 Sentry 的模式：核心 CLI（`dui map`、diff、本地渲染和 JSON 导出）保持开源，日后可由托管服务保存带有代码位置映射的 CI 上传、在每个 pull request 上展示界面对比、与 Figma 插件同步，并把设计评论关联回代码位置，同时提供团队权限。这只是待探索的方向，并非承诺。
 
