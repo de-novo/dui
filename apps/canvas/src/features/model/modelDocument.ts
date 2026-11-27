@@ -36,7 +36,7 @@ export function readModel(text: string): Model {
 }
 
 const tags = new Set(
-  "body dialog select option table caption thead tbody tfoot tr th td br hr main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label ul ol li dl dt dd small form output".split(
+  "html body dialog select option table caption thead tbody tfoot tr th td br hr main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label ul ol li dl dt dd small form output".split(
     " ",
   ),
 );
@@ -134,7 +134,12 @@ export function drawModel(model: Model, componentId: string) {
     }
     if (n.kind !== "element" || n.module || !tags.has(n.tag!))
       return placeholder(n.reason ?? n.tag ?? n.kind);
-    const el = n.tag === "body" ? doc.body : doc.createElement(n.tag!);
+    const el =
+      n.tag === "html"
+        ? doc.documentElement
+        : n.tag === "body"
+          ? doc.body
+          : doc.createElement(n.tag!);
     el.dataset.modelNode = n.id;
     const composite = new Map<string, string>();
     for (const d of n.style ?? []) {
@@ -203,6 +208,6 @@ export function drawModel(model: Model, componentId: string) {
     return el;
   }
   const root = component(componentId, new Map(), []);
-  if (root !== doc.body) doc.body.append(root);
+  if (root !== doc.body && root !== doc.documentElement) doc.body.append(root);
   return { html: "<!doctype html>" + doc.documentElement.outerHTML, unresolved: [...unresolved] };
 }

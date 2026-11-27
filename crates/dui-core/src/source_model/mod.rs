@@ -496,6 +496,16 @@ pub enum StyleValue {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LengthUnit {
+    Vw,
+    Vh,
+    Svw,
+    Svh,
+    Lvw,
+    Lvh,
+    Dvw,
+    Dvh,
+    Vmin,
+    Vmax,
     Px,
     Rem,
     Em,

@@ -257,6 +257,19 @@ pub fn extract_in_context(
     width: Option<u32>,
     root_attribute: Option<(&str, &str)>,
 ) -> Result<m::SourceModel, String> {
+    extract_with_scheme(project, entry, built_css, width, root_attribute, None)
+}
+pub fn extract_with_scheme(
+    project: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+    width: Option<u32>,
+    root_attribute: Option<(&str, &str)>,
+    scheme: Option<&str>,
+) -> Result<m::SourceModel, String> {
+    if scheme.is_some_and(|s| built_css.is_none() || !matches!(s, "light" | "dark")) {
+        return Err("expected built CSS and color scheme light or dark".into());
+    }
     if let Some((name, value)) = root_attribute
         && (built_css.is_none()
             || !name.starts_with("data-")
@@ -283,7 +296,7 @@ pub fn extract_in_context(
     } = syntax::load(project, entry, built_css, &mut diagnostics)?;
     let built = artifact
         .as_ref()
-        .map(|p| style::built::Sheet::new(&files[p], width, root_attribute))
+        .map(|p| style::built::Sheet::new(&files[p], width, root_attribute, scheme))
         .transpose()?;
     let mut model = m::SourceModel {
         schema_version: m::SCHEMA_VERSION,
