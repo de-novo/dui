@@ -108,6 +108,8 @@ Every node has `id` and `location`. A branch arm's `when` is `{"equals": <value>
 
 ## 6. Style
 
+The model has one `gap`. Both CSS and inline TSX can express it as `1.5rem 1.5rem`. Unequal values and individual `row-gap` or `column-gap` declarations retain their unresolved source.
+
 An element's `style` is a list of declarations. Each has a `property`, a `value`, an optional `when` condition and `from`, the source of the declaration: `syntax` (`class`, `inline`, `modifier`, `stylesheet`, `theme`), its `text` (one class, one inline entry, one modifier) and its `location`. Declarations apply in order. Among those whose conditions hold, the later one wins.
 
 | Group | Properties | Values |

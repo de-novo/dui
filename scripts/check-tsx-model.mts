@@ -102,6 +102,22 @@ export function Shadow({sheet}: {sheet: {card: string}}){return <p className={sh
 export default function View(){return <p style={{color:"#ffffff"}} className={sheet.card}/>;}`,
   );
   const cssPath = join(project, "View.module.css");
+  writeFileSync(cssPath, ".card {gap: 1.5rem 1.5rem;} .other {gap: 2px 5%; row-gap: 3px;}");
+  writeFileSync(
+    join(project, "Gaps.tsx"),
+    `import s from "./View.module.css"; export function Gaps(){return <div><p className={s.card}/><p style={{gap:"1.5rem 1.5rem"}}/><p className={s.other}/><p style={{gap:"2px 5%",columnGap:3}}/></div>}`,
+  );
+  const gaps = JSON.parse(extract(project, "Gaps.tsx"));
+  assert.ok(validate(gaps));
+  const [cssGap, inlineGap, mixedCss, mixedInline] = gaps.components[0].root.children;
+  for (const child of [cssGap, inlineGap]) {
+    assert.equal(child.style[0].property, "gap");
+    assert.deepEqual(child.style[0].value, { kind: "length", value: 1.5, unit: "rem" });
+  }
+  assert.equal(mixedCss.style[0].value.kind, "unresolved");
+  assert.equal(mixedCss.unresolvedStyle[0].text, "row-gap: 3px;");
+  assert.equal(mixedInline.style, undefined);
+  assert.equal(mixedInline.unresolvedStyle.length, 2);
   writeFileSync(
     cssPath,
     `p.card { color: #321; }

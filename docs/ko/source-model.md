@@ -110,6 +110,8 @@ flowchart LR
 
 ## 6. 스타일
 
+모델의 `gap`은 한 값이다. CSS와 인라인 TSX에서 `1.5rem 1.5rem`은 같은 간격으로 기록한다. 두 값이 다르거나 `row-gap` 또는 `column-gap`만 선언하면 원문을 미해결로 보존한다.
+
 요소의 `style`은 선언 목록이다. 각 선언은 `property`, `value`, 선택 `when` 조건, 그리고 선언의 출처 `from`을 가진다. `from`은 `syntax`(`class`, `inline`, `modifier`, `stylesheet`, `theme`), 그 `text`(클래스 하나, 인라인 항목 하나, modifier 하나), `location`이다. 선언은 순서대로 적용된다. 조건을 만족하는 선언 중 뒤의 것이 이긴다.
 
 | 그룹 | 속성 | 값 |
