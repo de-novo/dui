@@ -102,6 +102,37 @@ export function Shadow({sheet}: {sheet: {card: string}}){return <p className={sh
 export default function View(){return <p style={{color:"#ffffff"}} className={sheet.card}/>;}`,
   );
   const cssPath = join(project, "View.module.css");
+  for (const [css, tsx, expected] of [
+    ["0", "0", 0],
+    ["2.5", "2.5", 2.5],
+    [".5", '"0.5"', 0.5],
+    ["-1", "-1", null],
+    ["12px", '"12px"', null],
+    ["var(--ratio)", "ratio", null],
+  ] as const) {
+    writeFileSync(cssPath, `.panel { flex-grow: ${css}; }`);
+    writeFileSync(
+      join(project, "Grow.tsx"),
+      `import sheet from "./View.module.css"; export function Grow({ratio}) { return <main><p className={sheet.panel}/><p style={{flexGrow:${tsx}}}/></main>; }`,
+    );
+    const grow = JSON.parse(extract(project, "Grow.tsx"));
+    assert.ok(validate(grow));
+    for (const [index, child] of grow.components[0].root.children.entries()) {
+      const decl = child.style?.[0];
+      assert.equal(decl?.property, "grow");
+      if (expected === null) {
+        assert.equal(decl.value.kind, "unresolved");
+        assert.equal(decl.value.text, index === 0 ? css : tsx);
+      } else assert.deepEqual(decl.value, { kind: "number", value: expected });
+      const loc = decl.from.location;
+      assert.equal(loc.file, index === 0 ? "View.module.css" : "Grow.tsx");
+      assert.equal(
+        readFileSync(join(project, loc.file)).subarray(loc.start, loc.end).toString(),
+        decl.from.text,
+      );
+    }
+  }
+
   writeFileSync(cssPath, ".card {gap: 1.5rem 1.5rem;} .other {gap: 2px 5%; row-gap: 3px;}");
   writeFileSync(
     join(project, "Gaps.tsx"),
