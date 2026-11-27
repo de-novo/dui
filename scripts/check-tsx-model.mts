@@ -480,7 +480,51 @@ export default function View(){return <section><p className={sheet.card}/><p sty
   rmSync(project, { recursive: true, force: true });
 }
 // Build an actual utility stylesheet. The extractor only receives its finished artifact.
-const builtProject = mkdtempSync(resolve("apps/canvas/.dui-gap-"));
+// Neutral property, computed CSS property and expected values for each rendered card.
+const cardStyles = [
+  ["gap", "gap", "6px", "1px", "8px"],
+  ["color", "color", "rgb(18, 52, 86)", "rgb(34, 68, 102)", "rgb(51, 85, 119)"],
+  [
+    "background",
+    "background-color",
+    "rgb(210, 221, 232)",
+    "rgb(196, 213, 230)",
+    "rgb(179, 196, 213)",
+  ],
+  [
+    "borderColor",
+    "border-top-color",
+    "rgb(69, 103, 137)",
+    "rgb(69, 103, 137)",
+    "rgb(69, 103, 137)",
+  ],
+  ["borderWidth", "border-top-width", "2px", "3px", "4px"],
+  ["borderRadius", "border-top-left-radius", "7px", "5px", "9px"],
+  ["width", "width", "160px", "140px", "120px"],
+  ["height", "height", "90px", "80px", "70px"],
+  ["minWidth", "min-width", "80px", "80px", "80px"],
+  ["maxWidth", "max-width", "220px", "220px", "220px"],
+  ["minHeight", "min-height", "40px", "40px", "40px"],
+  ["maxHeight", "max-height", "120px", "120px", "120px"],
+  ["opacity", "opacity", "0.91", "0.82", "0.73"],
+  ["fontSize", "font-size", "16px", "14px", "12px"],
+  ["lineHeight", "line-height", "24px", "20px", "18px"],
+  ["letterSpacing", "letter-spacing", "1px", "2px", "3px"],
+  ["direction", "flex-direction", "column", "row", "row"],
+  ["wrap", "flex-wrap", "wrap", "wrap", "wrap"],
+  ["alignItems", "align-items", "center", "center", "center"],
+  ["justifyContent", "justify-content", "center", "center", "center"],
+  ["grow", "flex-grow", "2", "2", "2"],
+  ...["Top", "Bottom", "Start", "End"].flatMap((side) => {
+    const suffix =
+      side === "Start" || side === "End" ? "inline-" + side.toLowerCase() : side.toLowerCase();
+    return [
+      ["padding" + side, "padding-" + suffix, "12px", "10px", "10px"],
+      ["margin" + side, "margin-" + suffix, "6px", "4px", "4px"],
+    ];
+  }),
+];
+const builtProject = mkdtempSync(resolve("apps/canvas/.dui-style-"));
 try {
   writeFileSync(
     join(builtProject, "vite.config.mjs"),
@@ -488,7 +532,15 @@ try {
   );
   writeFileSync(
     join(builtProject, "style.css"),
-    '@import "tailwindcss"; @theme { --spacing: 3px; } [data-dense] { gap: 1px; }',
+    `@import "tailwindcss"; @theme { --spacing: 3px; }
+:root { --card-ink:#123456; }
+@layer components {
+.card { display:flex; color:var(--card-ink); background-color:#d2dde8; border-style:solid; border-color:#456789; border-width:2px; border-radius:7px;
+ width:160px; height:90px; min-width:80px; max-width:220px; min-height:40px; max-height:120px;
+ opacity:.91; font-size:16px; line-height:24px; letter-spacing:1px;
+ flex-direction:column; flex-wrap:wrap; align-items:center; justify-content:center; flex-grow:2; padding:12px; margin:6px; }
+}
+[data-dense] { gap:1px; color:#224466; background-color:#c4d5e6; border-width:3px; border-radius:5px; width:140px; height:80px; opacity:.82; font-size:14px; line-height:20px; letter-spacing:2px; flex-direction:row; padding:10px; margin:4px; }`,
   );
   writeFileSync(
     join(builtProject, "index.html"),
@@ -501,11 +553,12 @@ import {createRoot} from "react-dom/client";
 import {flushSync} from "react-dom";
 import {App} from "./App";
 flushSync(()=>createRoot(document.querySelector("#app")).render(<App/>));
-document.querySelector("output").textContent=[...document.querySelectorAll("main div")].map(el=>getComputedStyle(el).gap).join(",");`,
+const props=${JSON.stringify(cardStyles.map(([, css]) => css))};
+document.querySelector("output").textContent=JSON.stringify([...document.querySelectorAll("main div")].map(el=>props.map(p=>getComputedStyle(el).getPropertyValue(p))));`,
   );
   writeFileSync(
     join(builtProject, "App.tsx"),
-    'import React from "react"; import "./style.css"; export function App(){return <main><div className="grid gap-2"/><div className="grid gap-2" data-dense="yes"/><div data-dense style={{gap:8}}/></main>}',
+    'import React from "react"; import "./style.css"; export function App(){return <main><div className="card gap-2"/><div className="card gap-2" data-dense="yes"/><div className="card" data-dense style={{gap:8,color:"#335577",backgroundColor:"#b3c4d5",borderWidth:4,borderRadius:9,width:120,height:70,opacity:.73,fontSize:12,lineHeight:"18px",letterSpacing:3}}/></main>}',
   );
   execFileSync(process.execPath, [resolve("apps/canvas/node_modules/vite/bin/vite.js"), "build"], {
     cwd: builtProject,
@@ -522,12 +575,36 @@ document.querySelector("output").textContent=[...document.querySelectorAll("main
     );
   const output = readBuilt();
   assert.ok(validate(output), JSON.stringify(validate.errors));
-  const gaps = output.components[0].root.children.map((n: { style: { property: string }[] }) =>
-    n.style.filter((d) => d.property === "gap"),
-  );
-  assert.deepEqual(
-    gaps.map((ds: any[]) => ds.map((d) => d.value)),
-    [6, 1, 8].map((value) => [{ kind: "length", unit: "px", value }]),
+  const cards = output.components[0].root.children;
+  const modelValues = cards.map((card: { style: any[] }, index: number) =>
+    cardStyles.map(([property], k) => {
+      const matches = card.style.filter((d) => d.property === property);
+      assert.equal(matches.length, 1, `Card ${index} ${property}`);
+      const { value, from } = matches[0];
+      let cssValue = String(value.value);
+      if (value.kind === "color") {
+        const channels = value.value
+          .slice(1)
+          .match(/../g)
+          .map((h: string) => parseInt(h, 16));
+        cssValue = "rgb(" + channels.join(", ") + ")";
+      } else if (value.kind === "length") cssValue += value.unit;
+      assert.equal(
+        cssValue,
+        cardStyles[k][index + 2],
+        JSON.stringify({ index, property, value, from }),
+      );
+      if (from.syntax !== "inline") {
+        assert.equal(from.location.file, bundle);
+        assert.equal(
+          readFileSync(join(builtProject, bundle))
+            .subarray(from.location.start, from.location.end)
+            .toString(),
+          from.text,
+        );
+      }
+      return cssValue;
+    }),
   );
   if (process.argv.includes("--verify-render")) {
     const chrome = process.env.DUI_CHROMIUM;
@@ -547,29 +624,36 @@ document.querySelector("output").textContent=[...document.querySelectorAll("main
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
     const measured = dom.match(/<output>([^<]+)<\/output>/)?.[1];
-    assert.equal(
-      measured,
-      gaps.map(([d]: any[]) => String(d.value.value) + d.value.unit).join(","),
-    );
-    console.log(JSON.stringify({ computedGaps: measured }));
-  }
-  for (const [d] of gaps.slice(0, 2)) {
-    assert.equal(d.from.location.file, bundle);
-    const { start, end } = d.from.location;
-    assert.equal(
-      readFileSync(join(builtProject, bundle)).subarray(start, end).toString(),
-      d.from.text,
+    assert.ok(measured);
+    assert.deepEqual(JSON.parse(measured), modelValues);
+    console.log(
+      JSON.stringify({
+        renderedCards: cards.length,
+        propertiesPerCard: cardStyles.length,
+        matched: cards.length * cardStyles.length,
+      }),
     );
   }
   writeFileSync(
     join(builtProject, bundle),
-    ".gap-2 { gap: 7px } @media (min-width: 500px) { .gap-2 { gap: 9px } }",
+    `
+    .card { gap:7px; color:#123456; width:140px; border-radius:5px; }
+    @media (width>=500px) { .card { gap:9px; color:#abcdef; } }
+    .card { transform:var(--rotate, ) translateY(1px) }
+    .card { border-top-left-radius:2px }
+    .sidebar .badge:hover, .notice > strong { width:320px }
+  `,
   );
-  assert.equal(
-    readBuilt().components[0].root.children[0].style.find(
-      (d: { property: string }) => d.property === "gap",
-    ).value.kind,
-    "unresolved",
+  const staticCard = readBuilt().components[0].root.children[0];
+  for (const prop of ["color", "gap", "borderRadius"]) {
+    assert.equal(
+      staticCard.style.find((d: { property: string }) => d.property === prop).value.kind,
+      "unresolved",
+    );
+  }
+  assert.deepEqual(
+    staticCard.style.find((d: { property: string }) => d.property === "width").value,
+    { kind: "length", value: 140, unit: "px" },
   );
 } finally {
   rmSync(builtProject, { recursive: true, force: true });

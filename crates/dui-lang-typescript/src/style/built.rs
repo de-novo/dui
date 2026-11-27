@@ -1,23 +1,125 @@
-//! Resolve scalar gaps from an explicitly supplied, already bundled author stylesheet.
-use super::{P, V, uniform_gap};
+//! Resolve supported style declarations from an explicitly supplied, already bundled author stylesheet.
+use super::{P, V, modules, shorthand, spacing, uniform_gap};
 use crate::syntax::{File, children, first};
 use dui_core::source_model as m;
 use std::collections::BTreeMap;
 use tree_sitter::Node as Ast;
 
+// Each supported property uses the same value parser as a source stylesheet.
+const DIRECT: &[(&str, P)] = &[
+    ("gap", P::Gap),
+    ("color", P::Color),
+    ("background-color", P::Background),
+    ("border-color", P::BorderColor),
+    ("border-width", P::BorderWidth),
+    ("border-radius", P::BorderRadius),
+    ("opacity", P::Opacity),
+    ("font-size", P::FontSize),
+    ("line-height", P::LineHeight),
+    ("letter-spacing", P::LetterSpacing),
+    ("width", P::Width),
+    ("height", P::Height),
+    ("min-width", P::MinWidth),
+    ("max-width", P::MaxWidth),
+    ("min-height", P::MinHeight),
+    ("max-height", P::MaxHeight),
+    ("flex-direction", P::Direction),
+    ("align-items", P::AlignItems),
+    ("justify-content", P::JustifyContent),
+    ("flex-wrap", P::Wrap),
+    ("flex-grow", P::Grow),
+    ("padding-top", P::PaddingTop),
+    ("padding-bottom", P::PaddingBottom),
+    ("padding-inline-start", P::PaddingStart),
+    ("padding-inline-end", P::PaddingEnd),
+    ("margin-top", P::MarginTop),
+    ("margin-bottom", P::MarginBottom),
+    ("margin-inline-start", P::MarginStart),
+    ("margin-inline-end", P::MarginEnd),
+];
+
+fn affected(name: &str) -> Vec<P> {
+    if let Some(props) = spacing(name) {
+        return props.to_vec();
+    }
+    if let Some((_, prop)) = DIRECT.iter().find(|(css, _)| *css == name) {
+        return vec![*prop];
+    }
+    match name {
+        "background" => vec![P::Background],
+        "grid-gap" | "row-gap" | "column-gap" | "grid-row-gap" | "grid-column-gap" => vec![P::Gap],
+        "border" | "border-top" | "border-bottom" | "border-left" | "border-right"
+        | "border-inline" | "border-block" => vec![P::BorderWidth, P::BorderColor],
+        "font" => vec![P::FontSize, P::LineHeight],
+        "flex" => vec![P::Grow],
+        "flex-flow" => vec![P::Direction, P::Wrap],
+        "place-items" => vec![P::AlignItems],
+        "place-content" => vec![P::JustifyContent],
+        "padding-block" | "padding-block-start" | "padding-block-end" => {
+            vec![P::PaddingTop, P::PaddingBottom]
+        }
+        "padding-left" | "padding-right" => vec![P::PaddingStart, P::PaddingEnd],
+        "margin-block" | "margin-block-start" | "margin-block-end" => {
+            vec![P::MarginTop, P::MarginBottom]
+        }
+        "margin-left" | "margin-right" => vec![P::MarginStart, P::MarginEnd],
+        "inline-size" | "block-size" => vec![P::Width, P::Height],
+        "min-inline-size" | "min-block-size" => vec![P::MinWidth, P::MinHeight],
+        "max-inline-size" | "max-block-size" => vec![P::MaxWidth, P::MaxHeight],
+        "all" => DIRECT.iter().map(|(_, p)| *p).collect(),
+        n if n.starts_with("border-") && n.ends_with("-width") => vec![P::BorderWidth],
+        n if n.starts_with("border-") && n.ends_with("-color") => vec![P::BorderColor],
+        n if n.starts_with("border-") && n.ends_with("-radius") => vec![P::BorderRadius],
+        _ => vec![],
+    }
+}
+
 struct Rule<'a> {
     selectors: &'a str,
     layer: usize,
     uncertain: bool,
-    scalar: bool,
+    name: &'a str,
+    important: bool,
     value: &'a str,
     source: m::StyleSource,
 }
 
 pub(crate) struct Sheet<'a> {
-    rules: Vec<Rule<'a>>,
+    rules: BTreeMap<P, Vec<Rule<'a>>>,
+    selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
     vars: BTreeMap<&'a str, Option<&'a str>>,
+}
+
+struct Selector<'a> {
+    text: &'a str,
+    // A necessary type or class on the subject. Ancestors never qualify here.
+    subject: Option<&'a str>,
+}
+
+fn subject<'a>(file: &'a File, node: Ast<'_>) -> Option<&'a str> {
+    let parts = children(node);
+    match node.kind() {
+        "descendant_selector"
+        | "child_selector"
+        | "adjacent_sibling_selector"
+        | "sibling_selector" => subject(file, *parts.last()?),
+        "class_selector" => {
+            let class = file.text(*parts.last()?);
+            if ident(class) {
+                let text = file.text(node);
+                return text
+                    .get(text.len().checked_sub(class.len() + 1)?..)
+                    .filter(|s| s.starts_with('.'));
+            }
+            None
+        }
+        "tag_name" if ident(file.text(node)) => Some(file.text(node)),
+        "pseudo_class_selector" | "attribute_selector" | "id_selector" => {
+            subject(file, *parts.first()?)
+        }
+        _ => None,
+    }
 }
 
 fn ident(s: &str) -> bool {
@@ -26,15 +128,45 @@ fn ident(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
 }
 
+// The CSS grammar may mark a media range or an empty var() fallback as an error.
+// Both remain inside an intact rule; conditions stay unknown and values are parsed from source.
+fn structural_error(f: &File, root: Ast<'_>) -> bool {
+    let mut pending = vec![root];
+    while let Some(n) = pending.pop() {
+        if !n.has_error() {
+            continue;
+        }
+        if n.is_error() || n.is_missing() {
+            let parent = n.parent().map(|p| p.kind());
+            if n.is_error()
+                && (parent == Some("parenthesized_query") && !f.text(n).contains(['{', '}', ';'])
+                    || parent == Some("arguments") && f.text(n) == ",")
+            {
+                continue;
+            }
+            return true;
+        }
+        pending.extend(n.children(&mut n.walk()));
+    }
+    false
+}
+
 impl<'a> Sheet<'a> {
     pub(crate) fn new(f: &'a File) -> Result<Self, String> {
         let root = f.tree.root_node();
-        if root.has_error() {
+        if structural_error(f, root) {
             return Err(format!("Cannot parse built CSS: {}", f.path));
         }
         let mut sheet = Self {
-            rules: vec![],
+            rules: BTreeMap::new(),
             vars: BTreeMap::new(),
+            selectors: BTreeMap::from([(
+                "",
+                vec![Selector {
+                    text: "",
+                    subject: None,
+                }],
+            )]),
         };
         let mut layers = Vec::new();
         let mut stack = vec![(root, "", usize::MAX, false)];
@@ -65,32 +197,38 @@ impl<'a> Sheet<'a> {
                             .entry(prop)
                             .and_modify(|v| *v = None)
                             .or_insert(definition);
-                    } else if matches!(
-                        prop,
-                        "gap"
-                            | "grid-gap"
-                            | "row-gap"
-                            | "column-gap"
-                            | "grid-row-gap"
-                            | "grid-column-gap"
-                            | "all"
-                    ) {
-                        sheet.rules.push(Rule {
-                            selectors: selector,
-                            layer,
-                            uncertain: uncertain || important,
-                            scalar: matches!(prop, "gap" | "grid-gap"),
-                            value,
-                            source: m::StyleSource {
-                                syntax: m::StyleSyntax::Stylesheet,
-                                text: f.text(node).into(),
-                                location: f.loc(node),
-                            },
-                        });
+                    } else {
+                        for property in affected(prop) {
+                            sheet.rules.entry(property).or_default().push(Rule {
+                                selectors: selector,
+                                layer,
+                                uncertain,
+                                important,
+                                name: prop,
+                                value,
+                                source: m::StyleSource {
+                                    syntax: m::StyleSyntax::Stylesheet,
+                                    text: f.text(node).into(),
+                                    location: f.loc(node),
+                                },
+                            });
+                        }
                     }
                 }
                 "rule_set" => {
                     if let [selectors, body] = parts.as_slice() {
+                        sheet
+                            .selectors
+                            .entry(f.text(*selectors))
+                            .or_insert_with(|| {
+                                children(*selectors)
+                                    .into_iter()
+                                    .map(|node| Selector {
+                                        text: f.text(node),
+                                        subject: subject(f, node),
+                                    })
+                                    .collect()
+                            });
                         stack.push((
                             *body,
                             f.text(*selectors),
@@ -137,18 +275,94 @@ impl<'a> Sheet<'a> {
         Ok(sheet)
     }
 
-    fn value(&self, raw: &str) -> Option<V> {
-        if let Some(v) = uniform_gap(raw) {
-            return Some(v);
-        }
-        let (variable, factor) =
-            if let Some(calc) = raw.strip_prefix("calc(").and_then(|s| s.strip_suffix(')')) {
-                let (var, n) = calc.split_once('*')?;
-                (var.trim(), n.trim().parse::<f64>().ok()?)
+    fn value(&self, property: P, rule: &Rule<'_>) -> Option<V> {
+        let raw = rule.value;
+        let raw = if let Some(name) = raw.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
+            self.vars.get(name.trim()).copied().flatten()?
+        } else {
+            raw
+        };
+        if rule.name == "flex-flow" {
+            let mut direction = None;
+            let mut wrap = None;
+            for word in raw.split_ascii_whitespace() {
+                let slot = match word {
+                    "row" | "column" | "row-reverse" | "column-reverse" => &mut direction,
+                    "wrap" | "nowrap" | "wrap-reverse" => &mut wrap,
+                    _ => return None,
+                };
+                if slot.replace(word).is_some() {
+                    return None;
+                }
+            }
+            let (name, value) = if property == P::Direction {
+                ("flex-direction", direction.unwrap_or("row"))
             } else {
-                (raw, 1.)
+                ("flex-wrap", wrap.unwrap_or("nowrap"))
             };
-        let name = variable.strip_prefix("var(")?.strip_suffix(')')?.trim();
+            return modules::declaration(name, value).map(|(_, v)| v);
+        }
+        if rule.name == "border" {
+            let mut width = None;
+            let mut color = None;
+            let mut style = None;
+            for word in raw.split_ascii_whitespace() {
+                if let Some(c) = super::color(word) {
+                    if color.replace(c).is_some() {
+                        return None;
+                    }
+                } else if matches!(
+                    word,
+                    "solid"
+                        | "dashed"
+                        | "dotted"
+                        | "double"
+                        | "groove"
+                        | "ridge"
+                        | "inset"
+                        | "outset"
+                        | "none"
+                        | "hidden"
+                ) {
+                    if style.replace(word).is_some() {
+                        return None;
+                    }
+                } else {
+                    let v = super::size_value(P::BorderWidth, word)?;
+                    if width.replace(v).is_some() {
+                        return None;
+                    }
+                }
+            }
+            return if property == P::BorderColor {
+                color
+            } else {
+                width
+            };
+        }
+        let name = match rule.name {
+            "grid-gap" => "gap",
+            "background" => "background-color",
+            name => name,
+        };
+        if let Some(sides) = shorthand(name, raw) {
+            return sides
+                .into_iter()
+                .find(|(p, _)| *p == property)
+                .map(|(_, v)| v);
+        }
+        if name != "gap" || !raw.starts_with("calc(") {
+            let (props, value) = modules::declaration(name, raw)?;
+            return props.contains(&property).then_some(value);
+        }
+        let calc = raw.strip_prefix("calc(")?.strip_suffix(')')?;
+        let (variable, factor) = calc.split_once('*')?;
+        let factor = factor.trim().parse::<f64>().ok()?;
+        let name = variable
+            .trim()
+            .strip_prefix("var(")?
+            .strip_suffix(')')?
+            .trim();
         let V::Length { value, unit } = uniform_gap(self.vars.get(name).copied().flatten()?)?
         else {
             return None;
@@ -166,43 +380,68 @@ impl<'a> Sheet<'a> {
             None => Some(""),
             Some(v) => v.as_ref().and_then(|v| v.as_str()),
         };
+        for &(_, property) in DIRECT {
+            self.apply_property(property, classes, el);
+        }
+    }
+
+    fn apply_property(&self, property: P, classes: Option<&str>, el: &mut m::Element) {
         el.style
-            .retain(|d| d.property != P::Gap || d.from.syntax == m::StyleSyntax::Inline);
+            .retain(|d| d.property != property || d.from.syntax == m::StyleSyntax::Inline);
+        let Some(rules) = self.rules.get(&property) else {
+            return;
+        };
         let mut best = None;
         let mut rank = None;
-        let mut unknown = None;
-        for rule in &self.rules {
-            for sel in rule.selectors.split(',').map(str::trim) {
-                match specificity(sel, classes, el) {
+        let mut unknown: Option<&Rule<'_>> = None;
+        for rule in rules {
+            for selector in &self.selectors[rule.selectors] {
+                if selector
+                    .subject
+                    .is_some_and(|s| specificity(s, classes, el) == Some(None))
+                {
+                    continue;
+                }
+                match specificity(selector.text, classes, el) {
                     Some(None) => {}
-                    Some(Some(s)) if !rule.uncertain => {
+                    Some(Some(s)) if !rule.uncertain && !rule.important => {
                         if rank.is_none_or(|r| (rule.layer, s) >= r) {
                             rank = Some((rule.layer, s));
                             best = Some(rule);
                         }
                     }
-                    _ => unknown = Some(rule),
+                    _ if unknown.is_none_or(|prev| {
+                        (rule.important, rule.layer) >= (prev.important, prev.layer)
+                    }) =>
+                    {
+                        unknown = Some(rule)
+                    }
+                    _ => {}
                 }
             }
         }
-        let Some(rule) = unknown.or(best) else { return };
-        if unknown.is_none() && el.style.iter().any(|d| d.property == P::Gap) {
+        // Unknown selectors can only displace a normal winner in the same or a higher layer.
+        let unknown =
+            unknown.filter(|r| r.important || rank.is_none_or(|(layer, _)| r.layer >= layer));
+        if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
+        {
             return;
         }
-        el.style.retain(|d| d.property != P::Gap);
+        let Some(rule) = unknown.or(best) else { return };
+        el.style.retain(|d| d.property != property);
         let opaque_inline = el
             .unresolved_style
             .iter()
             .any(|d| d.syntax == m::StyleSyntax::Inline);
-        let value = (unknown.is_none() && !opaque_inline && rule.scalar)
-            .then(|| self.value(rule.value))
+        let value = (unknown.is_none() && !opaque_inline)
+            .then(|| self.value(property, rule))
             .flatten()
             .unwrap_or_else(|| V::Unresolved {
                 text: rule.source.text.clone(),
-                reason: "Cannot determine scalar gap from built CSS".into(),
+                reason: "Cannot determine style value from built CSS".into(),
             });
         el.style.push(m::StyleDeclaration {
-            property: P::Gap,
+            property,
             value,
             when: None,
             from: rule.source.clone(),

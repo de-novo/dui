@@ -25,7 +25,10 @@ fn literal(file: &File, node: Ast<'_>) -> Option<Value> {
         "string" if text.starts_with('\'') && text.ends_with('\'') && !text.contains('\\') => {
             Some(text[1..text.len() - 1].into())
         }
-        "string" | "true" | "false" | "number" | "null" => serde_json::from_str(text).ok(),
+        "number" => serde_json::from_str(text)
+            .ok()
+            .or_else(|| serde_json::Number::from_f64(text.parse().ok()?).map(Value::Number)),
+        "string" | "true" | "false" | "null" => serde_json::from_str(text).ok(),
         _ => None,
     }
 }
