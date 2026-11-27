@@ -250,15 +250,16 @@ impl Context<'_> {
             let key = if name == "a" { "href" } else { "to" };
             if let Some(v) = attr(self.file, open, key) {
                 let expr = self.expr(v);
-                let to = match &expr {
-                    m::Expr::Literal { value }
-                        if value.as_str().is_some_and(|s| s.starts_with('/')) =>
-                    {
-                        m::EdgeTarget::Route {
-                            route: value.as_str().unwrap_or_default().into(),
-                        }
+                let to = if let m::Expr::Literal { value } = &expr
+                    && let Some(route) = value
+                        .as_str()
+                        .filter(|s| s.starts_with('/') && !s.starts_with("//"))
+                {
+                    m::EdgeTarget::Route {
+                        route: route.into(),
                     }
-                    _ => m::EdgeTarget::Opaque { expr },
+                } else {
+                    m::EdgeTarget::Opaque { expr }
                 };
                 self.model.edges.push(m::Edge {
                     id: format!("{id}:link"),
