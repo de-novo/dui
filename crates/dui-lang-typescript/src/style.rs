@@ -193,6 +193,29 @@ fn spacing_value(name: &str, raw: &str) -> Option<V> {
     Some(value)
 }
 
+// Physical left/right only have a direction-independent logical mapping when equal.
+fn shorthand(name: &str, raw: &str) -> Option<Vec<(P, V)>> {
+    if !matches!(name, "margin" | "padding") {
+        return None;
+    }
+    let values: Vec<_> = raw
+        .split_ascii_whitespace()
+        .map(|word| spacing_value(name, word))
+        .collect::<Option<_>>()?;
+    let sides = match values.as_slice() {
+        [vertical, horizontal] => [vertical, horizontal, vertical, horizontal],
+        [top, horizontal, bottom] => [top, horizontal, bottom, horizontal],
+        [top, right, bottom, left] if right == left => [top, right, bottom, left],
+        _ => return None,
+    };
+    Some(
+        spacing(name)?
+            .iter()
+            .copied()
+            .zip(sides.into_iter().cloned())
+            .collect(),
+    )
+}
 fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
     let (prop, keyword) = match s {
         "flex" | "flex-row" => (P::Direction, "row"),
@@ -393,7 +416,17 @@ pub fn attribute(
         }
         if !class && first(value).is_some() && unwrap_expr(value).kind() == "object" {
             for pair in children(unwrap_expr(value)) {
-                record(f.text(pair), f.loc(pair), inline(f, pair))
+                let expanded = f.name(pair, "key").and_then(|name| {
+                    let val = crate::literal(f, field(pair, "value")?)?;
+                    shorthand(name, val.as_str()?)
+                });
+                if let Some(sides) = expanded {
+                    for (property, value) in sides {
+                        record(f.text(pair), f.loc(pair), Some((vec![property], value)))
+                    }
+                } else {
+                    record(f.text(pair), f.loc(pair), inline(f, pair))
+                }
             }
             return;
         }

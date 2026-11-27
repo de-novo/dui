@@ -170,6 +170,27 @@ export default function View(){return <section><p className={sheet.card}/><p sty
       ),
     );
   }
+  writeFileSync(cssPath, ".card {margin: 1rem auto -4px;}");
+  writeFileSync(
+    join(project, "View.tsx"),
+    `import s from "./View.module.css"; export function View(){return <div><p className={s.card}/><p style={{margin:"1rem auto -4px"}}/></div>}`,
+  );
+  const shorthand = JSON.parse(extract(project, "View.tsx"));
+  assert.ok(validate(shorthand));
+  for (const child of shorthand.components[0].root.children) {
+    assert.deepEqual(
+      child.style.map((d: { property: string; value: { value: unknown } }) => [
+        d.property,
+        d.value.value,
+      ]),
+      [
+        ["marginTop", 1],
+        ["marginEnd", "auto"],
+        ["marginBottom", -4],
+        ["marginStart", "auto"],
+      ],
+    );
+  }
 } finally {
   rmSync(project, { recursive: true, force: true });
 }
