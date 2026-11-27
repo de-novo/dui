@@ -238,6 +238,18 @@ pub fn extract_with_css(
     entry: &Path,
     built_css: Option<&Path>,
 ) -> Result<m::SourceModel, String> {
+    extract_at_width(project, entry, built_css, None)
+}
+
+pub fn extract_at_width(
+    project: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+    width: Option<u32>,
+) -> Result<m::SourceModel, String> {
+    if width.is_some() && (built_css.is_none() || width == Some(0)) {
+        return Err("viewport width requires built CSS and a positive width in CSS pixels".into());
+    }
     let mut diagnostics = Vec::new();
     let syntax::Sources {
         entry,
@@ -246,7 +258,7 @@ pub fn extract_with_css(
     } = syntax::load(project, entry, built_css, &mut diagnostics)?;
     let built = artifact
         .as_ref()
-        .map(|p| style::built::Sheet::new(&files[p]))
+        .map(|p| style::built::Sheet::new(&files[p], width))
         .transpose()?;
     let mut model = m::SourceModel {
         schema_version: m::SCHEMA_VERSION,

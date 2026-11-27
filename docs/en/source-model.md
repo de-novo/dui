@@ -17,6 +17,8 @@ Run `dui model PROJECT ENTRY.tsx` to print schema-v1 JSON from a TSX entry and i
 
 Pass `--built-css FILE` to read a single bundled stylesheet inside the project. For static HTML elements, the adapter resolves flex direction, wrapping, growth and alignment, gap, padding, margins, dimensions and their limits, foreground and background color, opacity, border width, color and radius, font size, line height and letter spacing. It applies supported rules by layer, selector specificity and declaration order, and records the winning declaration’s byte range. A potentially winning rule with an unknown condition or unsupported value stays unresolved. The model records declarations on the element; inherited or browser-default computed values are outside this extraction.
 
+Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
+
 ## 1. Principles
 
 1. **Declared, not observed.** The model holds what the code says. It runs no handlers, calls no APIs and starts no browser. Capture results stay in the [capture context](domain-model.md#2-entities-value-objects-and-identities).

@@ -1,7 +1,15 @@
 // Exercise the installed CLI against an app with no node_modules or tsconfig.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -540,11 +548,14 @@ try {
  opacity:.91; font-size:16px; line-height:24px; letter-spacing:1px;
  flex-direction:column; flex-wrap:wrap; align-items:center; justify-content:center; flex-grow:2; padding:12px; margin:6px; }
 }
+main { padding-top:3px; }
+@media (max-width:768px) { main { padding-top:7px; } }
+@media (width<768px) { main { padding-top:11px; } }
 [data-dense] { gap:1px; color:#224466; background-color:#c4d5e6; border-width:3px; border-radius:5px; width:140px; height:80px; opacity:.82; font-size:14px; line-height:20px; letter-spacing:2px; flex-direction:row; padding:10px; margin:4px; }`,
   );
   writeFileSync(
     join(builtProject, "index.html"),
-    '<div id="app"></div><output></output><script type="module" src="./entry.tsx"></script>',
+    '<style>output{display:none}</style><div id="app"></div><output></output><output id="responsive"></output><script type="module" src="./entry.tsx"></script>',
   );
   writeFileSync(
     join(builtProject, "entry.tsx"),
@@ -553,12 +564,13 @@ import {createRoot} from "react-dom/client";
 import {flushSync} from "react-dom";
 import {App} from "./App";
 flushSync(()=>createRoot(document.querySelector("#app")).render(<App/>));
+document.querySelector("#responsive").textContent=[innerWidth,getComputedStyle(document.querySelector("main")).paddingTop].join(",");
 const props=${JSON.stringify(cardStyles.map(([, css]) => css))};
 document.querySelector("output").textContent=JSON.stringify([...document.querySelectorAll("main div")].map(el=>props.map(p=>getComputedStyle(el).getPropertyValue(p))));`,
   );
   writeFileSync(
     join(builtProject, "App.tsx"),
-    'import React from "react"; import "./style.css"; export function App(){return <main><div className="card gap-2"/><div className="card gap-2" data-dense="yes"/><div className="card" data-dense style={{gap:8,color:"#335577",backgroundColor:"#b3c4d5",borderWidth:4,borderRadius:9,width:120,height:70,opacity:.73,fontSize:12,lineHeight:"18px",letterSpacing:3}}/></main>}',
+    'import React from "react"; import "./style.css"; export function App(){return <main><div className="card gap-2">Base</div><div className="card gap-2" data-dense="yes">Stylesheet</div><div className="card" data-dense style={{gap:8,color:"#335577",backgroundColor:"#b3c4d5",borderWidth:4,borderRadius:9,width:120,height:70,opacity:.73,fontSize:12,lineHeight:"18px",letterSpacing:3}}>Inline</div></main>}',
   );
   execFileSync(process.execPath, [resolve("apps/canvas/node_modules/vite/bin/vite.js"), "build"], {
     cwd: builtProject,
@@ -566,73 +578,99 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   const asset = readdirSync(join(builtProject, "dist/assets")).find((f) => f.endsWith(".css"));
   assert.ok(asset);
   const bundle = "dist/assets/" + asset;
-  const readBuilt = () =>
+  const readBuilt = (...options: string[]) =>
     JSON.parse(
-      execFileSync(cli, ["model", builtProject, "App.tsx", "--built-css", bundle], {
+      execFileSync(cli, ["model", builtProject, "App.tsx", "--built-css", bundle, ...options], {
         encoding: "utf8",
         env: { ...process.env, PATH: "" },
       }),
     );
   const output = readBuilt();
   assert.ok(validate(output), JSON.stringify(validate.errors));
-  const cards = output.components[0].root.children;
-  const modelValues = cards.map((card: { style: any[] }, index: number) =>
-    cardStyles.map(([property], k) => {
-      const matches = card.style.filter((d) => d.property === property);
-      assert.equal(matches.length, 1, `Card ${index} ${property}`);
-      const { value, from } = matches[0];
-      let cssValue = String(value.value);
-      if (value.kind === "color") {
-        const channels = value.value
-          .slice(1)
-          .match(/../g)
-          .map((h: string) => parseInt(h, 16));
-        cssValue = "rgb(" + channels.join(", ") + ")";
-      } else if (value.kind === "length") cssValue += value.unit;
-      assert.equal(
-        cssValue,
-        cardStyles[k][index + 2],
-        JSON.stringify({ index, property, value, from }),
-      );
-      if (from.syntax !== "inline") {
-        assert.equal(from.location.file, bundle);
-        assert.equal(
-          readFileSync(join(builtProject, bundle))
-            .subarray(from.location.start, from.location.end)
-            .toString(),
-          from.text,
-        );
-      }
-      return cssValue;
-    }),
+  assert.equal(
+    output.components[0].root.style.find((d: { property: string }) => d.property === "paddingTop")
+      .value.kind,
+    "unresolved",
   );
-  if (process.argv.includes("--verify-render")) {
-    const chrome = process.env.DUI_CHROMIUM;
-    assert.ok(chrome, "Set DUI_CHROMIUM to the browser executable for render verification");
-    const dom = execFileSync(
-      chrome,
-      [
-        "--headless",
-        "--disable-gpu",
-        "--disable-background-networking",
-        "--allow-file-access-from-files",
-        "--no-first-run",
-        `--user-data-dir=${join(builtProject, "browser-profile")}`,
-        "--dump-dom",
-        pathToFileURL(join(builtProject, "dist/index.html")).href,
-      ],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  for (const [width, expected] of [
+    [767, 11],
+    [768, 7],
+    [769, 3],
+  ]) {
+    const root = readBuilt("--viewport-width", String(width)).components[0].root;
+    assert.deepEqual(
+      root.style.find((d: { property: string }) => d.property === "paddingTop").value,
+      { kind: "length", value: expected, unit: "px" },
     );
-    const measured = dom.match(/<output>([^<]+)<\/output>/)?.[1];
-    assert.ok(measured);
-    assert.deepEqual(JSON.parse(measured), modelValues);
-    console.log(
-      JSON.stringify({
-        renderedCards: cards.length,
-        propertiesPerCard: cardStyles.length,
-        matched: cards.length * cardStyles.length,
+    const cards = root.children;
+    const modelValues = cards.map((card: { style: any[] }, index: number) =>
+      cardStyles.map(([property], k) => {
+        const matches = card.style.filter((d) => d.property === property);
+        assert.equal(matches.length, 1, `Card ${index} ${property}`);
+        const { value, from } = matches[0];
+        let cssValue = String(value.value);
+        if (value.kind === "color") {
+          const channels = value.value
+            .slice(1)
+            .match(/../g)
+            .map((h: string) => parseInt(h, 16));
+          cssValue = "rgb(" + channels.join(", ") + ")";
+        } else if (value.kind === "length") cssValue += value.unit;
+        assert.equal(
+          cssValue,
+          cardStyles[k][index + 2],
+          JSON.stringify({ index, property, value, from }),
+        );
+        if (from.syntax !== "inline") {
+          assert.equal(from.location.file, bundle);
+          assert.equal(
+            readFileSync(join(builtProject, bundle))
+              .subarray(from.location.start, from.location.end)
+              .toString(),
+            from.text,
+          );
+        }
+        return cssValue;
       }),
     );
+    if (process.argv.includes("--verify-render")) {
+      const chrome = process.env.DUI_CHROMIUM;
+      assert.ok(chrome, "Set DUI_CHROMIUM to the browser executable for render verification");
+      const captureDir = process.env.DUI_RENDER_CAPTURE_DIR;
+      const capture = join(builtProject, `card-${width}.png`);
+      const dom = execFileSync(
+        chrome,
+        [
+          "--headless",
+          `--window-size=${width},900`,
+          "--disable-gpu",
+          "--disable-background-networking",
+          "--allow-file-access-from-files",
+          "--no-first-run",
+          `--user-data-dir=${join(builtProject, "browser-profile")}`,
+          ...(captureDir ? [`--screenshot=${capture}`] : []),
+          "--dump-dom",
+          pathToFileURL(join(builtProject, "dist/index.html")).href,
+        ],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+      );
+      assert.ok(dom.includes(`<output id="responsive">${width},${expected}px</output>`));
+      const measured = dom.match(/<output>([^<]+)<\/output>/)?.[1];
+      assert.ok(measured);
+      assert.deepEqual(JSON.parse(measured), modelValues);
+      if (captureDir) {
+        mkdirSync(captureDir, { recursive: true });
+        copyFileSync(capture, join(captureDir, `card-${width}.png`));
+      }
+      console.log(
+        JSON.stringify({
+          viewportWidth: width,
+          renderedCards: cards.length,
+          propertiesPerCard: cardStyles.length,
+          matched: cards.length * cardStyles.length,
+        }),
+      );
+    }
   }
   writeFileSync(
     join(builtProject, bundle),
