@@ -145,6 +145,8 @@ A condition holds when all its fields hold: `minWidth` and `maxWidth` (lengths),
 
 The reference maps easy syntax: Tailwind classes and inline styles. Tailwind spacing steps are recorded as their resolved lengths. Medium and hard syntax ([style and design tokens](roadmap.md#default-pipeline)) uses the same declarations once its adapters exist.
 
+For a default import from `.module.css`, `className={styles.card}` reads matching `.card` and `tag.card` rules. The adapter orders declarations by selector specificity and source order, applies inline styles last, and records simple `min-width` or `max-width` media conditions. Each declaration points to its CSS source. Unsupported values and properties retain their source. When a module uses selectors or at-rules outside this subset, composition, or `!important`, its class reference stays unresolved.
+
 ## 7. Tokens
 
 A token keeps the name the source uses (`--color-brand`, `--text-2xl`) so it can later become a design variable. `group` is `color`, `spacing`, `typography`, `radius`, `size` or `other`. `value` is a final value, or a `token` value that aliases another token. Aliases must not form a cycle. `modes` holds values per mode, such as `dark`. A project token has a `location`. A framework default has a `package` (`tailwindcss`) and no location.
