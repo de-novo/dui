@@ -4,17 +4,7 @@ English · [한국어](../ko/roadmap.md) · [简体中文](../zh-CN/roadmap.md)
 
 ## Goal
 
-Today, the sources of truth for making a product are split across planning documents, Figma designs, and code. dui unifies development and UI work around one source: the code itself. The screen map and design view are generated from that code, and UI edits go back into the same code, so a separate design file cannot drift.
-
-**What this means**
-
-- Review and edit the UI against what the code actually renders.
-- Changes made in the map land in the same codebase that ships.
-
-**What this is not**
-
-- A standalone design tool with its own file format.
-- Support for every platform at once. The priority is the parse-and-approximate path needed for this goal; capture is optional verification.
+dui aims to let product planners, designers and QA reviewers see the screen a user will see and see it update as soon as the code changes. Reviewing the shipping code directly shortens the handoff from design through implementation to QA and gives teams faster feedback on AI-generated changes.
 
 <a id="never"></a>
 
@@ -87,7 +77,7 @@ Existing paths include local web URLs, native route discovery and captures on se
 
 A new language needs one adapter that maps that language onto this model: layout elements, declared state and data, navigation, and style syntax. The model, the approximate renderer, hot reload, and Figma export are reused.
 
-**Approximate, not exact.** The renderer's goal is a recognizable picture of each screen and the relations between screens, not pixel or CSS parity with a browser. Style extraction covers layout, spacing, color, typography and tokens ([#360](https://github.com/de-novo/dui/issues/360)). Anything else stays `unresolved` with its source, and the card says so. Broader web CSS compatibility is a separate research track ([#393](https://github.com/de-novo/dui/issues/393)). It lives in a separate crate or behind an experimental flag, stays out of the default map and the v1 schema, and comes after the TSX-model map ([#405](https://github.com/de-novo/dui/issues/405)). It may move to `ee/` with the render machine. Its first item is replacing the hand-written cascade with a library ([#404](https://github.com/de-novo/dui/issues/404)). Pixel accuracy is checked only by the opt-in render machine.
+dui’s platform-independent build and hot reload system translates source into a shared model without requiring a Vite or Next.js development server. Thin framework adapters translate into boxes, layout, text, styles and images. The engine aims to draw these primitives as users see them. Compare them with Chrome on the web and with the actual platform on native targets. Record raw differences first, then propose tolerances. Unknown inputs retain their source and unresolved status.
 
 <a id="swappable-renderers"></a>
 
@@ -141,9 +131,9 @@ flowchart TD
 | --- | --- | --- | --- |
 | 1. Schema | v0.2.x | Freeze a versioned JSON model for screens, components, edges, code locations, slots, declared state and branches, item schemas, field-to-UI bindings, neutral style properties (spacing, color, typography, radius, size, layout), and a token layer that keeps token names. | One example validates against the schema, including style properties and token names. Done: [source model, schema version 1](source-model.md). |
 | 2. Browserless default map | v0.2.x | `dui map` and `dui open` no longer start a browser by default. `--capture` and `dui run` stay for verification. | A browserless CI run shows screens and edges, and existing capture checks still pass. On the same example, measure end-to-end map time for the capture path and the AST path, both cold and incremental, and record the numbers. The AST default must be clearly faster. Do not publish target times before that measurement. |
-| 3. AST extractors | v0.2.x–v0.3.0 | Extract the model from source. First TypeScript/TSX, then Swift syntax only, on any OS. A type checker or compiler index is optional. Each adapter maps layout, state, navigation, and style syntax onto the model. | On Linux, with no browser and no Xcode, a TSX fixture and a Swift fixture emit the model, including easy style mappings. |
-| 4. Approximate renderer | v0.3.0 | Draw cards from the model only, including its style properties, with a minimal TypeScript/DOM renderer behind a small renderer interface. Label them as approximate. Put no model or business logic in the renderer. | Cards are not empty; text, stacks, and styles match the model; no browser is started; the renderer reads only the frozen model and can be replaced without changing extractors or the schema. |
-| 5. Hot reload | v0.3.0 | Watch files (in the same spirit as Vite), re-parse only what changed, patch only affected model nodes, and redraw with the approximate renderer. Track the import graph so screens that depend on a changed file update too. No app rebuild and no browser. | On the same example, measure edit-to-update latency and record it. Changing a file updates the dependent cards without rebuilding the app or starting a browser. |
+| 3. AST extractors | v0.2.x–v0.3.0 | Extract the model from source. First TypeScript/TSX, then Swift syntax only, on any OS. A type checker or compiler index is optional. Each adapter maps layout, state, navigation, and style syntax onto the model. | Extract every fixed [web JSX/CSS basics fixture](https://github.com/de-novo/dui/issues/441) through the default browserless AST path and record model assertions per fixture. |
+| 4. Approximate renderer | v0.3.0 | Draw cards from the model only, including its style properties, with a minimal TypeScript/DOM renderer behind a small renderer interface. Label them as approximate. Put no model or business logic in the renderer. | Measure the model-only card against Chrome at 1440×920 and 390×844. A fixture passes when every required probe passes at both sizes. Publish the full-suite pass rate and propose a target after the first baseline. Chrome runs only for verification. |
+| 5. Hot reload | v0.3.0 | Watch files (in the same spirit as Vite), re-parse only what changed, patch only affected model nodes, and redraw with the approximate renderer. Track the import graph so screens that depend on a changed file update too. No app rebuild and no browser. | Measure from completed file write to the first frame showing the expected change on the affected card. Report median, p95 and missed updates at both sizes alongside visual fidelity. |
 | 6. Slots, state, and lists | v0.3.0 | Toggle slot values, declared state, and list counts (0, 1, many) in the UI. Auto-generate mock items from the item schema. Hidden or unknown types stay placeholders. | Toggling `isOpen` or list count changes the picture with no network and no handlers. Saved value sets persist. |
 | 7. Optional render machine | v0.3.x | A common verification job: surface, cell, state, size in; frame, render tree, and fidelity out. Issues about a long-lived render server and concurrent browser work ([#343](https://github.com/de-novo/dui/issues/343), [#344](https://github.com/de-novo/dui/issues/344)) belong on this track, not the default map. | Fidelity is recorded when a job runs. Default map CI stays browserless. |
 | 8. Figma export | after v0.3.0 | Build frames and variants from the model only. Token names map to Figma variables when possible. | A read-only export needs no snapshot. |
