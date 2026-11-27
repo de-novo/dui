@@ -7,6 +7,9 @@ use tree_sitter::Node as Ast;
 
 // Each supported property uses the same value parser as a source stylesheet.
 const DIRECT: &[(&str, P)] = &[
+    ("display", P::Display),
+    ("grid-template-columns", P::GridColumnMinimum),
+    ("overflow-x", P::OverflowX),
     ("gap", P::Gap),
     ("color", P::Color),
     ("background-color", P::Background),
@@ -47,6 +50,7 @@ fn affected(name: &str) -> Vec<P> {
         return vec![*prop];
     }
     match name {
+        "overflow" => vec![P::OverflowX],
         "background" => vec![P::Background],
         "grid-gap" | "row-gap" | "column-gap" | "grid-row-gap" | "grid-column-gap" => vec![P::Gap],
         "border" | "border-top" | "border-bottom" | "border-left" | "border-right"
@@ -86,6 +90,9 @@ struct Rule<'a> {
 }
 
 pub(crate) struct Sheet<'a> {
+    document_vars: BTreeMap<&'a str, Option<&'a str>>,
+    root_key: Option<String>,
+    viewport_width: Option<u32>,
     rules: BTreeMap<P, Vec<Rule<'a>>>,
     selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
@@ -291,6 +298,9 @@ impl<'a> Sheet<'a> {
             return Err(format!("Cannot parse built CSS: {}", f.path));
         }
         let mut sheet = Self {
+            document_vars: BTreeMap::new(),
+            root_key: root_attribute.map(|(k, _)| k.to_owned()),
+            viewport_width: width,
             rules: BTreeMap::new(),
             vars: BTreeMap::new(),
             selectors: BTreeMap::from([(
@@ -302,6 +312,7 @@ impl<'a> Sheet<'a> {
             )]),
         };
         let mut variable_ranks = BTreeMap::new();
+        let mut scoped_variables = std::collections::BTreeSet::new();
         let mut ambiguous_variables = std::collections::BTreeSet::new();
         let mut layers = Vec::new();
         let mut stack = vec![(root, "", usize::MAX, false)];
@@ -350,6 +361,18 @@ impl<'a> Sheet<'a> {
                                 .unwrap_or(raw);
                             (name == key && ident(raw)).then_some(raw == value)
                         });
+                        if let Some((key, selected)) = root_attribute
+                            && let Some((attr, raw)) = selector
+                                .strip_prefix('[')
+                                .and_then(|s| s.strip_suffix(']'))
+                                .and_then(|s| s.split_once('='))
+                            && attr == key
+                            && ident(raw.trim_matches(['"', '\'']))
+                            && raw.trim_matches(['"', '\'']) != selected
+                        {
+                            scoped_variables.insert(prop);
+                            continue;
+                        }
                         if root_value == Some(false) {
                             continue;
                         }
@@ -454,16 +477,67 @@ impl<'a> Sheet<'a> {
         for name in ambiguous_variables {
             sheet.vars.insert(name, None);
         }
+        sheet.document_vars = sheet.vars.clone();
+        for name in scoped_variables {
+            sheet.vars.insert(name, None);
+        }
         Ok(sheet)
     }
 
-    fn value(&self, property: P, rule: &Rule<'_>) -> Option<V> {
+    fn value(
+        &self,
+        property: P,
+        rule: &Rule<'_>,
+        vars: &BTreeMap<&str, Option<&str>>,
+    ) -> Option<V> {
         let raw = rule.value;
         let raw = if let Some(name) = raw.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
-            self.vars.get(name.trim()).copied().flatten()?
+            vars.get(name.trim()).copied().flatten()?
         } else {
             raw
         };
+        if matches!(property, P::Display | P::OverflowX) {
+            let valid = if property == P::Display {
+                matches!(
+                    raw,
+                    "grid" | "flex" | "inline-flex" | "inline-block" | "block" | "inline" | "none"
+                )
+            } else {
+                matches!(raw, "visible" | "auto" | "scroll" | "hidden" | "clip")
+            };
+            return valid.then(|| V::Keyword { value: raw.into() });
+        }
+        if property == P::GridColumnMinimum {
+            let compact = raw.split_ascii_whitespace().collect::<String>();
+            if compact == "minmax(0,1fr)" {
+                return Some(V::Keyword {
+                    value: "single".into(),
+                });
+            }
+            return super::length(
+                compact
+                    .strip_prefix("repeat(auto-fit,minmax(")?
+                    .strip_suffix(",1fr))")?,
+            );
+        }
+        if property == P::FontSize && raw.starts_with("clamp(") {
+            let mut args = raw.strip_prefix("clamp(")?.strip_suffix(')')?.split(',');
+            let mut quantity = |unit: &str| {
+                args.next()?
+                    .trim()
+                    .strip_suffix(unit)?
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|n| n.is_finite() && *n >= 0.)
+            };
+            let lower = quantity("px")?;
+            let preferred = quantity("vw")? * f64::from(self.viewport_width?) / 100.;
+            let upper = quantity("px")?;
+            return args.next().is_none().then_some(V::Length {
+                value: lower.max(preferred.min(upper)),
+                unit: m::LengthUnit::Px,
+            });
+        }
         if rule.name == "flex-flow" {
             let mut direction = None;
             let mut wrap = None;
@@ -492,7 +566,7 @@ impl<'a> Sheet<'a> {
                 let word = if let Some(name) =
                     word.strip_prefix("var(").and_then(|s| s.strip_suffix(')'))
                 {
-                    self.vars.get(name.trim()).copied().flatten()?
+                    vars.get(name.trim()).copied().flatten()?
                 } else {
                     word
                 };
@@ -552,8 +626,7 @@ impl<'a> Sheet<'a> {
             .strip_prefix("var(")?
             .strip_suffix(')')?
             .trim();
-        let V::Length { value, unit } = uniform_gap(self.vars.get(name).copied().flatten()?)?
-        else {
+        let V::Length { value, unit } = uniform_gap(vars.get(name).copied().flatten()?)? else {
             return None;
         };
         let value = value * factor;
@@ -569,8 +642,41 @@ impl<'a> Sheet<'a> {
             None => Some(""),
             Some(v) => v.as_ref().and_then(|v| v.as_str()),
         };
+        let mut tag = open;
+        let document_scope = loop {
+            let name = tag
+                .child_by_field_name("name")
+                .map(|n| file.text(n))
+                .unwrap_or("");
+            if !name.starts_with(|c: char| c.is_ascii_lowercase())
+                || tag
+                    .children_by_field_name("attribute", &mut tag.walk())
+                    .any(|a| {
+                        a.kind() != "jsx_attribute"
+                            || first(a)
+                                .is_some_and(|k| Some(file.text(k)) == self.root_key.as_deref())
+                    })
+            {
+                break false;
+            }
+            if name == "body" {
+                break true;
+            }
+            let owner = if tag.kind() == "jsx_opening_element" {
+                tag.parent()
+            } else {
+                Some(tag)
+            };
+            let Some(parent) = owner
+                .and_then(|n| n.parent())
+                .and_then(|n| n.child_by_field_name("open_tag"))
+            else {
+                break false;
+            };
+            tag = parent;
+        };
         for &(_, property) in DIRECT {
-            self.apply_property(property, classes, el, file, open);
+            self.apply_property(property, classes, el, file, open, document_scope);
         }
     }
 
@@ -581,6 +687,7 @@ impl<'a> Sheet<'a> {
         el: &mut m::Element,
         file: &File,
         open: Ast<'_>,
+        document_scope: bool,
     ) {
         el.style
             .retain(|d| d.property != property || d.from.syntax == m::StyleSyntax::Inline);
@@ -634,7 +741,17 @@ impl<'a> Sheet<'a> {
             .iter()
             .any(|d| d.syntax == m::StyleSyntax::Inline);
         let value = (unknown.is_none() && !opaque_inline)
-            .then(|| self.value(property, rule))
+            .then(|| {
+                self.value(
+                    property,
+                    rule,
+                    if document_scope {
+                        &self.document_vars
+                    } else {
+                        &self.vars
+                    },
+                )
+            })
             .flatten()
             .unwrap_or_else(|| V::Unresolved {
                 text: rule.source.text.clone(),
@@ -740,6 +857,20 @@ fn contextual_specificity(
 
 // Outer None means the selector may match, but its outcome is unknown.
 fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
+    if let Some((tag, class)) = sel.split_once('.')
+        && ident(tag)
+        && ident(class)
+    {
+        if !tag.eq_ignore_ascii_case(&el.tag) {
+            return Some(None);
+        }
+        return Some(
+            classes?
+                .split_ascii_whitespace()
+                .any(|c| c == class)
+                .then_some(1025),
+        );
+    }
     let (matches, weight) = if let Some(class) = sel.strip_prefix('.').filter(|c| ident(c)) {
         (classes?.split_ascii_whitespace().any(|v| v == class), 1024)
     } else if let Some(attr) = sel

@@ -738,6 +738,31 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     ).value.kind,
     "unresolved",
   );
+  writeFileSync(
+    join(builtProject, bundle),
+    `
+    main {display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+    @media(max-width:680px){ main {grid-template-columns:minmax(0,1fr)} }
+    div.card { overflow-x:auto; font-size:clamp(30px,5vw,48px) }
+  `,
+  );
+  for (const width of [390, 1440]) {
+    const root = readBuilt("--viewport-width", String(width)).components[0].root;
+    const prop = (styles: Array<{ property: string; value: unknown }>, name: string) =>
+      styles.find((d) => d.property === name)?.value;
+    assert.deepEqual(
+      prop(root.style, "gridColumnMinimum"),
+      width === 390
+        ? { kind: "keyword", value: "single" }
+        : { kind: "length", value: 300, unit: "px" },
+    );
+    assert.deepEqual(prop(root.children[0].style, "overflowX"), { kind: "keyword", value: "auto" });
+    assert.deepEqual(prop(root.children[0].style, "fontSize"), {
+      kind: "length",
+      value: width === 390 ? 30 : 48,
+      unit: "px",
+    });
+  }
 } finally {
   rmSync(builtProject, { recursive: true, force: true });
 }

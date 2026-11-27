@@ -365,6 +365,9 @@ pub struct UnresolvedStyle {
 #[serde(rename_all = "camelCase")]
 pub enum StyleProperty {
     // Layout
+    Display,
+    GridColumnMinimum,
+    OverflowX,
     Direction,
     AlignItems,
     JustifyContent,

@@ -620,6 +620,27 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
     use StyleProperty as P;
     const SIZE: &[&str] = &["auto", "fill", "fit"];
     let (length, number, color, keywords): (bool, bool, bool, Option<&[&str]>) = match property {
+        P::Display => (
+            false,
+            false,
+            false,
+            Some(&[
+                "grid",
+                "flex",
+                "inline-flex",
+                "block",
+                "inline",
+                "inline-block",
+                "none",
+            ]),
+        ),
+        P::OverflowX => (
+            false,
+            false,
+            false,
+            Some(&["auto", "scroll", "hidden", "clip", "visible"]),
+        ),
+        P::GridColumnMinimum => (true, false, false, Some(&["single"])),
         P::Direction => (false, false, false, Some(&["row", "column", "overlay"])),
         P::AlignItems => (
             false,

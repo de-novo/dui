@@ -23,6 +23,8 @@ For a direct child or descendant selector with two simple parts, the TSX adapter
 
 When the project selects its theme with a root data attribute, supply the same value during extraction, for example `--root-attribute data-theme=dark`. The adapter resolves simple matching root variable declarations from the bundle. Without that context, conflicting definitions stay unresolved.
 
+The built CSS reader maps display mode, horizontal overflow and auto-fit grids with a minimum column width into model properties. A single flexible track is also supported. A literal body root preserves document colors. Scoped theme overrides stay uncertain when the ancestor chain cannot be established.
+
 ## 1. Principles
 
 1. **Declared, not observed.** The model holds what the code says. It runs no handlers, calls no APIs and starts no browser. Capture results stay in the [capture context](domain-model.md#2-entities-value-objects-and-identities).
