@@ -308,6 +308,10 @@
         "justifyContent",
         "wrap",
         "grow",
+        "shrink",
+        "flexBasis",
+        "rowGap",
+        "columnGap",
         "gap",
         "paddingTop",
         "paddingBottom",
@@ -334,6 +338,7 @@
         "lineHeight",
         "letterSpacing",
         "textAlign",
+        "textDecorationLine",
         "borderRadius",
         "borderWidth"
       ]

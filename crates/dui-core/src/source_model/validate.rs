@@ -662,8 +662,24 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
             ]),
         ),
         P::Wrap => (false, false, false, Some(&["wrap", "nowrap"])),
-        P::Order | P::Grow | P::Opacity | P::FontWeight => (false, true, false, Some(&[])),
-        P::Gap
+        P::Shrink | P::Order | P::Grow | P::Opacity | P::FontWeight => {
+            (false, true, false, Some(&[]))
+        }
+        P::FlexBasis => (
+            true,
+            false,
+            false,
+            Some(&[
+                "auto",
+                "min-content",
+                "max-content",
+                "content",
+                "fit-content",
+            ]),
+        ),
+        P::RowGap
+        | P::ColumnGap
+        | P::Gap
         | P::PaddingTop
         | P::PaddingBottom
         | P::PaddingStart
@@ -682,6 +698,12 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         P::FontFamily => (false, false, false, None),
         P::FontStyle => (false, false, false, Some(&["normal", "italic"])),
         P::LineHeight => (true, true, false, Some(&[])),
+        P::TextDecorationLine => (
+            false,
+            false,
+            false,
+            Some(&["none", "underline", "overline", "line-through"]),
+        ),
         P::TextAlign => (
             false,
             false,
