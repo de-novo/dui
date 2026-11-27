@@ -38,6 +38,7 @@ import {
 } from "./model/runLabels";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import { createDomModelRenderer, decodeModel, type Model } from "./features/model/modelDocument";
+import { useSourceModelHotReload } from "./features/model/useSourceModelHotReload";
 
 const modelRenderer = createDomModelRenderer();
 
@@ -106,8 +107,8 @@ function imageUrlFor(run: Run) {
 }
 
 function MapView({
-  archive,
-  sourceModel,
+  archive: initialArchive,
+  sourceModel: initialSourceModel,
   run,
   runs,
   onOpenDiff,
@@ -118,6 +119,14 @@ function MapView({
   runs: Run[];
   onOpenDiff: () => void;
 }) {
+  const hot = useSourceModelHotReload(
+    run.key,
+    initialArchive,
+    initialSourceModel,
+    !isStaticArchiveMode() && initialSourceModel !== undefined,
+  );
+  const archive = hot.archive;
+  const sourceModel = hot.model;
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
   const topBarRef = useRef<HTMLDivElement>(null);

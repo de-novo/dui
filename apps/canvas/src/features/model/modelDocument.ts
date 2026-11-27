@@ -72,6 +72,11 @@ type Component = {
 };
 export type Model = {
   schemaVersion: number;
+  files?: Record<string, unknown>[];
+  itemSchemas?: Record<string, unknown>[];
+  tokens?: Record<string, unknown>[];
+  edges?: Record<string, unknown>[];
+  diagnostics?: unknown[];
   screens?: { id: string; name: string; route?: string; component: string }[];
   components?: Component[];
 };

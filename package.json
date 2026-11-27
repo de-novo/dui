@@ -55,7 +55,8 @@
     "build:pages-demo": "tsc --project scripts && node scripts/build-pages-demo.mts",
     "verify:pages-demo": "tsc --project scripts && node scripts/verify-pages-demo.mts",
     "deps:check": "node scripts/dependency-catalog.mts",
-    "deps:sync": "node scripts/dependency-catalog.mts --write"
+    "deps:sync": "node scripts/dependency-catalog.mts --write",
+    "check:hot-reload": "node scripts/check-hot-reload.mts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

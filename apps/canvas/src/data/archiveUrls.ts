@@ -35,6 +35,10 @@ export function auditApiUrl(runKey: string): string {
   return `/api/audit?run=${encodeURIComponent(runKey)}`;
 }
 
+export function sourceModelApiUrl(runKey: string): string {
+  return `/api/source-model?run=${encodeURIComponent(runKey)}`;
+}
+
 export function diffApiUrl(beforeKey: string, afterKey: string, pixels: boolean): string {
   const base = staticArchiveBase();
   if (base) {
