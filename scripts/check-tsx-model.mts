@@ -1,7 +1,15 @@
 // Exercise the installed CLI against an app with no node_modules or tsconfig.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -547,7 +555,7 @@ main { padding-top:3px; }
   );
   writeFileSync(
     join(builtProject, "index.html"),
-    '<div id="app"></div><output></output><output id="responsive"></output><script type="module" src="./entry.tsx"></script>',
+    '<style>output{display:none}</style><div id="app"></div><output></output><output id="responsive"></output><script type="module" src="./entry.tsx"></script>',
   );
   writeFileSync(
     join(builtProject, "entry.tsx"),
@@ -562,7 +570,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   );
   writeFileSync(
     join(builtProject, "App.tsx"),
-    'import React from "react"; import "./style.css"; export function App(){return <main><div className="card gap-2"/><div className="card gap-2" data-dense="yes"/><div className="card" data-dense style={{gap:8,color:"#335577",backgroundColor:"#b3c4d5",borderWidth:4,borderRadius:9,width:120,height:70,opacity:.73,fontSize:12,lineHeight:"18px",letterSpacing:3}}/></main>}',
+    'import React from "react"; import "./style.css"; export function App(){return <main><div className="card gap-2">Base</div><div className="card gap-2" data-dense="yes">Stylesheet</div><div className="card" data-dense style={{gap:8,color:"#335577",backgroundColor:"#b3c4d5",borderWidth:4,borderRadius:9,width:120,height:70,opacity:.73,fontSize:12,lineHeight:"18px",letterSpacing:3}}>Inline</div></main>}',
   );
   execFileSync(process.execPath, [resolve("apps/canvas/node_modules/vite/bin/vite.js"), "build"], {
     cwd: builtProject,
@@ -628,6 +636,8 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     if (process.argv.includes("--verify-render")) {
       const chrome = process.env.DUI_CHROMIUM;
       assert.ok(chrome, "Set DUI_CHROMIUM to the browser executable for render verification");
+      const captureDir = process.env.DUI_RENDER_CAPTURE_DIR;
+      const capture = join(builtProject, `card-${width}.png`);
       const dom = execFileSync(
         chrome,
         [
@@ -638,6 +648,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
           "--allow-file-access-from-files",
           "--no-first-run",
           `--user-data-dir=${join(builtProject, "browser-profile")}`,
+          ...(captureDir ? [`--screenshot=${capture}`] : []),
           "--dump-dom",
           pathToFileURL(join(builtProject, "dist/index.html")).href,
         ],
@@ -647,6 +658,10 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
       const measured = dom.match(/<output>([^<]+)<\/output>/)?.[1];
       assert.ok(measured);
       assert.deepEqual(JSON.parse(measured), modelValues);
+      if (captureDir) {
+        mkdirSync(captureDir, { recursive: true });
+        copyFileSync(capture, join(captureDir, `card-${width}.png`));
+      }
       console.log(
         JSON.stringify({
           viewportWidth: width,
