@@ -1,0 +1,98 @@
+[
+  {
+    "width": 1440,
+    "app": "todo",
+    "from": "/#/",
+    "to": "/#/active"
+  },
+  {
+    "width": 1440,
+    "app": "todo",
+    "from": "/#/",
+    "to": "/#/completed"
+  },
+  {
+    "width": 1440,
+    "app": "todo",
+    "from": "/#/active",
+    "to": "/#/"
+  },
+  {
+    "width": 1440,
+    "app": "todo",
+    "from": "/#/active",
+    "to": "/#/completed"
+  },
+  {
+    "width": 1440,
+    "app": "todo",
+    "from": "/#/completed",
+    "to": "/#/"
+  },
+  {
+    "width": 1440,
+    "app": "todo",
+    "from": "/#/completed",
+    "to": "/#/active"
+  },
+  {
+    "width": 1440,
+    "app": "bp",
+    "from": "/",
+    "to": "/auth/login"
+  },
+  {
+    "width": 1440,
+    "app": "bp",
+    "from": "*",
+    "to": "/"
+  },
+  {
+    "width": 390,
+    "app": "todo",
+    "from": "/#/",
+    "to": "/#/active"
+  },
+  {
+    "width": 390,
+    "app": "todo",
+    "from": "/#/",
+    "to": "/#/completed"
+  },
+  {
+    "width": 390,
+    "app": "todo",
+    "from": "/#/active",
+    "to": "/#/"
+  },
+  {
+    "width": 390,
+    "app": "todo",
+    "from": "/#/active",
+    "to": "/#/completed"
+  },
+  {
+    "width": 390,
+    "app": "todo",
+    "from": "/#/completed",
+    "to": "/#/"
+  },
+  {
+    "width": 390,
+    "app": "todo",
+    "from": "/#/completed",
+    "to": "/#/active"
+  },
+  {
+    "width": 390,
+    "app": "bp",
+    "from": "/",
+    "to": "/auth/login"
+  },
+  {
+    "width": 390,
+    "app": "bp",
+    "from": "*",
+    "to": "/"
+  }
+]
