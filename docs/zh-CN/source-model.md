@@ -151,6 +151,8 @@ flowchart LR
 
 token 保留源码使用的名称（`--color-brand`、`--text-2xl`），以便之后成为设计变量。`group` 是 `color`、`spacing`、`typography`、`radius`、`size` 或 `other`。`value` 是最终值，或指向另一个 token 的 `token` 值（别名）。别名不得形成循环。`modes` 保存各模式的值，例如 `dark`。项目 token 有 `location`。框架默认值有 `package`（`tailwindcss`），没有位置。
 
+在同一个导入的主题样式表中，颜色或圆角 token 可以通过 `var(--name)` 引用同组的另一个 token。模型保留直接引用及解析后的值。循环引用、缺失的定义和带回退值的表达式以未解析值保留源码。
+
 ## 8. 边
 
 `kind` 是 `link`（声明式链接，例如 `<Link>` 或 `NavigationLink`）、`navigate`（命令式调用）或 `present`（覆盖在当前界面上的弹层或对话框）。`to` 是 `screen`、不匹配模型中任何界面的 `route` 路径，或 `opaque` 表达式。边从触发它的节点开始。其所属界面由绘制该节点的界面决定，包括经由组件实例的情况（`SourceModel::screen_edges`）。

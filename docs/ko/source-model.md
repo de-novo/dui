@@ -151,6 +151,8 @@ flowchart LR
 
 토큰은 소스가 쓰는 이름(`--color-brand`, `--text-2xl`)을 그대로 남겨 나중에 디자인 변수가 될 수 있게 한다. `group`은 `color`, `spacing`, `typography`, `radius`, `size`, `other` 중 하나다. `value`는 최종 값이거나, 다른 토큰을 가리키는 `token` 값(별칭)이다. 별칭은 순환하면 안 된다. `modes`는 `dark` 같은 모드별 값을 담는다. 프로젝트 토큰은 `location`을 가진다. 프레임워크 기본값은 `package`(`tailwindcss`)를 가지고 위치는 없다.
 
+가져온 테마 스타일시트 안에서 색상·반경 토큰은 `var(--name)`으로 같은 그룹의 다른 토큰을 참조할 수 있다. 모델은 직접 참조한 토큰과 최종 값을 보존한다. 순환 참조, 누락된 정의, 대체값이 있는 표현식은 미해결 값으로 원문을 보존한다.
+
 ## 8. 엣지
 
 `kind`는 `link`(`<Link>`, `NavigationLink` 같은 선언적 링크), `navigate`(명령형 호출), `present`(현재 화면 위의 시트나 대화상자) 중 하나다. `to`는 `screen`, 모델의 어떤 화면에도 맞지 않는 `route` 경로, 또는 `opaque` 표현식이다. 엣지는 자신을 트리거하는 노드에서 시작한다. 엣지의 화면은 그 노드를 그리는 화면에서 정해지며, 컴포넌트 인스턴스를 거친 경우도 포함한다(`SourceModel::screen_edges`).
