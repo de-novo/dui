@@ -141,8 +141,8 @@ flowchart TD
 | --- | --- | --- | --- |
 | 1. Schema | v0.2.x | 将屏幕、组件、跳转、代码位置、槽位、已声明状态与分支、列表项 schema、字段到 UI 的绑定、中立样式属性（spacing、color、typography、radius、size、layout），以及保留 token 名称的 token 层，冻结为带版本的 JSON 模型。 | 一个包含样式属性和 token 名称的示例通过 schema 校验。已完成：[源码模型，schema 版本 1](source-model.md)。 |
 | 2. Browserless default map | v0.2.x | 默认情况下 `dui map` 和 `dui open` 不再启动浏览器。`--capture` 和 `dui run` 仍用于校验。 | 无浏览器的 CI 运行能给出屏幕和跳转，且现有截图检查仍然通过。在同一示例上测量截图路径与 AST 路径的端到端地图生成时间（冷启动和增量），并记录数字。AST 默认路径必须明显更快。在测量之前不要公布目标时间。 |
-| 3. AST extractors | v0.2.x–v0.3.0 | 从源码提取模型。先做 TypeScript/TSX，再做可在任一操作系统上运行的 Swift syntax only。类型检查器或编译器索引是可选项。每个适配器把布局、状态、导航和样式语法映射到模型。 | 在 Linux 上，不启动浏览器、不使用 Xcode，一个 TSX fixture 和一个 Swift fixture 能输出模型，包括简单样式映射。 |
-| 4. Approximate renderer | v0.3.0 | 仅根据模型绘制卡片，包括其样式属性。使用置于小型渲染器接口之后的最小 TypeScript/DOM 渲染器。标注为近似。不要把模型或业务逻辑放进渲染器。 | 卡片非空；文本、堆叠和样式与模型一致；不启动浏览器；渲染器只读取已冻结的模型，并且可以在不改动提取器或 schema 的情况下被替换。 |
+| 3. AST extractors | v0.2.x–v0.3.0 | 从源码提取模型。先做 TypeScript/TSX，再做可在任一操作系统上运行的 Swift syntax only。类型检查器或编译器索引是可选项。每个适配器把布局、状态、导航和样式语法映射到模型。 | 通过默认的无浏览器 AST 路径提取每个固定的[网页 JSX/CSS 基础用例](https://github.com/de-novo/dui/issues/441)，逐项记录模型断言结果。 |
+| 4. Approximate renderer | v0.3.0 | 仅根据模型绘制卡片，包括其样式属性。使用置于小型渲染器接口之后的最小 TypeScript/DOM 渲染器。标注为近似。不要把模型或业务逻辑放进渲染器。 | 在 1440×920 和 390×844 下将仅从模型绘制的卡片与 Chrome 比较。用例须在两种尺寸下通过全部必测项。公布全套通过率，首次测量后提出目标值。仅在显式验证时启动 Chrome。 |
 | 5. Hot reload | v0.3.0 | 监视文件（与 Vite 同一思路），只重新解析变更部分，只补丁受影响的模型节点，再用近似渲染器重绘。跟踪 import 图，使依赖所改文件的屏幕一并更新。无需重新构建应用，也不启动浏览器。 | 在同一示例上测量从编辑到更新的延迟并记录。修改文件后，依赖卡片会更新，且不重新构建应用、不启动浏览器。 |
 | 6. Slots, state, and lists | v0.3.0 | 在 UI 中切换槽位值、已声明状态和列表数量（0、1、many）。根据列表项 schema 自动生成 mock 项。隐藏或未知类型保持为占位。 | 切换 `isOpen` 或列表数量时，画面在无网络、无处理函数的情况下变化。已保存的值集会保留。 |
 | 7. Optional render machine | v0.3.x | 通用校验任务：输入 surface、cell、state、size，输出 frame、render tree 和 fidelity。关于常驻渲染服务器和并发浏览器工作的议题（[#343](https://github.com/de-novo/dui/issues/343)、[#344](https://github.com/de-novo/dui/issues/344)）属于这条轨道，而不是默认地图。 | 任务运行时记录保真度。默认地图 CI 仍不使用浏览器。 |
