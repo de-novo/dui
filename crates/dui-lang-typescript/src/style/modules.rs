@@ -224,6 +224,9 @@ fn media(f: &File, query: Ast<'_>) -> Option<m::Condition> {
     })
 }
 fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
+    if let Some(mapped) = super::flex_keyword(name, Some(raw), raw) {
+        return Some(mapped);
+    }
     let (props, value) = if let Some(props) = spacing(name) {
         (props.to_vec(), spacing_value(name, raw))
     } else {
@@ -239,10 +242,6 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
                     .ok()
                     .filter(|v| v.is_finite())
                     .map(|value| V::Number { value }),
-            ),
-            "flex-direction" => (
-                vec![P::Direction],
-                matches!(raw, "column" | "row").then(|| V::Keyword { value: raw.into() }),
             ),
             _ => {
                 let props = match name {
