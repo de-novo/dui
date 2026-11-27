@@ -15,6 +15,8 @@
 | 참조 예제 | [`fixtures/source-model/src/`](../../fixtures/source-model/src/)의 TSX 소스에 대한 [`fixtures/source-model/model.json`](../../fixtures/source-model/model.json) |
 | 검사 | `npm run check:source-model` |
 
+`dui model PROJECT ENTRY.tsx`는 TSX 진입 파일과 상대 경로로 가져온 파일을 읽어 스키마 v1 JSON을 출력한다. 예제는 `dui model fixtures/source-model src/App.tsx`로 실행한다. 이름 있는 함수·화살표 컴포넌트, 구조 분해한 props, 로컬 상태, 선언된 호출 반환 타입, JSX 분기·목록 템플릿, React Router 경로·링크, 인라인 스타일, Tailwind CSS를 가져온 프로젝트의 기본 유틸리티 클래스를 읽는다. CSS Modules, 지원하지 않는 클래스, 동적 표현식은 원문을 보존한다. 프로젝트 의존성 설치, 타입 검사기, 브라우저 없이 실행할 수 있다.
+
 ## 1. 원칙
 
 1. **관찰이 아니라 선언.** 모델은 코드가 말하는 것을 담는다. 핸들러를 실행하지 않고, API를 부르지 않고, 브라우저를 띄우지 않는다. 캡처 결과는 [캡처 컨텍스트](domain-model.md#2-엔티티-값-객체와-식별자)에 남는다.

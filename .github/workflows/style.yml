@@ -49,6 +49,7 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo check --locked -p dui-core --target wasm32-unknown-unknown
       - run: npm ci --prefix apps/canvas
+      - run: npm run check:tsx-model
       - run: npm test --prefix apps/canvas
       - run: npm run build --prefix apps/canvas
       - run: npm ci --prefix packages/db

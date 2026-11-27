@@ -375,6 +375,7 @@ CAPTURE
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
   dui recheck RUN [PROJECT [MANIFEST]]    Re-render unsuccessful cells with current project conditions
+  dui model PROJECT ENTRY.tsx             Print the syntax-only TSX source model as JSON
   dui scan [PROJECT] [MANIFEST]           Print compiler facts, controls, and auto-mocks (no browser)
   dui transitions PROJECT MANIFEST [RUN]  Replay actions and verify screen transitions
 
@@ -449,6 +450,19 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
             .and_then(|s| serde_json::from_str(s).ok())
             .ok_or_else(|| failure(2, "expected live REQUEST_JSON"))?;
         return live::command(&request);
+    }
+    if let [cmd, rest @ ..] = args.as_slice()
+        && cmd == "model"
+    {
+        let [project, entry] = rest else {
+            return Err(failure(2, "expected model PROJECT ENTRY.tsx"));
+        };
+        let model = dui_lang_typescript::extract(Path::new(project), Path::new(entry))
+            .map_err(|reason| failure(2, &reason))?;
+        let raw = model
+            .to_json()
+            .map_err(|error| failure(3, &error.to_string()))?;
+        return Ok(json!({ "__rawStdout": raw }));
     }
     if let [cmd, all @ ..] = args.as_slice()
         && cmd == "map"
