@@ -1,0 +1,902 @@
+[
+  {
+    "rep": 0,
+    "width": 1440,
+    "mode": "dom",
+    "ordinal": 1,
+    "frameMs": 266.484,
+    "marks": {
+      "dom-mounted": 211.7999997138977
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        84.59999990463257,
+        95.7999997138977,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        196.90000009536743,
+        202.5,
+        2513
+      ],
+      [
+        "/favicon.ico",
+        248.69999980926514,
+        252.7999997138977,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 1440,
+    "mode": "dom",
+    "ordinal": 2,
+    "frameMs": 243.379,
+    "marks": {
+      "dom-mounted": 149.19999980926514
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        50.5,
+        55.299999713897705,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        125.89999961853027,
+        128.89999961853027,
+        2513
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 1440,
+    "mode": "gpui",
+    "ordinal": 1,
+    "frameMs": 655.087,
+    "marks": {
+      "init-start": 238.80000019073486,
+      "wasm-stream-start": 298.40000009536743,
+      "wasm-stream-end": 355.30000019073486,
+      "assets-ready": 355.80000019073486,
+      "run-returned": 363.5,
+      "adapter-start": 405.80000019073486,
+      "adapter-end": 406.40000009536743,
+      "device-start": 409.2000002861023,
+      "device-end": 413.30000019073486,
+      "first-submit": 530.3000001907349
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        68.2000002861023,
+        75.80000019073486,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        241.2000002861023,
+        335.6000003814697,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        241.30000019073486,
+        249,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        241.30000019073486,
+        248.40000009536743,
+        5000
+      ],
+      [
+        "/favicon.ico",
+        307,
+        317.5,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 1440,
+    "mode": "gpui",
+    "ordinal": 2,
+    "frameMs": 1219.389,
+    "marks": {
+      "init-start": 228.2000002861023,
+      "wasm-stream-start": 259.09999990463257,
+      "wasm-stream-end": 303.40000009536743,
+      "assets-ready": 990.7000002861023,
+      "run-returned": 999.0999999046326,
+      "adapter-start": 1011,
+      "adapter-end": 1011.4000000953674,
+      "device-start": 1012.5,
+      "device-end": 1013.5999999046326,
+      "first-submit": 1113
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        219.7000002861023,
+        224.7000002861023,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        229.40000009536743,
+        281.59999990463257,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        229.5,
+        233.2000002861023,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        229.5,
+        235.09999990463257,
+        5000
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 390,
+    "mode": "dom",
+    "ordinal": 1,
+    "frameMs": 184.575,
+    "marks": {
+      "dom-mounted": 158.09999990463257
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        35.80000019073486,
+        42.200000286102295,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        151,
+        153.30000019073486,
+        2513
+      ],
+      [
+        "/favicon.ico",
+        158.40000009536743,
+        160.7000002861023,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 390,
+    "mode": "dom",
+    "ordinal": 2,
+    "frameMs": 1533.266,
+    "marks": {
+      "dom-mounted": 1500.8000001907349
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        367.7000002861023,
+        372.30000019073486,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        1492.4000000953674,
+        1497.3000001907349,
+        2513
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 390,
+    "mode": "gpui",
+    "ordinal": 1,
+    "frameMs": 419.898,
+    "marks": {
+      "init-start": 153.69999980926514,
+      "wasm-stream-start": 159.59999990463257,
+      "wasm-stream-end": 208.69999980926514,
+      "assets-ready": 215.30000019073486,
+      "run-returned": 221.09999990463257,
+      "adapter-start": 227,
+      "adapter-end": 227.30000019073486,
+      "device-start": 228.69999980926514,
+      "device-end": 230.59999990463257,
+      "first-submit": 321
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        131,
+        138.09999990463257,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        155.5,
+        185.90000009536743,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        155.59999990463257,
+        159,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        155.59999990463257,
+        160.40000009536743,
+        5000
+      ],
+      [
+        "/favicon.ico",
+        215.19999980926514,
+        217.19999980926514,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 0,
+    "width": 390,
+    "mode": "gpui",
+    "ordinal": 2,
+    "frameMs": 436.055,
+    "marks": {
+      "init-start": 123,
+      "wasm-stream-start": 130.5,
+      "wasm-stream-end": 202.69999980926514,
+      "assets-ready": 213.80000019073486,
+      "run-returned": 219.19999980926514,
+      "adapter-start": 244.90000009536743,
+      "adapter-end": 245.59999990463257,
+      "device-start": 246.90000009536743,
+      "device-end": 248.30000019073486,
+      "first-submit": 337.80000019073486
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        89.30000019073486,
+        96.30000019073486,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        125.19999980926514,
+        178.40000009536743,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        125.30000019073486,
+        131.80000019073486,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        125.30000019073486,
+        133.69999980926514,
+        5000
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 1440,
+    "mode": "gpui",
+    "ordinal": 1,
+    "frameMs": 1859.935,
+    "marks": {
+      "init-start": 1415.7999997138977,
+      "wasm-stream-start": 1422.9000000953674,
+      "wasm-stream-end": 1489.7999997138977,
+      "assets-ready": 1490.4000000953674,
+      "run-returned": 1499,
+      "adapter-start": 1608.6999998092651,
+      "adapter-end": 1609.0999999046326,
+      "device-start": 1611.5999999046326,
+      "device-end": 1615.9000000953674,
+      "first-submit": 1736.0999999046326
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        1266.2999997138977,
+        1281.6999998092651,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        1418.7999997138977,
+        1465.5999999046326,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        1418.9000000953674,
+        1426.4000000953674,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        1418.9000000953674,
+        1426.5999999046326,
+        5000
+      ],
+      [
+        "/favicon.ico",
+        1433.5999999046326,
+        1441.2999997138977,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 1440,
+    "mode": "gpui",
+    "ordinal": 2,
+    "frameMs": 558.601,
+    "marks": {
+      "init-start": 71.69999980926514,
+      "wasm-stream-start": 128.89999961853027,
+      "wasm-stream-end": 202.2999997138977,
+      "assets-ready": 251.5,
+      "run-returned": 257.5,
+      "adapter-start": 354.5,
+      "adapter-end": 354.7999997138977,
+      "device-start": 356.2999997138977,
+      "device-end": 357.5,
+      "first-submit": 457
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        40.799999713897705,
+        49,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        74.39999961853027,
+        162,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        74.5,
+        79.69999980926514,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        74.5,
+        83.5,
+        5000
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 1440,
+    "mode": "dom",
+    "ordinal": 1,
+    "frameMs": 908.483,
+    "marks": {
+      "dom-mounted": 681.6999998092651
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        499.59999990463257,
+        507.69999980926514,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        667.5,
+        674.2999997138977,
+        2513
+      ],
+      [
+        "/favicon.ico",
+        907.6999998092651,
+        912,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 1440,
+    "mode": "dom",
+    "ordinal": 2,
+    "frameMs": 1634.733,
+    "marks": {
+      "dom-mounted": 1377.6999998092651
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        810.1999998092651,
+        821.0999999046326,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        931.5999999046326,
+        937,
+        2513
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 390,
+    "mode": "gpui",
+    "ordinal": 1,
+    "frameMs": 1088.107,
+    "marks": {
+      "init-start": 463.90000009536743,
+      "wasm-stream-start": 469.90000009536743,
+      "wasm-stream-end": 524.9000000953674,
+      "assets-ready": 699.3000001907349,
+      "run-returned": 717,
+      "adapter-start": 817.2000002861023,
+      "adapter-end": 817.5,
+      "device-start": 820.7000002861023,
+      "device-end": 825.8000001907349,
+      "first-submit": 952.7000002861023
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        134.30000019073486,
+        139.90000009536743,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        466,
+        501.2000002861023,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        466.1000003814697,
+        471.30000019073486,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        466.2000002861023,
+        471.2000002861023,
+        5000
+      ],
+      [
+        "/favicon.ico",
+        799.9000000953674,
+        801.9000000953674,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 390,
+    "mode": "gpui",
+    "ordinal": 2,
+    "frameMs": 900.485,
+    "marks": {
+      "init-start": 527.0999999046326,
+      "wasm-stream-start": 546.2000002861023,
+      "wasm-stream-end": 601.3000001907349,
+      "assets-ready": 620.8000001907349,
+      "run-returned": 625.5,
+      "adapter-start": 634.5,
+      "adapter-end": 635.2000002861023,
+      "device-start": 636.8000001907349,
+      "device-end": 637.9000000953674,
+      "first-submit": 744.0999999046326
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        354.5,
+        360.59999990463257,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        528.7000002861023,
+        579.5,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        528.9000000953674,
+        537.3000001907349,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        529.0999999046326,
+        538.2000002861023,
+        5000
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 390,
+    "mode": "dom",
+    "ordinal": 1,
+    "frameMs": 1127.779,
+    "marks": {
+      "dom-mounted": 392.40000009536743
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        158.80000019073486,
+        173.5,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        287.40000009536743,
+        290,
+        2513
+      ],
+      [
+        "/favicon.ico",
+        393.1000003814697,
+        397.30000019073486,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 1,
+    "width": 390,
+    "mode": "dom",
+    "ordinal": 2,
+    "frameMs": 133.236,
+    "marks": {
+      "dom-mounted": 108.39999961853027
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        7.299999713897705,
+        11.599999904632568,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        101.19999980926514,
+        105.2999997138977,
+        2513
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 1440,
+    "mode": "dom",
+    "ordinal": 1,
+    "frameMs": 234.356,
+    "marks": {
+      "dom-mounted": 173.30000019073486
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        47.80000019073486,
+        53.59999990463257,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        146.2000002861023,
+        147.90000009536743,
+        2513
+      ],
+      [
+        "/favicon.ico",
+        213.5,
+        215.7000002861023,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 1440,
+    "mode": "dom",
+    "ordinal": 2,
+    "frameMs": 274.926,
+    "marks": {
+      "dom-mounted": 258.2999997138977
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        17.5,
+        22.5,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        227.90000009536743,
+        230.59999990463257,
+        2513
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 1440,
+    "mode": "gpui",
+    "ordinal": 1,
+    "frameMs": 1673.785,
+    "marks": {
+      "init-start": 1221.4000000953674,
+      "wasm-stream-start": 1259.8000001907349,
+      "wasm-stream-end": 1340.9000000953674,
+      "assets-ready": 1345.3000001907349,
+      "run-returned": 1356.6999998092651,
+      "adapter-start": 1397.6999998092651,
+      "adapter-end": 1398.5,
+      "device-start": 1401.9000000953674,
+      "device-end": 1407.1999998092651,
+      "first-submit": 1542.5999999046326
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        202.30000019073486,
+        217.5,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        1226.4000000953674,
+        1307.0999999046326,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        1226.5,
+        1255.5999999046326,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        1226.8000001907349,
+        1261.4000000953674,
+        5000
+      ],
+      [
+        "/favicon.ico",
+        1383,
+        1399.0999999046326,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 1440,
+    "mode": "gpui",
+    "ordinal": 2,
+    "frameMs": 498.066,
+    "marks": {
+      "init-start": 181.5,
+      "wasm-stream-start": 221.5,
+      "wasm-stream-end": 275.2999997138977,
+      "assets-ready": 282,
+      "run-returned": 286.7999997138977,
+      "adapter-start": 291.7999997138977,
+      "adapter-end": 292.09999990463257,
+      "device-start": 293.69999980926514,
+      "device-end": 295.69999980926514,
+      "first-submit": 396.09999990463257
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        84.59999990463257,
+        99.19999980926514,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        183.59999990463257,
+        249.19999980926514,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        183.69999980926514,
+        189.2999997138977,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        183.7999997138977,
+        188.59999990463257,
+        5000
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 390,
+    "mode": "dom",
+    "ordinal": 1,
+    "frameMs": 185.531,
+    "marks": {
+      "dom-mounted": 162.40000009536743
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        54.5,
+        61.5,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        155.19999980926514,
+        157,
+        2513
+      ],
+      [
+        "/favicon.ico",
+        168.69999980926514,
+        170.2999997138977,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 390,
+    "mode": "dom",
+    "ordinal": 2,
+    "frameMs": 169.331,
+    "marks": {
+      "dom-mounted": 144
+    },
+    "resources": [
+      [
+        "/startup/dom/app.js",
+        63.299999713897705,
+        73,
+        157567
+      ],
+      [
+        "/startup/dom/model.json",
+        135.19999980926514,
+        140.09999990463257,
+        2513
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 390,
+    "mode": "gpui",
+    "ordinal": 1,
+    "frameMs": 376.828,
+    "marks": {
+      "init-start": 80.89999961853027,
+      "wasm-stream-start": 85.19999980926514,
+      "wasm-stream-end": 125.19999980926514,
+      "assets-ready": 125.69999980926514,
+      "run-returned": 132.39999961853027,
+      "adapter-start": 148.09999990463257,
+      "adapter-end": 150.39999961853027,
+      "device-start": 152.89999961853027,
+      "device-end": 155.89999961853027,
+      "first-submit": 259.59999990463257
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        42.39999961853027,
+        47.09999990463257,
+        166852
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        83.19999980926514,
+        109.5,
+        15986781
+      ],
+      [
+        "/startup/gpui/model.json",
+        83.2999997138977,
+        88.2999997138977,
+        2513
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        83.2999997138977,
+        87.09999990463257,
+        5000
+      ],
+      [
+        "/favicon.ico",
+        92.59999990463257,
+        101.09999990463257,
+        760
+      ]
+    ]
+  },
+  {
+    "rep": 2,
+    "width": 390,
+    "mode": "gpui",
+    "ordinal": 2,
+    "frameMs": 404.018,
+    "marks": {
+      "init-start": 142.39999961853027,
+      "wasm-stream-start": 145.89999961853027,
+      "wasm-stream-end": 201.59999990463257,
+      "assets-ready": 202.09999990463257,
+      "run-returned": 206.59999990463257,
+      "adapter-start": 221.2999997138977,
+      "adapter-end": 223.09999990463257,
+      "device-start": 224.2999997138977,
+      "device-end": 225.09999990463257,
+      "first-submit": 312.7999997138977
+    },
+    "resources": [
+      [
+        "/startup/gpui/dui_gpui_web_probe.js",
+        92.7999997138977,
+        98.19999980926514,
+        166852
+      ],
+      [
+        "/startup/gpui/model.json",
+        143.7999997138977,
+        148.7999997138977,
+        2513
+      ],
+      [
+        "/startup/gpui/dui_gpui_web_probe_bg.wasm",
+        143.7999997138977,
+        180.59999990463257,
+        15986781
+      ],
+      [
+        "/startup/gpui/IBMPlexSans-Regular.ttf",
+        143.89999961853027,
+        149.2999997138977,
+        5000
+      ]
+    ]
+  }
+]
