@@ -29,11 +29,11 @@ The built CSS reader maps display mode, horizontal overflow and auto-fit grids w
 
 The bundled CSS reader resolves independent row and column gaps and common flex shorthands into growth, shrinkage and basis.
 
-The reader also preserves simple font-family lists and text-decoration lines, expands block spacing in horizontal layouts, and evaluates two-argument px/vw minimums in spacing at the supplied viewport width.
+The reader expands block spacing in horizontal layouts. Built font-family lists, text-decoration lines, viewport minimums in spacing and ID selectors remain unresolved.
 
 Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
 
-Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports simple ID selectors, positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
+Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
 
 ## 1. Principles
 
