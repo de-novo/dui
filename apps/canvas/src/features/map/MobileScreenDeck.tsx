@@ -9,6 +9,8 @@ import {
   type ScreenCanvasDiff,
 } from "../../model/canvasDiff";
 import { routeName } from "./CaptureCard";
+import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
+import type { Model, SourceModelRenderer } from "../model/modelDocument";
 import { liveCell, useLiveFrame } from "./liveFrames";
 import { useState } from "react";
 
@@ -50,6 +52,32 @@ function LiveDeckFrame({
   );
 }
 
+function MobileApproximateCard({
+  renderer,
+  model,
+  screen,
+}: {
+  renderer?: SourceModelRenderer;
+  model?: Model;
+  screen: Screen;
+}) {
+  const { t } = useI18n();
+  const render = useApproximateModelRender(renderer, model, screen.component, 375);
+  if (!render) return null;
+  return (
+    <>
+      <div className="mobile-deck-frame mobile-deck-frame-model" data-showing="model">
+        <ApproximateModelFrame render={render} label={t.approximateModel} showUnresolved={false} />
+      </div>
+      {render.unresolved.length > 0 && (
+        <div className="mobile-model-unresolved" title={render.unresolved.join("\n")}>
+          {t.unresolvedModelParts(render.unresolved.length)}
+        </div>
+      )}
+    </>
+  );
+}
+
 export type MobileViewMode = "deck" | "map";
 
 function preferredCellForWidth(screen: Screen, width?: number) {
@@ -77,9 +105,13 @@ export function MobileScreenDeck({
   onSelectWidth,
   onSelectScreen,
   liveRun,
+  sourceModel,
+  modelRenderer,
 }: {
   /** Render cards without a capture from source (the run's project can run). */
   liveRun?: string;
+  sourceModel?: Model;
+  modelRenderer?: SourceModelRenderer;
   archive: Archive;
   width?: number;
   widths: number[];
@@ -186,7 +218,9 @@ export function MobileScreenDeck({
                 <div className="mobile-deck-card-head">
                   <span className="mobile-deck-route">
                     {isOverlay && <span className="mobile-modal-tag">MODAL</span>}
-                    <strong>{screen.nativeSource?.name ?? routeName(screen.path)}</strong>
+                    <strong>
+                      {screen.nativeSource?.name ?? screen.name ?? routeName(screen.path)}
+                    </strong>
                   </span>
                   <span className="mobile-deck-meta">
                     {screenDiff && (
@@ -206,7 +240,14 @@ export function MobileScreenDeck({
                   </span>
                 </div>
 
-                {screen.nativeSource && !cell && !src && (
+                {!cell && !src && sourceModel && screen.component && (
+                  <MobileApproximateCard
+                    renderer={modelRenderer}
+                    model={sourceModel}
+                    screen={screen}
+                  />
+                )}
+                {screen.nativeSource && !cell && !src && !screen.component && (
                   <div className="source-frame">
                     <SourceCardBody source={screen.nativeSource} preview={screen.sourcePreview} />
                   </div>

@@ -81,6 +81,8 @@ function enrichGraph(runDir: string): Record<string, unknown> {
     return entry;
   });
   graph.cells = enrichedCells;
+  if (fs.existsSync(path.join(runDir, "source-model.json")))
+    graph.sourceModel = "source-model.json";
   if (report.screenDiscovery) graph.screenDiscovery = report.screenDiscovery;
   if (report.locales) graph.locales = report.locales;
   return graph;
@@ -309,6 +311,10 @@ function exportRunToArchive(
   });
   if (auditRes.stdout.trim()) {
     fs.writeFileSync(path.join(dest, "audit.json"), auditRes.stdout);
+  }
+
+  if (fs.existsSync(path.join(runDir, "source-model.json"))) {
+    fs.copyFileSync(path.join(runDir, "source-model.json"), path.join(dest, "source-model.json"));
   }
 
   for (const entry of fs.readdirSync(runDir)) {

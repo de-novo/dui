@@ -153,10 +153,20 @@ export type NativeSource = {
   dynamic?: boolean;
   condition?: string;
 };
+export type SourceLocation = {
+  file: string;
+  line?: number;
+  column?: number;
+};
 
 export type Screen = {
   nativeSource?: NativeSource;
   sourcePreview?: SourcePreview;
+  /** The model component drawn by the approximate renderer, for source-model archives. */
+  component?: string;
+  /** Router display name and declaration position recorded in the viewer graph. */
+  name?: string;
+  sourceLocation?: SourceLocation;
   id: string;
   path: string;
   cells: Cell[];
@@ -182,7 +192,9 @@ export type ScreenLink = {
   replayVerified: boolean;
 };
 export type ScreenMap = {
-  screenDiscovery?: { kind: "native-source"; limitations: string[] };
+  screenDiscovery?: { kind: string; limitations: string[] };
+  /** Archive file containing the frozen schema-v1 source model. */
+  sourceModel?: string;
   screens: Screen[];
   links: ScreenLink[];
 };
@@ -339,12 +351,29 @@ export function decodeOverview(raw: unknown): ScreenMap {
     if (!record(node) || node.kind !== "screen") continue;
     if (typeof node.id !== "string" || typeof node.label !== "string")
       throw Error("Invalid screen");
+    const sourceLocation =
+      record(node.location) && typeof node.location.file === "string"
+        ? {
+            file: node.location.file,
+            line:
+              typeof node.location.line === "number" && Number.isInteger(node.location.line)
+                ? node.location.line
+                : undefined,
+            column:
+              typeof node.location.column === "number" && Number.isInteger(node.location.column)
+                ? node.location.column
+                : undefined,
+          }
+        : undefined;
     const screen: Screen = {
       id: node.id,
       path: node.label,
       cells: [],
       discoveredFrom: decodeOrigin(node.discoveredFrom),
       nativeSource: decodeNativeSource(node.nativeSource),
+      component: typeof node.component === "string" ? node.component : undefined,
+      name: typeof node.name === "string" ? node.name : undefined,
+      sourceLocation,
     };
     if (screen.nativeSource?.projectScope || node.sourcePreview !== undefined)
       screen.sourcePreview = decodeSourcePreview(
@@ -465,17 +494,19 @@ export function decodeOverview(raw: unknown): ScreenMap {
     links.push(link);
   }
   const discovery = raw.screenDiscovery;
-  if (record(discovery) && discovery.kind === "native-source") {
+  const sourceModel = typeof raw.sourceModel === "string" ? raw.sourceModel : undefined;
+  if (record(discovery) && typeof discovery.kind === "string") {
     if (
       !Array.isArray(discovery.limitations) ||
       !discovery.limitations.every((v) => typeof v === "string")
     )
-      throw Error("Invalid native discovery limitations");
+      throw Error("Invalid discovery limitations");
     return {
       screens,
       links,
-      screenDiscovery: { kind: "native-source", limitations: discovery.limitations },
+      sourceModel,
+      screenDiscovery: { kind: discovery.kind, limitations: discovery.limitations },
     };
   }
-  return { screens, links };
+  return { screens, links, sourceModel };
 }

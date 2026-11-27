@@ -39,6 +39,7 @@ export type Messages = {
   mobileViewMode: string;
   openModel: string;
   approximateModel: string;
+  unresolvedModelParts: (count: number) => string;
   invalidModel: string;
   noSavedMaps: string;
   archiveLoadFailed: string;
@@ -243,6 +244,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     mobileViewMode: "Mobile view mode",
     openModel: "Open source model",
     approximateModel: "Approximate model",
+    unresolvedModelParts: (count) => `${count} unresolved model parts`,
     invalidModel: "Could not read this schema-v1 model.",
     noSavedMaps: "No saved screen maps.",
     archiveLoadFailed: "Could not load the archive.",
@@ -469,6 +471,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     mobileViewMode: "移动端视图模式",
     openModel: "打开源模型",
     approximateModel: "近似模型",
+    unresolvedModelParts: (count) => `${count} 处模型内容未解析`,
     invalidModel: "无法读取此版本 1 模型。",
     noSavedMaps: "暂无已保存的界面地图。",
     archiveLoadFailed: "无法加载归档数据。",
@@ -681,6 +684,7 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     mobileViewMode: "모바일 보기 모드",
     openModel: "소스 모델 열기",
     approximateModel: "근사 모델",
+    unresolvedModelParts: (count) => `해석되지 않은 모델 요소 ${count}개`,
     invalidModel: "스키마 v1 모델을 읽을 수 없습니다.",
     noSavedMaps: "저장된 화면 지도가 없습니다.",
     archiveLoadFailed: "아카이브를 불러올 수 없습니다.",

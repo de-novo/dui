@@ -92,7 +92,7 @@ export function ScreenInspector({
   const screenCells =
     locale === null ? rawScreenCells : rawScreenCells.filter((c) => c.locale === locale);
   const title = screen
-    ? (screen.nativeSource?.name ?? routeName(screen.path))
+    ? (screen.nativeSource?.name ?? screen.name ?? routeName(screen.path))
     : t.screenUnavailable;
   const showFullPath = Boolean(screen && title !== screen.path);
   const widthsOnScreen = new Set(screenCells.map((c) => c.width)).size;
@@ -177,6 +177,28 @@ export function ScreenInspector({
           source={screen.nativeSource}
           sourceOnly={rawScreenCells.length === 0}
         />
+      )}
+
+      {screen?.sourceLocation && (
+        <div className="native-source-evidence">
+          <span>
+            {t.sourceDeclaration}
+            {rawScreenCells.length === 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <span className="capture-status" data-status="unverified">
+                  {t.unverified}
+                </span>
+              </>
+            )}
+          </span>
+          <code>
+            {screen.sourceLocation.file}
+            {screen.sourceLocation.line === undefined ? "" : ":" + screen.sourceLocation.line}
+          </code>
+          {screen.component && <code>{screen.component}</code>}
+        </div>
       )}
 
       {screen?.sourcePreview && (

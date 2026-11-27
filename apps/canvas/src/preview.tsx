@@ -37,6 +37,9 @@ import {
   formatShowcaseRunLabel,
 } from "./model/runLabels";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
+import { createDomModelRenderer, decodeModel, type Model } from "./features/model/modelDocument";
+
+const modelRenderer = createDomModelRenderer();
 
 const CaptureDiffView = lazy(() =>
   import("./features/diff/CaptureDiffView").then((m) => ({ default: m.CaptureDiffView })),
@@ -104,11 +107,13 @@ function imageUrlFor(run: Run) {
 
 function MapView({
   archive,
+  sourceModel,
   run,
   runs,
   onOpenDiff,
 }: {
   archive: Archive;
+  sourceModel?: Model;
   run: Run;
   runs: Run[];
   onOpenDiff: () => void;
@@ -361,6 +366,8 @@ function MapView({
             onSelectWidth={(nextWidth) => update({ width: String(nextWidth), state: null })}
             onSelectScreen={(id) => select(id)}
             liveRun={run.responsiveAvailable ? run.key : undefined}
+            sourceModel={sourceModel}
+            modelRenderer={modelRenderer}
           />
         ) : (
           <div ref={overviewLayer} className="overview-layer">
@@ -400,6 +407,8 @@ function MapView({
                     mode={mode}
                     edgeStart={edgeStart}
                     liveRun={run.responsiveAvailable ? run.key : undefined}
+                    sourceModel={sourceModel}
+                    modelRenderer={modelRenderer}
                     selectedId={selectedId}
                     focusActive={showDetails}
                     openCommentsByPath={commentsByPath}
@@ -746,11 +755,13 @@ function Viewer({
   initialRuns,
   run,
   archive,
+  sourceModel,
   error,
 }: {
   initialRuns: Run[];
   run?: Run;
   archive?: Archive;
+  sourceModel?: Model;
   error?: string;
 }) {
   const { t } = useI18n();
@@ -814,7 +825,13 @@ function Viewer({
           <DiscoveryLimitations limitations={archive.screenDiscovery.limitations} open />
         </section>
       ) : archive && run ? (
-        <MapView archive={archive} run={run} runs={runs} onOpenDiff={() => openDiff()} />
+        <MapView
+          archive={archive}
+          sourceModel={sourceModel}
+          run={run}
+          runs={runs}
+          onOpenDiff={() => openDiff()}
+        />
       ) : !error && !archive ? (
         <EmptyWorkspace title={t.noSavedMaps} openModel={t.openModel} />
       ) : (
@@ -853,9 +870,13 @@ if (new URLSearchParams(location.search).get("view") === "model") {
     run = key === null ? runs[0] : runs.find((r) => r.key === key);
     if (key !== null && !run) throw Error("workspace-unavailable");
     const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
+    const sourceModel =
+      run && archive?.sourceModel
+        ? decodeModel(await json(archiveUrl(archive.sourceModel, run)))
+        : undefined;
     root.render(
       <LocaleProvider>
-        <Viewer initialRuns={runs} run={run} archive={archive} />
+        <Viewer initialRuns={runs} run={run} archive={archive} sourceModel={sourceModel} />
       </LocaleProvider>,
     );
   } catch (error) {

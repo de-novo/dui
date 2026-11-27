@@ -394,6 +394,10 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
     }
     if let Some(obj) = graph.as_object_mut() {
         obj.insert("cells".into(), Value::Array(cells));
+        if root.join("source-model.json").is_file() {
+            obj.insert("sourceModel".into(), json!("source-model.json"));
+            images.insert("source-model.json".into());
+        }
     }
     let body = if graph["nodes"].as_array().is_some_and(|nodes| {
         nodes
@@ -792,6 +796,19 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                 "application/json; charset=utf-8",
                 "no-store",
                 &graph_bytes,
+            );
+            return;
+        }
+        if archive_name == "source-model.json"
+            && images.contains(archive_name)
+            && let Ok(bytes) = fs::read(root.join(archive_name))
+        {
+            send_response(
+                &mut stream,
+                200,
+                "application/json; charset=utf-8",
+                "public, max-age=31536000, immutable",
+                &bytes,
             );
             return;
         }

@@ -114,6 +114,10 @@ try {
       JSON.parse(execFileSync(binary, ["model", project, "src/App.tsx"], { encoding: "utf8" })),
     );
     const graph = artifact("graph.json");
+    assert.equal(graph.sourceModel, "source-model.json");
+    assert.equal(graph.nodes[0].name, "Orders");
+    assert.equal(graph.nodes[0].component, "src/Orders.tsx#Orders");
+    assert.equal(graph.nodes[0].location.file, "src/App.tsx");
     assert.deepEqual(
       graph.nodes.map((n: { label: string }) => n.label),
       ["/", "/settings"],
