@@ -743,7 +743,8 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     `
     main {display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
     @media(max-width:680px){ main {grid-template-columns:minmax(0,1fr)} }
-    div.card { order:-2; overflow-x:auto; font-size:clamp(30px,5vw,48px) }
+    main {gap:8px 10px;column-gap:12px}
+    div.card { flex:2 0 40%; order:-2; overflow-x:auto; font-size:clamp(30px,5vw,48px) }
   `,
   );
   for (const width of [390, 1440]) {
@@ -756,6 +757,15 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
         ? { kind: "keyword", value: "single" }
         : { kind: "length", value: 300, unit: "px" },
     );
+    assert.deepEqual(prop(root.style, "rowGap"), { kind: "length", value: 8, unit: "px" });
+    assert.deepEqual(prop(root.style, "columnGap"), { kind: "length", value: 12, unit: "px" });
+    assert.deepEqual(prop(root.children[0].style, "shrink"), { kind: "number", value: 0 });
+    assert.deepEqual(prop(root.children[0].style, "grow"), { kind: "number", value: 2 });
+    assert.deepEqual(prop(root.children[0].style, "flexBasis"), {
+      kind: "length",
+      value: 40,
+      unit: "percent",
+    });
     assert.deepEqual(prop(root.children[0].style, "order"), { kind: "number", value: -2 });
     assert.deepEqual(prop(root.children[0].style, "overflowX"), { kind: "keyword", value: "auto" });
     assert.deepEqual(prop(root.children[0].style, "fontSize"), {

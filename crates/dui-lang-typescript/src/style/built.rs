@@ -12,6 +12,10 @@ const DIRECT: &[(&str, P)] = &[
     ("grid-template-columns", P::GridColumnMinimum),
     ("overflow-x", P::OverflowX),
     ("gap", P::Gap),
+    ("row-gap", P::RowGap),
+    ("column-gap", P::ColumnGap),
+    ("flex-shrink", P::Shrink),
+    ("flex-basis", P::FlexBasis),
     ("color", P::Color),
     ("background-color", P::Background),
     ("border-color", P::BorderColor),
@@ -43,7 +47,23 @@ const DIRECT: &[(&str, P)] = &[
     ("margin-inline-end", P::MarginEnd),
 ];
 
+fn flex_basis(raw: &str) -> Option<V> {
+    if matches!(
+        raw,
+        "auto" | "min-content" | "max-content" | "content" | "fit-content"
+    ) {
+        return Some(V::Keyword { value: raw.into() });
+    }
+    super::size_value(P::Width, raw).filter(|v| matches!(v, V::Length { .. }))
+}
+
 fn affected(name: &str) -> Vec<P> {
+    match name {
+        "gap" | "grid-gap" => return vec![P::Gap, P::RowGap, P::ColumnGap],
+        "row-gap" | "grid-row-gap" => return vec![P::Gap, P::RowGap],
+        "column-gap" | "grid-column-gap" => return vec![P::Gap, P::ColumnGap],
+        _ => {}
+    }
     if let Some(props) = spacing(name) {
         return props.to_vec();
     }
@@ -53,11 +73,10 @@ fn affected(name: &str) -> Vec<P> {
     match name {
         "overflow" => vec![P::OverflowX],
         "background" => vec![P::Background],
-        "grid-gap" | "row-gap" | "column-gap" | "grid-row-gap" | "grid-column-gap" => vec![P::Gap],
         "border" | "border-top" | "border-bottom" | "border-left" | "border-right"
         | "border-inline" | "border-block" => vec![P::BorderWidth, P::BorderColor],
         "font" => vec![P::FontSize, P::LineHeight],
-        "flex" => vec![P::Grow],
+        "flex" => vec![P::Grow, P::Shrink, P::FlexBasis],
         "flex-flow" => vec![P::Direction, P::Wrap],
         "place-items" => vec![P::AlignItems],
         "place-content" => vec![P::JustifyContent],
@@ -497,6 +516,48 @@ impl<'a> Sheet<'a> {
         } else {
             raw
         };
+        if rule.name == "flex" {
+            let parts: Vec<_> = raw.split_ascii_whitespace().collect();
+            let (grow, shrink, basis) = match parts.as_slice() {
+                ["none"] => ("0", "0", "auto"),
+                ["initial"] => ("0", "1", "auto"),
+                ["auto"] => ("1", "1", "auto"),
+                [g] if super::grow_factor(g).is_some() => (*g, "1", "0%"),
+                [b] => ("1", "1", *b),
+                [g, s] if super::grow_factor(s).is_some() => (*g, *s, "0%"),
+                [g, b] => (*g, "1", *b),
+                [g, s, b] => (*g, *s, *b),
+                _ => return None,
+            };
+            let grow = super::grow_factor(grow)?;
+            let shrink = super::grow_factor(shrink)?;
+            let basis = flex_basis(basis)?;
+            return Some(if property == P::Grow {
+                grow
+            } else if property == P::Shrink {
+                shrink
+            } else {
+                basis
+            });
+        }
+        if property == P::Shrink {
+            return super::grow_factor(raw);
+        }
+        if property == P::FlexBasis {
+            return flex_basis(raw);
+        }
+        if matches!(property, P::RowGap | P::ColumnGap) && !raw.starts_with("calc(") {
+            let mut parts = raw.split_ascii_whitespace();
+            let row = uniform_gap(parts.next()?)?;
+            let col = parts
+                .next()
+                .map(uniform_gap)
+                .unwrap_or_else(|| Some(row.clone()))?;
+            if parts.next().is_some() {
+                return None;
+            }
+            return Some(if property == P::RowGap { row } else { col });
+        }
         if matches!(property, P::Display | P::OverflowX) {
             let valid = if property == P::Display {
                 matches!(
@@ -732,6 +793,15 @@ impl<'a> Sheet<'a> {
             unknown_rank.is_some_and(|(important, candidate)| important || Some(candidate) >= rank)
         });
         if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
+        {
+            return;
+        }
+        if matches!(property, P::RowGap | P::ColumnGap)
+            && !unknown.is_some_and(|r| r.important)
+            && el
+                .style
+                .iter()
+                .any(|d| d.property == P::Gap && d.from.syntax == m::StyleSyntax::Inline)
         {
             return;
         }

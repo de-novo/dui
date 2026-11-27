@@ -44,6 +44,7 @@ const css: Record<string, string> = {
   direction: "flex-direction",
   wrap: "flex-wrap",
   grow: "flex-grow",
+  shrink: "flex-shrink",
   background: "background-color",
   paddingStart: "padding-inline-start",
   paddingEnd: "padding-inline-end",

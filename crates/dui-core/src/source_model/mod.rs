@@ -374,6 +374,10 @@ pub enum StyleProperty {
     JustifyContent,
     Wrap,
     Grow,
+    Shrink,
+    FlexBasis,
+    RowGap,
+    ColumnGap,
     // Spacing
     Gap,
     PaddingTop,
