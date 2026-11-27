@@ -227,7 +227,9 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
     if let Some(mapped) = super::flex_keyword(name, Some(raw), raw) {
         return Some(mapped);
     }
-    let (props, value) = if let Some(props) = spacing(name) {
+    let (props, value) = if let Some(prop) = super::size_property(name) {
+        (vec![prop], super::size_value(prop, raw))
+    } else if let Some(props) = spacing(name) {
         (props.to_vec(), spacing_value(name, raw))
     } else {
         match name {
@@ -246,10 +248,6 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
             ),
             _ => {
                 let props = match name {
-                    "width" => vec![P::Width],
-                    "height" => vec![P::Height],
-                    "min-width" => vec![P::MinWidth],
-                    "max-width" => vec![P::MaxWidth],
                     "font-size" => vec![P::FontSize],
                     "border-radius" => vec![P::BorderRadius],
                     _ => return None,
