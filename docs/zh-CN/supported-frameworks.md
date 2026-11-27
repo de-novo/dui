@@ -19,6 +19,8 @@
 
 例如，TypeScript 规则将 Zustand 的 `create` 识别为状态存储，将 Zod 的 `object` 识别为模式。各次调用的类型由编译器提供。仅凭安装了某个包，无法判断界面使用了哪个状态。内置规则列出了具体的包和符号，项目可以通过 `rulePacks` 添加自己的规则。[内置规则](../../rules/web.json) · [清单参考](../reference.md)
 
+实验性的 `@ui-sdk/core` 规则包通过项目的 TypeScript 编译器读取 `definePrimitive` 的状态对象形状和槽位 `present` 谓词。只有状态键经由 `usePrimitive` 选项连接到编译器可确认的 React 状态槽时，才会规划其结果。可解析的谓词子集是状态键本身、其否定，或与字符串、数字、布尔值、null 字面量的严格相等/不等比较。其他表达式保留在事实中并明确记录限制，不会猜测状态。如果受控状态未以这种方式连接，例如目前使用的 `createParts` JSX 简写，也会报告相应的规划限制。当前扫描读取项目源码中的 `definePrimitive` 对象字面量，不读取已安装 UI SDK 包中的实现体。UI SDK 尚无稳定主版本，因此其 `stacks.toml` 条目标记为实验性。[UI SDK 规则](../../rules/ui-sdk.json) · [基元检查](../../scripts/check-ui-sdk-primitives.mts)
+
 网页捕获取决于浏览器可以访问哪些页面。即使缺少模板语言的规则，Chromium 可以访问的页面也能出现在地图上。枚举隐藏路由、读取组件输入或根据类型规划状态，都需要相应的源码依据。需要登录或没有入站链接的页面可能需要提供会话或显式入口。[界面地图约定](web-viewer.md)
 
 ## 编译器与宿主要求

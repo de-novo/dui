@@ -1,0 +1,6 @@
+{
+  "tsconfig": "tsconfig.json",
+  "path": "/",
+  "widths": [390, 1440],
+  "readySelector": "[data-testid=lookup-fixture]"
+}

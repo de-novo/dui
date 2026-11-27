@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dui UI SDK primitive fixture</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #f8fafc;
+        color: #172033;
+      }
+      main {
+        box-sizing: border-box;
+        min-height: 100vh;
+        padding: 32px;
+      }
+      .lookup-panel {
+        display: grid;
+        align-content: start;
+        justify-items: start;
+        gap: 14px;
+        max-width: 620px;
+      }
+      .lookup-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      input {
+        min-width: 220px;
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #8290a5;
+        border-radius: 8px;
+        font: inherit;
+      }
+      button {
+        padding: 10px 14px;
+        border: 1px solid #315fde;
+        border-radius: 8px;
+        background: #315fde;
+        color: white;
+        font: inherit;
+      }
+      [data-slot="lookup-control-clear"] {
+        background: white;
+        color: #315fde;
+      }
+      [data-slot="lookup-control-popup"] {
+        max-width: 560px;
+        padding: 18px;
+        border: 1px solid #94a3b8;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 10px 30px rgb(15 23 42 / 18%);
+      }
+      .results {
+        margin: 0;
+        color: #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.tsx"></script>
+  </body>
+</html>

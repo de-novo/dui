@@ -83,10 +83,63 @@ fn truthy_representatives(shape: &Value) -> Vec<Value> {
     out
 }
 
+fn push_unique(values: &mut Vec<Value>, value: Value) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+fn primitive_planning_values(slot: &Value) -> Option<Vec<Value>> {
+    let entries = slot["primitive"]["presence"].as_array()?;
+    if entries.is_empty() {
+        return None;
+    }
+    let declared = &slot["primitive"]["stateShape"];
+    let shape = if declared["kind"]
+        .as_str()
+        .is_some_and(|kind| kind != "unknown")
+    {
+        declared
+    } else {
+        &slot["shape"]
+    };
+    let representatives = representatives(shape);
+    let truthy = truthy_representatives(shape);
+    let mut values = Vec::new();
+    for entry in entries {
+        let predicate = &entry["predicate"];
+        let keyless = predicate["key"].as_str().is_none();
+        if keyless {
+            continue;
+        }
+        match predicate["operator"].as_str() {
+            Some("truthy" | "falsy") => {
+                for value in &truthy {
+                    push_unique(&mut values, value.clone());
+                }
+            }
+            Some("eq" | "neq") => {
+                let literal = predicate["value"].clone();
+                push_unique(&mut values, literal.clone());
+                if let Some(other) = representatives.iter().find(|value| **value != literal) {
+                    push_unique(&mut values, other.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    Some(values)
+}
+
 fn slot_values_for_planning(
     slot: &Value,
     predicate_ops: &BTreeMap<(String, u64), BTreeSet<String>>,
 ) -> Vec<Value> {
+    if let Some(values) = primitive_planning_values(slot)
+        && !values.is_empty()
+    {
+        return values;
+    }
     let shape = &slot["shape"];
     if !is_unbounded_primitive(shape) {
         return representatives(shape);
@@ -445,6 +498,30 @@ pub fn graph(facts: &[Value], hits: &BTreeSet<String>) -> Value {
     json!({"nodes":nodes.into_values().collect::<Vec<_>>(),"edges":edges.into_iter().map(|(source,target,kind)|json!({"source":source,"target":target,"kind":kind})).collect::<Vec<_>>()})
 }
 
+fn json_truthy(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(v) => *v,
+        Value::Number(n) => n.as_f64().is_some_and(|v| v != 0.0),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    }
+}
+
+fn primitive_predicate_truth(predicate: &Value, value: &Value) -> Option<bool> {
+    match predicate["operator"].as_str() {
+        Some("truthy") => Some(json_truthy(value)),
+        Some("falsy") => Some(!json_truthy(value)),
+        Some("eq") => Some(value == &predicate["value"]),
+        Some("neq") => Some(value != &predicate["value"]),
+        _ => None,
+    }
+}
+
+fn css_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 // Bind simple predicates to the compiler-discovered slot in the same declaration.
 pub fn assertions(facts: &[Value], row: &BTreeMap<String, Value>, spec: &Value) -> Value {
     let mut checks = Vec::new();
@@ -452,6 +529,30 @@ pub fn assertions(facts: &[Value], row: &BTreeMap<String, Value>, spec: &Value) 
         let Some(slot) = facts.iter().find(|f| f["kind"] == "slot" && key(f) == *id) else {
             continue;
         };
+        if let Some(entries) = slot["primitive"]["presence"].as_array() {
+            let primitive_name = slot["primitive"]["name"].as_str().unwrap_or_default();
+            for entry in entries {
+                let Some(truth) = primitive_predicate_truth(&entry["predicate"], value) else {
+                    continue;
+                };
+                let Some(slot_name) = entry["slot"].as_str() else {
+                    continue;
+                };
+                if primitive_name.is_empty() || slot_name.is_empty() {
+                    continue;
+                }
+                let data_slot = if slot_name == "root" {
+                    primitive_name.to_owned()
+                } else {
+                    format!("{primitive_name}-{slot_name}")
+                };
+                checks.push(json!({
+                    "slot": id,
+                    "selector": format!("[data-slot=\"{}\"]", css_string(&data_slot)),
+                    "present": truth,
+                }));
+            }
+        }
         let mut matching_branches: Vec<&Value> = facts
             .iter()
             .filter(|f| {
@@ -734,6 +835,55 @@ mod tests {
             planned.len() <= 18,
             "expected covering array compression <= 18 rows, got {}",
             planned.len()
+        );
+    }
+
+    #[test]
+    fn primitive_predicates_plan_exact_presence_witnesses_and_assert_data_slots() {
+        let mut value = slot(2, "Lookup");
+        value["shape"] = json!({"kind":"string"});
+        value["primitive"] = json!({
+            "name":"lookup-control",
+            "state":"value",
+            "presence":[{"slot":"clear","predicate":{"operator":"neq","key":"value","value":""}}]
+        });
+        let mut open = slot(20, "Lookup");
+        open["primitive"] = json!({
+            "name":"lookup-control",
+            "state":"open",
+            "presence":[{"slot":"popup","predicate":{"operator":"truthy","key":"open"}}]
+        });
+        let facts = vec![value.clone(), open.clone()];
+        let active: BTreeSet<String> = facts.iter().map(key).collect();
+        let rows = candidates(&facts, &active);
+        let (value_id, open_id) = (key(&value), key(&open));
+        for text in ["", "sample"] {
+            for visible in [false, true] {
+                assert!(
+                    rows.iter()
+                        .any(|row| row.get(&value_id) == Some(&json!(text))
+                            && row.get(&open_id) == Some(&json!(visible))),
+                    "missing primitive outcome value={text:?} open={visible}"
+                );
+            }
+        }
+        let row = BTreeMap::from([(value_id, json!("sample")), (open_id, json!(true))]);
+        let checks = assertions(&facts, &row, &json!({}));
+        assert!(
+            checks
+                .as_array()
+                .is_some_and(|checks| checks.iter().any(|check| {
+                    check["selector"] == json!("[data-slot=\"lookup-control-clear\"]")
+                        && check["present"] == json!(true)
+                }))
+        );
+        assert!(
+            checks
+                .as_array()
+                .is_some_and(|checks| checks.iter().any(|check| {
+                    check["selector"] == json!("[data-slot=\"lookup-control-popup\"]")
+                        && check["present"] == json!(true)
+                }))
         );
     }
 

@@ -52,6 +52,96 @@ assert.equal(row.children[1].unresolvedStyle[0].location.file, "src/Orders.modul
 assert.ok(orders.root.style.some((s: { from: { text: string } }) => s.from.text === "gap-4"));
 assert.equal(orders.root.children[0].style.at(-1).value.token, "src/theme.css#--color-brand");
 
+const queryProject = mkdtempSync(join(tmpdir(), "dui-query-view-"));
+try {
+  mkdirSync(join(queryProject, "src"));
+  const entrySource = `import { lazy } from "react";
+const DiffView = lazy(() => import("./DiffView").then((m) => ({ default: m.DiffView })));
+function Viewer() {
+  const params = new URLSearchParams(location.search);
+  const isDiff = params.get("view") === "diff";
+  function showDiff() { history.pushState(null, "", "?view=diff"); }
+  return <main>
+    <a href="?view=model">Model</a>
+    <button onClick={showDiff}>Diff</button>
+    {isDiff && document.readyState === "complete" ? <DiffView /> : <p>Overview</p>}
+  </main>;
+}
+if (new URLSearchParams(location.search).get("view") === "model") {
+  const { ModelView } = await import("./ModelView");
+  root.render(<ModelView />);
+} else {
+  root.render(<Viewer />);
+}`;
+  writeFileSync(join(queryProject, "src/preview.tsx"), entrySource);
+  writeFileSync(
+    join(queryProject, "src/ModelView.tsx"),
+    `export function ModelView() { return <main><a href="?">Map</a></main>; }`,
+  );
+  writeFileSync(
+    join(queryProject, "src/DiffView.tsx"),
+    `export function DiffView() { return <main>Diff</main>; }`,
+  );
+  const mapOutput = execFileSync(cli, ["map", queryProject, "--entry", "src/preview.tsx"], {
+    encoding: "utf8",
+    env: { ...process.env, HOME: join(queryProject, "home"), PATH: "", DUI_CHROMIUM: "/absent" },
+  });
+  const mapBody = JSON.parse(mapOutput);
+  assert.equal(mapBody.screenDiscovery.declared, 3, JSON.stringify(mapBody.screenDiscovery));
+  assert.equal(
+    mapBody.screenDiscovery.resolvedRelations,
+    2,
+    JSON.stringify(mapBody.screenDiscovery),
+  );
+  const graph = JSON.parse(readFileSync(join(mapBody.output, "graph.json"), "utf8"));
+  assert.deepEqual(graph.nodes.map((n: { label: string }) => n.label).sort(), [
+    "/",
+    "/?view=diff",
+    "/?view=model",
+  ]);
+  assert.deepEqual(
+    graph.edges.map((e: { source: string; target: string }) => [e.source, e.target]).sort(),
+    [
+      ["route:/", "route:/?view=model"],
+      ["route:/?view=model", "route:/"],
+    ],
+  );
+  const queryModel = JSON.parse(extract(queryProject, "src/preview.tsx"));
+  assert.ok(
+    queryModel.edges.every(
+      (edge: { to: { kind: string; screen?: string }; kind: string }) =>
+        edge.kind !== "navigate" &&
+        !(edge.to.kind === "screen" && edge.to.screen === "route:/?view=diff"),
+    ),
+    "runtime pushState must not become a source-proven diff navigation edge",
+  );
+
+  writeFileSync(
+    join(queryProject, "src/preview.tsx"),
+    entrySource.replace('href="?view=model"', 'href="?view=other"'),
+  );
+  const uncorroborated = JSON.parse(extract(queryProject, "src/preview.tsx"));
+  const other = uncorroborated.edges.find((edge: { location: { file: string } }) =>
+    edge.location.file.endsWith("preview.tsx"),
+  );
+  assert.equal(other.to.kind, "opaque", "query links without a matching view stay opaque");
+
+  writeFileSync(
+    join(queryProject, "src/preview.tsx"),
+    entrySource.replace(
+      "root.render(<ModelView />);",
+      "root.render(<><ModelView /><DiffView /></>);",
+    ),
+  );
+  const ambiguous = JSON.parse(extract(queryProject, "src/preview.tsx"));
+  assert.ok(
+    !ambiguous.screens?.some((screen: { route?: string }) => screen.route === "/?view=model"),
+    "a branch with two possible view components is not a source-proven query view",
+  );
+} finally {
+  rmSync(queryProject, { recursive: true, force: true });
+}
+
 const project = mkdtempSync(join(tmpdir(), "dui-tsx-"));
 try {
   writeFileSync(
