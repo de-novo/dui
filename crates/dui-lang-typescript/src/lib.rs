@@ -1,5 +1,6 @@
 //! Extract schema-v1 models from a TSX entry and its reachable static imports.
 mod render;
+mod routes;
 mod style;
 mod syntax;
 use dui_core::source_model as m;
@@ -380,6 +381,7 @@ pub fn extract_in_context(
             });
         }
     }
+    routes::discover(&files, &mut model);
     if model.screens.is_empty() {
         let candidates: Vec<_> = model
             .components

@@ -14,6 +14,8 @@ pub struct File {
     pub imports: BTreeSet<String>,
     // Local alias -> (module or relative file, exported name).
     pub bindings: BTreeMap<String, (String, String)>,
+    // Literal dynamic-import request -> relative file.
+    pub dynamic_imports: BTreeMap<String, String>,
 }
 pub fn children(n: Ast<'_>) -> Vec<Ast<'_>> {
     n.named_children(&mut n.walk())
@@ -100,22 +102,56 @@ impl File {
             .filter(|n| n.kind() == "export_statement")
             .find_map(|n| {
                 let default = n.children(&mut n.walk()).any(|c| c.kind() == "default");
-                if default != (name == "default") {
+                if let Some(decl) = field(n, "declaration") {
+                    if default != (name == "default") {
+                        return None;
+                    }
+                    let decls =
+                        if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration") {
+                            children(decl)
+                        } else {
+                            vec![decl]
+                        };
+                    return decls
+                        .into_iter()
+                        .filter_map(|d| self.name(d, "name"))
+                        .find(|s| default || *s == name);
+                }
+                if default {
+                    if name != "default" {
+                        return None;
+                    }
+                    return field(n, "value")
+                        .or_else(|| children(n).into_iter().find(|c| c.kind() == "identifier"))
+                        .filter(|v| v.kind() == "identifier")
+                        .map(|v| self.text(v));
+                }
+                if field(n, "source").is_some() {
                     return None;
                 }
-                let decl = field(n, "declaration")?;
-                let decls = if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration")
-                {
-                    children(decl)
-                } else {
-                    vec![decl]
-                };
-                decls
+                children(n)
                     .into_iter()
-                    .filter_map(|d| self.name(d, "name"))
-                    .find(|s| default || *s == name)
+                    .find(|c| c.kind() == "export_clause")
+                    .and_then(|clause| {
+                        children(clause).into_iter().find_map(|spec| {
+                            if spec.kind() != "export_specifier" {
+                                return None;
+                            }
+                            let local_node = field(spec, "name")?;
+                            let exported = field(spec, "alias")
+                                .map(|alias| export_text(self.text(alias)))
+                                .unwrap_or_else(|| export_text(self.text(local_node)));
+                            (exported == name).then(|| export_text(self.text(local_node)))
+                        })
+                    })
             })
     }
+}
+fn export_text(text: &str) -> &str {
+    text.strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .or_else(|| text.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
+        .unwrap_or(text)
 }
 fn relative(root: &Path, path: &Path) -> Option<String> {
     let full = path.canonicalize().ok()?;
@@ -129,8 +165,71 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
             .replace(std::path::MAIN_SEPARATOR, "/"),
     )
 }
-fn resolve(root: &Path, from: &str, request: &str) -> Option<String> {
-    let path = root.join(Path::new(from).parent()?).join(request);
+struct Alias {
+    pattern: String,
+    replacements: Vec<PathBuf>,
+}
+
+fn path_aliases(root: &Path) -> Vec<Alias> {
+    let Ok(text) = fs::read_to_string(root.join("tsconfig.json"))
+        .or_else(|_| fs::read_to_string(root.join("jsconfig.json")))
+    else {
+        return Vec::new();
+    };
+    let Ok(config) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return Vec::new();
+    };
+    let Some(options) = config.get("compilerOptions") else {
+        return Vec::new();
+    };
+    let base = root.join(
+        options
+            .get("baseUrl")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("."),
+    );
+    let Some(paths) = options.get("paths").and_then(serde_json::Value::as_object) else {
+        return Vec::new();
+    };
+    paths
+        .iter()
+        .filter_map(|(pattern, targets)| {
+            let targets: Vec<PathBuf> = targets
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .map(|target| base.join(target))
+                .collect();
+            (!targets.is_empty()).then(|| Alias {
+                pattern: pattern.clone(),
+                replacements: targets,
+            })
+        })
+        .collect()
+}
+
+fn alias_match<'a>(pattern: &str, request: &'a str) -> Option<&'a str> {
+    if let Some((prefix, suffix)) = pattern.split_once('*') {
+        if request.len() >= prefix.len() + suffix.len()
+            && request.starts_with(prefix)
+            && request.ends_with(suffix)
+        {
+            return Some(&request[prefix.len()..request.len() - suffix.len()]);
+        }
+        None
+    } else {
+        (pattern == request).then_some("")
+    }
+}
+
+fn uses_alias(request: &str, aliases: &[Alias]) -> bool {
+    aliases
+        .iter()
+        .any(|alias| alias_match(&alias.pattern, request).is_some())
+}
+
+fn module_candidates(path: PathBuf) -> Vec<PathBuf> {
     let mut paths = vec![path.clone()];
     if path.extension().is_none() {
         for ext in ["ts", "tsx"] {
@@ -141,7 +240,30 @@ fn resolve(root: &Path, from: &str, request: &str) -> Option<String> {
         }
     }
     paths
+}
+
+fn resolve(root: &Path, from: &str, request: &str, aliases: &[Alias]) -> Option<String> {
+    let mut bases = Vec::new();
+    if request.starts_with('.') {
+        bases.push(root.join(Path::new(from).parent()?).join(request));
+    } else {
+        for alias in aliases {
+            let Some(matched) = alias_match(&alias.pattern, request) else {
+                continue;
+            };
+            bases.extend(alias.replacements.iter().map(|target| {
+                let text = target.to_string_lossy();
+                if text.contains('*') {
+                    PathBuf::from(text.replacen('*', matched, 1))
+                } else {
+                    target.clone()
+                }
+            }));
+        }
+    }
+    bases
         .into_iter()
+        .flat_map(module_candidates)
         .filter(|p| {
             matches!(
                 p.extension().and_then(|x| x.to_str()),
@@ -163,6 +285,7 @@ pub fn load(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<Sources, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let aliases = path_aliases(&root);
     let entry = relative(&root, &root.join(entry))
         .filter(|p| p.ends_with(".tsx"))
         .ok_or("expected a TSX entry file inside PROJECT")?;
@@ -204,6 +327,7 @@ pub fn load(
             tree,
             imports: BTreeSet::new(),
             bindings: BTreeMap::new(),
+            dynamic_imports: BTreeMap::new(),
         };
         if file.tree.root_node().has_error() {
             diagnostics.push(Diagnostic {
@@ -224,8 +348,8 @@ pub fn load(
                 continue;
             };
             let mut module = request.to_owned();
-            if request.starts_with('.') {
-                if let Some(resolved) = resolve(&root, &path, request) {
+            if request.starts_with('.') || uses_alias(request, &aliases) {
+                if let Some(resolved) = resolve(&root, &path, request, &aliases) {
                     module = resolved;
                     if module != path && file.imports.insert(module.clone()) {
                         pending.push(module.clone());
@@ -264,6 +388,32 @@ pub fn load(
             for (alias, name) in bindings {
                 file.bindings.insert(alias, (module.clone(), name));
             }
+        }
+        let mut pending_nodes = vec![file.tree.root_node()];
+        while let Some(node) = pending_nodes.pop() {
+            if node.kind() == "call_expression"
+                && field(node, "function").is_some_and(|f| f.kind() == "import")
+                && let Some(argument) = field(node, "arguments").and_then(first)
+                && argument.kind() == "string"
+            {
+                let raw = file.text(argument);
+                if let Some(request) = raw.get(1..raw.len().saturating_sub(1)) {
+                    if let Some(resolved) = resolve(&root, &path, request, &aliases) {
+                        file.dynamic_imports
+                            .insert(request.to_owned(), resolved.clone());
+                        if resolved != path && file.imports.insert(resolved.clone()) {
+                            pending.push(resolved);
+                        }
+                    } else if request.starts_with('.') || uses_alias(request, &aliases) {
+                        diagnostics.push(Diagnostic {
+                            code: "unresolved-import".into(),
+                            message: request.into(),
+                            location: Some(file.loc(argument)),
+                        });
+                    }
+                }
+            }
+            pending_nodes.extend(children(node));
         }
         files.insert(path, file);
     }
