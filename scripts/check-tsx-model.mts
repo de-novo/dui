@@ -743,6 +743,9 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     `
     main {display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
     @media(max-width:680px){ main {grid-template-columns:minmax(0,1fr)} }
+    main {border:2px dashed #aabbcc;border-bottom:4px solid #112233;backdrop-filter:blur(14px);
+      background:color-mix(in srgb,#112233 82%,transparent);border-collapse:collapse;text-transform:uppercase;
+      vertical-align:top;text-align:left;white-space:pre-wrap}
     main {gap:8px 10px;column-gap:12px;padding:4px min(10px,1vw);padding-block:12px 18px;font-family:system-ui,sans-serif;text-decoration:none}
     div.card { flex:2 0 40%; order:-2; overflow-x:auto; font-size:clamp(30px,5vw,48px) }
   `,
@@ -757,6 +760,25 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
         ? { kind: "keyword", value: "single" }
         : { kind: "length", value: 300, unit: "px" },
     );
+    for (const [name, value] of Object.entries({
+      borderTopStyle: "dashed",
+      borderBottomStyle: "solid",
+      borderCollapse: "collapse",
+      textTransform: "uppercase",
+      verticalAlign: "top",
+      textAlign: "left",
+      whiteSpace: "pre-wrap",
+    })) {
+      assert.deepEqual(prop(root.style, name), { kind: "keyword", value });
+    }
+    assert.deepEqual(prop(root.style, "background"), { kind: "color", value: "#112233d1" });
+    assert.deepEqual(prop(root.style, "backdropBlur"), { kind: "length", value: 14, unit: "px" });
+    assert.deepEqual(prop(root.style, "borderBottomWidth"), {
+      kind: "length",
+      value: 4,
+      unit: "px",
+    });
+    assert.deepEqual(prop(root.style, "borderTopWidth"), { kind: "length", value: 2, unit: "px" });
     assert.deepEqual(prop(root.style, "paddingStart"), {
       kind: "length",
       value: width === 390 ? 3.9 : 10,
@@ -785,6 +807,23 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
       value: width === 390 ? 30 : 48,
       unit: "px",
     });
+  }
+  writeFileSync(
+    join(builtProject, "App.tsx"),
+    "export function App(){return <body><table><tbody><tr><td>First</td></tr><tr><td>Last</td></tr></tbody></table></body>}",
+  );
+  writeFileSync(
+    join(builtProject, bundle),
+    "td {border-bottom:1px solid #123456} tr:last-child td {border-bottom:0}",
+  );
+  const rows = readBuilt().components[0].root.children[0].children[0].children;
+  for (const [index, expected] of [1, 0].entries()) {
+    assert.equal(
+      rows[index].children[0].style.find(
+        (d: { property: string }) => d.property === "borderBottomWidth",
+      ).value.value,
+      expected,
+    );
   }
 } finally {
   rmSync(builtProject, { recursive: true, force: true });

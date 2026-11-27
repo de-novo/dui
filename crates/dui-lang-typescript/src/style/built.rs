@@ -8,6 +8,25 @@ use tree_sitter::Node as Ast;
 // Each supported property uses the same value parser as a source stylesheet.
 const DIRECT: &[(&str, P)] = &[
     ("order", P::Order),
+    ("text-align", P::TextAlign),
+    ("border-collapse", P::BorderCollapse),
+    ("vertical-align", P::VerticalAlign),
+    ("text-transform", P::TextTransform),
+    ("white-space", P::WhiteSpace),
+    ("backdrop-filter", P::BackdropBlur),
+    ("border-style", P::BorderStyle),
+    ("border-top-width", P::BorderTopWidth),
+    ("border-top-color", P::BorderTopColor),
+    ("border-top-style", P::BorderTopStyle),
+    ("border-right-width", P::BorderRightWidth),
+    ("border-right-color", P::BorderRightColor),
+    ("border-right-style", P::BorderRightStyle),
+    ("border-bottom-width", P::BorderBottomWidth),
+    ("border-bottom-color", P::BorderBottomColor),
+    ("border-bottom-style", P::BorderBottomStyle),
+    ("border-left-width", P::BorderLeftWidth),
+    ("border-left-color", P::BorderLeftColor),
+    ("border-left-style", P::BorderLeftStyle),
     ("display", P::Display),
     ("grid-template-columns", P::GridColumnMinimum),
     ("overflow-x", P::OverflowX),
@@ -59,12 +78,118 @@ fn flex_basis(raw: &str) -> Option<V> {
     super::size_value(P::Width, raw).filter(|v| matches!(v, V::Length { .. }))
 }
 
+const BORDER_STYLES: &[&str] = &[
+    "none", "hidden", "dotted", "dashed", "solid", "double", "groove", "ridge", "inset", "outset",
+];
+const EDGES: &[(&str, [P; 3])] = &[
+    (
+        "border-top",
+        [P::BorderTopWidth, P::BorderTopColor, P::BorderTopStyle],
+    ),
+    (
+        "border-right",
+        [
+            P::BorderRightWidth,
+            P::BorderRightColor,
+            P::BorderRightStyle,
+        ],
+    ),
+    (
+        "border-bottom",
+        [
+            P::BorderBottomWidth,
+            P::BorderBottomColor,
+            P::BorderBottomStyle,
+        ],
+    ),
+    (
+        "border-left",
+        [P::BorderLeftWidth, P::BorderLeftColor, P::BorderLeftStyle],
+    ),
+];
+fn edge_properties(name: &str) -> Option<Vec<P>> {
+    let general = [P::BorderWidth, P::BorderColor, P::BorderStyle];
+    let part = match name {
+        "border" => None,
+        "border-width" => Some(0),
+        "border-color" => Some(1),
+        "border-style" => Some(2),
+        _ => {
+            for (side, props) in EDGES {
+                if name == *side {
+                    return Some(general.into_iter().chain(*props).collect());
+                }
+                if let Some(suffix) = name.strip_prefix(side) {
+                    let i = match suffix {
+                        "-width" => 0,
+                        "-color" => 1,
+                        "-style" => 2,
+                        _ => continue,
+                    };
+                    return Some(vec![general[i], props[i]]);
+                }
+            }
+            return None;
+        }
+    };
+    Some(match part {
+        None => general
+            .into_iter()
+            .chain(EDGES.iter().flat_map(|(_, props)| *props))
+            .collect(),
+        Some(i) => std::iter::once(general[i])
+            .chain(EDGES.iter().map(|(_, props)| props[i]))
+            .collect(),
+    })
+}
+
+fn alpha_mix(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<V> {
+    let mut args = raw
+        .strip_prefix("color-mix(")?
+        .strip_suffix(')')?
+        .split(',')
+        .map(str::trim);
+    if args.next()? != "in srgb" {
+        return None;
+    }
+    let (base, weight) = args.next()?.rsplit_once(' ')?;
+    if args.next()? != "transparent" || args.next().is_some() {
+        return None;
+    }
+    let fraction = weight.strip_suffix('%')?.parse::<f64>().ok()? / 100.;
+    if !(0.0..=1.0).contains(&fraction) {
+        return None;
+    }
+    let base = if let Some(key) = base.strip_prefix("var(").and_then(|v| v.strip_suffix(')')) {
+        vars.get(key)?.as_ref()?
+    } else {
+        base
+    };
+    let V::Color { value } = super::color(base)? else {
+        return None;
+    };
+    let alpha = if value.len() == 9 {
+        u8::from_str_radix(&value[7..], 16).ok()?
+    } else {
+        255
+    };
+    Some(V::Color {
+        value: format!(
+            "{}{:02x}",
+            &value[..7],
+            (f64::from(alpha) * fraction).round() as u8
+        ),
+    })
+}
 fn affected(name: &str) -> Vec<P> {
     match name {
         "gap" | "grid-gap" => return vec![P::Gap, P::RowGap, P::ColumnGap],
         "row-gap" | "grid-row-gap" => return vec![P::Gap, P::RowGap],
         "column-gap" | "grid-column-gap" => return vec![P::Gap, P::ColumnGap],
         _ => {}
+    }
+    if let Some(edges) = edge_properties(name) {
+        return edges;
     }
     if let Some(props) = spacing(name) {
         return props.to_vec();
@@ -681,11 +806,77 @@ impl<'a> Sheet<'a> {
             };
             return modules::declaration(name, value).map(|(_, v)| v);
         }
-        if rule.name == "border" {
+        if property == P::BackdropBlur {
+            return super::size_value(
+                P::BorderWidth,
+                raw.strip_prefix("blur(")?.strip_suffix(')')?,
+            );
+        }
+        if matches!(property, P::Background | P::Color) && raw.starts_with("color-mix(") {
+            return alpha_mix(raw, vars);
+        }
+        let keywords: &[&str] = match property {
+            P::BorderCollapse => &["collapse", "separate"],
+            P::VerticalAlign => &[
+                "baseline",
+                "top",
+                "middle",
+                "bottom",
+                "text-top",
+                "text-bottom",
+                "sub",
+                "super",
+            ],
+            P::TextTransform => &["none", "uppercase", "lowercase", "capitalize"],
+            P::WhiteSpace => &[
+                "normal",
+                "pre",
+                "nowrap",
+                "pre-wrap",
+                "pre-line",
+                "break-spaces",
+            ],
+            P::TextAlign => &["start", "end", "left", "right", "center", "justify"],
+            _ => &[],
+        };
+        if !keywords.is_empty() {
+            return keywords
+                .contains(&raw)
+                .then(|| V::Keyword { value: raw.into() });
+        }
+        if edge_properties(rule.name).is_some() {
+            let general = [P::BorderWidth, P::BorderColor, P::BorderStyle];
+            let role = general.iter().position(|p| *p == property).or_else(|| {
+                EDGES
+                    .iter()
+                    .find_map(|(_, props)| props.iter().position(|p| *p == property))
+            })?;
+            if general.contains(&property)
+                && EDGES.iter().any(|(side, _)| rule.name.starts_with(side))
+            {
+                return None;
+            }
+            if rule.name.ends_with("-width") {
+                return super::size_value(P::BorderWidth, raw);
+            }
+            if rule.name.ends_with("-color") {
+                return super::color(raw).or_else(|| alpha_mix(raw, vars));
+            }
+            if rule.name.ends_with("-style") {
+                return BORDER_STYLES
+                    .contains(&raw)
+                    .then(|| V::Keyword { value: raw.into() });
+            }
+
             let mut width = None;
-            let mut color = None;
             let mut style = None;
-            for word in raw.split_ascii_whitespace() {
+            let (prefix, mix) = if let Some((prefix, mix)) = raw.split_once("color-mix(") {
+                (prefix, Some(alpha_mix(&format!("color-mix({mix}"), vars)?))
+            } else {
+                (raw, None)
+            };
+            let mut color = mix;
+            for word in prefix.split_ascii_whitespace() {
                 let word = if let Some(name) =
                     word.strip_prefix("var(").and_then(|s| s.strip_suffix(')'))
                 {
@@ -720,10 +911,12 @@ impl<'a> Sheet<'a> {
                     }
                 }
             }
-            return if property == P::BorderColor {
-                color
-            } else {
-                width
+            return match role {
+                0 => width,
+                1 => color,
+                _ => Some(V::Keyword {
+                    value: style.unwrap_or("none").into(),
+                }),
             };
         }
         let name = match rule.name {
@@ -866,6 +1059,17 @@ impl<'a> Sheet<'a> {
         {
             return;
         }
+        if let Some(i) = EDGES
+            .iter()
+            .find_map(|(_, props)| props.iter().position(|p| *p == property))
+            && !unknown.is_some_and(|r| r.important)
+            && el.style.iter().any(|d| {
+                d.from.syntax == m::StyleSyntax::Inline
+                    && d.property == [P::BorderWidth, P::BorderColor, P::BorderStyle][i]
+            })
+        {
+            return;
+        }
         let Some(rule) = unknown.or(best) else { return };
         el.style.retain(|d| d.property != property);
         let opaque_inline = el
@@ -916,6 +1120,38 @@ fn simple_selector_weight(sel: &str) -> Option<u32> {
         })
 }
 
+// Unknown siblings (expressions, fragments or component instances) may emit elements.
+fn edge_child(file: &File, node: Ast<'_>, first_child: bool) -> Option<bool> {
+    let parent = node.parent()?.child_by_field_name("open_tag")?;
+    if !file
+        .text(parent.child_by_field_name("name")?)
+        .starts_with(|c: char| c.is_ascii_lowercase())
+    {
+        return None;
+    }
+    let sibling = if first_child {
+        Ast::prev_named_sibling
+    } else {
+        Ast::next_named_sibling
+    };
+    let mut current = sibling(&node);
+    while let Some(next) = current {
+        match next.kind() {
+            "jsx_text" | "jsx_opening_element" | "jsx_closing_element" => {}
+            "jsx_element" | "jsx_self_closing_element" => {
+                let tag = next.child_by_field_name("open_tag").unwrap_or(next);
+                let name = file.text(tag.child_by_field_name("name")?);
+                return name
+                    .starts_with(|c: char| c.is_ascii_lowercase())
+                    .then_some(false);
+            }
+            _ => return None,
+        }
+        current = sibling(&next);
+    }
+    Some(true)
+}
+
 // Walk only intrinsic JSX ancestors. A component or expression boundary can add
 // wrappers, so failure to prove a match beyond that boundary stays unknown.
 fn contextual_specificity(
@@ -941,6 +1177,13 @@ fn contextual_specificity(
     let target_weight = match specificity(target, classes, el)? {
         Some(w) => w,
         None => return Some(None),
+    };
+    let (ancestor, edge) = if let Some(tag) = ancestor.strip_suffix(":last-child") {
+        (tag, Some(false))
+    } else if let Some(tag) = ancestor.strip_suffix(":first-child") {
+        (tag, Some(true))
+    } else {
+        (ancestor, None)
     };
     let class = ancestor.strip_prefix('.');
     if !ident(class.unwrap_or(ancestor)) {
@@ -977,10 +1220,19 @@ fn contextual_specificity(
         } else {
             name.eq_ignore_ascii_case(ancestor)
         };
-        if matched {
-            return Some(Some(target_weight + if class.is_some() { 1024 } else { 1 }));
+        if matched
+            && match edge {
+                Some(first) => edge_child(file, parent, first)?,
+                None => true,
+            }
+        {
+            return Some(Some(
+                target_weight
+                    + if class.is_some() { 1024 } else { 1 }
+                    + if edge.is_some() { 1024 } else { 0 },
+            ));
         }
-        if direct {
+        if direct || (name == "body" && class.is_none() && ancestor != "html") {
             return Some(None);
         }
         parent = parent.parent()?;
