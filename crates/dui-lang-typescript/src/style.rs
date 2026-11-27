@@ -59,6 +59,7 @@ fn size_property(name: &str) -> Option<P> {
     Some(match name {
         "width" => P::Width,
         "height" => P::Height,
+        "border-width" => P::BorderWidth,
         "min-width" => P::MinWidth,
         "max-width" => P::MaxWidth,
         "min-height" => P::MinHeight,
@@ -68,6 +69,9 @@ fn size_property(name: &str) -> Option<P> {
 }
 fn size_value(property: P, raw: &str) -> Option<V> {
     let raw = raw.trim();
+    if property == P::BorderWidth {
+        return uniform_length(raw, 4, false);
+    }
     if raw.eq_ignore_ascii_case("auto") && !matches!(property, P::MaxWidth | P::MaxHeight) {
         return Some(V::Keyword {
             value: "auto".into(),
@@ -89,9 +93,8 @@ fn grow_factor(raw: &str) -> Option<V> {
         .map(|value| V::Number { value })
 }
 
-// Schema v1 has a single gap. A two-axis CSS shorthand fits only when the
-// specified lengths agree; comparing resolved pixels would depend on layout.
-fn uniform_gap(raw: &str) -> Option<V> {
+// A scalar model property can preserve shorthand only if all sides agree.
+fn uniform_length(raw: &str, max_values: usize, allow_percent: bool) -> Option<V> {
     let parse = |word: &str| {
         if word.parse::<f64>().ok() == Some(0.) {
             return Some(V::Length {
@@ -99,16 +102,23 @@ fn uniform_gap(raw: &str) -> Option<V> {
                 unit: m::LengthUnit::Px,
             });
         }
-        length(word).filter(|v| matches!(v,V::Length{value,..} if *value>=0.))
+        length(word).filter(|v| {
+            matches!(v, V::Length { value, unit }
+            if *value >= 0. && (allow_percent || *unit != m::LengthUnit::Percent))
+        })
     };
     let mut words = raw.split_ascii_whitespace();
-    let row = parse(words.next()?)?;
-    if let Some(column) = words.next()
-        && (parse(column)? != row || words.next().is_some())
-    {
-        return None;
+    let first = parse(words.next()?)?;
+    for (index, word) in words.enumerate() {
+        if index + 1 >= max_values || parse(word)? != first {
+            return None;
+        }
     }
-    Some(row)
+    Some(first)
+}
+
+fn uniform_gap(raw: &str) -> Option<V> {
+    uniform_length(raw, 2, true)
 }
 
 pub fn theme(f: &File) -> Vec<m::Token> {
