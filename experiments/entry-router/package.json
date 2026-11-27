@@ -1,0 +1,9 @@
+{
+  "name": "dui-entry-router-probe",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "oxc-parser": "0.160.0",
+    "oxc-resolver": "11.24.2"
+  }
+}
