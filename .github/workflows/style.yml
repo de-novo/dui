@@ -44,6 +44,13 @@ jobs:
       - run: npm run check:style
       - name: Validate the versioned source model
         run: npm run check:source-model
+      - name: Keep source model v1 changes additive
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          SOURCE_MODEL_BASE=FETCH_HEAD npm run check:source-model-additive
       - name: Keep the source model reader building for wasm
         run: |
           rustup target add wasm32-unknown-unknown

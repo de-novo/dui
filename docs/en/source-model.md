@@ -192,7 +192,7 @@ The JSON Schema checks shapes, enums, patterns and required fields. The Rust rea
 
 `npm run check:source-model` validates the reference against the schema, checks that bad shapes are rejected, and runs the reader's tests. Those tests also check that every reference location points at the fixture source and that the file digests match.
 
-Version 1 is frozen. Any change to fields, kinds or meaning creates `schemaVersion` 2 with a new schema file. The version 1 file and reader do not change. Readers reject versions they do not know.
+Version 1 changes only by addition. A new optional field, a new style property, a new enum value or a new node kind that older readers can ignore stays in version 1. Removing or renaming a field, enum value or kind, making an optional field required, or changing what an existing value means creates `schemaVersion` 2 with a new schema file; the version 1 file and reader then stop changing. `npm run check:source-model-additive` compares the version 1 schema with the pull request's base and fails on any removal or rename. Readers reject versions they do not know.
 
 ## 10. Drawing the model
 
