@@ -576,6 +576,18 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
                 color(val.as_str()?)?,
             ));
         }
+        "order" => {
+            let n = val
+                .as_i64()
+                .and_then(|n| i32::try_from(n).ok())
+                .or_else(|| val.as_str()?.trim().parse::<i32>().ok())?;
+            return Some((
+                vec![P::Order],
+                V::Number {
+                    value: f64::from(n),
+                },
+            ));
+        }
         "fontWeight" | "opacity" => {
             return Some((
                 vec![if name == "opacity" {

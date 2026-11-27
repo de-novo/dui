@@ -367,6 +367,7 @@ pub enum StyleProperty {
     // Layout
     Display,
     GridColumnMinimum,
+    Order,
     OverflowX,
     Direction,
     AlignItems,

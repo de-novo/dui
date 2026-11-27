@@ -7,6 +7,7 @@ use tree_sitter::Node as Ast;
 
 // Each supported property uses the same value parser as a source stylesheet.
 const DIRECT: &[(&str, P)] = &[
+    ("order", P::Order),
     ("display", P::Display),
     ("grid-template-columns", P::GridColumnMinimum),
     ("overflow-x", P::OverflowX),

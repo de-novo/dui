@@ -743,7 +743,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     `
     main {display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
     @media(max-width:680px){ main {grid-template-columns:minmax(0,1fr)} }
-    div.card { overflow-x:auto; font-size:clamp(30px,5vw,48px) }
+    div.card { order:-2; overflow-x:auto; font-size:clamp(30px,5vw,48px) }
   `,
   );
   for (const width of [390, 1440]) {
@@ -756,6 +756,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
         ? { kind: "keyword", value: "single" }
         : { kind: "length", value: 300, unit: "px" },
     );
+    assert.deepEqual(prop(root.children[0].style, "order"), { kind: "number", value: -2 });
     assert.deepEqual(prop(root.children[0].style, "overflowX"), { kind: "keyword", value: "auto" });
     assert.deepEqual(prop(root.children[0].style, "fontSize"), {
       kind: "length",

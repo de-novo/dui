@@ -240,6 +240,12 @@ pub(super) fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
                     .filter(|v| (1.0..=1000.0).contains(v))
                     .map(|value| V::Number { value }),
             ),
+            "order" => (
+                vec![P::Order],
+                raw.trim().parse::<i32>().ok().map(|n| V::Number {
+                    value: f64::from(n),
+                }),
+            ),
             "letter-spacing" => (vec![P::LetterSpacing], super::letter_spacing(raw)),
             "line-height" => (vec![P::LineHeight], super::line_height(raw)),
             "gap" => (vec![P::Gap], super::uniform_gap(raw)),

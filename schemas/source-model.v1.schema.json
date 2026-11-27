@@ -301,6 +301,7 @@
       "enum": [
         "display",
         "gridColumnMinimum",
+        "order",
         "overflowX",
         "direction",
         "alignItems",

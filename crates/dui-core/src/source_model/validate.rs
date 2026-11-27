@@ -662,7 +662,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
             ]),
         ),
         P::Wrap => (false, false, false, Some(&["wrap", "nowrap"])),
-        P::Grow | P::Opacity | P::FontWeight => (false, true, false, Some(&[])),
+        P::Order | P::Grow | P::Opacity | P::FontWeight => (false, true, false, Some(&[])),
         P::Gap
         | P::PaddingTop
         | P::PaddingBottom
@@ -691,7 +691,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
     };
     match value {
         StyleValue::Length { .. } => length,
-        StyleValue::Number { .. } => number,
+        StyleValue::Number { value } => number && (property != P::Order || value.fract() == 0.0),
         StyleValue::Color { .. } => color,
         StyleValue::Keyword { value } => {
             keywords.is_none_or(|allowed| allowed.contains(&value.as_str()))
