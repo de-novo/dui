@@ -1,0 +1,30 @@
+.track {
+  display: block;
+  width: 120px;
+  height: 32px;
+  margin: 12px;
+  background: #135c52;
+  color: white;
+  font: 14px/32px sans-serif;
+}
+.move {
+  transform: translateX(0px);
+  transition: transform 1s linear;
+}
+.move:hover {
+  transform: translateX(96px);
+}
+.pulse {
+  animation: slide 1s linear both;
+}
+@keyframes slide {
+  0% {
+    transform: translateX(0px);
+  }
+  50% {
+    transform: translateX(112px);
+  }
+  100% {
+    transform: translateX(48px);
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "tracks": [
+    {
+      "target": "App.tsx#Probe@0.0",
+      "trigger": "hover-enter",
+      "durationMs": 1000,
+      "timing": "linear",
+      "fill": "transition-state",
+      "property": "translateX",
+      "unit": "px",
+      "frames": [
+        {
+          "offset": 0,
+          "x": 0
+        },
+        {
+          "offset": 1,
+          "x": 96
+        }
+      ],
+      "tsxSpan": [
+        91,
+        113
+      ],
+      "cssSpans": [
+        [
+          0,
+          145
+        ],
+        [
+          146,
+          220
+        ],
+        [
+          221,
+          267
+        ]
+      ]
+    },
+    {
+      "target": "App.tsx#Probe@0.1",
+      "trigger": "mount",
+      "durationMs": 1000,
+      "timing": "linear",
+      "fill": "both",
+      "property": "translateX",
+      "unit": "px",
+      "frames": [
+        {
+          "offset": 0,
+          "x": 0,
+          "cssSpan": [
+            335,
+            375
+          ]
+        },
+        {
+          "offset": 0.5,
+          "x": 112,
+          "cssSpan": [
+            378,
+            421
+          ]
+        },
+        {
+          "offset": 1,
+          "x": 48,
+          "cssSpan": [
+            424,
+            467
+          ]
+        }
+      ],
+      "tsxSpan": [
+        146,
+        169
+      ],
+      "cssSpans": [
+        [
+          0,
+          145
+        ],
+        [
+          268,
+          313
+        ]
+      ]
+    },
+    {
+      "target": "App.tsx#Probe@0.2",
+      "trigger": "mount",
+      "durationMs": 1000,
+      "timing": "linear",
+      "fill": "both",
+      "property": "translateX",
+      "unit": "px",
+      "frames": [
+        {
+          "offset": 0,
+          "x": 0,
+          "cssSpan": [
+            335,
+            375
+          ]
+        },
+        {
+          "offset": 0.5,
+          "x": 112,
+          "cssSpan": [
+            378,
+            421
+          ]
+        },
+        {
+          "offset": 1,
+          "x": 48,
+          "cssSpan": [
+            424,
+            467
+          ]
+        }
+      ],
+      "tsxSpan": [
+        201,
+        249
+      ],
+      "cssSpans": [
+        [
+          0,
+          145
+        ],
+        [
+          537,
+          609
+        ]
+      ]
+    }
+  ],
+  "unverified": [
+    {
+      "target": "App.tsx#Probe@0.3",
+      "reason": "runtime class expression",
+      "span": [
+        284,
+        303
+      ]
+    }
+  ]
+}
