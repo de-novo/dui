@@ -4,8 +4,11 @@ const { chromium } = require("playwright-core"),
 const fs = require("node:fs"),
   path = require("node:path");
 (async () => {
-  const [repo, modelFile, site, executablePath, out] = process.argv.slice(2);
+  const [repo, modelFile, site, executablePath, out, typographySheet] = process.argv.slice(2);
   const model = JSON.parse(fs.readFileSync(modelFile));
+  const prototype = require("./viewport-font.cjs");
+  const typography =
+    typographySheet && prototype.projectFont(fs.readFileSync(typographySheet, "utf8"));
   const renderer = path.join(repo, "apps/canvas/src/features/model/modelDocument.ts");
   const Frame = path.join(repo, "apps/canvas/src/features/model/ApproximateModelFrame.tsx");
   const moduleCode = `import React from 'react';import{createRoot}from'react-dom/client';import{drawModel,decodeModel}from '${renderer}';import{ApproximateModelFrame}from '${Frame}';export function draw(m,width){return drawModel(decodeModel(m),m.components.find(c=>c.name==='ModelView').id,{width})}export function mount(node,render){createRoot(node).render(React.createElement(ApproximateModelFrame,{render,label:'Approximate'}))}`;
@@ -46,7 +49,17 @@ const fs = require("node:fs"),
             if (!el) return null;
             const { x, y, width, height } = el.getBoundingClientRect();
             const cs = getComputedStyle(el);
-            return { selector, x, y, width, height, display: cs.display, font: cs.fontSize };
+            return {
+              selector,
+              x,
+              y,
+              width,
+              height,
+              display: cs.display,
+              font: cs.fontSize,
+              family: cs.fontFamily,
+              lineHeight: cs.lineHeight,
+            };
           });
         }, shadow);
       const reference = await read(false);
@@ -66,7 +79,7 @@ const fs = require("node:fs"),
       });
       await page.addScriptTag({ content: bundle });
       const result = await page.evaluate(({ model, width }) => probe.draw(model, width), {
-        model,
+        model: typography ? prototype.viewportModel(model, width, height) : model,
         width,
       });
       await page.evaluate(
@@ -78,6 +91,19 @@ const fs = require("node:fs"),
         { result },
       );
       await page.locator(".approximate-model-content").locator("main").waitFor();
+      const viewportOnly = await read(true);
+      if (typography)
+        await page.evaluate((t) => {
+          const root = document.querySelector(".approximate-model-content").shadowRoot;
+          const sheet = document.createElement("style");
+          sheet.textContent = ":host{" + t.root + "} .research-document-body{" + t.body + "}";
+          const main = root.querySelector("main"),
+            body = document.createElement("div");
+          body.className = "research-document-body";
+          main.before(body);
+          body.append(main);
+          root.append(sheet);
+        }, typography);
       const shadow = await read(true);
       await page.screenshot({ path: path.join(out, `real-${width}-shadow.png`) });
       await page.setContent(result.html);
@@ -104,6 +130,7 @@ const fs = require("node:fs"),
       data[width] = {
         reference,
         shadow,
+        viewportOnly,
         standalone,
         matches,
         transform,
