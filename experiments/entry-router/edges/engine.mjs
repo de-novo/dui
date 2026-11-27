@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import { parseSync, visitorKeys } from "oxc-parser";
 import { ResolverFactory } from "oxc-resolver";
 export const walk = (n, fn) => {
@@ -34,8 +33,7 @@ export function project(root) {
     const links = [],
       used = new Set(),
       imports = [],
-      exports = [],
-      parents = new Map();
+      exports = [];
     function resolve(s) {
       const f = resolver.resolveFileSync(file, s).path;
       return f && !f.includes("/node_modules/") && f.startsWith(root + "/") && /\.[jt]sx?$/.test(f)
