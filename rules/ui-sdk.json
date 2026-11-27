@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "package": "@ui-sdk/core",
+      "symbol": "definePrimitive",
+      "kind": "primitive"
+    }
+  ]
+}

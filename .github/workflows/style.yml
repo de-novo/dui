@@ -74,6 +74,7 @@ jobs:
       - run: npm ci --prefix apps/canvas
       - run: npm ci --prefix fixtures/replay
       - run: npm ci --prefix fixtures/toggle
+      - run: npm ci --prefix fixtures/ui-sdk-primitives
       - name: Inspect committed React instances, M1 gates, and i18n in Chrome
         run: |
           export DUI_CHROMIUM="$(command -v google-chrome)"
@@ -95,6 +96,7 @@ jobs:
           npm run check:design-audit
           npm run check:query-params
           npm run check:p2-rules
+          npm run check:ui-sdk-primitives
           npm run check:real-api
           npm run check:branch-diff
           npm run check:universal-web
