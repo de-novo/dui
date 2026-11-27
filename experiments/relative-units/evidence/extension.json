@@ -1,0 +1,28 @@
+{
+  "rootFont": {
+    "n": 62.5,
+    "unit": "%"
+  },
+  "widths": {
+    "App.tsx#App@0.4.0": {
+      "n": 20,
+      "unit": "vw"
+    },
+    "App.tsx#App@0.5.0": {
+      "clamp": [
+        {
+          "n": 60,
+          "unit": "px"
+        },
+        {
+          "n": 12,
+          "unit": "vw"
+        },
+        {
+          "n": 150,
+          "unit": "px"
+        }
+      ]
+    }
+  }
+}

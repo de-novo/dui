@@ -1,0 +1,36 @@
+html {
+  font-size: 62.5%;
+}
+.rem {
+  width: 8rem;
+}
+.parent {
+  font-size: 20px;
+}
+.nested {
+  font-size: 1.5em;
+}
+.em {
+  width: 3em;
+}
+.container {
+  width: 200px;
+}
+.percent {
+  width: 50%;
+}
+.padding {
+  padding: 10%;
+}
+.marker {
+  width: 20px;
+}
+.viewport {
+  width: 20vw;
+}
+.fluid {
+  width: clamp(60px, 12vw, 150px);
+}
+.inherited {
+  width: 4em;
+}

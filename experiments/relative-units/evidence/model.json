@@ -1,0 +1,936 @@
+{
+  "schemaVersion": 1,
+  "extractor": {
+    "name": "dui-lang-typescript",
+    "version": "0.2.0"
+  },
+  "files": [
+    {
+      "path": "App.tsx",
+      "language": "typescript",
+      "sha256": "c5f17f3014e3e7090168b33cba96f711d6eb89f2a21d0b19b84dceb0df48da84"
+    },
+    {
+      "path": "built.css",
+      "language": "css",
+      "sha256": "15f42227239130935ad339d6cd0071339facf08f412cbf693e2053768721fbe6"
+    }
+  ],
+  "screens": [
+    {
+      "id": "App.tsx#App",
+      "name": "App",
+      "component": "App.tsx#App",
+      "origin": "syntax",
+      "location": {
+        "file": "App.tsx",
+        "line": 1,
+        "column": 8,
+        "start": 7,
+        "end": 853
+      }
+    }
+  ],
+  "components": [
+    {
+      "id": "App.tsx#App",
+      "name": "App",
+      "location": {
+        "file": "App.tsx",
+        "line": 1,
+        "column": 8,
+        "start": 7,
+        "end": 853
+      },
+      "root": {
+        "kind": "element",
+        "id": "App.tsx#App@0",
+        "tag": "main",
+        "children": [
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.0",
+            "tag": "section",
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.0.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "width",
+                    "value": {
+                      "kind": "length",
+                      "value": 8,
+                      "unit": "rem"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "width: 8rem;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 5,
+                        "column": 3,
+                        "start": 38,
+                        "end": 50
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "rem",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 5,
+                      "column": 25,
+                      "start": 86,
+                      "end": 89
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 5,
+                  "column": 9,
+                  "start": 70,
+                  "end": 93
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 4,
+              "column": 7,
+              "start": 52,
+              "end": 110
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.1",
+            "tag": "section",
+            "style": [
+              {
+                "property": "fontSize",
+                "value": {
+                  "kind": "length",
+                  "value": 20,
+                  "unit": "px"
+                },
+                "from": {
+                  "syntax": "stylesheet",
+                  "text": "font-size: 20px;",
+                  "location": {
+                    "file": "built.css",
+                    "line": 8,
+                    "column": 3,
+                    "start": 65,
+                    "end": 81
+                  }
+                }
+              }
+            ],
+            "unresolvedStyle": [
+              {
+                "syntax": "class",
+                "text": "parent",
+                "reason": "Unsupported style syntax",
+                "location": {
+                  "file": "App.tsx",
+                  "line": 7,
+                  "column": 27,
+                  "start": 137,
+                  "end": 143
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.1.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "fontSize",
+                    "value": {
+                      "kind": "length",
+                      "value": 1.5,
+                      "unit": "em"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "font-size: 1.5em;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 11,
+                        "column": 3,
+                        "start": 96,
+                        "end": 113
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "nested",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 8,
+                      "column": 25,
+                      "start": 170,
+                      "end": 176
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "kind": "element",
+                    "id": "App.tsx#App@0.1.0.0",
+                    "tag": "div",
+                    "style": [
+                      {
+                        "property": "width",
+                        "value": {
+                          "kind": "length",
+                          "value": 3,
+                          "unit": "em"
+                        },
+                        "from": {
+                          "syntax": "stylesheet",
+                          "text": "width: 3em;",
+                          "location": {
+                            "file": "built.css",
+                            "line": 14,
+                            "column": 3,
+                            "start": 124,
+                            "end": 135
+                          }
+                        }
+                      }
+                    ],
+                    "unresolvedStyle": [
+                      {
+                        "syntax": "class",
+                        "text": "em",
+                        "reason": "Unsupported style syntax",
+                        "location": {
+                          "file": "App.tsx",
+                          "line": 9,
+                          "column": 27,
+                          "start": 205,
+                          "end": 207
+                        }
+                      }
+                    ],
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 9,
+                      "column": 11,
+                      "start": 189,
+                      "end": 211
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 8,
+                  "column": 9,
+                  "start": 154,
+                  "end": 226
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 7,
+              "column": 7,
+              "start": 117,
+              "end": 243
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.2",
+            "tag": "section",
+            "style": [
+              {
+                "property": "width",
+                "value": {
+                  "kind": "length",
+                  "value": 200,
+                  "unit": "px"
+                },
+                "from": {
+                  "syntax": "stylesheet",
+                  "text": "width: 200px;",
+                  "location": {
+                    "file": "built.css",
+                    "line": 17,
+                    "column": 3,
+                    "start": 153,
+                    "end": 166
+                  }
+                }
+              }
+            ],
+            "unresolvedStyle": [
+              {
+                "syntax": "class",
+                "text": "container",
+                "reason": "Unsupported style syntax",
+                "location": {
+                  "file": "App.tsx",
+                  "line": 12,
+                  "column": 27,
+                  "start": 270,
+                  "end": 279
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.2.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "width",
+                    "value": {
+                      "kind": "length",
+                      "value": 50,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "width: 50%;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 20,
+                        "column": 3,
+                        "start": 182,
+                        "end": 193
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "percent",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 13,
+                      "column": 25,
+                      "start": 306,
+                      "end": 313
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 13,
+                  "column": 9,
+                  "start": 290,
+                  "end": 317
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 12,
+              "column": 7,
+              "start": 250,
+              "end": 334
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.3",
+            "tag": "section",
+            "style": [
+              {
+                "property": "width",
+                "value": {
+                  "kind": "length",
+                  "value": 200,
+                  "unit": "px"
+                },
+                "from": {
+                  "syntax": "stylesheet",
+                  "text": "width: 200px;",
+                  "location": {
+                    "file": "built.css",
+                    "line": 17,
+                    "column": 3,
+                    "start": 153,
+                    "end": 166
+                  }
+                }
+              }
+            ],
+            "unresolvedStyle": [
+              {
+                "syntax": "class",
+                "text": "container",
+                "reason": "Unsupported style syntax",
+                "location": {
+                  "file": "App.tsx",
+                  "line": 15,
+                  "column": 27,
+                  "start": 361,
+                  "end": 370
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.3.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "paddingTop",
+                    "value": {
+                      "kind": "length",
+                      "value": 10,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "padding: 10%;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 23,
+                        "column": 3,
+                        "start": 209,
+                        "end": 222
+                      }
+                    }
+                  },
+                  {
+                    "property": "paddingBottom",
+                    "value": {
+                      "kind": "length",
+                      "value": 10,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "padding: 10%;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 23,
+                        "column": 3,
+                        "start": 209,
+                        "end": 222
+                      }
+                    }
+                  },
+                  {
+                    "property": "paddingStart",
+                    "value": {
+                      "kind": "length",
+                      "value": 10,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "padding: 10%;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 23,
+                        "column": 3,
+                        "start": 209,
+                        "end": 222
+                      }
+                    }
+                  },
+                  {
+                    "property": "paddingEnd",
+                    "value": {
+                      "kind": "length",
+                      "value": 10,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "padding: 10%;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 23,
+                        "column": 3,
+                        "start": 209,
+                        "end": 222
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "padding",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 16,
+                      "column": 25,
+                      "start": 397,
+                      "end": 404
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "kind": "element",
+                    "id": "App.tsx#App@0.3.0.0",
+                    "tag": "div",
+                    "style": [
+                      {
+                        "property": "width",
+                        "value": {
+                          "kind": "length",
+                          "value": 20,
+                          "unit": "px"
+                        },
+                        "from": {
+                          "syntax": "stylesheet",
+                          "text": "width: 20px;",
+                          "location": {
+                            "file": "built.css",
+                            "line": 26,
+                            "column": 3,
+                            "start": 237,
+                            "end": 249
+                          }
+                        }
+                      }
+                    ],
+                    "unresolvedStyle": [
+                      {
+                        "syntax": "class",
+                        "text": "marker",
+                        "reason": "Unsupported style syntax",
+                        "location": {
+                          "file": "App.tsx",
+                          "line": 17,
+                          "column": 27,
+                          "start": 433,
+                          "end": 439
+                        }
+                      }
+                    ],
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 17,
+                      "column": 11,
+                      "start": 417,
+                      "end": 443
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 16,
+                  "column": 9,
+                  "start": 381,
+                  "end": 458
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 15,
+              "column": 7,
+              "start": 341,
+              "end": 475
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.4",
+            "tag": "section",
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.4.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "width",
+                    "value": {
+                      "kind": "unresolved",
+                      "text": "20vw",
+                      "reason": "Unsupported CSS value"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "width: 20vw;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 29,
+                        "column": 3,
+                        "start": 266,
+                        "end": 278
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "viewport",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 21,
+                      "column": 25,
+                      "start": 516,
+                      "end": 524
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 21,
+                  "column": 9,
+                  "start": 500,
+                  "end": 528
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 20,
+              "column": 7,
+              "start": 482,
+              "end": 545
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.5",
+            "tag": "section",
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.5.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "width",
+                    "value": {
+                      "kind": "unresolved",
+                      "text": "clamp(60px, 12vw, 150px)",
+                      "reason": "Unsupported CSS value"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "width: clamp(60px, 12vw, 150px);",
+                      "location": {
+                        "file": "built.css",
+                        "line": 32,
+                        "column": 3,
+                        "start": 292,
+                        "end": 324
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "fluid",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 24,
+                      "column": 25,
+                      "start": 586,
+                      "end": 591
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 24,
+                  "column": 9,
+                  "start": 570,
+                  "end": 595
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 23,
+              "column": 7,
+              "start": 552,
+              "end": 612
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.6",
+            "tag": "section",
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.6.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "width",
+                    "value": {
+                      "kind": "length",
+                      "value": 4,
+                      "unit": "em"
+                    },
+                    "from": {
+                      "syntax": "stylesheet",
+                      "text": "width: 4em;",
+                      "location": {
+                        "file": "built.css",
+                        "line": 35,
+                        "column": 3,
+                        "start": 342,
+                        "end": 353
+                      }
+                    }
+                  }
+                ],
+                "unresolvedStyle": [
+                  {
+                    "syntax": "class",
+                    "text": "inherited",
+                    "reason": "Unsupported style syntax",
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 27,
+                      "column": 25,
+                      "start": 653,
+                      "end": 662
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 27,
+                  "column": 9,
+                  "start": 637,
+                  "end": 666
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 26,
+              "column": 7,
+              "start": 619,
+              "end": 683
+            }
+          },
+          {
+            "kind": "element",
+            "id": "App.tsx#App@0.7",
+            "tag": "section",
+            "style": [
+              {
+                "property": "width",
+                "value": {
+                  "kind": "length",
+                  "value": 200,
+                  "unit": "px"
+                },
+                "from": {
+                  "syntax": "stylesheet",
+                  "text": "width: 200px;",
+                  "location": {
+                    "file": "built.css",
+                    "line": 17,
+                    "column": 3,
+                    "start": 153,
+                    "end": 166
+                  }
+                }
+              }
+            ],
+            "unresolvedStyle": [
+              {
+                "syntax": "class",
+                "text": "container",
+                "reason": "Unsupported style syntax",
+                "location": {
+                  "file": "App.tsx",
+                  "line": 29,
+                  "column": 27,
+                  "start": 710,
+                  "end": 719
+                }
+              }
+            ],
+            "children": [
+              {
+                "kind": "element",
+                "id": "App.tsx#App@0.7.0",
+                "tag": "div",
+                "style": [
+                  {
+                    "property": "paddingTop",
+                    "value": {
+                      "kind": "length",
+                      "value": 5,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "inline",
+                      "text": "padding: \"5% 10%\"",
+                      "location": {
+                        "file": "App.tsx",
+                        "line": 30,
+                        "column": 23,
+                        "start": 744,
+                        "end": 761
+                      }
+                    }
+                  },
+                  {
+                    "property": "paddingEnd",
+                    "value": {
+                      "kind": "length",
+                      "value": 10,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "inline",
+                      "text": "padding: \"5% 10%\"",
+                      "location": {
+                        "file": "App.tsx",
+                        "line": 30,
+                        "column": 23,
+                        "start": 744,
+                        "end": 761
+                      }
+                    }
+                  },
+                  {
+                    "property": "paddingBottom",
+                    "value": {
+                      "kind": "length",
+                      "value": 5,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "inline",
+                      "text": "padding: \"5% 10%\"",
+                      "location": {
+                        "file": "App.tsx",
+                        "line": 30,
+                        "column": 23,
+                        "start": 744,
+                        "end": 761
+                      }
+                    }
+                  },
+                  {
+                    "property": "paddingStart",
+                    "value": {
+                      "kind": "length",
+                      "value": 10,
+                      "unit": "percent"
+                    },
+                    "from": {
+                      "syntax": "inline",
+                      "text": "padding: \"5% 10%\"",
+                      "location": {
+                        "file": "App.tsx",
+                        "line": 30,
+                        "column": 23,
+                        "start": 744,
+                        "end": 761
+                      }
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "kind": "element",
+                    "id": "App.tsx#App@0.7.0.0",
+                    "tag": "div",
+                    "style": [
+                      {
+                        "property": "width",
+                        "value": {
+                          "kind": "length",
+                          "value": 20,
+                          "unit": "px"
+                        },
+                        "from": {
+                          "syntax": "stylesheet",
+                          "text": "width: 20px;",
+                          "location": {
+                            "file": "built.css",
+                            "line": 26,
+                            "column": 3,
+                            "start": 237,
+                            "end": 249
+                          }
+                        }
+                      }
+                    ],
+                    "unresolvedStyle": [
+                      {
+                        "syntax": "class",
+                        "text": "marker",
+                        "reason": "Unsupported style syntax",
+                        "location": {
+                          "file": "App.tsx",
+                          "line": 31,
+                          "column": 27,
+                          "start": 792,
+                          "end": 798
+                        }
+                      }
+                    ],
+                    "location": {
+                      "file": "App.tsx",
+                      "line": 31,
+                      "column": 11,
+                      "start": 776,
+                      "end": 802
+                    }
+                  }
+                ],
+                "location": {
+                  "file": "App.tsx",
+                  "line": 30,
+                  "column": 9,
+                  "start": 730,
+                  "end": 817
+                }
+              }
+            ],
+            "location": {
+              "file": "App.tsx",
+              "line": 29,
+              "column": 7,
+              "start": 690,
+              "end": 834
+            }
+          }
+        ],
+        "location": {
+          "file": "App.tsx",
+          "line": 3,
+          "column": 5,
+          "start": 39,
+          "end": 846
+        }
+      }
+    }
+  ]
+}
