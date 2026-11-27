@@ -1,7 +1,8 @@
 // Exercise the installed CLI against an app with no node_modules or tsconfig.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
@@ -409,6 +410,101 @@ export default function View(){return <section><p className={sheet.card}/><p sty
   }
 } finally {
   rmSync(project, { recursive: true, force: true });
+}
+// Build an actual utility stylesheet. The extractor only receives its finished artifact.
+const builtProject = mkdtempSync(resolve("apps/canvas/.dui-gap-"));
+try {
+  writeFileSync(
+    join(builtProject, "vite.config.mjs"),
+    'import tw from "@tailwindcss/vite"; export default {base:"./",plugins:[tw()]};',
+  );
+  writeFileSync(
+    join(builtProject, "style.css"),
+    '@import "tailwindcss"; @theme { --spacing: 3px; } [data-dense] { gap: 1px; }',
+  );
+  writeFileSync(
+    join(builtProject, "index.html"),
+    '<div id="app"></div><output></output><script type="module" src="./entry.tsx"></script>',
+  );
+  writeFileSync(
+    join(builtProject, "entry.tsx"),
+    `import React from "react";
+import {createRoot} from "react-dom/client";
+import {flushSync} from "react-dom";
+import {App} from "./App";
+flushSync(()=>createRoot(document.querySelector("#app")).render(<App/>));
+document.querySelector("output").textContent=[...document.querySelectorAll("main div")].map(el=>getComputedStyle(el).gap).join(",");`,
+  );
+  writeFileSync(
+    join(builtProject, "App.tsx"),
+    'import React from "react"; import "./style.css"; export function App(){return <main><div className="grid gap-2"/><div className="grid gap-2" data-dense="yes"/><div data-dense style={{gap:8}}/></main>}',
+  );
+  execFileSync(process.execPath, [resolve("apps/canvas/node_modules/vite/bin/vite.js"), "build"], {
+    cwd: builtProject,
+  });
+  const asset = readdirSync(join(builtProject, "dist/assets")).find((f) => f.endsWith(".css"));
+  assert.ok(asset);
+  const bundle = "dist/assets/" + asset;
+  const readBuilt = () =>
+    JSON.parse(
+      execFileSync(cli, ["model", builtProject, "App.tsx", "--built-css", bundle], {
+        encoding: "utf8",
+        env: { ...process.env, PATH: "" },
+      }),
+    );
+  const output = readBuilt();
+  assert.ok(validate(output), JSON.stringify(validate.errors));
+  const gaps = output.components[0].root.children.map((n: { style: { property: string }[] }) =>
+    n.style.filter((d) => d.property === "gap"),
+  );
+  assert.deepEqual(
+    gaps.map((ds: any[]) => ds.map((d) => d.value)),
+    [6, 1, 8].map((value) => [{ kind: "length", unit: "px", value }]),
+  );
+  if (process.argv.includes("--verify-render")) {
+    const chrome = process.env.DUI_CHROMIUM;
+    assert.ok(chrome, "Set DUI_CHROMIUM to the browser executable for render verification");
+    const dom = execFileSync(
+      chrome,
+      [
+        "--headless",
+        "--disable-gpu",
+        "--disable-background-networking",
+        "--allow-file-access-from-files",
+        "--no-first-run",
+        `--user-data-dir=${join(builtProject, "browser-profile")}`,
+        "--dump-dom",
+        pathToFileURL(join(builtProject, "dist/index.html")).href,
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const measured = dom.match(/<output>([^<]+)<\/output>/)?.[1];
+    assert.equal(
+      measured,
+      gaps.map(([d]: any[]) => String(d.value.value) + d.value.unit).join(","),
+    );
+    console.log(JSON.stringify({ computedGaps: measured }));
+  }
+  for (const [d] of gaps.slice(0, 2)) {
+    assert.equal(d.from.location.file, bundle);
+    const { start, end } = d.from.location;
+    assert.equal(
+      readFileSync(join(builtProject, bundle)).subarray(start, end).toString(),
+      d.from.text,
+    );
+  }
+  writeFileSync(
+    join(builtProject, bundle),
+    ".gap-2 { gap: 7px } @media (min-width: 500px) { .gap-2 { gap: 9px } }",
+  );
+  assert.equal(
+    readBuilt().components[0].root.children[0].style.find(
+      (d: { property: string }) => d.property === "gap",
+    ).value.kind,
+    "unresolved",
+  );
+} finally {
+  rmSync(builtProject, { recursive: true, force: true });
 }
 console.log(
   JSON.stringify({

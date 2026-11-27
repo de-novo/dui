@@ -227,8 +227,24 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
 }
 
 pub fn extract(project: &Path, entry: &Path) -> Result<m::SourceModel, String> {
+    extract_with_css(project, entry, None)
+}
+
+pub fn extract_with_css(
+    project: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+) -> Result<m::SourceModel, String> {
     let mut diagnostics = Vec::new();
-    let (entry, files) = syntax::load(project, entry, &mut diagnostics)?;
+    let syntax::Sources {
+        entry,
+        artifact,
+        files,
+    } = syntax::load(project, entry, built_css, &mut diagnostics)?;
+    let built = artifact
+        .as_ref()
+        .map(|p| style::built::Sheet::new(&files[p]))
+        .transpose()?;
     let mut model = m::SourceModel {
         schema_version: m::SCHEMA_VERSION,
         extractor: m::Extractor {
@@ -301,6 +317,7 @@ pub fn extract(project: &Path, entry: &Path) -> Result<m::SourceModel, String> {
                 files: &files,
                 slots: slot,
                 tailwind,
+                built: built.as_ref(),
                 modules: modules.bindings(file, f),
                 signatures: &signatures,
                 items: vec![],

@@ -15,6 +15,7 @@ pub struct Context<'a> {
     pub signatures: &'a BTreeMap<String, Vec<m::Slot>>,
     pub modules: style::modules::Bindings<'a>,
     pub tailwind: bool,
+    pub built: Option<&'a style::built::Sheet<'a>>,
     pub items: Vec<(String, String)>,
     pub model: &'a mut m::SourceModel,
 }
@@ -322,6 +323,11 @@ impl Context<'_> {
                 .map(|v| self.expr(*v))
                 .unwrap_or(m::Expr::Literal { value: true.into() });
             el.props.insert(key.into(), expr);
+        }
+        if let Some(sheet) = self.built
+            && name.starts_with(char::is_lowercase)
+        {
+            sheet.apply(self.file, open, &mut el);
         }
         // Inline declarations have higher precedence regardless of JSX attribute order.
         el.style

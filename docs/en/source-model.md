@@ -15,6 +15,8 @@ The source model is what source code declares about its UI. Language adapters wr
 
 Run `dui model PROJECT ENTRY.tsx` to print schema-v1 JSON from a TSX entry and its relative imports. Try `dui model fixtures/source-model src/App.tsx`. The adapter reads named function and arrow components, destructured props, local state, declared call return types, JSX branches and list templates, React Router routes and links, inline styles, and common utilities in projects that import Tailwind CSS. CSS Modules, unsupported classes and dynamic expressions retain their source. The command requires no project install, type checker or browser.
 
+Pass `--built-css FILE` to read a single bundled stylesheet inside the project. For static HTML elements the adapter resolves scalar `gap` from emitted rules, including named layers, simple class selectors and data-attribute presence. The selected declaration points into the bundle. Unsupported selectors or conditional gap rules that could apply yield an unresolved value. Other properties use source extraction.
+
 ## 1. Principles
 
 1. **Declared, not observed.** The model holds what the code says. It runs no handlers, calls no APIs and starts no browser. Capture results stay in the [capture context](domain-model.md#2-entities-value-objects-and-identities).

@@ -1,4 +1,5 @@
 //! Map static style syntax and retain the source of each unsupported declaration.
+pub(crate) mod built;
 pub(crate) mod modules;
 use crate::syntax::{File, children, field, first, unwrap_expr};
 use dui_core::source_model::{self as m, StyleProperty as P, StyleValue as V};
