@@ -156,14 +156,22 @@ fn rules(
                     text: f.text(decl).into(),
                     location: f.loc(decl),
                 };
-                if let Some((props, value)) = parts.first().and_then(|name| {
+                if let Some(sides) = parts.first().and_then(|name| {
                     let value = f.text(decl).split_once(':')?.1.trim_end_matches(';').trim();
-                    declaration(f.text(*name), value)
+                    if let Some(sides) = super::shorthand(f.text(*name), value) {
+                        return Some(sides);
+                    }
+                    declaration(f.text(*name), value).map(|(props, value)| {
+                        props
+                            .into_iter()
+                            .map(|prop| (prop, value.clone()))
+                            .collect()
+                    })
                 }) {
-                    for property in props {
+                    for (property, value) in sides {
                         rule.declarations.push(m::StyleDeclaration {
                             property,
-                            value: value.clone(),
+                            value,
                             when: when.cloned(),
                             from: from.clone(),
                         });
