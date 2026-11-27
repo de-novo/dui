@@ -151,8 +151,48 @@ fn structural_error(f: &File, root: Ast<'_>) -> bool {
     false
 }
 
+// Resolve a single pixel width constraint. Other media conditions keep their uncertainty.
+fn width_query(raw: &str, width: u32) -> Option<bool> {
+    // Minifiers also emit strict ranges as the negation of an inclusive range.
+    let raw = raw.trim();
+    let (query, negate) = raw
+        .strip_prefix("not all and ")
+        .map_or((raw, false), |q| (q.trim(), true));
+    let feature = query.strip_prefix('(')?.strip_suffix(')')?.trim();
+    let (op, length) = if let Some((name, length)) = feature.split_once(':') {
+        let op = match name.trim() {
+            "min-width" => ">=",
+            "max-width" => "<=",
+            "width" => "=",
+            _ => return None,
+        };
+        (op, length)
+    } else {
+        let range = feature.strip_prefix("width")?.trim_start();
+        [">=", "<=", ">", "<", "="]
+            .into_iter()
+            .find_map(|op| Some((op, range.strip_prefix(op)?)))?
+    };
+    let length = length.trim();
+    let threshold = length
+        .strip_suffix("px")
+        .or_else(|| (length == "0").then_some(length))?
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite() && *v >= 0.)?;
+    let width = f64::from(width);
+    let matched = match op {
+        ">=" => width >= threshold,
+        "<=" => width <= threshold,
+        ">" => width > threshold,
+        "<" => width < threshold,
+        _ => width == threshold,
+    };
+    Some(matched != negate)
+}
+
 impl<'a> Sheet<'a> {
-    pub(crate) fn new(f: &'a File) -> Result<Self, String> {
+    pub(crate) fn new(f: &'a File, width: Option<u32>) -> Result<Self, String> {
         let root = f.tree.root_node();
         if structural_error(f, root) {
             return Err(format!("Cannot parse built CSS: {}", f.path));
@@ -175,6 +215,16 @@ impl<'a> Sheet<'a> {
             match node.kind() {
                 "import_statement" => {
                     return Err("Built CSS must include its imports in one bundle".into());
+                }
+                "media_statement" => {
+                    if let [query, body] = parts.as_slice() {
+                        let matches = width.and_then(|w| width_query(f.text(*query), w));
+                        if matches != Some(false) {
+                            stack.push((*body, selector, layer, uncertain || matches.is_none()));
+                        }
+                    } else {
+                        stack.extend(parts.into_iter().rev().map(|p| (p, selector, layer, true)));
+                    }
                 }
                 "declaration" => {
                     let Some(prop) = parts.first().map(|p| f.text(*p)) else {

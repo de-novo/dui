@@ -375,7 +375,7 @@ CAPTURE
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
   dui recheck RUN [PROJECT [MANIFEST]]    Re-render unsuccessful cells with current project conditions
-  dui model PROJECT ENTRY.tsx [--built-css FILE]  Print the TSX source model as JSON
+  dui model PROJECT ENTRY.tsx [--built-css FILE [--viewport-width PX]]  Print the TSX source model as JSON
   dui scan [PROJECT] [MANIFEST]           Print compiler facts, controls, and auto-mocks (no browser)
   dui transitions PROJECT MANIFEST [RUN]  Replay actions and verify screen transitions
 
@@ -454,20 +454,32 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
     if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "model"
     {
-        let (project, entry, css) = match rest {
-            [project, entry] => (project, entry, None),
-            [project, entry, flag, css] if flag == "--built-css" => {
-                (project, entry, Some(Path::new(css)))
-            }
-            _ => {
-                return Err(failure(
-                    2,
-                    "expected model PROJECT ENTRY.tsx [--built-css FILE]",
-                ));
-            }
+        let usage = "expected model PROJECT ENTRY.tsx [--built-css FILE [--viewport-width PX]]";
+        let [project, entry, options @ ..] = rest else {
+            return Err(failure(2, usage));
         };
+        let mut css = None;
+        let mut width = None;
+        for pair in options.chunks(2) {
+            match pair {
+                [flag, path] if flag == "--built-css" && css.is_none() => {
+                    css = Some(Path::new(path))
+                }
+                [flag, raw] if flag == "--viewport-width" && width.is_none() => {
+                    width = Some(
+                        raw.to_str()
+                            .and_then(|s| s.parse::<u32>().ok())
+                            .filter(|w| *w > 0)
+                            .ok_or_else(|| {
+                                failure(2, "expected a positive viewport width in CSS pixels")
+                            })?,
+                    );
+                }
+                _ => return Err(failure(2, usage)),
+            }
+        }
         let model =
-            dui_lang_typescript::extract_with_css(Path::new(project), Path::new(entry), css)
+            dui_lang_typescript::extract_at_width(Path::new(project), Path::new(entry), css, width)
                 .map_err(|reason| failure(2, &reason))?;
         let raw = model
             .to_json()
