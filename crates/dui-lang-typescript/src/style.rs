@@ -160,11 +160,13 @@ const PADDING: &[P] = &[
 fn spacing(name: &str) -> Option<&'static [P]> {
     Some(match name {
         "padding" => PADDING,
+        "padding-inline" => &[P::PaddingStart, P::PaddingEnd],
         "padding-top" => &[P::PaddingTop],
         "padding-bottom" => &[P::PaddingBottom],
         "padding-inline-start" => &[P::PaddingStart],
         "padding-inline-end" => &[P::PaddingEnd],
         "margin" => &[P::MarginTop, P::MarginEnd, P::MarginBottom, P::MarginStart],
+        "margin-inline" => &[P::MarginStart, P::MarginEnd],
         "margin-top" => &[P::MarginTop],
         "margin-bottom" => &[P::MarginBottom],
         "margin-inline-start" => &[P::MarginStart],
@@ -195,6 +197,18 @@ fn spacing_value(name: &str, raw: &str) -> Option<V> {
 
 // Physical left/right only have a direction-independent logical mapping when equal.
 fn shorthand(name: &str, raw: &str) -> Option<Vec<(P, V)>> {
+    if matches!(name, "padding-inline" | "margin-inline") {
+        let mut words = raw.split_ascii_whitespace();
+        let start = spacing_value(name, words.next()?)?;
+        let end = match words.next() {
+            Some(word) => spacing_value(name, word)?,
+            None => start.clone(),
+        };
+        if words.next().is_some() {
+            return None;
+        }
+        return Some(spacing(name)?.iter().copied().zip([start, end]).collect());
+    }
     if !matches!(name, "margin" | "padding") {
         return None;
     }
@@ -276,10 +290,7 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
         },
     ))
 }
-fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
-    let name = f.name(pair, "key")?;
-    let raw = field(pair, "value")?;
-    // React spells standard CSS properties in camelCase and numeric lengths in logical pixels.
+fn css_property_name(name: &str) -> String {
     let mut css_name = String::new();
     for c in name.chars() {
         if c.is_ascii_uppercase() {
@@ -289,6 +300,13 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
             css_name.push(c);
         }
     }
+    css_name
+}
+fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
+    let name = f.name(pair, "key")?;
+    let raw = field(pair, "value")?;
+    // React spells standard CSS properties in camelCase and numeric lengths in logical pixels.
+    let css_name = css_property_name(name);
     if let Some(props) = spacing(&css_name) {
         let value = match crate::literal(f, raw) {
             Some(serde_json::Value::String(text)) => spacing_value(&css_name, &text)?,
@@ -418,7 +436,7 @@ pub fn attribute(
             for pair in children(unwrap_expr(value)) {
                 let expanded = f.name(pair, "key").and_then(|name| {
                     let val = crate::literal(f, field(pair, "value")?)?;
-                    shorthand(name, val.as_str()?)
+                    shorthand(&css_property_name(name), val.as_str()?)
                 });
                 if let Some(sides) = expanded {
                     for (property, value) in sides {

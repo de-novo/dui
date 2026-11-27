@@ -149,6 +149,8 @@ For a default import from `.module.css`, `className={styles.card}` reads matchin
 
 Stylesheet `padding-inline-start: 12px` and inline `paddingInlineStart: 12` both emit `paddingStart` with a length of `12px`. Logical start and end are preserved for either writing direction. Margins also accept negative lengths and `auto`.
 
+For example, `padding-inline: 2px 5%` and `paddingInline: "2px 5%"` emit `paddingStart` of `2px` and `paddingEnd` of `5%`.
+
 ## 7. Tokens
 
 A token keeps the name the source uses (`--color-brand`, `--text-2xl`) so it can later become a design variable. `group` is `color`, `spacing`, `typography`, `radius`, `size` or `other`. `value` is a final value, or a `token` value that aliases another token. Aliases must not form a cycle. `modes` holds values per mode, such as `dark`. A project token has a `location`. A framework default has a `package` (`tailwindcss`) and no location.
