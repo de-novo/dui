@@ -103,6 +103,11 @@ impl File {
                 if default != (name == "default") {
                     return None;
                 }
+                if default
+                    && let Some(value) = field(n, "value").filter(|v| v.kind() == "identifier")
+                {
+                    return Some(self.text(value));
+                }
                 let decl = field(n, "declaration")?;
                 let decls = if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration")
                 {

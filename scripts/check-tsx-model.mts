@@ -867,6 +867,33 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     borderTopRightRadius: 3,
   }))
     assert.equal(aside[name], value, name);
+  writeFileSync(
+    join(builtProject, "App.tsx"),
+    "export function App(){return <html><body><main>Page</main></body></html>}",
+  );
+  writeFileSync(
+    join(builtProject, bundle),
+    ":root{--ink:#123456;color:var(--ink)} @media(prefers-color-scheme:dark){:root{--ink:#abcdef}} main{min-height:100svh;width:90vw}",
+  );
+  for (const [scheme, ink] of [
+    ["light", "#123456"],
+    ["dark", "#abcdef"],
+  ]) {
+    const result = readBuilt("--color-scheme", scheme);
+    assert.ok(validate(result), JSON.stringify(validate.errors));
+    const root = result.components[0].root;
+    assert.equal(styles(root).color, ink);
+    const main = root.children[0].children[0];
+    for (const [property, unit] of [
+      ["minHeight", "svh"],
+      ["width", "vw"],
+    ]) {
+      assert.equal(
+        main.style.find((d: { property: string }) => d.property === property).value.unit,
+        unit,
+      );
+    }
+  }
 } finally {
   rmSync(builtProject, { recursive: true, force: true });
 }

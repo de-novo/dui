@@ -22,6 +22,16 @@ fn color(s: &str) -> Option<V> {
 }
 fn length(s: &str) -> Option<V> {
     for (suffix, unit) in [
+        ("vw", m::LengthUnit::Vw),
+        ("vh", m::LengthUnit::Vh),
+        ("svw", m::LengthUnit::Svw),
+        ("svh", m::LengthUnit::Svh),
+        ("lvw", m::LengthUnit::Lvw),
+        ("lvh", m::LengthUnit::Lvh),
+        ("dvw", m::LengthUnit::Dvw),
+        ("dvh", m::LengthUnit::Dvh),
+        ("vmin", m::LengthUnit::Vmin),
+        ("vmax", m::LengthUnit::Vmax),
         ("rem", m::LengthUnit::Rem),
         ("em", m::LengthUnit::Em),
         ("px", m::LengthUnit::Px),

@@ -508,6 +508,7 @@ impl<'a> Sheet<'a> {
         f: &'a File,
         width: Option<u32>,
         root_attribute: Option<(&str, &str)>,
+        scheme: Option<&str>,
     ) -> Result<Self, String> {
         let root = f.tree.root_node();
         if structural_error(f, root) {
@@ -541,7 +542,20 @@ impl<'a> Sheet<'a> {
                 }
                 "media_statement" => {
                     if let [query, body] = parts.as_slice() {
-                        let matches = width.and_then(|w| width_query(f.text(*query), w));
+                        let raw = f.text(*query).trim();
+                        let preference = raw
+                            .strip_prefix('(')
+                            .and_then(|s| s.strip_suffix(')'))
+                            .and_then(|s| s.split_once(':'))
+                            .filter(|(k, v)| {
+                                k.trim() == "prefers-color-scheme"
+                                    && matches!(v.trim(), "light" | "dark")
+                            });
+                        let matches = if let Some((_, v)) = preference {
+                            scheme.map(|s| s == v.trim())
+                        } else {
+                            width.and_then(|w| width_query(raw, w))
+                        };
                         if matches != Some(false) {
                             stack.push((*body, selector, layer, uncertain || matches.is_none()));
                         }
@@ -596,7 +610,7 @@ impl<'a> Sheet<'a> {
                         if root_value == Some(false) {
                             continue;
                         }
-                        if root_attribute.is_some()
+                        if (root_attribute.is_some() || scheme.is_some())
                             && (root || root_value == Some(true))
                             && !important
                             && !uncertain
@@ -609,7 +623,7 @@ impl<'a> Sheet<'a> {
                                 variable_ranks.insert(prop, rank);
                                 sheet.vars.insert(prop, Some(value));
                             }
-                        } else if root_attribute.is_some() {
+                        } else if root_attribute.is_some() || scheme.is_some() {
                             ambiguous_variables.insert(prop);
                         } else {
                             let definition = (root && !uncertain && !important).then_some(value);
@@ -1434,6 +1448,9 @@ fn contextual_specificity(
 
 // Outer None means the selector may match, but its outcome is unknown.
 fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
+    if sel == ":root" {
+        return Some((el.tag == "html").then_some(1024));
+    }
     if let Some(id) = sel.strip_prefix('#').filter(|s| ident(s)) {
         return match el.props.get("id") {
             None => Some(None),

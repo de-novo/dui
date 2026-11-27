@@ -396,7 +396,7 @@
       "required": ["value", "unit"],
       "properties": {
         "value": { "type": "number" },
-        "unit": { "enum": ["px", "rem", "em", "percent", "pt", "dp"] }
+        "unit": { "enum": ["px", "rem", "em", "percent", "pt", "dp", "vw", "vh", "svw", "svh", "lvw", "lvh", "dvw", "dvh", "vmin", "vmax"] }
       }
     },
     "finalValue": {
@@ -409,7 +409,7 @@
           "properties": {
             "kind": { "const": "length" },
             "value": { "type": "number" },
-            "unit": { "enum": ["px", "rem", "em", "percent", "pt", "dp"] }
+            "unit": { "enum": ["px", "rem", "em", "percent", "pt", "dp", "vw", "vh", "svw", "svh", "lvw", "lvh", "dvw", "dvh", "vmin", "vmax"] }
           }
         },
         {

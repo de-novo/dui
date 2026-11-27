@@ -19,6 +19,8 @@ Pass `--built-css FILE` to read a single bundled stylesheet inside the project. 
 
 Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
 
+Pass `--color-scheme light|dark` to resolve a single `prefers-color-scheme` condition in the bundle. A TSX document entry can supply the `html` root for `:root` styles. Viewport length units are preserved for the renderer.
+
 For a direct child or descendant selector with two simple parts, the TSX adapter checks intrinsic JSX ancestors up to the component boundary. To inspect a model, run `dui serve`, choose **Open source model** in the workspace picker and select the exported JSON. The viewer draws the selected component from schema v1 and lists unresolved styles.
 
 When the project selects its theme with a root data attribute, supply the same value during extraction, for example `--root-attribute data-theme=dark`. The adapter resolves simple matching root variable declarations from the bundle. Without that context, conflicting definitions stay unresolved.
