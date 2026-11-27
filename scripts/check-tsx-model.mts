@@ -122,6 +122,34 @@ try {
     themed.tokens.find((t: { name: string }) => t.name === "--color-loop").value.text,
     "var(--color-cycle)",
   );
+  for (const [base, expected] of [
+    ["3px", { kind: "length", value: 6, unit: "px" }],
+    ["var(--spacing-unit)", { kind: "length", value: 1, unit: "rem" }],
+    ["var(--unknown)", null],
+    ["2px 4px", null],
+    ["0", { kind: "length", value: 0, unit: "px" }],
+  ] as const) {
+    writeFileSync(
+      join(project, "theme.css"),
+      `@import "tailwindcss"; @theme { --spacing: ${base}; --spacing-unit: 0.5rem; --spacing-4: 11px; }`,
+    );
+    writeFileSync(
+      join(project, "Scale.tsx"),
+      `import "./theme.css"; export function Scale(){return <main className="gap-2 px-4"/>;}`,
+    );
+    const scaled = JSON.parse(extract(project, "Scale.tsx"));
+    assert.ok(validate(scaled));
+    const [gap, start, end] = scaled.components[0].root.style;
+    assert.equal(gap.property, "gap");
+    if (expected) assert.deepEqual(gap.value, expected);
+    else assert.equal(gap.value.kind, "unresolved");
+    assert.deepEqual(start.value, {
+      kind: "token",
+      token: "theme.css#--spacing-4",
+      resolved: { kind: "length", value: 11, unit: "px" },
+    });
+    assert.deepEqual(end.value, start.value);
+  }
   writeFileSync(
     join(project, "View.tsx"),
     `import sheet from "./View.module.css";
