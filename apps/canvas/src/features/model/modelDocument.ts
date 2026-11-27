@@ -36,7 +36,7 @@ export function readModel(text: string): Model {
 }
 
 const tags = new Set(
-  "body dialog select option main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label ul ol li dl dt dd small form output".split(
+  "body dialog select option table caption thead tbody tfoot tr th td br hr main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label ul ol li dl dt dd small form output".split(
     " ",
   ),
 );

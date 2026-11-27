@@ -408,6 +408,7 @@ pub enum StyleProperty {
     LineHeight,
     LetterSpacing,
     TextAlign,
+    TextDecorationLine,
     // Radius and border
     BorderRadius,
     BorderWidth,

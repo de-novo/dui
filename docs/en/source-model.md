@@ -27,6 +27,8 @@ The built CSS reader maps display mode, horizontal overflow and auto-fit grids w
 
 The bundled CSS reader resolves independent row and column gaps and common flex shorthands into growth, shrinkage and basis.
 
+The reader also preserves simple font-family lists and text-decoration lines, expands block spacing in horizontal layouts, and evaluates two-argument px/vw minimums in spacing at the supplied viewport width.
+
 ## 1. Principles
 
 1. **Declared, not observed.** The model holds what the code says. It runs no handlers, calls no APIs and starts no browser. Capture results stay in the [capture context](domain-model.md#2-entities-value-objects-and-identities).

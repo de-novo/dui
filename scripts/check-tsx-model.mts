@@ -743,7 +743,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     `
     main {display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
     @media(max-width:680px){ main {grid-template-columns:minmax(0,1fr)} }
-    main {gap:8px 10px;column-gap:12px}
+    main {gap:8px 10px;column-gap:12px;padding:4px min(10px,1vw);padding-block:12px 18px;font-family:system-ui,sans-serif;text-decoration:none}
     div.card { flex:2 0 40%; order:-2; overflow-x:auto; font-size:clamp(30px,5vw,48px) }
   `,
   );
@@ -757,6 +757,18 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
         ? { kind: "keyword", value: "single" }
         : { kind: "length", value: 300, unit: "px" },
     );
+    assert.deepEqual(prop(root.style, "paddingStart"), {
+      kind: "length",
+      value: width === 390 ? 3.9 : 10,
+      unit: "px",
+    });
+    assert.deepEqual(prop(root.style, "paddingTop"), { kind: "length", value: 12, unit: "px" });
+    assert.deepEqual(prop(root.style, "paddingBottom"), { kind: "length", value: 18, unit: "px" });
+    assert.deepEqual(prop(root.style, "fontFamily"), {
+      kind: "keyword",
+      value: "system-ui,sans-serif",
+    });
+    assert.deepEqual(prop(root.style, "textDecorationLine"), { kind: "keyword", value: "none" });
     assert.deepEqual(prop(root.style, "rowGap"), { kind: "length", value: 8, unit: "px" });
     assert.deepEqual(prop(root.style, "columnGap"), { kind: "length", value: 12, unit: "px" });
     assert.deepEqual(prop(root.children[0].style, "shrink"), { kind: "number", value: 0 });

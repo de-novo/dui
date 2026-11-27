@@ -698,6 +698,12 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         P::FontFamily => (false, false, false, None),
         P::FontStyle => (false, false, false, Some(&["normal", "italic"])),
         P::LineHeight => (true, true, false, Some(&[])),
+        P::TextDecorationLine => (
+            false,
+            false,
+            false,
+            Some(&["none", "underline", "overline", "line-through"]),
+        ),
         P::TextAlign => (
             false,
             false,
