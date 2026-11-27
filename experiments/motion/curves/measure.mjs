@@ -91,9 +91,9 @@ try {
     // Reverse a running CSS transition in a real animation frame. Record only its elapsed clock as input.
     const reversal = await ref.evaluate(async () => {
       const e = document.querySelector(".reverse");
-      getComputedStyle(e).transform;
+      getComputedStyle(e).getPropertyValue("transform");
       e.classList.add("go");
-      getComputedStyle(e).transform;
+      getComputedStyle(e).getPropertyValue("transform");
       const a = e.getAnimations()[0];
       await a.ready;
       return await new Promise((resolve) => {
@@ -104,7 +104,7 @@ try {
           }
           const elapsed = a.currentTime;
           e.classList.remove("go");
-          getComputedStyle(e).transform;
+          getComputedStyle(e).getPropertyValue("transform");
           const reverse = e.getAnimations()[0];
           reverse.pause();
           resolve({ elapsed, actualDuration: reverse.effect.getTiming().duration });
