@@ -844,43 +844,6 @@ impl<'a> Sheet<'a> {
                 },
             );
         }
-        if property == P::TextDecorationLine
-            && matches!(raw, "none" | "underline" | "overline" | "line-through")
-        {
-            return Some(V::Keyword { value: raw.into() });
-        }
-        if rule.name == "font-family"
-            && raw.split(',').all(|family| {
-                let name = family.trim().trim_matches(['"', '\'']);
-                !name.is_empty()
-                    && name
-                        .bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b' ' | b'_'))
-            })
-        {
-            return Some(V::Keyword { value: raw.into() });
-        }
-        // Evaluate viewport lengths in spacing before expanding their shorthand.
-        let normalized;
-        let raw = if spacing(rule.name).is_some() && raw.contains("min(") {
-            let width = f64::from(self.viewport_width?);
-            let (before, args) = raw.split_once("min(")?;
-            let (args, after) = args.split_once(')')?;
-            let px = |arg: &str| {
-                let arg = arg.trim();
-                let (value, scale) = arg
-                    .strip_suffix("px")
-                    .map(|v| (v, 1.0))
-                    .or_else(|| arg.strip_suffix("vw").map(|v| (v, width / 100.0)))?;
-                let n = value.parse::<f64>().ok()? * scale;
-                n.is_finite().then_some(n)
-            };
-            let (a, b) = args.split_once(',')?;
-            normalized = format!("{before}{}px{after}", px(a)?.min(px(b)?));
-            normalized.as_str()
-        } else {
-            raw
-        };
         if rule.name == "flex" {
             let parts: Vec<_> = raw.split_ascii_whitespace().collect();
             let (grow, shrink, basis) = match parts.as_slice() {
@@ -1365,8 +1328,7 @@ fn contextual_specificity(
         (ancestor, None)
     };
     let class = ancestor.strip_prefix('.');
-    let id = ancestor.strip_prefix('#');
-    if !ident(class.or(id).unwrap_or(ancestor)) {
+    if !ident(class.unwrap_or(ancestor)) {
         return None;
     }
     let mut parent = if open.kind() == "jsx_opening_element" {
@@ -1383,25 +1345,18 @@ fn contextual_specificity(
         if !name.starts_with(|c: char| c.is_ascii_lowercase()) || !ident(name) {
             return None;
         }
-        let matched = if let Some(required) = class.or(id) {
+        let matched = if let Some(class) = class {
             if children(tag).iter().any(|n| n.kind() == "jsx_expression") {
                 return None;
             }
             match children(tag).into_iter().find(|a| {
                 a.kind() == "jsx_attribute"
-                    && first(*a).is_some_and(|k| {
-                        file.text(k) == if id.is_some() { "id" } else { "className" }
-                    })
+                    && first(*a).is_some_and(|k| file.text(k) == "className")
             }) {
-                Some(a) => {
-                    let v = crate::literal(file, *children(a).get(1)?)?;
-                    let s = v.as_str()?;
-                    if id.is_some() {
-                        s == required
-                    } else {
-                        s.split_ascii_whitespace().any(|v| v == required)
-                    }
-                }
+                Some(a) => crate::literal(file, *children(a).get(1)?)?
+                    .as_str()?
+                    .split_ascii_whitespace()
+                    .any(|s| s == class),
                 None => false,
             }
         } else {
@@ -1415,17 +1370,11 @@ fn contextual_specificity(
         {
             return Some(Some(
                 target_weight
-                    + if id.is_some() {
-                        1048576
-                    } else if class.is_some() {
-                        1024
-                    } else {
-                        1
-                    }
+                    + if class.is_some() { 1024 } else { 1 }
                     + if edge.is_some() { 1024 } else { 0 },
             ));
         }
-        if direct || (name == "body" && class.is_none() && id.is_none() && ancestor != "html") {
+        if direct || (name == "body" && class.is_none() && ancestor != "html") {
             return Some(None);
         }
         parent = parent.parent()?;
@@ -1434,13 +1383,6 @@ fn contextual_specificity(
 
 // Outer None means the selector may match, but its outcome is unknown.
 fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
-    if let Some(id) = sel.strip_prefix('#').filter(|s| ident(s)) {
-        return match el.props.get("id") {
-            None => Some(None),
-            Some(m::Expr::Literal { value }) => Some((value.as_str()? == id).then_some(1048576)),
-            _ => None,
-        };
-    }
     if let Some((tag, class)) = sel.split_once('.')
         && ident(tag)
         && ident(class)

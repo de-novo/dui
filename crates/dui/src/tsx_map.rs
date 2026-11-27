@@ -1,6 +1,6 @@
 //! Publish the source model and its declared screen relations without starting a host.
 use crate::{Reply, analysis, archive, failure, replay::io};
-use dui_core::source_model::EdgeTarget;
+use dui_core::source_model::{EdgeTarget, SourceModel};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -37,8 +37,28 @@ pub(crate) fn entry(project: &Path) -> Result<Option<PathBuf>, (u8, Value)> {
     }
 }
 
-pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
-    let model = dui_lang_typescript::extract(project, entry).map_err(|e| failure(2, &e))?;
+pub(crate) fn project_relative_entry(project: &Path, entry: &Path) -> Option<String> {
+    let root = project.canonicalize().ok()?;
+    let full = if entry.is_absolute() {
+        entry.to_owned()
+    } else {
+        root.join(entry)
+    };
+    let full = full.canonicalize().ok()?;
+    full.strip_prefix(root)
+        .ok()?
+        .to_str()
+        .map(|path| path.replace(std::path::MAIN_SEPARATOR, "/"))
+}
+
+pub(crate) struct SourceProjection {
+    pub nodes: Vec<Value>,
+    pub edges: Vec<Value>,
+    pub discovery: Value,
+}
+
+/// Project a source model into the viewer's graph nodes, links and discovery metadata.
+pub(crate) fn project_model(model: &SourceModel) -> SourceProjection {
     let nodes: Vec<_> = model
         .screens
         .iter()
@@ -75,9 +95,20 @@ pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
     }
     let discovery = json!({"kind":"tsx-source","declared":nodes.len(),"resolvedRelations":edges.len(),
         "unresolvedRelations":unresolved,"limitations":limitations,"diagnostics":model.diagnostics});
-    let graph = json!({"nodes":nodes,"edges":edges,"cells":[],"overview":[],"screenDiscovery":discovery,
-         "sourceModel":"source-model.json"});
-    let report = json!({"screenDiscovery":discovery,"sourceModel":"source-model.json","browser":null,
+    SourceProjection {
+        nodes,
+        edges,
+        discovery,
+    }
+}
+
+pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
+    let model = dui_lang_typescript::extract(project, entry).map_err(|e| failure(2, &e))?;
+    let projection = project_model(&model);
+    let source_entry = project_relative_entry(project, entry);
+    let graph = json!({"nodes":projection.nodes,"edges":projection.edges,"cells":[],"overview":[],"screenDiscovery":projection.discovery,
+         "sourceModel":"source-model.json","sourceEntry":source_entry});
+    let report = json!({"screenDiscovery":projection.discovery,"sourceModel":"source-model.json","sourceEntry":source_entry,"browser":null,
         "sourceFiles":model.files.iter().map(|f| &f.path).collect::<Vec<_>>(),"cells":[],
         "coverage":{"attempted":0,"renderable":0,"unrenderable":0,"verified":0}});
     archive::publish(archive::provenance(project)?, |out| {

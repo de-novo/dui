@@ -17,6 +17,7 @@ use std::{
     time::Duration,
 };
 
+mod hot_reload;
 mod responsive;
 
 mod canvas_assets {
@@ -40,6 +41,7 @@ struct ViewerState {
     archive_images: BTreeMap<String, Arc<BTreeSet<String>>>,
     archive_graphs: BTreeMap<String, Arc<ArchiveGraph>>,
     audit_cache: BTreeMap<String, Value>,
+    hot_sessions: BTreeMap<String, hot_reload::HotSession>,
 }
 
 impl Drop for ViewerState {
@@ -659,6 +661,157 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
         }
         return;
     }
+    if path == "/api/source-model" || path == "/api/source-model/" {
+        if !is_same_origin(&headers) {
+            send_json(
+                &mut stream,
+                403,
+                &json!({"status":"error","reason":"forbidden-origin"}),
+            );
+            return;
+        }
+        if method != "GET" {
+            send_response(&mut stream, 405, "text/plain", "no-store", b"");
+            return;
+        }
+        let requested_key = query.get("run").map(String::as_str);
+        let resolved = {
+            let Ok(mut guard) = state.lock() else {
+                send_json(&mut stream, 500, &json!({"status":"error"}));
+                return;
+            };
+            let mut key = requested_key
+                .map(str::to_owned)
+                .or_else(|| guard.default_run_key.clone());
+            let mut root = key
+                .as_deref()
+                .and_then(|key| guard.run_roots.get(key).cloned());
+            if root.is_none() {
+                let listed = list_archives(&guard);
+                guard.default_run_key = listed
+                    .first()
+                    .and_then(|archive| archive.run["key"].as_str())
+                    .map(str::to_owned);
+                for archive in &listed {
+                    if let Some(key) = archive.run["key"].as_str() {
+                        guard.run_roots.insert(key.to_owned(), archive.root.clone());
+                    }
+                }
+                let picked = match requested_key {
+                    None => listed.first(),
+                    Some(key) => listed
+                        .iter()
+                        .find(|archive| archive.run["key"].as_str() == Some(key)),
+                };
+                if let Some(archive) = picked {
+                    key = archive.run["key"].as_str().map(str::to_owned);
+                    root = Some(archive.root.clone());
+                }
+            }
+            key.zip(root)
+        };
+        let Some((run_key, root)) = resolved else {
+            send_json(
+                &mut stream,
+                404,
+                &json!({"status":"error","reason":"run-not-found"}),
+            );
+            return;
+        };
+        let Some(model_text) = fs::read_to_string(root.join("source-model.json")).ok() else {
+            send_json(
+                &mut stream,
+                404,
+                &json!({"status":"error","reason":"source-model-unavailable"}),
+            );
+            return;
+        };
+        let archive_model = match dui_core::source_model::SourceModel::from_json(&model_text) {
+            Ok(model) => model,
+            Err(_) => {
+                send_json(
+                    &mut stream,
+                    500,
+                    &json!({"status":"error","reason":"invalid-archived-source-model"}),
+                );
+                return;
+            }
+        };
+        let graph = read_optional_json(&root.join("graph.json")).unwrap_or_else(|| json!({}));
+        let report = read_optional_json(&root.join("report.json")).unwrap_or_else(|| json!({}));
+        let meta = read_optional_json(&root.join("snapshot.json"));
+        let Some(project) = resolve_project_path(meta.as_ref()) else {
+            send_json(
+                &mut stream,
+                404,
+                &json!({"status":"error","reason":"project-unavailable"}),
+            );
+            return;
+        };
+        let declared_entry = graph["sourceEntry"]
+            .as_str()
+            .or_else(|| report["sourceEntry"].as_str())
+            .map(PathBuf::from);
+        let inferred_entry = declared_entry.or_else(|| {
+            let files: BTreeSet<&str> = archive_model
+                .screens
+                .iter()
+                .map(|screen| screen.location.file.as_str())
+                .collect();
+            if let [file] = files.iter().copied().collect::<Vec<_>>().as_slice() {
+                Some(PathBuf::from(file))
+            } else {
+                crate::tsx_map::entry(&project)
+                    .ok()
+                    .flatten()
+                    .and_then(|entry| {
+                        crate::tsx_map::project_relative_entry(&project, &entry).map(PathBuf::from)
+                    })
+            }
+        });
+        let Some(entry) = inferred_entry else {
+            send_json(
+                &mut stream,
+                404,
+                &json!({"status":"error","reason":"source-entry-unavailable"}),
+            );
+            return;
+        };
+        let nodes = graph["nodes"].as_array().cloned().unwrap_or_default();
+        let edges = graph["edges"].as_array().cloned().unwrap_or_default();
+        let discovery = graph["screenDiscovery"].clone();
+        let session = {
+            let Ok(mut guard) = state.lock() else {
+                send_json(&mut stream, 500, &json!({"status":"error"}));
+                return;
+            };
+            if let Some(session) = guard.hot_sessions.get(&run_key) {
+                session.clone()
+            } else {
+                let session = hot_reload::HotSession::start(
+                    project,
+                    entry,
+                    archive_model,
+                    nodes,
+                    edges,
+                    discovery,
+                );
+                guard.hot_sessions.insert(run_key.clone(), session.clone());
+                session
+            }
+        };
+        let since = query
+            .get("revision")
+            .and_then(|value| value.parse::<u64>().ok());
+        let status_since = query
+            .get("statusRevision")
+            .and_then(|value| value.parse::<u64>().ok());
+        let wait = query.get("wait").is_some_and(|value| value != "0");
+        let body = session.response(since, status_since, wait);
+        send_json(&mut stream, 200, &body);
+        return;
+    }
+
     if let Some(mut archive_name) = path.strip_prefix("/archive/") {
         // `/archive/r/<run>/<name>`: the run in the path, so a snapshot's relative asset names
         // resolve within its run.
@@ -1255,6 +1408,7 @@ pub fn serve(run_dirs: Vec<PathBuf>, port: u16, open_browser: bool) -> Reply {
         archive_images: BTreeMap::new(),
         archive_graphs: BTreeMap::new(),
         audit_cache: BTreeMap::new(),
+        hot_sessions: BTreeMap::new(),
     }));
 
     for incoming in listener.incoming() {

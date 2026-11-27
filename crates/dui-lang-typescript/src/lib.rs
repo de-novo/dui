@@ -1,4 +1,6 @@
 //! Extract schema-v1 models from a TSX entry and its reachable static imports.
+mod class_view;
+mod hash_routes;
 mod render;
 mod routes;
 mod style;
@@ -8,6 +10,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, path::Path};
 use syntax::{File, children, field, first, unwrap_expr};
+pub use syntax::{LoadStats, ParseCache};
 use tree_sitter::Node as Ast;
 
 type Files = BTreeMap<String, File>;
@@ -91,6 +94,9 @@ fn fields(files: &Files, file: &File, body: Ast<'_>) -> Vec<m::Field> {
         .collect()
 }
 fn returned(f: Ast<'_>) -> Option<Ast<'_>> {
+    if f.kind() == "method_definition" {
+        return class_view::tail(f);
+    }
     let body = field(f, "body")?;
     if body.kind() != "statement_block" {
         return Some(unwrap_expr(body));
@@ -120,6 +126,9 @@ fn returned(f: Ast<'_>) -> Option<Ast<'_>> {
         .map(unwrap_expr)
 }
 fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
+    if f.kind() == "method_definition" {
+        return class_view::props(file, f, id);
+    }
     let mut out = Vec::new();
     if let Some(param) = field(f, "parameters").and_then(first)
         && let Some(pat) = field(param, "pattern").filter(|p| p.kind() == "object_pattern")
@@ -258,6 +267,30 @@ pub fn extract_in_context(
     width: Option<u32>,
     root_attribute: Option<(&str, &str)>,
 ) -> Result<m::SourceModel, String> {
+    let mut cache = ParseCache::default();
+    extract_in_context_impl(project, entry, built_css, width, root_attribute, &mut cache)
+        .map(|(model, _)| model)
+}
+
+/// Extract with a caller-owned parse cache. Unchanged files reuse their trees; changed files are
+/// the only files parsed again. Import declarations are re-read against the filesystem without
+/// re-parsing so added and deleted imports stay correct.
+pub fn extract_incremental(
+    project: &Path,
+    entry: &Path,
+    cache: &mut ParseCache,
+) -> Result<(m::SourceModel, LoadStats), String> {
+    extract_in_context_impl(project, entry, None, None, None, cache)
+}
+
+fn extract_in_context_impl(
+    project: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+    width: Option<u32>,
+    root_attribute: Option<(&str, &str)>,
+    cache: &mut ParseCache,
+) -> Result<(m::SourceModel, LoadStats), String> {
     if let Some((name, value)) = root_attribute
         && (built_css.is_none()
             || !name.starts_with("data-")
@@ -277,11 +310,14 @@ pub fn extract_in_context(
         return Err("viewport width requires built CSS and a positive width in CSS pixels".into());
     }
     let mut diagnostics = Vec::new();
-    let syntax::Sources {
-        entry,
-        artifact,
-        files,
-    } = syntax::load(project, entry, built_css, &mut diagnostics)?;
+    let (
+        syntax::Sources {
+            entry,
+            artifact,
+            files,
+        },
+        stats,
+    ) = syntax::load_cached(project, entry, built_css, &mut diagnostics, cache)?;
     let built = artifact
         .as_ref()
         .map(|p| style::built::Sheet::new(&files[p], width, root_attribute))
@@ -357,6 +393,7 @@ pub fn extract_in_context(
                 file,
                 files: &files,
                 slots: slot,
+                class_render: f.kind() == "method_definition",
                 tailwind,
                 built: built.as_ref(),
                 modules: modules.bindings(file, f),
@@ -406,6 +443,8 @@ pub fn extract_in_context(
             })
         }
     }
+    model.components.sort_by(|a, b| a.id.cmp(&b.id));
+    hash_routes::apply(&files[&entry], &mut model);
     for e in &mut model.edges {
         if let m::EdgeTarget::Route { route } = &e.to
             && model
@@ -419,10 +458,9 @@ pub fn extract_in_context(
         }
     }
     model.screens.sort_by(|a, b| a.id.cmp(&b.id));
-    model.components.sort_by(|a, b| a.id.cmp(&b.id));
     model.edges.sort_by(|a, b| a.id.cmp(&b.id));
     model.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
     model.tokens.sort_by(|a, b| a.id.cmp(&b.id));
     m::validate(&model).map_err(|errs| format!("invalid source model: {errs:?}"))?;
-    Ok(model)
+    Ok((model, stats))
 }

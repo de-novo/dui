@@ -1,5 +1,6 @@
 //! Source ranges, declarations and local module imports. No project code is executed.
 use dui_core::source_model::{Diagnostic, Location};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -7,6 +8,7 @@ use std::{
 };
 use tree_sitter::{Node as Ast, Parser, Tree};
 
+#[derive(Clone)]
 pub struct File {
     pub path: String,
     pub src: String,
@@ -14,7 +16,6 @@ pub struct File {
     pub imports: BTreeSet<String>,
     // Local alias -> (module or relative file, exported name).
     pub bindings: BTreeMap<String, (String, String)>,
-    // Literal dynamic-import request -> relative file.
     pub dynamic_imports: BTreeMap<String, String>,
 }
 pub fn children(n: Ast<'_>) -> Vec<Ast<'_>> {
@@ -87,6 +88,8 @@ impl File {
                 }
                 let f = match n.kind() {
                     "function_declaration" => n,
+                    "class_declaration" => self.class_render(n)?,
+
                     "variable_declarator" => {
                         field(n, "value").filter(|v| v.kind() == "arrow_function")?
                     }
@@ -95,6 +98,38 @@ impl File {
                 Some((name, f))
             })
             .collect()
+    }
+    fn class_render<'a>(&self, class: Ast<'a>) -> Option<Ast<'a>> {
+        let heritage = children(class)
+            .into_iter()
+            .find(|n| n.kind() == "class_heritage")?;
+        let base = children(heritage)
+            .into_iter()
+            .find(|n| n.kind() == "extends_clause")
+            .and_then(|n| field(n, "value"))?;
+        let (alias, component) = if base.kind() == "member_expression" {
+            let receiver = self.name(base, "object")?;
+            let (module, export) = self.bindings.get(receiver)?;
+            if module != "react" || !matches!(export.as_str(), "*" | "default") {
+                return None;
+            }
+            (receiver, self.name(base, "property")?)
+        } else {
+            let name = self.text(base);
+            (name, self.bindings.get(name)?.1.as_str())
+        };
+        if self.bindings.get(alias)?.0 != "react"
+            || !matches!(component, "Component" | "PureComponent")
+        {
+            return None;
+        }
+        children(field(class, "body")?).into_iter().find(|n| {
+            n.kind() == "method_definition"
+                && self.name(*n, "name") == Some("render")
+                && !n
+                    .children(&mut n.walk())
+                    .any(|child| child.kind() == "static")
+        })
     }
     pub fn exported(&self, name: &str) -> Option<&str> {
         children(self.tree.root_node())
@@ -147,6 +182,7 @@ impl File {
             })
     }
 }
+
 fn export_text(text: &str) -> &str {
     text.strip_prefix('"')
         .and_then(|s| s.strip_suffix('"'))
@@ -272,18 +308,168 @@ fn resolve(root: &Path, from: &str, request: &str, aliases: &[Alias]) -> Option<
         })
         .find_map(|p| relative(root, &p))
 }
+
+/// Read the import statements of an already parsed file against the current filesystem. This
+/// refreshes added and removed imports without re-parsing the file's source.
+struct ImportScan {
+    imports: BTreeSet<String>,
+    bindings: BTreeMap<String, (String, String)>,
+    diagnostics: Vec<Diagnostic>,
+    dynamic_imports: BTreeMap<String, String>,
+}
+
+fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
+    let mut imports = BTreeSet::new();
+    let mut bindings = BTreeMap::new();
+    let mut diagnostics = Vec::new();
+    let mut dynamic_imports = BTreeMap::new();
+    for stmt in children(file.tree.root_node())
+        .into_iter()
+        .filter(|n| n.kind() == "import_statement")
+    {
+        let Some(source) = field(stmt, "source") else {
+            continue;
+        };
+        let raw = file.text(source);
+        let Some(request) = raw.get(1..raw.len().saturating_sub(1)) else {
+            continue;
+        };
+        let mut module = request.to_owned();
+        if request.starts_with('.') || uses_alias(request, aliases) {
+            if let Some(resolved) = resolve(root, &file.path, request, aliases) {
+                module = resolved;
+                if module != file.path {
+                    imports.insert(module.clone());
+                }
+            } else {
+                diagnostics.push(Diagnostic {
+                    code: "unresolved-import".into(),
+                    message: request.into(),
+                    location: Some(file.loc(source)),
+                });
+            }
+        }
+        let mut imported = Vec::new();
+        for clause in children(stmt)
+            .into_iter()
+            .filter(|n| n.kind() == "import_clause")
+            .flat_map(children)
+        {
+            match clause.kind() {
+                "identifier" => imported.push((file.text(clause).to_owned(), "default".to_owned())),
+                "namespace_import" => {
+                    if let Some(alias) = first(clause) {
+                        imported.push((file.text(alias).into(), "*".into()));
+                    }
+                }
+                "named_imports" => {
+                    for spec in children(clause) {
+                        if let Some(name) = file.name(spec, "name") {
+                            imported.push((
+                                file.name(spec, "alias").unwrap_or(name).to_owned(),
+                                name.to_owned(),
+                            ))
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for (alias, name) in imported {
+            bindings.insert(alias, (module.clone(), name));
+        }
+    }
+    let mut pending_nodes = vec![file.tree.root_node()];
+    while let Some(node) = pending_nodes.pop() {
+        if node.kind() == "call_expression"
+            && field(node, "function").is_some_and(|f| f.kind() == "import")
+            && let Some(argument) = field(node, "arguments").and_then(first)
+            && argument.kind() == "string"
+        {
+            let raw = file.text(argument);
+            if let Some(request) = raw.get(1..raw.len().saturating_sub(1)) {
+                if let Some(resolved) = resolve(root, &file.path, request, aliases) {
+                    dynamic_imports.insert(request.to_owned(), resolved.clone());
+                    if resolved != file.path {
+                        imports.insert(resolved);
+                    }
+                } else if request.starts_with('.') || uses_alias(request, aliases) {
+                    diagnostics.push(Diagnostic {
+                        code: "unresolved-import".into(),
+                        message: request.into(),
+                        location: Some(file.loc(argument)),
+                    });
+                }
+            }
+        }
+        pending_nodes.extend(children(node));
+    }
+    ImportScan {
+        imports,
+        bindings,
+        diagnostics,
+        dynamic_imports,
+    }
+}
+
+fn parse_file(path: &str, src: String, parser: &mut Parser) -> Result<File, String> {
+    let lang = if path.ends_with(".css") {
+        tree_sitter_css::LANGUAGE
+    } else if path.ends_with(".tsx") {
+        tree_sitter_typescript::LANGUAGE_TSX
+    } else {
+        tree_sitter_typescript::LANGUAGE_TYPESCRIPT
+    };
+    parser
+        .set_language(&lang.into())
+        .map_err(|e| e.to_string())?;
+    let tree = parser
+        .parse(src.as_bytes(), None)
+        .ok_or("parse interrupted")?;
+    Ok(File {
+        path: path.into(),
+        src,
+        tree,
+        imports: BTreeSet::new(),
+        bindings: BTreeMap::new(),
+        dynamic_imports: BTreeMap::new(),
+    })
+}
+
 pub struct Sources {
     pub entry: String,
     pub artifact: Option<String>,
     pub files: BTreeMap<String, File>,
 }
 
-pub fn load(
+#[derive(Default)]
+pub struct ParseCache {
+    files: BTreeMap<String, (String, File)>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct LoadStats {
+    pub parsed: Vec<String>,
+    pub reused: Vec<String>,
+}
+
+pub fn load_cached(
     root: &Path,
     entry: &Path,
     built_css: Option<&Path>,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Result<Sources, String> {
+    cache: &mut ParseCache,
+) -> Result<(Sources, LoadStats), String> {
+    load_inner(root, entry, built_css, diagnostics, Some(cache))
+}
+
+fn load_inner(
+    root: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+    diagnostics: &mut Vec<Diagnostic>,
+    mut cache: Option<&mut ParseCache>,
+) -> Result<(Sources, LoadStats), String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let aliases = path_aliases(&root);
     let entry = relative(&root, &root.join(entry))
@@ -299,6 +485,7 @@ pub fn load(
     let mut pending = vec![entry.clone()];
     pending.extend(built_css.iter().cloned());
     let mut files = BTreeMap::new();
+    let mut stats = LoadStats::default();
     let mut parser = Parser::new();
     while let Some(path) = pending.pop() {
         if files.contains_key(&path) {
@@ -308,26 +495,24 @@ pub fn load(
         if src.len() >= u32::MAX as usize {
             return Err(format!("{path}: source exceeds model location range"));
         }
-        let lang = if path.ends_with(".css") {
-            tree_sitter_css::LANGUAGE
-        } else if path.ends_with(".tsx") {
-            tree_sitter_typescript::LANGUAGE_TSX
+        let sha256 = format!("{:x}", Sha256::digest(src.as_bytes()));
+        let cached = cache
+            .as_ref()
+            .and_then(|cache| cache.files.get(&path))
+            .filter(|(cached_sha, _)| cached_sha == &sha256)
+            .map(|(_, file)| file.clone());
+        let mut file = if let Some(file) = cached {
+            stats.reused.push(path.clone());
+            file
         } else {
-            tree_sitter_typescript::LANGUAGE_TYPESCRIPT
-        };
-        parser
-            .set_language(&lang.into())
-            .map_err(|e| e.to_string())?;
-        let tree = parser
-            .parse(src.as_bytes(), None)
-            .ok_or("parse interrupted")?;
-        let mut file = File {
-            path: path.clone(),
-            src,
-            tree,
-            imports: BTreeSet::new(),
-            bindings: BTreeMap::new(),
-            dynamic_imports: BTreeMap::new(),
+            stats.parsed.push(path.clone());
+            let parsed = parse_file(&path, src, &mut parser)?;
+            if let Some(cache) = cache.as_mut() {
+                cache
+                    .files
+                    .insert(path.clone(), (sha256.clone(), parsed.clone()));
+            }
+            parsed
         };
         if file.tree.root_node().has_error() {
             diagnostics.push(Diagnostic {
@@ -336,90 +521,24 @@ pub fn load(
                 location: Some(file.loc(file.tree.root_node())),
             });
         }
-        for stmt in children(file.tree.root_node())
-            .into_iter()
-            .filter(|n| n.kind() == "import_statement")
-        {
-            let Some(source) = field(stmt, "source") else {
-                continue;
-            };
-            let raw = file.text(source);
-            let Some(request) = raw.get(1..raw.len().saturating_sub(1)) else {
-                continue;
-            };
-            let mut module = request.to_owned();
-            if request.starts_with('.') || uses_alias(request, &aliases) {
-                if let Some(resolved) = resolve(&root, &path, request, &aliases) {
-                    module = resolved;
-                    if module != path && file.imports.insert(module.clone()) {
-                        pending.push(module.clone());
-                    }
-                } else {
-                    diagnostics.push(Diagnostic {
-                        code: "unresolved-import".into(),
-                        message: request.into(),
-                        location: Some(file.loc(source)),
-                    });
-                }
+        let mut scan = scan_imports(&root, &file, &aliases);
+        file.imports = scan.imports;
+        file.bindings = scan.bindings;
+        file.dynamic_imports = scan.dynamic_imports;
+        diagnostics.append(&mut scan.diagnostics);
+        for module in &file.imports {
+            if !files.contains_key(module) {
+                pending.push(module.clone());
             }
-            let mut bindings = Vec::new();
-            for clause in children(stmt)
-                .into_iter()
-                .filter(|n| n.kind() == "import_clause")
-                .flat_map(children)
-            {
-                match clause.kind() {
-                    "identifier" => {
-                        bindings.push((file.text(clause).to_owned(), "default".to_owned()))
-                    }
-                    "named_imports" => {
-                        for spec in children(clause) {
-                            if let Some(name) = file.name(spec, "name") {
-                                bindings.push((
-                                    file.name(spec, "alias").unwrap_or(name).to_owned(),
-                                    name.to_owned(),
-                                ))
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            for (alias, name) in bindings {
-                file.bindings.insert(alias, (module.clone(), name));
-            }
-        }
-        let mut pending_nodes = vec![file.tree.root_node()];
-        while let Some(node) = pending_nodes.pop() {
-            if node.kind() == "call_expression"
-                && field(node, "function").is_some_and(|f| f.kind() == "import")
-                && let Some(argument) = field(node, "arguments").and_then(first)
-                && argument.kind() == "string"
-            {
-                let raw = file.text(argument);
-                if let Some(request) = raw.get(1..raw.len().saturating_sub(1)) {
-                    if let Some(resolved) = resolve(&root, &path, request, &aliases) {
-                        file.dynamic_imports
-                            .insert(request.to_owned(), resolved.clone());
-                        if resolved != path && file.imports.insert(resolved.clone()) {
-                            pending.push(resolved);
-                        }
-                    } else if request.starts_with('.') || uses_alias(request, &aliases) {
-                        diagnostics.push(Diagnostic {
-                            code: "unresolved-import".into(),
-                            message: request.into(),
-                            location: Some(file.loc(argument)),
-                        });
-                    }
-                }
-            }
-            pending_nodes.extend(children(node));
         }
         files.insert(path, file);
     }
-    Ok(Sources {
-        entry,
-        artifact: built_css,
-        files,
-    })
+    Ok((
+        Sources {
+            entry,
+            artifact: built_css,
+            files,
+        },
+        stats,
+    ))
 }
