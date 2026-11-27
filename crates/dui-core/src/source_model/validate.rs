@@ -704,11 +704,67 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
             false,
             Some(&["none", "underline", "overline", "line-through"]),
         ),
+        P::BorderCollapse => (false, false, false, Some(&["collapse", "separate"])),
+        P::VerticalAlign => (
+            false,
+            false,
+            false,
+            Some(&[
+                "baseline",
+                "top",
+                "middle",
+                "bottom",
+                "text-top",
+                "text-bottom",
+                "sub",
+                "super",
+            ]),
+        ),
+        P::TextTransform => (
+            false,
+            false,
+            false,
+            Some(&["none", "uppercase", "lowercase", "capitalize"]),
+        ),
+        P::WhiteSpace => (
+            false,
+            false,
+            false,
+            Some(&[
+                "normal",
+                "pre",
+                "nowrap",
+                "pre-wrap",
+                "pre-line",
+                "break-spaces",
+            ]),
+        ),
+        P::BorderStyle
+        | P::BorderTopStyle
+        | P::BorderRightStyle
+        | P::BorderBottomStyle
+        | P::BorderLeftStyle => (
+            false,
+            false,
+            false,
+            Some(&[
+                "none", "hidden", "dotted", "dashed", "solid", "double", "groove", "ridge",
+                "inset", "outset",
+            ]),
+        ),
+        P::BorderTopWidth
+        | P::BorderRightWidth
+        | P::BorderBottomWidth
+        | P::BorderLeftWidth
+        | P::BackdropBlur => (true, false, false, Some(&[])),
+        P::BorderTopColor | P::BorderRightColor | P::BorderBottomColor | P::BorderLeftColor => {
+            (false, false, true, Some(&[]))
+        }
         P::TextAlign => (
             false,
             false,
             false,
-            Some(&["start", "center", "end", "justify"]),
+            Some(&["start", "center", "end", "justify", "left", "right"]),
         ),
     };
     match value {

@@ -143,6 +143,10 @@ export function drawModel(model: Model, componentId: string) {
           continue;
         }
       }
+      if (d.property === "backdropBlur" && !d.when && d.value.kind === "length") {
+        el.style.backdropFilter = `blur(${cssValue(d.value)})`;
+        continue;
+      }
       const key = css[d.property] ?? d.property.replace(/[A-Z]/g, (ch) => "-" + ch.toLowerCase());
       const val = cssValue(d.value);
       if (!val || d.when || !CSS.supports(key, val)) {
@@ -156,7 +160,11 @@ export function drawModel(model: Model, componentId: string) {
         d.property === "wrap"
       )
         if (!el.style.display) el.style.display = "flex";
-      if (d.property === "borderWidth") el.style.borderStyle = "solid";
+      if (
+        d.property === "borderWidth" &&
+        !n.style?.some((s) => s.property === "borderStyle" && !s.when && cssValue(s.value))
+      )
+        el.style.borderStyle = "solid";
       el.style.setProperty(key, val);
     }
     for (const u of n.unresolvedStyle ?? []) unresolved.add(n.id + " · " + u.text);
