@@ -264,6 +264,12 @@ impl Context<'_> {
                     location: location.clone(),
                 });
             }
+        } else if router == Some("Route") {
+            self.model.diagnostics.push(m::Diagnostic {
+                code: "unresolved-route".into(),
+                message: "Route requires a literal absolute path and a statically resolved element component".into(),
+                location: Some(location.clone()),
+            });
         }
         if name == "a" || router == Some("Link") {
             let key = if name == "a" { "href" } else { "to" };

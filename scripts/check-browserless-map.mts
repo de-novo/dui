@@ -2,7 +2,7 @@
 // still maps a static build and a running URL from the HTML their servers send, with screens,
 // edges and the limitation that links only scripts add are missing.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -97,6 +97,57 @@ const server = createServer((req, res) => {
   }
 });
 try {
+  const project = join(root, "fixtures/source-model");
+  for (const entry of [[], ["--entry", "src/App.tsx"]]) {
+    const report = JSON.parse(
+      execFileSync(binary, ["map", project, ...entry], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: join(stage, "tsx-home"), PATH: "", DUI_CHROMIUM: "/absent" },
+      }),
+    );
+    const artifact = (file: string) => JSON.parse(readFileSync(join(report.output, file), "utf8"));
+    assert.equal(report.screenDiscovery.kind, "tsx-source");
+    assert.equal(report.browser, null);
+    assert.deepEqual(report.cells, []);
+    assert.deepEqual(
+      artifact("source-model.json"),
+      JSON.parse(execFileSync(binary, ["model", project, "src/App.tsx"], { encoding: "utf8" })),
+    );
+    const graph = artifact("graph.json");
+    assert.deepEqual(
+      graph.nodes.map((n: { label: string }) => n.label),
+      ["/", "/settings"],
+    );
+    assert.deepEqual(
+      graph.edges.map((e: { source: string; target: string }) => [e.source, e.target]),
+      [
+        ["route:/", "route:/settings"],
+        ["route:/settings", "route:/"],
+      ],
+    );
+  }
+  const dynamic = join(stage, "dynamic");
+  mkdirSync(dynamic);
+  writeFileSync(
+    join(dynamic, "App.tsx"),
+    [
+      'import { Link, Route } from "react-router";',
+      "export function App(){return <><Route path={runtimePath} element={<App/>}/><Link to={runtimeTarget}>Open</Link></>}",
+    ].join("\n"),
+  );
+  const dynamicReport = JSON.parse(
+    execFileSync(binary, ["map", dynamic], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: join(stage, "dynamic-home"), PATH: "", DUI_CHROMIUM: "/absent" },
+    }),
+  );
+  assert.equal(dynamicReport.screenDiscovery.resolvedRelations, 0);
+  assert.equal(dynamicReport.screenDiscovery.unresolvedRelations.length, 1);
+  const unresolvedRoute = dynamicReport.screenDiscovery.diagnostics.find(
+    (d: { code: string }) => d.code === "unresolved-route",
+  );
+  assert.equal(unresolvedRoute.location.file, "App.tsx");
+  assert.equal(unresolvedRoute.location.line, 2);
   const built = await map([site, "--build-dir", site], "home-build");
   check("--build-dir", built.report);
   const again = await map([site, "--build-dir", site], "home-build");
