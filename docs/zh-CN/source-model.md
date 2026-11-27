@@ -110,6 +110,8 @@ flowchart LR
 
 ## 6. 样式
 
+模型只有一个 `gap` 值。CSS 和内联 TSX 中的 `1.5rem 1.5rem` 均可表示该间距。两个值不同时，以及单独声明 `row-gap` 或 `column-gap` 时，保留未解析的源码。
+
 元素的 `style` 是一个声明列表。每条声明有 `property`、`value`、可选的 `when` 条件和 `from`（声明的来源）：`syntax`（`class`、`inline`、`modifier`、`stylesheet`、`theme`）、其 `text`（一个类、一个内联条目、一个 modifier）和 `location`。声明按顺序生效。在条件成立的声明中，后面的生效。
 
 | 分组 | 属性 | 值 |

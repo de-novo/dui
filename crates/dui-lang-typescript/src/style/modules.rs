@@ -220,6 +220,7 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
         (props.to_vec(), spacing_value(name, raw))
     } else {
         match name {
+            "gap" => (vec![P::Gap], super::uniform_gap(raw)),
             "color" => (vec![P::Color], color(raw)),
             "background-color" => (vec![P::Background], color(raw)),
             "border-color" => (vec![P::BorderColor], color(raw)),
@@ -236,7 +237,6 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
             ),
             _ => {
                 let props = match name {
-                    "gap" => vec![P::Gap],
                     "width" => vec![P::Width],
                     "height" => vec![P::Height],
                     "min-width" => vec![P::MinWidth],

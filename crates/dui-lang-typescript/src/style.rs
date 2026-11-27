@@ -36,6 +36,28 @@ fn length(s: &str) -> Option<V> {
     }
     None
 }
+// Schema v1 has a single gap. A two-axis CSS shorthand fits only when the
+// specified lengths agree; comparing resolved pixels would depend on layout.
+fn uniform_gap(raw: &str) -> Option<V> {
+    let parse = |word: &str| {
+        if word.parse::<f64>().ok() == Some(0.) {
+            return Some(V::Length {
+                value: 0.,
+                unit: m::LengthUnit::Px,
+            });
+        }
+        length(word).filter(|v| matches!(v,V::Length{value,..} if *value>=0.))
+    };
+    let mut words = raw.split_ascii_whitespace();
+    let row = parse(words.next()?)?;
+    if let Some(column) = words.next()
+        && (parse(column)? != row || words.next().is_some())
+    {
+        return None;
+    }
+    Some(row)
+}
+
 pub fn theme(f: &File) -> Vec<m::Token> {
     let mut tokens = BTreeMap::new();
     for rule in children(f.tree.root_node()) {
@@ -285,7 +307,17 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
     }
     let val = crate::literal(f, raw)?;
     let props = match name {
-        "gap" => vec![P::Gap],
+        "gap" => {
+            let value = if let Some(n) = val.as_f64().filter(|n| *n >= 0.) {
+                V::Length {
+                    value: n,
+                    unit: m::LengthUnit::Px,
+                }
+            } else {
+                uniform_gap(val.as_str()?)?
+            };
+            return Some((vec![P::Gap], value));
+        }
         "width" => vec![P::Width],
         "height" => vec![P::Height],
         "borderRadius" => vec![P::BorderRadius],
