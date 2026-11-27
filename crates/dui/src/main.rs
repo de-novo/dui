@@ -375,7 +375,7 @@ CAPTURE
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
   dui recheck RUN [PROJECT [MANIFEST]]    Re-render unsuccessful cells with current project conditions
-  dui model PROJECT ENTRY.tsx             Print the syntax-only TSX source model as JSON
+  dui model PROJECT ENTRY.tsx [--built-css FILE]  Print the TSX source model as JSON
   dui scan [PROJECT] [MANIFEST]           Print compiler facts, controls, and auto-mocks (no browser)
   dui transitions PROJECT MANIFEST [RUN]  Replay actions and verify screen transitions
 
@@ -454,11 +454,21 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
     if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "model"
     {
-        let [project, entry] = rest else {
-            return Err(failure(2, "expected model PROJECT ENTRY.tsx"));
+        let (project, entry, css) = match rest {
+            [project, entry] => (project, entry, None),
+            [project, entry, flag, css] if flag == "--built-css" => {
+                (project, entry, Some(Path::new(css)))
+            }
+            _ => {
+                return Err(failure(
+                    2,
+                    "expected model PROJECT ENTRY.tsx [--built-css FILE]",
+                ));
+            }
         };
-        let model = dui_lang_typescript::extract(Path::new(project), Path::new(entry))
-            .map_err(|reason| failure(2, &reason))?;
+        let model =
+            dui_lang_typescript::extract_with_css(Path::new(project), Path::new(entry), css)
+                .map_err(|reason| failure(2, &reason))?;
         let raw = model
             .to_json()
             .map_err(|error| failure(3, &error.to_string()))?;

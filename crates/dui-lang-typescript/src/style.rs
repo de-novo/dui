@@ -1,4 +1,5 @@
 //! Map static style syntax and retain the source of each unsupported declaration.
+pub(crate) mod built;
 pub(crate) mod modules;
 use crate::syntax::{File, children, field, first, unwrap_expr};
 use dui_core::source_model::{self as m, StyleProperty as P, StyleValue as V};
@@ -136,14 +137,14 @@ pub fn theme(f: &File) -> Vec<m::Token> {
             .filter(|n| n.kind() == "declaration")
         {
             let parts = children(decl);
-            let [name, value] = parts.as_slice() else {
+            let [name, value, rest @ ..] = parts.as_slice() else {
                 continue;
             };
             let name = f.text(*name);
-            let val = f.text(*value);
+            let val = &f.src[value.start_byte()..rest.last().unwrap_or(value).end_byte()];
             let group = if name.starts_with("--color-") {
                 m::TokenGroup::Color
-            } else if name.starts_with("--spacing-") {
+            } else if name == "--spacing" || name.starts_with("--spacing-") {
                 m::TokenGroup::Spacing
             } else if name.starts_with("--radius-") {
                 m::TokenGroup::Radius
@@ -152,6 +153,11 @@ pub fn theme(f: &File) -> Vec<m::Token> {
             };
             let value = (if group == m::TokenGroup::Color {
                 color(val)
+            } else if group == m::TokenGroup::Spacing && val.parse::<f64>().ok() == Some(0.) {
+                Some(V::Length {
+                    value: 0.,
+                    unit: m::LengthUnit::Px,
+                })
             } else {
                 length(val)
             })
@@ -317,6 +323,35 @@ fn shorthand(name: &str, raw: &str) -> Option<Vec<(P, V)>> {
             .collect(),
     )
 }
+fn scaled_spacing(class: &str, step: u16, tokens: &[m::Token]) -> V {
+    let mut bases = tokens.iter().filter(|token| token.name == "--spacing");
+    let scale = f64::from(step);
+    let Some(base) = bases.next() else {
+        return V::Length {
+            value: scale / 4.,
+            unit: m::LengthUnit::Rem,
+        };
+    };
+    let length = if let V::Token { resolved, .. } = &base.value {
+        resolved.as_deref()
+    } else {
+        Some(&base.value)
+    };
+    if bases.next().is_none()
+        && let Some(V::Length { value, unit }) = length
+        && (value * scale).is_finite()
+    {
+        return V::Length {
+            value: value * scale,
+            unit: *unit,
+        };
+    }
+    V::Unresolved {
+        text: class.into(),
+        reason: "Cannot resolve the --spacing scale".into(),
+    }
+}
+
 fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
     let (prop, keyword) = match s {
         "flex" | "flex-row" => (P::Direction, "row"),
@@ -342,13 +377,7 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
                     return None;
                 }
                 let step = key.parse::<u16>().ok()?;
-                return Some((
-                    props.into(),
-                    V::Length {
-                        value: f64::from(step) / 4.,
-                        unit: m::LengthUnit::Rem,
-                    },
-                ));
+                return Some((props.into(), scaled_spacing(s, step, tokens)));
             };
             if matches.next().is_some() {
                 return None;

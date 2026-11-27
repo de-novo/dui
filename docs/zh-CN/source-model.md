@@ -17,6 +17,8 @@
 
 运行 `dui model PROJECT ENTRY.tsx`，从 TSX 入口及其相对导入生成 schema v1 JSON。可用 `dui model fixtures/source-model src/App.tsx` 运行示例。适配器读取具名函数和箭头函数组件、解构的 props、本地状态、已声明的调用返回类型、JSX 分支和列表模板、React Router 路由和链接、内联样式，以及导入 Tailwind CSS 的项目中的常见工具类。CSS Modules、未支持的类和动态表达式保留原文。无需安装项目依赖、类型检查器或浏览器。
 
+使用 `--built-css FILE` 可读取项目内的单个 CSS 构建产物。适配器根据生成的规则解析静态 HTML 元素的标量 `gap`，支持命名层、简单类选择器和 data 属性存在选择器，并记录所选声明在产物中的位置。可能生效的未支持选择器或条件间距规则会产生未解析值。其他属性仍从源码提取。
+
 ## 1. 原则
 
 1. **声明，而非观察。** 模型只记录代码所说的内容。它不运行处理函数，不调用 API，也不启动浏览器。捕获结果留在[捕获上下文](domain-model.md#2-实体值对象与标识)中。

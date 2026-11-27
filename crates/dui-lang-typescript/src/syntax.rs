@@ -150,16 +150,31 @@ fn resolve(root: &Path, from: &str, request: &str) -> Option<String> {
         })
         .find_map(|p| relative(root, &p))
 }
+pub struct Sources {
+    pub entry: String,
+    pub artifact: Option<String>,
+    pub files: BTreeMap<String, File>,
+}
+
 pub fn load(
     root: &Path,
     entry: &Path,
+    built_css: Option<&Path>,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Result<(String, BTreeMap<String, File>), String> {
+) -> Result<Sources, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let entry = relative(&root, &root.join(entry))
         .filter(|p| p.ends_with(".tsx"))
         .ok_or("expected a TSX entry file inside PROJECT")?;
+    let built_css = built_css
+        .map(|path| {
+            relative(&root, &root.join(path))
+                .filter(|p| p.ends_with(".css"))
+                .ok_or("expected a built .css file inside PROJECT")
+        })
+        .transpose()?;
     let mut pending = vec![entry.clone()];
+    pending.extend(built_css.iter().cloned());
     let mut files = BTreeMap::new();
     let mut parser = Parser::new();
     while let Some(path) = pending.pop() {
@@ -252,5 +267,9 @@ pub fn load(
         }
         files.insert(path, file);
     }
-    Ok((entry, files))
+    Ok(Sources {
+        entry,
+        artifact: built_css,
+        files,
+    })
 }
