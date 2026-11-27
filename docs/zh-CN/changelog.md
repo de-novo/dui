@@ -9,6 +9,7 @@
 
 ### Added
 
+- 使用 `dui model PROJECT ENTRY.tsx` 直接从 TSX 提取源码模型。 ([#355](https://github.com/de-novo/dui/issues/355))
 - 带版本的源码模型，schema 版本 1：界面、组件、槽位、分支、列表、列表项 schema、跳转边、中立样式属性和设计 token，附 JSON Schema、检查引用的 Rust 读取器和 TSX 参考示例（`npm run check:source-model`）([#353](https://github.com/de-novo/dui/issues/353))。
 - 从本地 URL 或静态构建产物绘制网页地图，从原生源码发现路由并关联模拟器截图。 ([#238](https://github.com/de-novo/dui/pull/238), [#241](https://github.com/de-novo/dui/pull/241), [#243](https://github.com/de-novo/dui/pull/243)).
 - 检查捕获依据，重试失败的格子，并在 PR 中比较界面。 ([#199](https://github.com/de-novo/dui/pull/199), [#201](https://github.com/de-novo/dui/pull/201), [#205](https://github.com/de-novo/dui/pull/205)).

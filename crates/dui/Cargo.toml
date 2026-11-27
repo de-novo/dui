@@ -6,6 +6,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+dui-lang-typescript.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 dui-core.workspace = true

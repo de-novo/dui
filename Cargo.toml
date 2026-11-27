@@ -2,6 +2,7 @@
 members = [
   "crates/dui-core",
   "crates/dui-ports",
+  "crates/dui-lang-typescript",
   "crates/dui-storage",
   "crates/dui-app",
   "crates/dui",
@@ -14,6 +15,10 @@ license = "Apache-2.0"
 version = "0.2.0"
 
 [workspace.dependencies]
+dui-lang-typescript = { path = "crates/dui-lang-typescript" }
+tree-sitter = "0.25.10"
+tree-sitter-css = "0.25.0"
+tree-sitter-typescript = "0.23.2"
 base64 = "0.22"
 csv = "1"
 dui-app = { path = "crates/dui-app" }

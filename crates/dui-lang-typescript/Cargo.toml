@@ -1,0 +1,14 @@
+[package]
+name = "dui-lang-typescript"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+dui-core.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tree-sitter.workspace = true
+tree-sitter-typescript.workspace = true
+tree-sitter-css.workspace = true

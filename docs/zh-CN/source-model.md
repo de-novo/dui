@@ -15,6 +15,8 @@
 | 参考示例 | [`fixtures/source-model/src/`](../../fixtures/source-model/src/) 中 TSX 源码对应的 [`fixtures/source-model/model.json`](../../fixtures/source-model/model.json) |
 | 检查 | `npm run check:source-model` |
 
+运行 `dui model PROJECT ENTRY.tsx`，从 TSX 入口及其相对导入生成 schema v1 JSON。可用 `dui model fixtures/source-model src/App.tsx` 运行示例。适配器读取具名函数和箭头函数组件、解构的 props、本地状态、已声明的调用返回类型、JSX 分支和列表模板、React Router 路由和链接、内联样式，以及导入 Tailwind CSS 的项目中的常见工具类。CSS Modules、未支持的类和动态表达式保留原文。无需安装项目依赖、类型检查器或浏览器。
+
 ## 1. 原则
 
 1. **声明，而非观察。** 模型只记录代码所说的内容。它不运行处理函数，不调用 API，也不启动浏览器。捕获结果留在[捕获上下文](domain-model.md#2-实体值对象与标识)中。
