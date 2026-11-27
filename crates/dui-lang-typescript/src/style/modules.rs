@@ -223,7 +223,7 @@ fn media(f: &File, query: Ast<'_>) -> Option<m::Condition> {
         expr: None,
     })
 }
-fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
+pub(super) fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
     if let Some(mapped) = super::flex_keyword(name, Some(raw), raw) {
         return Some(mapped);
     }

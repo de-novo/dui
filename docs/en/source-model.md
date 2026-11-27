@@ -15,7 +15,7 @@ The source model is what source code declares about its UI. Language adapters wr
 
 Run `dui model PROJECT ENTRY.tsx` to print schema-v1 JSON from a TSX entry and its relative imports. Try `dui model fixtures/source-model src/App.tsx`. The adapter reads named function and arrow components, destructured props, local state, declared call return types, JSX branches and list templates, React Router routes and links, inline styles, and common utilities in projects that import Tailwind CSS. CSS Modules, unsupported classes and dynamic expressions retain their source. The command requires no project install, type checker or browser.
 
-Pass `--built-css FILE` to read a single bundled stylesheet inside the project. For static HTML elements the adapter resolves scalar `gap` from emitted rules, including named layers, simple class selectors and data-attribute presence. The selected declaration points into the bundle. Unsupported selectors or conditional gap rules that could apply yield an unresolved value. Other properties use source extraction.
+Pass `--built-css FILE` to read a single bundled stylesheet inside the project. For static HTML elements, the adapter resolves flex direction, wrapping, growth and alignment, gap, padding, margins, dimensions and their limits, foreground and background color, opacity, border width, color and radius, font size, line height and letter spacing. It applies supported rules by layer, selector specificity and declaration order, and records the winning declaration’s byte range. A potentially winning rule with an unknown condition or unsupported value stays unresolved. The model records declarations on the element; inherited or browser-default computed values are outside this extraction.
 
 ## 1. Principles
 
