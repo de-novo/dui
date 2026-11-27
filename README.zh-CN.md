@@ -19,7 +19,7 @@ dui 从项目的官方编译器读取类型。库规则识别程序中的特定 
 | 要查看的内容 | 方法 |
 | --- | --- |
 | 有类型的状态槽和路由参数 | `dui scan` 使用项目的 TypeScript 编译器及匹配符号的规则。 |
-| 不同宽度下可访问的网页 | 向 `dui map` 提供本地 URL 或静态构建目录。Chromium 可跨框架沿同源链接访问页面。 |
+| 不同宽度下可访问的网页 | 向 `dui map` 提供本地 URL 或静态构建目录。dui 沿服务器发送的 HTML 中的同源链接访问页面；`--capture` 时用 Chromium 渲染。 |
 | 源码中声明的原生界面 | 在 React Navigation、Expo Router 或 Flutter 项目中运行 `dui map`。每张卡片指向相应的声明。 |
 | 渲染后的 UI | 在配置的 Web、移动、桌面或终端宿主上捕获。部分 SwiftUI 和 Compose 组件也可导出为可交互的 HTML 预览。 |
 
@@ -77,7 +77,7 @@ dui open --no-open
 
 运行 `curl -fsSL https://dui.sh/install | DUI_TAG=main sh` 安装开发版。以下示例和命令表适用于开发版。网站也提供[默认安装版本的发布文档](https://dui.sh/?lang=zh-CN#release-guide)。
 
-开发版的 `dui map --no-capture` 规划界面、状态和宽度但不截图，`dui map` 截取所有计划的格子。参见[共享屏幕地图](docs/zh-CN/web-viewer.md#共享屏幕地图)。
+开发版的 `dui map` 不启动浏览器规划界面、状态和宽度，`dui map --capture` 截取所有计划的格子。参见[共享屏幕地图](docs/zh-CN/web-viewer.md#共享屏幕地图)。
 
 如果静态站点已构建到 `dist/`，在项目根目录运行以下命令，再用上面的查看器命令打开结果。
 
@@ -90,7 +90,7 @@ dui map . --build-dir dist
 
 | 命令 | 适用场景 |
 | --- | --- |
-| `dui map [PROJECT]` | **带路由应用的默认命令**（TanStack Router、React Router 7/8、Next.js 或链接）。自动发现路由与模态框，并合并 `dui.json` 中的 `routeParams`、`storageState`、`readySelector` 及额外 `scenarios`。 |
+| `dui map [PROJECT]` | **带路由应用的默认命令**（TanStack Router、React Router 7/8、Next.js 或链接）。自动发现路由，合并 `dui.json` 中的 `routeParams`、`storageState`、`readySelector` 及额外 `scenarios`，不启动浏览器规划所有格子；`--capture` 会连同模态框一起截图。 |
 | `dui run [PROJECT] [MANIFEST]` | **按清单直接捕获。** 直接运行 `dui.json`（省略参数默认使用 `.` / `dui.json`；若未指定 `path` 或 `host` 则自动回退到 `dui map`）。 |
 
 | 分组 | 命令 | 用途 |

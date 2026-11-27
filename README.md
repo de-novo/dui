@@ -19,7 +19,7 @@ dui reads types from the project's official compiler. Library rules identify spe
 | To see | Use |
 | --- | --- |
 | Typed state slots and route parameters | `dui scan` with the project's TypeScript compiler and matching symbol rules. |
-| Reachable web screens at different widths | `dui map` with a local URL or static build. Chromium follows same-origin links across frameworks. |
+| Reachable web screens at different widths | `dui map` with a local URL or static build. dui follows same-origin links in the served HTML; `--capture` renders them in Chromium. |
 | Declared native screens | `dui map` on a React Navigation, Expo Router or Flutter project. Each card points to its declaration. |
 | Rendered UI | Capture on the configured web, mobile, desktop or terminal host. Selected SwiftUI and Compose components can also be exported as interactive HTML previews. |
 
@@ -79,7 +79,7 @@ The first command reports the installed version. The second writes a capture and
 
 To install the development build, run `curl -fsSL https://dui.sh/install | DUI_TAG=main sh`. The following example and command reference describe that build. The website also links to the [documentation for the default release](https://dui.sh/?lang=en#release-guide).
 
-On this build `dui map --no-capture` plans the screens, states and widths without capturing them; `dui map` captures every planned cell. See [Shared screen maps](docs/en/web-viewer.md#shared-screen-maps).
+On this build `dui map` plans the screens, states and widths without starting a browser; `dui map --capture` captures every planned cell. See [Shared screen maps](docs/en/web-viewer.md#shared-screen-maps).
 
 For a static site already built in `dist/`, run this command from its project root. Open the result with the viewer command above.
 
@@ -92,7 +92,7 @@ dui map . --build-dir dist
 
 | Command | When to use |
 | --- | --- |
-| `dui map [PROJECT]` | **Default for apps with a router** (TanStack Router, React Router 7/8, Next.js, or links). Automatically discovers screens & modals, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and captures everything. |
+| `dui map [PROJECT]` | **Default for apps with a router** (TanStack Router, React Router 7/8, Next.js, or links). Automatically discovers screens, merges optional `dui.json` (`routeParams`, `storageState`, `readySelector`, and extra out-of-router `scenarios`), and plans every cell without a browser. `--capture` captures everything, modals included. |
 | `dui run [PROJECT] [MANIFEST]` | **Explicit manifest capture.** Runs `dui.json` directly (omitting arguments defaults to `.` / `dui.json`, and falls back to `dui map` if no explicit `path` or `host` is set). |
 
 | Group | Command | Purpose |

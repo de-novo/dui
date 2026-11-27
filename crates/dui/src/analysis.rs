@@ -1408,6 +1408,19 @@ fn execute_with_locales(
             "capturedCells": captured,
         });
     }
+    // A map read from HTML alone did not run the app's scripts, so links they add are missing.
+    if plan_only
+        && report["cells"]
+            .as_array()
+            .is_some_and(|cells| cells.iter().any(|c| c["observation"]["renderer"] == "html"))
+        && let Some(discovery) = report.get_mut("screenDiscovery")
+    {
+        let note = "Links are read from the HTML the server sends, without running scripts; links that only scripts add appear with `dui map --capture`.";
+        match discovery["limitations"].as_array_mut() {
+            Some(limits) => limits.push(json!(note)),
+            None => discovery["limitations"] = json!([note]),
+        }
+    }
     // Each HTML snapshot is rendered back after capture, in the capture's own browsers: at its
     // own width for its fidelity and, when the manifest asks (#323), at the screen's other
     // captured widths, which renders every pair again (46 s for a 301-page site).

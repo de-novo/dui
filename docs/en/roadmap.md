@@ -143,6 +143,13 @@ flowchart TD
 | 8. Figma export | after v0.3.0 | Build frames and variants from the model only. Token names map to Figma variables when possible. | A read-only export needs no snapshot. |
 | 9. GPUI web canvas | from v1.0.0 | Try GPUI (wasm32 web backend, WebGPU with WebGL2 fallback) for the in-app canvas — the screen renderer only. The React shell stays. | Preconditions: a stable official `gpui` crate that includes the web backend; Korean IME and text selection verified. Measure bundle size and tab memory against the TypeScript renderer and record the numbers (a published reference is Zed's Delta web bundle, about 23MB). Keep the GPUI canvas opt-in until it wins on those measurements. Until then, the default screen renderer stays TypeScript/DOM or a lightweight canvas. |
 
+**Phase 2 measurement (2026-11-27).** `dui map --build-dir` on one laptop, release build, end to end, each run twice in the same home ([#368](https://github.com/de-novo/dui/issues/368)). A second run of an explicit target renders every cell again, so the capture path gains nothing from it. True incremental updates after a file change belong to phase 5.
+
+| Example | Browserless default, first / second run | `--capture`, first / second run |
+| --- | --- | --- |
+| Synthetic static site, 301 pages, 602 cells | 2.3 s / 2.4 s | 312 s / 325 s |
+| dui's site, 4 pages, 8 cells | 0.23 s / 0.19 s | 11.3 s / 9.9 s |
+
 **Out of scope for the default path.** Running business logic, calling APIs, or reproducing exact native or web pixels. Those stay on the verification track.
 
 **Pixel verification and the render server (optional, v0.3.x).** A long-lived official-engine render server is optional pixel verification, not the default map ([decision](architecture.md#4-finalized-decisions-2026-11-20)). The default `dui map` and `dui open` do not start a browser. When used, the server is a job dispatcher for `--capture`, `dui run`, and later other surfaces. Work described in [#343](https://github.com/de-novo/dui/issues/343) and [#344](https://github.com/de-novo/dui/issues/344) belongs on this track. It can still grow out of the shared live session owner ([#333](https://github.com/de-novo/dui/issues/333)), but only behind an explicit opt-in.

@@ -2,9 +2,10 @@ use crate::{Reply, archive, failure, replay::io};
 use serde_json::{Value, json};
 use std::{fs, path::Path, process::Command};
 
-/// Map a project, capturing every planned cell. Without `capture` (`--no-capture`) the map holds
-/// no evidence: screens, states and widths are planned, each screen is loaded once to read its
-/// links, and cells stay `not-rendered` (docs/en/web-viewer.md#shared-screen-maps).
+/// Map a project. Without `capture` (the default) the map holds no evidence and starts no browser:
+/// screens, states and widths are planned, each web screen's HTML is read once for its links, and
+/// cells stay `not-rendered`. With `capture` (`--capture`) every planned cell is captured
+/// (docs/en/web-viewer.md#shared-screen-maps, AGENTS.md#never).
 pub fn capture(project: &Path, capture: bool) -> Reply {
     capture_target(project, None, capture)
 }
@@ -57,8 +58,9 @@ pub(crate) fn capture_target(
     result
 }
 
-/// A map without evidence: no images, HTML snapshots or dialog probing; the analysis loads each
-/// screen once at its widest width to read links and leaves every other cell `not-rendered`.
+/// A map without evidence: no browser, images, HTML snapshots or dialog probing; the analysis
+/// reads each screen's HTML once at its widest width for links and leaves every cell
+/// `not-rendered`.
 fn plan_only(manifest: &Path) -> Result<(), (u8, Value)> {
     let mut spec: Value = serde_json::from_slice(&fs::read(manifest).map_err(io)?).map_err(io)?;
     spec["capture"] = json!(false);
@@ -80,6 +82,22 @@ fn summary_line(report: &Value) -> Option<String> {
         report["coverage"]["verified"],
         seconds(&timings["wallMs"])
     );
+    if captured == 0 && report["browser"].is_null() {
+        let screens: std::collections::BTreeSet<&str> = report["cells"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|c| c["path"].as_str())
+            .collect();
+        let screens = match screens.len() {
+            1 => "1 screen".to_owned(),
+            n => format!("{n} screens"),
+        };
+        return Some(format!(
+            "dui map: {screens}, {cells} cells planned without a browser in {}; capture them with --capture",
+            seconds(&timings["wallMs"])
+        ));
+    }
     if let Some(phase) = timings["slowestPhase"].as_str() {
         line.push_str(&format!(
             "; slowest phase {phase} ({} over {} captures)",
@@ -432,19 +450,18 @@ mod tests {
             "dui map: 5 cells, 5 captured (1 verified) in 12.3 s; slowest phase settle (9.0 s over \
              5 captures); unverified: 2 not-ready, 1 api-error, 1 redirected"
         );
-        // A map without capture plans its cells: none captured, none counted as a failure kind
-        // other than not-rendered.
+        // A map without capture plans its cells and started no browser.
         let planned = json!({
             "coverage": {"verified": 0},
             "timings": {"wallMs": 1_000},
             "cells": [
-                {"status": "unverified", "reason": "not-rendered"},
-                {"status": "unverified", "reason": "not-rendered"},
+                {"path": "/", "status": "unverified", "reason": "not-rendered"},
+                {"path": "/", "status": "unverified", "reason": "not-rendered"},
             ],
         });
         assert_eq!(
             summary_line(&planned).expect("line"),
-            "dui map: 2 cells, 0 captured (0 verified) in 1.0 s; unverified: 2 not-rendered"
+            "dui map: 1 screen, 2 cells planned without a browser in 1.0 s; capture them with --capture"
         );
     }
 

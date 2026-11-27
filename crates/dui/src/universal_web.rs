@@ -196,6 +196,12 @@ fn serve_connection(mut stream: TcpStream, root: &Path, spa_fallback: bool) {
     if reader.read_line(&mut request_line).is_err() || request_line.trim().is_empty() {
         return;
     }
+    // The rest of the request head is read too: closing with unread bytes resets the
+    // connection, and the client can lose the response.
+    let mut line = String::new();
+    while reader.read_line(&mut line).is_ok_and(|n| n > 0) && line.trim_end() != "" {
+        line.clear();
+    }
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let target = parts.next().unwrap_or("/");
@@ -598,8 +604,34 @@ impl SurfaceAdapter for UniversalWebSurface {
         }
     }
 
+    fn maps_without_renderer(&self) -> bool {
+        true
+    }
+
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
+        // Without capture no browser starts (AGENTS.md#never): links are read from the HTML the
+        // app's server sends.
+        if crate::html_map::HtmlLinks::wanted(spec) {
+            let mut links = crate::html_map::HtmlLinks::new(Box::new(|| {
+                let session = UniversalWebHost
+                    .start(project, spec, &Value::Null)
+                    .map_err(|(_, v)| v.to_string())?;
+                Ok(Some((
+                    session.port(),
+                    Box::new(session) as Box<dyn std::any::Any>,
+                )))
+            }));
+            return analysis::exercise_with_renderer(
+                Some(&mut links),
+                facts,
+                spec,
+                Some(project),
+                out,
+                None,
+                force,
+            );
+        }
         let exe = crate::chromium::executable();
         let browser_version = crate::chromium::version_tag(&exe);
         let mut lazy = LazyUniversalBrowser {

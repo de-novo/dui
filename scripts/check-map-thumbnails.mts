@@ -36,7 +36,7 @@ type View = { cards: Card[]; overflow: number; bytes: { thumb: number; full: num
 let server: ReturnType<typeof spawn> | undefined;
 try {
   writeFileSync(join(site, "dui.json"), JSON.stringify({ widths: [1280] }));
-  const run = spawnSync(binary, ["map", site, "--build-dir", site], {
+  const run = spawnSync(binary, ["map", site, "--build-dir", site, "--capture"], {
     encoding: "utf8",
     env: { ...process.env, HOME: home },
   });

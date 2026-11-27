@@ -99,6 +99,7 @@ pub mod auth;
 pub mod compiler_oracle;
 pub mod diff;
 pub mod edit;
+pub mod html_links;
 pub mod inspect;
 pub mod ios;
 pub mod locale;
