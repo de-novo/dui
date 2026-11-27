@@ -825,6 +825,48 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
       expected,
     );
   }
+  writeFileSync(
+    join(builtProject, "App.tsx"),
+    'export function App(){return <><section id="catalog"><aside>Notes</aside></section><footer>End</footer></>}',
+  );
+  writeFileSync(
+    join(builtProject, bundle),
+    `
+  #catalog{position:relative;inset:2px 4px 6px;z-index:-3;background-image:radial-gradient(#123456 2px,transparent 2px);background-size:12px 16px}
+  #catalog aside{position:sticky;box-shadow:-1px 2px 3px -4px #aabbcc80;border-radius:2px 3px 4px 5px;border-bottom-left-radius:9px}
+  `,
+  );
+  const grouped = readBuilt().components[0].root;
+  assert.equal(grouped.kind, "fragment");
+  assert.equal(grouped.children.length, 2);
+  const styles = (n: { style: { property: string; value: { value: unknown } }[] }) =>
+    Object.fromEntries(n.style.map((d) => [d.property, d.value.value]));
+  const section = styles(grouped.children[0]);
+  for (const [name, value] of Object.entries({
+    position: "relative",
+    zIndex: -3,
+    top: 2,
+    right: 4,
+    bottom: 6,
+    left: 4,
+    dotColor: "#123456",
+    dotRadius: 2,
+    tileWidth: 12,
+    tileHeight: 16,
+  }))
+    assert.equal(section[name], value, name);
+  const aside = styles(grouped.children[0].children[0]);
+  for (const [name, value] of Object.entries({
+    position: "sticky",
+    shadowX: -1,
+    shadowY: 2,
+    shadowBlur: 3,
+    shadowSpread: -4,
+    shadowColor: "#aabbcc80",
+    borderBottomLeftRadius: 9,
+    borderTopRightRadius: 3,
+  }))
+    assert.equal(aside[name], value, name);
 } finally {
   rmSync(builtProject, { recursive: true, force: true });
 }

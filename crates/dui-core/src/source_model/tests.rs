@@ -74,6 +74,7 @@ fn reference_model_covers_styles_tokens_branches_and_lists() {
             Node::Text(_) => "text",
             Node::Branch(_) => "branch",
             Node::List(_) => "list",
+            Node::Fragment(_) => "fragment",
             Node::Outlet(_) => "outlet",
             Node::Placeholder(_) => "placeholder",
         });

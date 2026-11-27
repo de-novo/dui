@@ -206,10 +206,27 @@ impl Context<'_> {
             location: self.file.loc(n),
         })
     }
+    fn child_nodes(&mut self, n: Ast<'_>, id: &str) -> Vec<m::Node> {
+        let mut nodes = Vec::new();
+        for c in children(n).into_iter().filter(|c| {
+            !(matches!(c.kind(), "jsx_opening_element" | "jsx_closing_element")
+                || c.kind() == "jsx_expression" && first(*c).is_none())
+        }) {
+            if n.kind() == "jsx_self_closing_element" {
+                break;
+            }
+            nodes.push(self.node(c, format!("{id}.{}", nodes.len())));
+        }
+        nodes
+    }
     fn element(&mut self, n: Ast<'_>, id: String) -> m::Node {
         let open = tag(n);
         let Some(name) = self.file.name(open, "name") else {
-            return self.placeholder(n, id, "JSX fragment");
+            return m::Node::Fragment(m::Fragment {
+                children: self.child_nodes(n, &id),
+                id,
+                location: self.file.loc(n),
+            });
         };
         let component = self.component(name);
         let binding = self.file.bindings.get(name);
@@ -332,16 +349,7 @@ impl Context<'_> {
         // Inline declarations have higher precedence regardless of JSX attribute order.
         el.style
             .sort_by_key(|decl| decl.from.syntax == m::StyleSyntax::Inline);
-        for c in children(n).into_iter().filter(|c| {
-            !(matches!(c.kind(), "jsx_opening_element" | "jsx_closing_element")
-                || c.kind() == "jsx_expression" && first(*c).is_none())
-        }) {
-            if n.kind() == "jsx_self_closing_element" {
-                break;
-            }
-            el.children
-                .push(self.node(c, format!("{id}.{}", el.children.len())));
-        }
+        el.children = self.child_nodes(n, &id);
         if let Some(component) = component {
             m::Node::Instance(m::Instance {
                 id,

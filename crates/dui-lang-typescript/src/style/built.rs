@@ -27,6 +27,25 @@ const DIRECT: &[(&str, P)] = &[
     ("border-left-width", P::BorderLeftWidth),
     ("border-left-color", P::BorderLeftColor),
     ("border-left-style", P::BorderLeftStyle),
+    ("position", P::Position),
+    ("top", P::Top),
+    ("right", P::Right),
+    ("bottom", P::Bottom),
+    ("left", P::Left),
+    ("z-index", P::ZIndex),
+    ("background-image", P::DotRadius),
+    ("background-image", P::DotColor),
+    ("background-size", P::TileWidth),
+    ("background-size", P::TileHeight),
+    ("box-shadow", P::ShadowX),
+    ("box-shadow", P::ShadowY),
+    ("box-shadow", P::ShadowBlur),
+    ("box-shadow", P::ShadowSpread),
+    ("box-shadow", P::ShadowColor),
+    ("border-top-left-radius", P::BorderTopLeftRadius),
+    ("border-top-right-radius", P::BorderTopRightRadius),
+    ("border-bottom-right-radius", P::BorderBottomRightRadius),
+    ("border-bottom-left-radius", P::BorderBottomLeftRadius),
     ("display", P::Display),
     ("grid-template-columns", P::GridColumnMinimum),
     ("overflow-x", P::OverflowX),
@@ -181,12 +200,54 @@ fn alpha_mix(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<V> {
         ),
     })
 }
+fn four_sides(raw: &str) -> Option<[&str; 4]> {
+    let tokens: Vec<_> = raw.split_ascii_whitespace().collect();
+    match tokens.as_slice() {
+        [a] => Some([a, a, a, a]),
+        [a, b] => Some([a, b, a, b]),
+        [a, b, c] => Some([a, b, c, b]),
+        [a, b, c, d] => Some([a, b, c, d]),
+        _ => None,
+    }
+}
 fn affected(name: &str) -> Vec<P> {
     match name {
         "gap" | "grid-gap" => return vec![P::Gap, P::RowGap, P::ColumnGap],
         "row-gap" | "grid-row-gap" => return vec![P::Gap, P::RowGap],
         "column-gap" | "grid-column-gap" => return vec![P::Gap, P::ColumnGap],
         _ => {}
+    }
+    match name {
+        "background-image" => return vec![P::DotColor, P::DotRadius],
+        "background-size" => return vec![P::TileWidth, P::TileHeight],
+        "box-shadow" => {
+            return vec![
+                P::ShadowX,
+                P::ShadowY,
+                P::ShadowBlur,
+                P::ShadowSpread,
+                P::ShadowColor,
+            ];
+        }
+        "inset" => return vec![P::Top, P::Right, P::Bottom, P::Left],
+        "border-radius" => {
+            return vec![
+                P::BorderRadius,
+                P::BorderTopLeftRadius,
+                P::BorderTopRightRadius,
+                P::BorderBottomRightRadius,
+                P::BorderBottomLeftRadius,
+            ];
+        }
+        _ => {}
+    }
+    if name.starts_with("border-")
+        && name.ends_with("-radius")
+        && let Some((_, corner)) = DIRECT
+            .iter()
+            .find(|(css, _)| *css == name && *css != "border-radius")
+    {
+        return vec![P::BorderRadius, *corner];
     }
     if let Some(edges) = edge_properties(name) {
         return edges;
@@ -199,7 +260,13 @@ fn affected(name: &str) -> Vec<P> {
     }
     match name {
         "overflow" => vec![P::OverflowX],
-        "background" => vec![P::Background],
+        "background" => vec![
+            P::Background,
+            P::DotRadius,
+            P::DotColor,
+            P::TileWidth,
+            P::TileHeight,
+        ],
         "border" | "border-top" | "border-bottom" | "border-left" | "border-right"
         | "border-inline" | "border-block" => vec![P::BorderWidth, P::BorderColor],
         "text-decoration" => vec![P::TextDecorationLine],
@@ -649,6 +716,118 @@ impl<'a> Sheet<'a> {
         } else {
             raw
         };
+        if rule.name == "position" {
+            return matches!(raw, "static" | "relative" | "absolute" | "fixed" | "sticky")
+                .then(|| V::Keyword { value: raw.into() });
+        }
+        if rule.name == "z-index" {
+            return if raw == "auto" {
+                Some(V::Keyword { value: raw.into() })
+            } else {
+                raw.parse::<i32>()
+                    .ok()
+                    .map(|v| V::Number { value: v.into() })
+            };
+        }
+        if matches!(property, P::Top | P::Right | P::Bottom | P::Left) {
+            let side = match property {
+                P::Right => 1,
+                P::Bottom => 2,
+                P::Left => 3,
+                _ => 0,
+            };
+            let token = if rule.name == "inset" {
+                four_sides(raw)?[side]
+            } else if matches!(rule.name, "top" | "right" | "bottom" | "left") {
+                raw
+            } else {
+                return None;
+            };
+            return super::spacing_value("margin", token);
+        }
+        if let Some(i) = [
+            P::BorderTopLeftRadius,
+            P::BorderTopRightRadius,
+            P::BorderBottomRightRadius,
+            P::BorderBottomLeftRadius,
+        ]
+        .iter()
+        .position(|p| *p == property)
+        {
+            let token = if rule.name == "border-radius" {
+                four_sides(raw)?[i]
+            } else {
+                raw
+            };
+            return uniform_gap(token);
+        }
+        if rule.name == "background-image" {
+            let (first, last) = raw
+                .strip_prefix("radial-gradient(")?
+                .strip_suffix(')')?
+                .split_once(',')?;
+            let (ink, radius) = first.trim().rsplit_once(' ')?;
+            if last.trim().strip_prefix("transparent ")? != radius {
+                return None;
+            }
+            let ink = if let Some(key) = ink.strip_prefix("var(").and_then(|s| s.strip_suffix(')'))
+            {
+                vars.get(key.trim()).copied().flatten()?
+            } else {
+                ink
+            };
+            let color = super::color(ink)?;
+            let radius = uniform_gap(radius)?;
+            return Some(if property == P::DotColor {
+                color
+            } else {
+                radius
+            });
+        }
+        if rule.name == "background-size" {
+            let mut tokens = raw.split_ascii_whitespace();
+            let w = uniform_gap(tokens.next()?)?;
+            let h = uniform_gap(tokens.next()?)?;
+            if tokens.next().is_some() {
+                return None;
+            }
+            return Some(if property == P::TileWidth { w } else { h });
+        }
+        if rule.name == "box-shadow" {
+            let parts: Vec<_> = raw.split_ascii_whitespace().collect();
+            let (color, lengths) = parts.split_last()?;
+            let color = super::color(color)?;
+            let (x, y, blur, spread) = match lengths {
+                [x, y] => (*x, *y, "0", "0"),
+                [x, y, b] => (*x, *y, *b, "0"),
+                [x, y, b, s] => (*x, *y, *b, *s),
+                _ => return None,
+            };
+            let offset = |v| {
+                super::spacing_value("margin", v)
+                    .filter(|n| matches!(n,V::Length{unit,..} if *unit!=m::LengthUnit::Percent))
+            };
+            let values = [
+                offset(x)?,
+                offset(y)?,
+                offset(blur)?,
+                offset(spread)?,
+                color,
+            ];
+            if matches!(values[2],V::Length{value,..} if value<0.) {
+                return None;
+            }
+            let index = [
+                P::ShadowX,
+                P::ShadowY,
+                P::ShadowBlur,
+                P::ShadowSpread,
+                P::ShadowColor,
+            ]
+            .iter()
+            .position(|p| *p == property)?;
+            return Some(values[index].clone());
+        }
         if matches!(rule.name, "padding-block" | "margin-block") && self.horizontal_block {
             let mut parts = raw.split_ascii_whitespace();
             let first = parts.next()?;
@@ -1186,7 +1365,8 @@ fn contextual_specificity(
         (ancestor, None)
     };
     let class = ancestor.strip_prefix('.');
-    if !ident(class.unwrap_or(ancestor)) {
+    let id = ancestor.strip_prefix('#');
+    if !ident(class.or(id).unwrap_or(ancestor)) {
         return None;
     }
     let mut parent = if open.kind() == "jsx_opening_element" {
@@ -1203,18 +1383,25 @@ fn contextual_specificity(
         if !name.starts_with(|c: char| c.is_ascii_lowercase()) || !ident(name) {
             return None;
         }
-        let matched = if let Some(class) = class {
+        let matched = if let Some(required) = class.or(id) {
             if children(tag).iter().any(|n| n.kind() == "jsx_expression") {
                 return None;
             }
             match children(tag).into_iter().find(|a| {
                 a.kind() == "jsx_attribute"
-                    && first(*a).is_some_and(|k| file.text(k) == "className")
+                    && first(*a).is_some_and(|k| {
+                        file.text(k) == if id.is_some() { "id" } else { "className" }
+                    })
             }) {
-                Some(a) => crate::literal(file, *children(a).get(1)?)?
-                    .as_str()?
-                    .split_ascii_whitespace()
-                    .any(|s| s == class),
+                Some(a) => {
+                    let v = crate::literal(file, *children(a).get(1)?)?;
+                    let s = v.as_str()?;
+                    if id.is_some() {
+                        s == required
+                    } else {
+                        s.split_ascii_whitespace().any(|v| v == required)
+                    }
+                }
                 None => false,
             }
         } else {
@@ -1228,11 +1415,17 @@ fn contextual_specificity(
         {
             return Some(Some(
                 target_weight
-                    + if class.is_some() { 1024 } else { 1 }
+                    + if id.is_some() {
+                        1048576
+                    } else if class.is_some() {
+                        1024
+                    } else {
+                        1
+                    }
                     + if edge.is_some() { 1024 } else { 0 },
             ));
         }
-        if direct || (name == "body" && class.is_none() && ancestor != "html") {
+        if direct || (name == "body" && class.is_none() && id.is_none() && ancestor != "html") {
             return Some(None);
         }
         parent = parent.parent()?;
@@ -1241,6 +1434,13 @@ fn contextual_specificity(
 
 // Outer None means the selector may match, but its outcome is unknown.
 fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
+    if let Some(id) = sel.strip_prefix('#').filter(|s| ident(s)) {
+        return match el.props.get("id") {
+            None => Some(None),
+            Some(m::Expr::Literal { value }) => Some((value.as_str()? == id).then_some(1048576)),
+            _ => None,
+        };
+    }
     if let Some((tag, class)) = sel.split_once('.')
         && ident(tag)
         && ident(class)
