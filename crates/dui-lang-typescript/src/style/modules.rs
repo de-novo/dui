@@ -171,7 +171,7 @@ fn rules(
                     for (property, value) in sides {
                         rule.declarations.push(m::StyleDeclaration {
                             property,
-                            value,
+                            value: super::export_value(value, &from.text),
                             when: when.cloned(),
                             from: from.clone(),
                         });
@@ -283,6 +283,7 @@ pub(super) fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
         value.unwrap_or_else(|| V::Unresolved {
             text: raw.into(),
             reason: "Unsupported CSS value".into(),
+            refinement: None,
         }),
     ))
 }

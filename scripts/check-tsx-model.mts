@@ -289,6 +289,27 @@ export default function View(){return <p style={{color:"#ffffff"}} className={sh
     }
   }
 
+  writeFileSync(cssPath, ".box {width: 20vw; max-width: clamp(60px, 12vw, 150px);}");
+  writeFileSync(
+    join(project, "ViewportSizes.tsx"),
+    `import sheet from "./View.module.css"; export function ViewportSizes(){return <main><p className={sheet.box}/><p style={{width:"20vw",maxWidth:"clamp(60px, 12vw, 150px)"}}/></main>}`,
+  );
+  const viewportSizes = JSON.parse(extract(project, "ViewportSizes.tsx"));
+  assert.ok(validate(viewportSizes));
+  for (const child of viewportSizes.components[0].root.children) {
+    const width = child.style.find((d: { property: string }) => d.property === "width").value;
+    assert.equal(width.kind, "unresolved");
+    assert.deepEqual(width.refinement, { kind: "length", value: 20, unit: "vw" });
+    const maxWidth = child.style.find((d: { property: string }) => d.property === "maxWidth").value;
+    assert.equal(maxWidth.kind, "unresolved");
+    assert.deepEqual(maxWidth.refinement, {
+      kind: "clamp",
+      min: { value: 60, unit: "px" },
+      preferred: { value: 12, unit: "vw" },
+      max: { value: 150, unit: "px" },
+    });
+  }
+
   for (const [css, tsx, expected] of [
     ["0", "0", 0],
     ["2.5", "2.5", 2.5],
@@ -831,6 +852,8 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   writeFileSync(
     join(builtProject, bundle),
     `
+    html {font-size:62.5%}
+    body {font-size:1.2em}
     main {display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
     @media(max-width:680px){ main {grid-template-columns:minmax(0,1fr)} }
     main {border:2px dashed #aabbcc;border-bottom:4px solid #112233;backdrop-filter:blur(14px);
@@ -892,11 +915,54 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     assert.deepEqual(prop(root.children[0].style, "order"), { kind: "number", value: -2 });
     assert.deepEqual(prop(root.children[0].style, "overflowX"), { kind: "keyword", value: "auto" });
     assert.deepEqual(prop(root.children[0].style, "fontSize"), {
-      kind: "length",
-      value: width === 390 ? 30 : 48,
-      unit: "px",
+      kind: "unresolved",
+      text: "font-size:clamp(30px,5vw,48px)",
+      reason: "Viewport or clamp length is only available as a typed refinement",
+      refinement: {
+        kind: "clamp",
+        min: { value: 30, unit: "px" },
+        preferred: { value: 5, unit: "vw" },
+        max: { value: 48, unit: "px" },
+      },
     });
+    const documentStyle = readBuilt("--viewport-width", String(width)).documentStyle;
+    assert.deepEqual(
+      documentStyle.root.style.find((d: { property: string }) => d.property === "fontSize").value,
+      { kind: "length", value: 62.5, unit: "percent" },
+    );
+    assert.deepEqual(
+      documentStyle.body.style.find((d: { property: string }) => d.property === "fontSize").value,
+      { kind: "length", value: 1.2, unit: "em" },
+    );
   }
+  writeFileSync(
+    join(builtProject, bundle),
+    `.card { width: 20vw; }
+     html { font-size: 20px; }
+     :root { font-size: 18px; }
+     html[data-mode=night] { font-size: 22px; }
+     html body { font-size: 1.2em; }`,
+  );
+  const viewportWidth = readBuilt().components[0].root.children[0].style.find(
+    (d: { property: string }) => d.property === "width",
+  ).value;
+  assert.equal(viewportWidth.kind, "unresolved");
+  assert.deepEqual(viewportWidth.refinement, { kind: "length", value: 20, unit: "vw" });
+  const documentCascade = readBuilt("--root-attribute", "data-mode=day").documentStyle;
+  assert.deepEqual(
+    documentCascade.root.style.find((d: { property: string }) => d.property === "fontSize").value,
+    { kind: "length", value: 18, unit: "px" },
+  );
+  assert.deepEqual(
+    documentCascade.body.style.find((d: { property: string }) => d.property === "fontSize").value,
+    { kind: "length", value: 1.2, unit: "em" },
+  );
+  const uncertainDocument = readBuilt().documentStyle;
+  assert.equal(
+    uncertainDocument.root.style.find((d: { property: string }) => d.property === "fontSize").value
+      .kind,
+    "unresolved",
+  );
   writeFileSync(
     join(builtProject, "App.tsx"),
     "export function App(){return <body><table><tbody><tr><td>First</td></tr><tr><td>Last</td></tr></tbody></table></body>}",

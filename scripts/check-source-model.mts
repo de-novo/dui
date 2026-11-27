@@ -56,6 +56,47 @@ for (const [name, mutate] of readerOnly) {
   assert.equal(validate(model), true, `schema should leave ${name} to the reader`);
 }
 
+// Additive v1 shapes: old readers still see the unresolved fallback while new readers
+// can use document typography and typed viewport/clamp refinements.
+const evolved = reference();
+evolved.documentStyle = {
+  root: {
+    style: [
+      {
+        property: "fontSize",
+        value: { kind: "length", value: 62.5, unit: "percent" },
+        from: {
+          syntax: "class",
+          text: "font-size: 62.5%;",
+          location: evolved.components[0].root.location,
+        },
+      },
+    ],
+  },
+};
+evolved.components[0].root.style = [
+  {
+    property: "width",
+    value: {
+      kind: "unresolved",
+      text: "width: clamp(60px, 12vw, 150px);",
+      reason: "Viewport or clamp length is only available as a typed refinement",
+      refinement: {
+        kind: "clamp",
+        min: { value: 60, unit: "px" },
+        preferred: { value: 12, unit: "vw" },
+        max: { value: 150, unit: "px" },
+      },
+    },
+    from: {
+      syntax: "class",
+      text: "width: clamp(60px, 12vw, 150px);",
+      location: evolved.components[0].root.location,
+    },
+  },
+];
+assert.equal(validate(evolved), true, JSON.stringify(validate.errors));
+
 execFileSync("cargo", ["test", "--locked", "--quiet", "-p", "dui-core", "source_model"], {
   cwd: root,
   stdio: ["ignore", "inherit", "inherit"],

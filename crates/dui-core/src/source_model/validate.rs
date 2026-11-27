@@ -195,6 +195,22 @@ impl<'a> Check<'a> {
             self.component(&format!("/components/{index}"), component);
         }
 
+        if let Some(document) = &model.document_style {
+            if document.root.is_none() && document.body.is_none() {
+                self.error("/documentStyle", "must describe the root or body");
+            }
+            for (name, part) in [("root", &document.root), ("body", &document.body)] {
+                if let Some(part) = part {
+                    for (index, declaration) in part.style.iter().enumerate() {
+                        self.document_declaration(
+                            &format!("/documentStyle/{name}/style/{index}"),
+                            declaration,
+                        );
+                    }
+                }
+            }
+        }
+
         for (index, screen) in model.screens.iter().enumerate() {
             let pointer = format!("/screens/{index}");
             self.non_empty(format!("{pointer}/id"), &screen.id);
@@ -302,6 +318,17 @@ impl<'a> Check<'a> {
                     self.error(format!("{pointer}/value"), "must be a finite number");
                 }
             }
+            StyleValue::Clamp {
+                min,
+                preferred,
+                max,
+            } => {
+                for (name, length) in [("min", min), ("preferred", preferred), ("max", max)] {
+                    if !length.value.is_finite() {
+                        self.error(format!("{pointer}/{name}/value"), "must be a finite number");
+                    }
+                }
+            }
             StyleValue::Color { value } => {
                 if !is_hex_color(value) {
                     self.error(format!("{pointer}/value"), "must be #rrggbb or #rrggbbaa");
@@ -316,9 +343,26 @@ impl<'a> Check<'a> {
                     self.style_value(&format!("{pointer}/resolved"), resolved);
                 }
             }
-            StyleValue::Unresolved { text, reason } => {
+            StyleValue::Unresolved {
+                text,
+                reason,
+                refinement,
+            } => {
                 self.non_empty(format!("{pointer}/text"), text);
                 self.non_empty(format!("{pointer}/reason"), reason);
+                if let Some(refinement) = refinement {
+                    if matches!(
+                        refinement.as_ref(),
+                        StyleValue::Token { .. } | StyleValue::Unresolved { .. }
+                    ) {
+                        self.error(
+                            format!("{pointer}/refinement"),
+                            "must be a final typed value",
+                        );
+                    } else {
+                        self.style_value(&format!("{pointer}/refinement"), refinement);
+                    }
+                }
             }
         }
     }
@@ -536,10 +580,11 @@ impl<'a> Check<'a> {
                     .map(|value| (format!("{value_pointer}/resolved"), value))
             }
             other @ (StyleValue::Length { .. }
+            | StyleValue::Clamp { .. }
             | StyleValue::Color { .. }
             | StyleValue::Number { .. }
             | StyleValue::Keyword { .. }
-            | StyleValue::Unresolved { .. }) => Some((value_pointer, other)),
+            | StyleValue::Unresolved { .. }) => Some((value_pointer.clone(), other)),
         };
         if let Some((pointer, value)) = checked
             && !accepts(declaration.property, value)
@@ -549,8 +594,88 @@ impl<'a> Check<'a> {
                 format!("not a value for {:?}", declaration.property),
             );
         }
+        if let StyleValue::Unresolved {
+            refinement: Some(refinement),
+            ..
+        } = &declaration.value
+            && !accepts(declaration.property, refinement)
+        {
+            self.error(
+                format!("{value_pointer}/refinement"),
+                format!("not a value for {:?}", declaration.property),
+            );
+        }
         if let Some(condition) = &declaration.when {
             self.condition(&format!("{pointer}/when"), condition, scope);
+        }
+        self.non_empty(format!("{pointer}/from/text"), &declaration.from.text);
+        self.location(
+            &format!("{pointer}/from/location"),
+            &declaration.from.location,
+        );
+    }
+
+    fn document_declaration(&mut self, pointer: &str, declaration: &StyleDeclaration) {
+        let value_pointer = format!("{pointer}/value");
+        self.style_value(&value_pointer, &declaration.value);
+        let checked = match &declaration.value {
+            StyleValue::Token { token, resolved } => {
+                if !self.tokens.contains_key(token.as_str()) {
+                    self.error(
+                        format!("{value_pointer}/token"),
+                        format!("unknown token {token:?}"),
+                    );
+                }
+                resolved
+                    .as_deref()
+                    .map(|value| (format!("{value_pointer}/resolved"), value))
+            }
+            other @ (StyleValue::Length { .. }
+            | StyleValue::Clamp { .. }
+            | StyleValue::Color { .. }
+            | StyleValue::Number { .. }
+            | StyleValue::Keyword { .. }
+            | StyleValue::Unresolved { .. }) => Some((value_pointer.clone(), other)),
+        };
+        if let Some((pointer, value)) = checked
+            && !accepts(declaration.property, value)
+        {
+            self.error(
+                pointer,
+                format!("not a value for {:?}", declaration.property),
+            );
+        }
+        if let StyleValue::Unresolved {
+            refinement: Some(refinement),
+            ..
+        } = &declaration.value
+            && !accepts(declaration.property, refinement)
+        {
+            self.error(
+                format!("{value_pointer}/refinement"),
+                format!("not a value for {:?}", declaration.property),
+            );
+        }
+        if let Some(condition) = &declaration.when {
+            if condition.expr.is_some() {
+                self.error(
+                    format!("{pointer}/when/expr"),
+                    "document style conditions cannot read component expressions",
+                );
+            }
+            for (name, length) in [
+                ("minWidth", &condition.min_width),
+                ("maxWidth", &condition.max_width),
+            ] {
+                if let Some(length) = length
+                    && !length.value.is_finite()
+                {
+                    self.error(
+                        format!("{pointer}/when/{name}/value"),
+                        "must be a finite number",
+                    );
+                }
+            }
         }
         self.non_empty(format!("{pointer}/from/text"), &declaration.from.text);
         self.location(
@@ -789,7 +914,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         ),
     };
     match value {
-        StyleValue::Length { .. } => length,
+        StyleValue::Length { .. } | StyleValue::Clamp { .. } => length,
         StyleValue::Number { value } => {
             number && (!matches!(property, P::Order | P::ZIndex) || value.fract() == 0.0)
         }

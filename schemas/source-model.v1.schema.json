@@ -20,6 +20,7 @@
     "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
     "screens": { "type": "array", "items": { "$ref": "#/$defs/screen" } },
     "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+    "documentStyle": { "$ref": "#/$defs/documentStyle" },
     "itemSchemas": { "type": "array", "items": { "$ref": "#/$defs/itemSchema" } },
     "tokens": { "type": "array", "items": { "$ref": "#/$defs/token" } },
     "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
@@ -396,7 +397,26 @@
       "required": ["value", "unit"],
       "properties": {
         "value": { "type": "number" },
-        "unit": { "enum": ["px", "rem", "em", "percent", "pt", "dp"] }
+        "unit": {
+          "enum": [
+            "px",
+            "rem",
+            "em",
+            "percent",
+            "pt",
+            "dp",
+            "vw",
+            "vh",
+            "svw",
+            "svh",
+            "lvw",
+            "lvh",
+            "dvw",
+            "dvh",
+            "vmin",
+            "vmax"
+          ]
+        }
       }
     },
     "finalValue": {
@@ -409,7 +429,36 @@
           "properties": {
             "kind": { "const": "length" },
             "value": { "type": "number" },
-            "unit": { "enum": ["px", "rem", "em", "percent", "pt", "dp"] }
+            "unit": {
+          "enum": [
+            "px",
+            "rem",
+            "em",
+            "percent",
+            "pt",
+            "dp",
+            "vw",
+            "vh",
+            "svw",
+            "svh",
+            "lvw",
+            "lvh",
+            "dvw",
+            "dvh",
+            "vmin",
+            "vmax"
+          ]
+        }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["min", "preferred", "max"],
+          "properties": {
+            "kind": { "const": "clamp" },
+            "min": { "$ref": "#/$defs/length" },
+            "preferred": { "$ref": "#/$defs/length" },
+            "max": { "$ref": "#/$defs/length" }
           }
         },
         {
@@ -436,7 +485,8 @@
           "properties": {
             "kind": { "const": "unresolved" },
             "text": { "$ref": "#/$defs/text" },
-            "reason": { "$ref": "#/$defs/text" }
+            "reason": { "$ref": "#/$defs/text" },
+            "refinement": { "$ref": "#/$defs/refinedValue" }
           }
         }
       ]
@@ -455,6 +505,85 @@
           }
         }
       ]
+    },
+    "refinedValue": {
+      "type": "object",
+      "required": ["kind"],
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["value", "unit"],
+          "properties": {
+            "kind": { "const": "length" },
+            "value": { "type": "number" },
+            "unit": {
+              "enum": [
+                "px",
+                "rem",
+                "em",
+                "percent",
+                "pt",
+                "dp",
+                "vw",
+                "vh",
+                "svw",
+                "svh",
+                "lvw",
+                "lvh",
+                "dvw",
+                "dvh",
+                "vmin",
+                "vmax"
+              ]
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["min", "preferred", "max"],
+          "properties": {
+            "kind": { "const": "clamp" },
+            "min": { "$ref": "#/$defs/length" },
+            "preferred": { "$ref": "#/$defs/length" },
+            "max": { "$ref": "#/$defs/length" }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": {
+            "kind": { "const": "color" },
+            "value": { "type": "string", "pattern": "^#[0-9a-f]{6}([0-9a-f]{2})?$" }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": { "kind": { "const": "number" }, "value": { "type": "number" } }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["value"],
+          "properties": { "kind": { "const": "keyword" }, "value": { "$ref": "#/$defs/text" } }
+        }
+      ]
+    },
+    "documentStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "root": { "$ref": "#/$defs/documentElementStyle" },
+        "body": { "$ref": "#/$defs/documentElementStyle" }
+      }
+    },
+    "documentElementStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style"],
+      "properties": {
+        "style": { "type": "array", "items": { "$ref": "#/$defs/styleDeclaration" } }
+      }
     },
     "condition": {
       "type": "object",

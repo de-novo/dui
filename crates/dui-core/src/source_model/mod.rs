@@ -35,6 +35,9 @@ pub struct SourceModel {
     pub screens: Vec<Screen>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub components: Vec<Component>,
+    /// Effective document typography extracted from a bundled stylesheet, when proven.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document_style: Option<DocumentStyle>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub item_schemas: Vec<ItemSchema>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -329,6 +332,24 @@ pub struct Placeholder {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DocumentStyle {
+    /// Declarations effective on the document root element.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<DocumentElementStyle>,
+    /// Declarations effective on the document body element.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<DocumentElementStyle>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DocumentElementStyle {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub style: Vec<StyleDeclaration>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StyleDeclaration {
     pub property: StyleProperty,
     pub value: StyleValue,
@@ -470,6 +491,12 @@ pub enum StyleValue {
         value: f64,
         unit: LengthUnit,
     },
+    /// A bounded CSS clamp() made of three literal lengths.
+    Clamp {
+        min: Length,
+        preferred: Length,
+        max: Length,
+    },
     /// Lowercase sRGB hex, `#rrggbb` or `#rrggbbaa`.
     Color {
         value: String,
@@ -490,12 +517,26 @@ pub enum StyleValue {
     Unresolved {
         text: String,
         reason: String,
+        /// Typed value for readers that understand the newer shape. The unresolved
+        /// text remains the fallback for readers that do not.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        refinement: Option<Box<StyleValue>>,
     },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LengthUnit {
+    Vw,
+    Vh,
+    Svw,
+    Svh,
+    Lvw,
+    Lvh,
+    Dvw,
+    Dvh,
+    Vmin,
+    Vmax,
     Px,
     Rem,
     Em,

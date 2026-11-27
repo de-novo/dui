@@ -333,6 +333,7 @@ fn extract_in_context_impl(
         files: vec![],
         screens: vec![],
         components: vec![],
+        document_style: None,
         item_schemas: vec![],
         tokens: vec![],
         edges: vec![],
@@ -464,6 +465,9 @@ fn extract_in_context_impl(
     model.edges.sort_by(|a, b| a.id.cmp(&b.id));
     model.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
     model.tokens.sort_by(|a, b| a.id.cmp(&b.id));
+    if let Some(sheet) = &built {
+        model.document_style = sheet.document_style();
+    }
     m::validate(&model).map_err(|errs| format!("invalid source model: {errs:?}"))?;
     Ok((model, stats))
 }

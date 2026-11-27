@@ -59,6 +59,39 @@ fn reference_model_is_valid_and_canonical() {
 }
 
 #[test]
+fn reader_accepts_additive_document_context_and_length_refinement() {
+    let mut document = reference();
+    let location = document["components"][0]["root"]["location"].clone();
+    document["documentStyle"] = json!({
+        "root": {"style": [{
+            "property": "fontSize",
+            "value": {"kind": "length", "value": 62.5, "unit": "percent"},
+            "from": {"syntax": "class", "text": "font-size: 62.5%;", "location": location}
+        }]}
+    });
+    document["components"][0]["root"]["style"] = json!([{
+        "property": "width",
+        "value": {
+            "kind": "unresolved",
+            "text": "width: clamp(60px, 12vw, 150px);",
+            "reason": "Viewport or clamp length is only available as a typed refinement",
+            "refinement": {
+                "kind": "clamp",
+                "min": {"value": 60, "unit": "px"},
+                "preferred": {"value": 12, "unit": "vw"},
+                "max": {"value": 150, "unit": "px"}
+            }
+        },
+        "from": {"syntax": "class", "text": "width: clamp(60px, 12vw, 150px);", "location": location}
+    }]);
+    let model = SourceModel::from_json(&document.to_string()).expect("additive model is valid");
+    let Some(document_style) = model.document_style else {
+        panic!("document style was not read");
+    };
+    assert_eq!(document_style.root.expect("root").style.len(), 1);
+}
+
+#[test]
 fn reference_model_covers_styles_tokens_branches_and_lists() {
     let model = SourceModel::from_json(REFERENCE).expect("valid");
     let mut kinds = BTreeSet::new();
