@@ -219,7 +219,20 @@ fn dechunk(mut body: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader};
     use std::net::TcpListener;
+
+    fn read_request(stream: &TcpStream) {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("read timeout");
+        for line in BufReader::new(stream).lines() {
+            if line.expect("request header").is_empty() {
+                return;
+            }
+        }
+        panic!("connection closed before the request headers ended");
+    }
 
     /// A server that answers each request with the next of `responses`.
     fn serve(responses: Vec<&'static str>) -> u16 {
@@ -228,8 +241,7 @@ mod tests {
         std::thread::spawn(move || {
             for response in responses {
                 let (mut stream, _) = listener.accept().expect("accept");
-                let mut buf = [0u8; 2048];
-                let _ = stream.read(&mut buf);
+                read_request(&stream);
                 stream.write_all(response.as_bytes()).expect("write");
             }
         });
@@ -263,8 +275,7 @@ mod tests {
         let port = listener.local_addr().expect("addr").port();
         std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
-            let mut buf = [0u8; 2048];
-            let _ = stream.read(&mut buf);
+            read_request(&stream);
             let body = "<a href=\"/b\">b</a>";
             write!(
                 stream,
