@@ -73,6 +73,11 @@ fn size_value(property: P, raw: &str) -> Option<V> {
     if property == P::BorderWidth {
         return uniform_length(raw, 4, false);
     }
+    if raw.eq_ignore_ascii_case("fit-content") && matches!(property, P::Width | P::Height) {
+        return Some(V::Keyword {
+            value: "fit".into(),
+        });
+    }
     if raw.eq_ignore_ascii_case("auto") && !matches!(property, P::MaxWidth | P::MaxHeight) {
         return Some(V::Keyword {
             value: "auto".into(),

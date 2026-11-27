@@ -15,6 +15,7 @@ const DIRECT: &[(&str, P)] = &[
     ("border-radius", P::BorderRadius),
     ("opacity", P::Opacity),
     ("font-size", P::FontSize),
+    ("font-weight", P::FontWeight),
     ("line-height", P::LineHeight),
     ("letter-spacing", P::LetterSpacing),
     ("width", P::Width),
@@ -94,34 +95,122 @@ pub(crate) struct Sheet<'a> {
 struct Selector<'a> {
     text: &'a str,
     // A necessary type or class on the subject. Ancestors never qualify here.
-    subject: Option<&'a str>,
+    subject: Subject<'a>,
 }
 
-fn subject<'a>(file: &'a File, node: Ast<'_>) -> Option<&'a str> {
+// Conditions necessary for a selector to apply to an intrinsic element.
+// Keeping alternatives avoids counting :is() branches as simultaneous requirements.
+enum Subject<'a> {
+    Unknown,
+    PseudoElement,
+    Tag(&'a str),
+    Class(String),
+    Attribute(&'a str),
+    Id(&'a str),
+    All(Vec<Self>),
+    Any(Vec<Self>),
+}
+
+impl Subject<'_> {
+    fn excludes(&self, classes: Option<&str>, el: &m::Element, spread: bool) -> bool {
+        match self {
+            Self::Unknown => false,
+            Self::PseudoElement => true,
+            Self::Tag(tag) => !tag.eq_ignore_ascii_case(&el.tag),
+            Self::Class(class) => {
+                !spread && classes.is_some_and(|s| !s.split_ascii_whitespace().any(|v| v == class))
+            }
+            Self::Attribute(key) => !spread && !el.props.contains_key(*key),
+            Self::Id(id) => {
+                !spread
+                    && match el.props.get("id") {
+                        None => true,
+                        Some(m::Expr::Literal { value }) => {
+                            value.as_str().is_some_and(|v| v != *id)
+                        }
+                        _ => false,
+                    }
+            }
+            Self::All(parts) => parts.iter().any(|p| p.excludes(classes, el, spread)),
+            Self::Any(parts) => {
+                !parts.is_empty() && parts.iter().all(|p| p.excludes(classes, el, spread))
+            }
+        }
+    }
+}
+
+fn subject<'a>(file: &'a File, node: Ast<'_>) -> Subject<'a> {
     let parts = children(node);
     match node.kind() {
         "descendant_selector"
         | "child_selector"
         | "adjacent_sibling_selector"
-        | "sibling_selector" => subject(file, *parts.last()?),
-        "class_selector" => {
-            let class = file.text(*parts.last()?);
-            if ident(class) {
-                let text = file.text(node);
-                return text
-                    .get(text.len().checked_sub(class.len() + 1)?..)
-                    .filter(|s| s.starts_with('.'));
+        | "sibling_selector" => parts.last().map_or(Subject::Unknown, |n| subject(file, *n)),
+        "tag_name" if ident(file.text(node)) => Subject::Tag(file.text(node)),
+        "class_selector" | "id_selector" | "attribute_selector" | "pseudo_class_selector" => {
+            let mut conditions = Vec::new();
+            for n in parts {
+                let raw = file.text(n);
+                let condition = match (node.kind(), n.kind()) {
+                    ("class_selector", "class_name") => {
+                        let mut class = String::new();
+                        let mut chars = raw.chars();
+                        while let Some(c) = chars.next() {
+                            if c == '\\' {
+                                let Some(escaped) =
+                                    chars.next().filter(|c| c.is_ascii_punctuation())
+                                else {
+                                    return Subject::Unknown;
+                                };
+                                class.push(escaped);
+                            } else {
+                                class.push(c);
+                            }
+                        }
+                        Subject::Class(class)
+                    }
+                    ("attribute_selector", "attribute_name")
+                        if raw.starts_with("data-") && ident(raw) =>
+                    {
+                        Subject::Attribute(raw)
+                    }
+                    ("id_selector", "id_name") if ident(raw) => Subject::Id(raw),
+                    ("pseudo_class_selector", "arguments")
+                        if n.prev_named_sibling()
+                            .is_some_and(|name| matches!(file.text(name), "is" | "where")) =>
+                    {
+                        Subject::Any(children(n).into_iter().map(|p| subject(file, p)).collect())
+                    }
+                    (_, kind) if kind.ends_with("_selector") || kind == "tag_name" => {
+                        subject(file, n)
+                    }
+                    _ => Subject::Unknown,
+                };
+                conditions.push(condition);
             }
-            None
+            Subject::All(conditions)
         }
-        "tag_name" if ident(file.text(node)) => Some(file.text(node)),
-        "pseudo_class_selector" | "attribute_selector" | "id_selector" => {
-            subject(file, *parts.first()?)
+        "pseudo_element_selector"
+            if parts.iter().any(|n| {
+                n.kind() == "tag_name"
+                    && (file.text(*n).starts_with("-webkit-")
+                        || matches!(
+                            file.text(*n),
+                            "before"
+                                | "after"
+                                | "file-selector-button"
+                                | "placeholder"
+                                | "selection"
+                                | "backdrop"
+                                | "marker"
+                        ))
+            }) =>
+        {
+            Subject::PseudoElement
         }
-        _ => None,
+        _ => Subject::Unknown,
     }
 }
-
 fn ident(s: &str) -> bool {
     !s.is_empty()
         && s.bytes()
@@ -204,7 +293,7 @@ impl<'a> Sheet<'a> {
                 "",
                 vec![Selector {
                     text: "",
-                    subject: None,
+                    subject: Subject::Unknown,
                 }],
             )]),
         };
@@ -431,11 +520,18 @@ impl<'a> Sheet<'a> {
             Some(v) => v.as_ref().and_then(|v| v.as_str()),
         };
         for &(_, property) in DIRECT {
-            self.apply_property(property, classes, el);
+            self.apply_property(property, classes, el, file, open);
         }
     }
 
-    fn apply_property(&self, property: P, classes: Option<&str>, el: &mut m::Element) {
+    fn apply_property(
+        &self,
+        property: P,
+        classes: Option<&str>,
+        el: &mut m::Element,
+        file: &File,
+        open: Ast<'_>,
+    ) {
         el.style
             .retain(|d| d.property != property || d.from.syntax == m::StyleSyntax::Inline);
         let Some(rules) = self.rules.get(&property) else {
@@ -444,35 +540,39 @@ impl<'a> Sheet<'a> {
         let mut best = None;
         let mut rank = None;
         let mut unknown: Option<&Rule<'_>> = None;
-        for rule in rules {
+        let spread = children(open).iter().any(|n| n.kind() == "jsx_expression");
+        let mut unknown_rank = None;
+        for (order, rule) in rules.iter().enumerate() {
             for selector in &self.selectors[rule.selectors] {
-                if selector
-                    .subject
-                    .is_some_and(|s| specificity(s, classes, el) == Some(None))
-                {
+                if selector.subject.excludes(classes, el, spread) {
                     continue;
                 }
-                match specificity(selector.text, classes, el) {
+                match contextual_specificity(selector.text, classes, el, file, open) {
                     Some(None) => {}
                     Some(Some(s)) if !rule.uncertain && !rule.important => {
-                        if rank.is_none_or(|r| (rule.layer, s) >= r) {
-                            rank = Some((rule.layer, s));
+                        if rank.is_none_or(|r| (rule.layer, s, order) >= r) {
+                            rank = Some((rule.layer, s, order));
                             best = Some(rule);
                         }
                     }
-                    _ if unknown.is_none_or(|prev| {
-                        (rule.important, rule.layer) >= (prev.important, prev.layer)
-                    }) =>
-                    {
-                        unknown = Some(rule)
+                    outcome => {
+                        let weight = outcome
+                            .flatten()
+                            .or_else(|| simple_selector_weight(selector.text))
+                            .unwrap_or(u32::MAX);
+                        let candidate = (rule.important, (rule.layer, weight, order));
+                        if unknown_rank.is_none_or(|r| candidate >= r) {
+                            unknown_rank = Some(candidate);
+                            unknown = Some(rule);
+                        }
                     }
-                    _ => {}
                 }
             }
         }
         // Unknown selectors can only displace a normal winner in the same or a higher layer.
-        let unknown =
-            unknown.filter(|r| r.important || rank.is_none_or(|(layer, _)| r.layer >= layer));
+        let unknown = unknown.filter(|_| {
+            unknown_rank.is_some_and(|(important, candidate)| important || Some(candidate) >= rank)
+        });
         if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
         {
             return;
@@ -499,10 +599,99 @@ impl<'a> Sheet<'a> {
     }
 }
 
+// Matching an ancestor can be uncertain while its selector weight is still exact.
+fn simple_selector_weight(sel: &str) -> Option<u32> {
+    sel.split(|c: char| c == '>' || c.is_ascii_whitespace())
+        .filter(|s| !s.is_empty())
+        .try_fold(0u32, |sum, token| {
+            let weight = if token == "*" {
+                0
+            } else if token.strip_prefix('.').is_some_and(ident) {
+                1024
+            } else if ident(token) {
+                1
+            } else {
+                return None;
+            };
+            sum.checked_add(weight)
+        })
+}
+
+// Walk only intrinsic JSX ancestors. A component or expression boundary can add
+// wrappers, so failure to prove a match beyond that boundary stays unknown.
+fn contextual_specificity(
+    sel: &str,
+    classes: Option<&str>,
+    el: &m::Element,
+    file: &File,
+    open: Ast<'_>,
+) -> Option<Option<u32>> {
+    if let Some(result) = specificity(sel, classes, el) {
+        return Some(result);
+    }
+    let (ancestor, target, direct) = if let Some((a, b)) = sel.split_once('>') {
+        (a.trim(), b.trim(), true)
+    } else {
+        let mut tokens = sel.split_ascii_whitespace();
+        let pair = (tokens.next()?, tokens.next()?, false);
+        if tokens.next().is_some() {
+            return None;
+        }
+        pair
+    };
+    let target_weight = match specificity(target, classes, el)? {
+        Some(w) => w,
+        None => return Some(None),
+    };
+    let class = ancestor.strip_prefix('.');
+    if !ident(class.unwrap_or(ancestor)) {
+        return None;
+    }
+    let mut parent = if open.kind() == "jsx_opening_element" {
+        open.parent()?.parent()?
+    } else {
+        open.parent()?
+    };
+    loop {
+        if parent.kind() != "jsx_element" {
+            return None;
+        }
+        let tag = parent.child_by_field_name("open_tag")?;
+        let name = file.text(tag.child_by_field_name("name")?);
+        if !name.starts_with(|c: char| c.is_ascii_lowercase()) || !ident(name) {
+            return None;
+        }
+        let matched = if let Some(class) = class {
+            if children(tag).iter().any(|n| n.kind() == "jsx_expression") {
+                return None;
+            }
+            match children(tag).into_iter().find(|a| {
+                a.kind() == "jsx_attribute"
+                    && first(*a).is_some_and(|k| file.text(k) == "className")
+            }) {
+                Some(a) => crate::literal(file, *children(a).get(1)?)?
+                    .as_str()?
+                    .split_ascii_whitespace()
+                    .any(|s| s == class),
+                None => false,
+            }
+        } else {
+            name.eq_ignore_ascii_case(ancestor)
+        };
+        if matched {
+            return Some(Some(target_weight + if class.is_some() { 1024 } else { 1 }));
+        }
+        if direct {
+            return Some(None);
+        }
+        parent = parent.parent()?;
+    }
+}
+
 // Outer None means the selector may match, but its outcome is unknown.
-fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u8>> {
+fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
     let (matches, weight) = if let Some(class) = sel.strip_prefix('.').filter(|c| ident(c)) {
-        (classes?.split_ascii_whitespace().any(|v| v == class), 2)
+        (classes?.split_ascii_whitespace().any(|v| v == class), 1024)
     } else if let Some(attr) = sel
         .strip_prefix('[')
         .and_then(|s| s.strip_suffix(']'))
@@ -513,7 +702,7 @@ fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Opti
             Some(m::Expr::Literal { value }) => !value.is_null(),
             Some(_) => return None,
         };
-        (present, 2)
+        (present, 1024)
     } else if sel == "*" {
         (true, 0)
     } else if ident(sel) {

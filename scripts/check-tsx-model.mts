@@ -693,6 +693,22 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     staticCard.style.find((d: { property: string }) => d.property === "width").value,
     { kind: "length", value: 140, unit: "px" },
   );
+  writeFileSync(
+    join(builtProject, bundle),
+    `
+    .external div { font-size: 30px; }
+    main > div { line-height: 20px; width: fit-content; }
+    main div { font-size: 14px; }
+    div > div { line-height: 90px; }
+    .external :is(a, code), [data-missing=yes], #missing, div::before { width: 3px; }
+  `,
+  );
+  const nested = readBuilt().components[0].root.children[0].style;
+  const valueOf = (key: string) =>
+    nested.find((d: { property: string }) => d.property === key)?.value;
+  assert.equal(valueOf("fontSize").kind, "unresolved"); // External class has higher specificity.
+  assert.deepEqual(valueOf("lineHeight"), { kind: "length", value: 20, unit: "px" });
+  assert.deepEqual(valueOf("width"), { kind: "keyword", value: "fit" });
 } finally {
   rmSync(builtProject, { recursive: true, force: true });
 }
