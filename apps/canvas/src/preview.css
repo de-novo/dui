@@ -2576,10 +2576,25 @@ h2 {
     flex: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px 6px;
     font-family: var(--font-mono);
     font-size: 0.72rem;
     color: var(--muted-foreground);
+  }
+
+  .mobile-deck-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
   }
 
   .mobile-diff-tag {

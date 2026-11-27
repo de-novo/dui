@@ -110,7 +110,7 @@ pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
          "sourceModel":"source-model.json","sourceEntry":source_entry});
     let report = json!({"screenDiscovery":projection.discovery,"sourceModel":"source-model.json","sourceEntry":source_entry,"browser":null,
         "sourceFiles":model.files.iter().map(|f| &f.path).collect::<Vec<_>>(),"cells":[],
-        "coverage":{"attempted":0,"renderable":0,"unrenderable":0,"verified":0}});
+        "coverage":crate::coverage::base(&[])});
     archive::publish(archive::provenance(project)?, |out| {
         fs::create_dir_all(out).map_err(io)?;
         fs::write(out.join("source-model.json"), model.to_json().map_err(io)?).map_err(io)?;

@@ -225,13 +225,13 @@ Also a **coverage check**: confirm via coverage that the branches the state aime
 
 Measured as a number, not a feeling. The denominator is defined explicitly.
 
-- **Denominator** = (render branches per screen + data-shape representative values per screen + reachable sequence states within the depth limit) × number of configured widths.
+- **Planned denominator** = (render branches per screen + data-shape representative values per screen + reachable sequence states within the depth limit) × number of configured widths.
   - Render branches: conditional render branches (conditional JSX, ternaries, early returns, `match` arms) inside components reachable from the screen root. Branches with no effect on what is drawn (logging, etc.) are removed by exclusion rules.
   - Because the analyzer builds the denominator itself, "branches missing from the denominator" are measured separately: compare with the full branch list from runtime coverage tools (V8 coverage / istanbul; for Rust, the `cargo llvm-cov` family).
-- **Unrenderable cells** (see "Rendering limits") are **excluded from the denominator** but always reported as a separate count with reasons. So coverage = `verified` cells ÷ renderable cells.
+- **Unrenderable cells** (see "Rendering limits") are **excluded from the denominator** but always reported as a separate count with reasons. Planned cells that were never captured stay `unverified` with reason `not-rendered`; they are reported separately, not as failed verification. Coverage = `verified` cells ÷ captured renderable cells (`capturedRenderable`).
 - A project or module that the selected analysis adapter rejects for an incompatible compiler or host runtime is `unsupported` and excluded from coverage.
-- **Numerator** = the number of `verified` cells in the denominator.
-- **Report**: renderable coverage % per screen and per kind + a list of unverified cells (with reasons) + the unrenderable count (with reasons). E.g. `review 97.8% (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths; unrenderable 2 (system-ui)`.
+- **Numerator** = the number of `verified` cells in the captured renderable denominator.
+- **Report**: planned, captured and verified counts; captured-renderable coverage % per screen and per kind; cells unverified after capture (with reasons) separately from not captured cells; and the unrenderable count (with reasons). The legacy `renderable` count still includes every planned renderable cell, and `attempted` remains the legacy alias of `captured`. E.g. `review 97.8% of captured renderable (branches 44/45, shapes 18/18, sequences 23/24) × 3 widths; planned 272, captured 270; unrenderable 2 (system-ui)`.
 - **Condition for 99%**: our code (obora, pippip) follows a rule to gather screen state in one place with types, reducers, or state machines. That keeps the sequence-state denominator accurate.
 
 ## 9. Per-language specifics

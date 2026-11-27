@@ -69,11 +69,11 @@
 | `facts.json` | 컴파일러에서 읽은 사실, 상태 후보의 소스 위치, 생성한 목 응답. |
 | `graph.json` | 도구에서 읽을 수 있는 그래프 노드와 간선. |
 
-**한 칸**은 시나리오 하나의 상태 하나를 한 가지 폭으로 캡처할 자리다. `verified`는 경로, 폭, 준비 조건, 필수 요청과 해당 상태에 대한 검사를 통과한 칸이다. `unverified`에는 검사에 실패한 칸과 예산 한도로 시도하지 못한 칸(`not-rendered`)이 포함된다. `unrenderable`에는 렌더 환경의 한계를 기록한다. 미지원 프로젝트는 캡처 전에 거절한다.
+**한 칸**은 시나리오 하나의 상태 하나를 한 가지 폭으로 캡처할 자리다. `verified`는 경로, 폭, 준비 조건, 필수 요청과 해당 상태에 대한 검사를 통과한 칸이다. `unverified`에는 검사에 실패한 칸이 포함된다. 캡처가 실행되지 않은 계획 칸도 사유 `not-rendered`의 `unverified`지만, 검증 실패가 아니라 미캡처로 보고된다. `unrenderable`에는 렌더 환경의 한계를 기록한다. 미지원 프로젝트는 캡처 전에 거절한다.
 
-**검증 실패 사유.** `reason`은 실패 종류로 시작하고 무엇이 실패했는지가 뒤따른다: `http-error`(문서가 4xx/5xx), `api-error: 401 /api/me`, `redirected: /a → /b`, `not-ready: SELECTOR`(페이지가 계속 바뀌었으면 `+ unsettled: NODE CHANGE`), `unsettled: NODE CHANGE`, `width-mismatch: observed W (expected W)`, `request-failed: /path STATUS`, `not-analyzed: compiler diagnostics`, `assert-failed: slot NAME is VALUE (expected VALUE)`(또는 실패한 상태 단언, 실행되지 않은 분기 프로브), `missing-state-assertion`, `missing-screen-assertion`, `not-rendered`. `dui map`은 stderr 요약에서 검증되지 않은 셀을 종류별로 센다.
+**검증 실패 사유.** `reason`은 실패 종류로 시작하고 무엇이 실패했는지가 뒤따른다: `http-error`(문서가 4xx/5xx), `api-error: 401 /api/me`, `redirected: /a → /b`, `not-ready: SELECTOR`(페이지가 계속 바뀌었으면 `+ unsettled: NODE CHANGE`), `unsettled: NODE CHANGE`, `width-mismatch: observed W (expected W)`, `request-failed: /path STATUS`, `not-analyzed: compiler diagnostics`, `assert-failed: slot NAME is VALUE (expected VALUE)`(또는 실패한 상태 단언, 실행되지 않은 분기 프로브), `missing-state-assertion`, `missing-screen-assertion`, `not-rendered`. `dui map`은 stderr 요약에서 미캡처 칸과 캡처 후 미검증 칸을 나누어 센다.
 
-**칸 검증률**은 `coverage.verified / coverage.renderable`이다. 화면 여섯 개를 폭 세 가지에서 모두 캡처하면 기본 상태 18칸을 채운 것이다. 추가로 계획된 상태도 분모에 포함한다. 분기 커버리지는 `observedBranchOutcomes`와 `branchOutcomes`로 따로 확인한다.
+**칸 검증률**은 `coverage.verified / coverage.capturedRenderable`, 즉 캡처된 렌더 가능 칸 중 검증된 칸의 비율이다. `coverage`는 `planned`, `captured`, `verified` 개수를 제공한다. 기존 `renderable` 값은 아직 캡처되지 않은 칸을 포함해 계획한 모든 렌더 가능 칸을 세고, `attempted`는 `captured`의 기존 별칭이다. 화면 여섯 개를 폭 세 가지에서 모두 캡처하면 기본 상태 18칸을 채운 것이다. 분기 커버리지는 `observedBranchOutcomes`와 `branchOutcomes`로 따로 확인한다.
 
 **소요 시간.** 캡처한 각 셀에는 밀리초 단위 `timing`이 있다: `navigateMs`, `settleMs`(`settlePolls` 포함), `screenshotMs`, `snapshotMs`, `overlaysMs`, `keyboardMs`, `totalMs`. 캐시에서 가져온 셀에는 없다. 리포트의 `timings`에는 `wallMs`, 단계별 `totals`, `slowestPhase`, 가장 느린 셀 다섯 개(`slowestCells`)가 있다. `dui map`은 셀 수, 전체 시간, 가장 느린 단계를 stderr에 한 줄로 출력한다.
 
@@ -98,7 +98,7 @@
 | `dui open [RUN_DIR]` | — | 내장 2D 캔버스 뷰어를 브라우저에서 연다. `RUN_DIR`에는 `graph.json`이 있어야 하며, 다른 경로나 알 수 없는 옵션은 이유와 함께 종료 코드 2로 끝난다. `--help`는 옵션을 출력한다. |
 | `dui desktop` | — | `~/.dui/dui.db`를 직접 읽는 네이티브 GPUI 데스크톱 뷰어를 연다. |
 | `dui diff BEFORE AFTER [--markdown]` | `diff(before, after)` | 두 캡처를 비교한다(요소 `renderDiff`, 지연 픽셀 오버레이, `--base BRANCH --markdown` PR 코멘트 출력). |
-| `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | 검증률·누락 사유·미해결 리뷰 코멘트를 계산한다. |
+| `dui audit RUN_DIR [--goal PERCENT]` | `audit(run, goal?)` | 캡처된 렌더 가능 칸의 검증률, 계획·캡처·검증 개수, 누락 사유, 미캡처 칸, 미해결 리뷰 코멘트를 계산한다. |
 | `dui audit RUN_DIR --design MANIFEST [--goal PERCENT]` | — | 캡처한 노드를 프로젝트 명세와 비교하고 결과를 `designAudit`에 기록한다. [플러그인 규약](architecture.md#63-프로젝트-디자인-검사) |
 | `dui comment <add\|list\|resolve\|reopen>` | `comment_*` | 화면·상태·폭·전이에 고정된 리뷰 코멘트를 관리한다. |
 | `dui transitions PROJECT MANIFEST [RUN]` | `transitions(...)` | 액션을 재실행해 화면 전이를 검증한다. |

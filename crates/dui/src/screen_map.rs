@@ -81,13 +81,21 @@ fn plan_only(manifest: &Path) -> Result<(), (u8, Value)> {
 fn summary_line(report: &Value) -> Option<String> {
     let timings = report.get("timings")?;
     let seconds = |ms: &Value| format!("{:.1} s", ms.as_u64().unwrap_or(0) as f64 / 1000.0);
-    let cells = report["cells"].as_array().map_or(0, Vec::len);
-    let captured = report["cells"]
-        .as_array()
-        .map_or(0, |c| c.iter().filter(|c| c["image"].is_string()).count());
+    let cells = report["coverage"]["planned"]
+        .as_u64()
+        .unwrap_or_else(|| report["cells"].as_array().map_or(0, Vec::len) as u64);
+    let captured = report["coverage"]["captured"].as_u64().unwrap_or(0);
+    let verified = report["coverage"]["verified"].as_u64().unwrap_or(0);
+    let captured_renderable = report["coverage"]["capturedRenderable"]
+        .as_u64()
+        .unwrap_or(captured);
+    let coverage_detail = if captured_renderable == 0 {
+        "no captured renderable cells".to_owned()
+    } else {
+        format!("{verified}/{captured_renderable} verified captured renderable")
+    };
     let mut line = format!(
-        "dui map: {cells} cells, {captured} captured ({} verified) in {}",
-        report["coverage"]["verified"],
+        "dui map: {cells} planned, {captured} captured, {coverage_detail} in {}",
         seconds(&timings["wallMs"])
     );
     if captured == 0 && report["browser"].is_null() {
@@ -102,7 +110,7 @@ fn summary_line(report: &Value) -> Option<String> {
             n => format!("{n} screens"),
         };
         return Some(format!(
-            "dui map: {screens}, {cells} cells planned without a browser in {}; capture them with --capture",
+            "dui map: {screens}, {cells} planned without a browser, {captured} captured, {coverage_detail} in {}; capture them with --capture",
             seconds(&timings["wallMs"])
         ));
     }
@@ -118,16 +126,26 @@ fn summary_line(report: &Value) -> Option<String> {
     for cell in report["cells"].as_array().into_iter().flatten() {
         if cell["status"] == "unverified"
             && let Some(reason) = cell["reason"].as_str()
+            && reason != "not-rendered"
         {
             let kind = reason.split(':').next().unwrap_or(reason);
             *kinds.entry(kind).or_default() += 1;
         }
     }
+    let not_captured = report["cells"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|c| c["status"] == "unverified" && c["reason"] == "not-rendered")
+        .count();
+    if not_captured > 0 {
+        line.push_str(&format!("; not captured: {not_captured} not-rendered"));
+    }
     if !kinds.is_empty() {
         let mut kinds: Vec<_> = kinds.into_iter().collect();
         kinds.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
         let parts: Vec<String> = kinds.iter().map(|(k, n)| format!("{n} {k}")).collect();
-        line.push_str(&format!("; unverified: {}", parts.join(", ")));
+        line.push_str(&format!("; unverified after capture: {}", parts.join(", ")));
     }
     Some(line)
 }
@@ -442,7 +460,8 @@ mod tests {
     fn the_summary_groups_unverified_cells_by_reason() {
         let cell = |status: &str, reason: Option<&str>| json!({"status": status, "reason": reason, "image": "x.png"});
         let report = json!({
-            "coverage": {"verified": 1},
+            "browser": "test-browser",
+            "coverage": {"planned": 5, "captured": 5, "verified": 1, "capturedRenderable": 5},
             "timings": {"wallMs": 12_300, "slowestPhase": "settle", "capturedCells": 5,
                         "totals": {"settleMs": 9_000}},
             "cells": [
@@ -455,12 +474,14 @@ mod tests {
         });
         assert_eq!(
             summary_line(&report).expect("line"),
-            "dui map: 5 cells, 5 captured (1 verified) in 12.3 s; slowest phase settle (9.0 s over \
-             5 captures); unverified: 2 not-ready, 1 api-error, 1 redirected"
+            "dui map: 5 planned, 5 captured, 1/5 verified captured renderable in 12.3 s; slowest \
+             phase settle (9.0 s over 5 captures); unverified after capture: 2 not-ready, 1 api-error, \
+             1 redirected"
         );
         // A map without capture plans its cells and started no browser.
         let planned = json!({
-            "coverage": {"verified": 0},
+            "browser": null,
+            "coverage": {"planned": 2, "captured": 0, "verified": 0, "capturedRenderable": 0},
             "timings": {"wallMs": 1_000},
             "cells": [
                 {"path": "/", "status": "unverified", "reason": "not-rendered"},
@@ -469,7 +490,8 @@ mod tests {
         });
         assert_eq!(
             summary_line(&planned).expect("line"),
-            "dui map: 1 screen, 2 cells planned without a browser in 1.0 s; capture them with --capture"
+            "dui map: 1 screen, 2 planned without a browser, 0 captured, no captured renderable cells \
+             in 1.0 s; capture them with --capture"
         );
     }
 

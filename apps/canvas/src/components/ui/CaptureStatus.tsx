@@ -11,10 +11,16 @@ export function CaptureStatus({ cell }: { cell?: Cell }) {
         : t.verified
       : cell.status === "unrenderable"
         ? t.unrenderable
-        : t.unverified;
+        : cell.reason === "not-rendered"
+          ? t.notCaptured
+          : t.unverifiedAfterCapture;
   return (
     <>
-      <span className="capture-status" data-status={cell.status}>
+      <span
+        className="capture-status"
+        data-status={cell.status}
+        data-capture-state={cell.reason === "not-rendered" ? "not-captured" : "captured"}
+      >
         {label}
       </span>
       {cell.reason && <span className="capture-reason">{cell.reason}</span>}

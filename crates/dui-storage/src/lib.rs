@@ -1431,14 +1431,23 @@ impl SqliteStore {
         for row in rows {
             let status: CellStatus = serde_json::from_str(&row.map_err(db_err)?).map_err(db_err)?;
             summary.total += 1;
+            summary.planned += 1;
             match status {
                 CellStatus::Verified => {
                     summary.verified += 1;
+                    summary.captured += 1;
+                    summary.captured_renderable += 1;
                     summary.renderable += 1;
                 }
-                CellStatus::Unverified { .. } => {
-                    summary.unverified += 1;
+                CellStatus::Unverified { ref reason } => {
                     summary.renderable += 1;
+                    if reason.as_str() == "not-rendered" {
+                        summary.not_captured += 1;
+                    } else {
+                        summary.unverified += 1;
+                        summary.captured += 1;
+                        summary.captured_renderable += 1;
+                    }
                 }
                 CellStatus::Unrenderable { .. } => {
                     summary.unrenderable += 1;

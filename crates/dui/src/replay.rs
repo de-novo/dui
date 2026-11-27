@@ -281,7 +281,7 @@ fn unavailable(jobs: &[Job], analysis: &Value, out: &Path) -> Reply {
             c
         })
         .collect();
-    let report = json!({"coverage":{"attempted":0,"renderable":0,"verified":0,"unrenderable":cells.len()},"cells":cells,"compiler":analysis["compiler"]});
+    let report = json!({"coverage":crate::coverage::base(&cells),"cells":cells,"compiler":analysis["compiler"]});
     let g = crate::graph_view::with_cells(
         graph(
             analysis["facts"]
@@ -657,7 +657,9 @@ fn finish(jobs: &[Job], analysis: &Value, out: &Path) -> Reply {
         "postMountAttempts":cells.iter().filter(|c|c["injectionPhase"]=="after-mount" || c.get("rejectedRetry").is_some()).count(),
         "verifiedAfterMount":cells.iter().filter(|c|c["injectionPhase"]=="after-mount" && c["status"]=="verified").count(),
     });
-    let mut report = json!({"evidenceSummary":summary,"versions":analysis["versions"],"sourceFiles":analysis["sourceFiles"],"os":std::env::consts::OS,"unverifiedReasons":reasons,"coverage":{"attempted":jobs.len(),"renderable":jobs.len(),"verified":verified,"unrenderable":0,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"remainingPlans":0,"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"cells":cells,"compiler":analysis["compiler"],"diagnostics":analysis["diagnostics"]});
+    let mut report = json!({"evidenceSummary":summary,"versions":analysis["versions"],"sourceFiles":analysis["sourceFiles"],"os":std::env::consts::OS,"unverifiedReasons":reasons,"coverage":crate::coverage::base(&cells),"remainingPlans":0,"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"cells":cells,"compiler":analysis["compiler"],"diagnostics":analysis["diagnostics"]});
+    report["coverage"]["branchOutcomes"] = json!(expected.len());
+    report["coverage"]["observedBranchOutcomes"] = json!(expected.intersection(&hits).count());
     if let Some(environment) = crate::reference::load(&out.join("environment.json"))? {
         report["environment"] = environment;
     }

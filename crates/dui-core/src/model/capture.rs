@@ -798,6 +798,14 @@ impl Edge {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoverageSummary {
+    #[serde(default)]
+    pub planned: usize,
+    #[serde(default)]
+    pub captured: usize,
+    #[serde(default)]
+    pub captured_renderable: usize,
+    #[serde(default)]
+    pub not_captured: usize,
     pub verified: usize,
     pub unverified: usize,
     pub unrenderable: usize,
@@ -810,14 +818,23 @@ impl CoverageSummary {
         let mut summary = Self::default();
         for cell in cells {
             summary.total += 1;
+            summary.planned += 1;
             match cell.status() {
                 CellStatus::Verified => {
                     summary.verified += 1;
+                    summary.captured += 1;
+                    summary.captured_renderable += 1;
                     summary.renderable += 1;
                 }
-                CellStatus::Unverified { .. } => {
-                    summary.unverified += 1;
+                CellStatus::Unverified { reason } => {
                     summary.renderable += 1;
+                    if reason.as_str() == "not-rendered" {
+                        summary.not_captured += 1;
+                    } else {
+                        summary.unverified += 1;
+                        summary.captured += 1;
+                        summary.captured_renderable += 1;
+                    }
                 }
                 CellStatus::Unrenderable { .. } => {
                     summary.unrenderable += 1;

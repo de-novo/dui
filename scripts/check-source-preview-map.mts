@@ -48,7 +48,15 @@ try {
     writeFileSync(join(project, "dui.json"), JSON.stringify({ sourcePreviews: entries }));
   configure();
   const first = map();
-  assert.deepEqual(first.coverage, { attempted: 0, renderable: 0, unrenderable: 0, verified: 0 });
+  assert.deepEqual(first.coverage, {
+    planned: 0,
+    captured: 0,
+    verified: 0,
+    capturedRenderable: 0,
+    attempted: 0,
+    renderable: 0,
+    unrenderable: 0,
+  });
   const nodes = graph(first.output).nodes;
   assert.equal(nodes.length, entries.length);
   assert.equal(new Set(nodes.map((n) => n.id)).size, nodes.length);

@@ -1311,7 +1311,10 @@ fn execute_with_locales(
         .filter(|c| c["reason"] != "not-rendered" && c["status"] != "unrenderable")
         .count();
     let renderable = cells.len() - unrenderable;
-    let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"remainingPlans":remaining,"coverage":{"verified":verified,"renderable":renderable,"attempted":attempted,"unrenderable":unrenderable,"branchOutcomes":expected.len(),"observedBranchOutcomes":expected.intersection(&hits).count()},"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
+    let mut coverage = crate::coverage::base(&cells);
+    coverage["branchOutcomes"] = json!(expected.len());
+    coverage["observedBranchOutcomes"] = json!(expected.intersection(&hits).count());
+    let mut report = json!({"browser":browser_version,"os":std::env::consts::OS,"scenarios":rounds,"discoveredRoutes":discovered_routes,"unobservedSlots":unseen,"diagnostics":analysis["diagnostics"],"sourceFiles":analysis["sourceFiles"],"versions":analysis["versions"],"compiler":analysis["compiler"],"path":spec["path"],"remainingPlans":remaining,"coverage":coverage,"unobservedBranches":expected.difference(&hits).collect::<Vec<_>>(),"runtimeOnlyInstrumentedBranches":hits.difference(&expected).collect::<Vec<_>>(),"cells":cells});
     report["timings"] = timing_summary(&report["cells"], run_started.elapsed());
     report["overlayDiscovery"] = json!({
         "method": if compiler_overlays { "compiler" } else { "runtime" },

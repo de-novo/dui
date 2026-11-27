@@ -139,6 +139,8 @@ export type Messages = {
   noCaptureAtWidth: string;
   verified: string;
   unverified: string;
+  notCaptured: string;
+  unverifiedAfterCapture: string;
   sourcePreview: string;
   sourcePreviewNotNative: string;
   previewSwitch: (number: number) => string;
@@ -190,6 +192,13 @@ export type Messages = {
   commentResolved: string;
   noComments: string;
   commentFailed: string;
+  auditCoverageLabel: (verifiedPct: number, goalPct: number, capturedRenderable: number) => string;
+  auditCapturedCellsLabel: (
+    verified: number,
+    capturedRenderable: number,
+    captured: number,
+    planned: number,
+  ) => string;
   auditOpenCommentsLabel: (count: number) => string;
   selectMapScreen: string;
   mapConnections: string;
@@ -353,6 +362,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "No capture at this width",
     verified: "Verified",
     unverified: "Unverified",
+    notCaptured: "Not captured",
+    unverifiedAfterCapture: "Unverified after capture",
     sourcePreview: "Source preview",
     sourcePreviewNotNative:
       "Redrawn in HTML from portable layout primitives. Not the native iOS or Android screen.",
@@ -409,6 +420,14 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     commentResolved: "Resolved",
     noComments: "No review comments on this screen yet.",
     commentFailed: "Could not save review comments.",
+    auditCoverageLabel: (verifiedPct, goalPct, capturedRenderable) =>
+      capturedRenderable === 0
+        ? `Coverage not measurable / ${goalPct}% goal`
+        : `Coverage ${verifiedPct.toFixed(1)}% / ${goalPct}% goal`,
+    auditCapturedCellsLabel: (verified, capturedRenderable, captured, planned) =>
+      capturedRenderable === 0
+        ? `No captured renderable cells · ${captured}/${planned} captured`
+        : `${verified}/${capturedRenderable} verified captured renderable · ${captured}/${planned} captured`,
     auditOpenCommentsLabel: (count) => `${count} unresolved`,
     selectMapScreen: "Select a screen",
     mapConnections: "Connections",
@@ -573,6 +592,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "此宽度暂无截图",
     verified: "已验证",
     unverified: "未验证",
+    notCaptured: "未捕获",
+    unverifiedAfterCapture: "捕获后未验证",
     sourcePreview: "源码预览",
     sourcePreviewNotNative: "依据可移植布局元素以 HTML 重新绘制，并非真实的 iOS 或 Android 界面。",
     previewSwitch: (number) => "开关 " + number,
@@ -624,6 +645,14 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     commentResolved: "已解决",
     noComments: "此界面暂无评审评论。",
     commentFailed: "无法保存评审评论。",
+    auditCoverageLabel: (verifiedPct, goalPct, capturedRenderable) =>
+      capturedRenderable === 0
+        ? `覆盖率无法计量 / 目标 ${goalPct}%`
+        : `覆盖率 ${verifiedPct.toFixed(1)}% / 目标 ${goalPct}%`,
+    auditCapturedCellsLabel: (verified, capturedRenderable, captured, planned) =>
+      capturedRenderable === 0
+        ? `无已捕获可渲染格 · 已捕获 ${captured}/${planned}`
+        : `已捕获可渲染格验证 ${verified}/${capturedRenderable} · 已捕获 ${captured}/${planned}`,
     auditOpenCommentsLabel: (count) => `${count} 条待处理评论`,
     selectMapScreen: "选择屏幕",
     mapConnections: "连接",
@@ -789,6 +818,8 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     noCaptureAtWidth: "이 폭의 캡처가 없습니다",
     verified: "검증됨",
     unverified: "미검증",
+    notCaptured: "캡처되지 않음",
+    unverifiedAfterCapture: "캡처 후 미검증",
     sourcePreview: "소스 미리보기",
     sourcePreviewNotNative:
       "이식 가능한 레이아웃 요소를 HTML로 다시 그린 것입니다. 실제 iOS·Android 화면이 아닙니다.",
@@ -841,6 +872,14 @@ export const MESSAGES: Record<UiLocale, Messages> = {
     commentResolved: "해결됨",
     noComments: "이 화면에 등록된 코멘트가 없습니다.",
     commentFailed: "코멘트를 불러오거나 저장할 수 없습니다.",
+    auditCoverageLabel: (verifiedPct, goalPct, capturedRenderable) =>
+      capturedRenderable === 0
+        ? `커버리지 측정 불가 / 목표 ${goalPct}%`
+        : `커버리지 ${verifiedPct.toFixed(1)}% / 목표 ${goalPct}%`,
+    auditCapturedCellsLabel: (verified, capturedRenderable, captured, planned) =>
+      capturedRenderable === 0
+        ? `캡처된 렌더 가능 칸 없음 · 캡처 ${captured}/${planned}`
+        : `캡처된 렌더 가능 칸 검증 ${verified}/${capturedRenderable} · 캡처 ${captured}/${planned}`,
     auditOpenCommentsLabel: (count) => `미해결 코멘트 ${count}개`,
     selectMapScreen: "화면 선택",
     mapConnections: "연결선",

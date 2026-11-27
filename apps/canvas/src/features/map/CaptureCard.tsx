@@ -25,6 +25,17 @@ export function routeName(path: string) {
   return path.split("?")[0].split("/").filter(Boolean).slice(-2).join("/") || path;
 }
 
+export function captureBadgeCounts(cells: Cell[]) {
+  return {
+    notCaptured: cells.filter((c) => c.status === "unverified" && c.reason === "not-rendered")
+      .length,
+    unverifiedAfterCapture: cells.filter(
+      (c) => c.status === "unverified" && c.reason !== "not-rendered",
+    ).length,
+    unavailable: cells.filter((c) => c.status === "unrenderable").length,
+  };
+}
+
 export function CaptureCard({
   screen,
   cell,
@@ -86,8 +97,7 @@ export function CaptureCard({
   );
   const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
-  const missing = screen.cells.filter((c) => c.status === "unverified").length;
-  const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
+  const { notCaptured, unverifiedAfterCapture, unavailable } = captureBadgeCounts(screen.cells);
   const large = Boolean(cardWidth && cardWidth >= 800);
   const thumbnail = small && !screenDiff ? cell?.thumbnail : undefined;
   const fallbackSrc = thumbnail
@@ -332,9 +342,14 @@ export function CaptureCard({
             {t.comments} {openComments}
           </small>
         )}
-        {missing > 0 && (
-          <small title={missing + " unverified cells"}>
-            {t.unverified} {missing}
+        {notCaptured > 0 && (
+          <small title={notCaptured + " planned cells never captured"}>
+            {t.notCaptured} {notCaptured}
+          </small>
+        )}
+        {unverifiedAfterCapture > 0 && (
+          <small title={unverifiedAfterCapture + " captured cells without passing verification"}>
+            {t.unverifiedAfterCapture} {unverifiedAfterCapture}
           </small>
         )}
         {unavailable > 0 && (

@@ -40,7 +40,10 @@ type RunReport = {
     termination: string;
   }[];
   coverage: {
+    planned: number;
+    captured: number;
     verified: number;
+    capturedRenderable: number;
     renderable: number;
     attempted: number;
     unrenderable: number;
@@ -238,7 +241,12 @@ try {
       normalizeRun(mcpFullReport),
       "CLI and MCP full-budget plans/verdicts diverged",
     );
-    assert.equal(cliFullReport.coverage.verified, cliFullReport.coverage.renderable);
+    assert.equal(cliFullReport.coverage.planned, 18);
+    assert.equal(cliFullReport.coverage.captured, 18);
+    assert.equal(cliFullReport.coverage.capturedRenderable, 18);
+    assert.equal(cliFullReport.coverage.attempted, 18);
+    assert.equal(cliFullReport.coverage.verified, cliFullReport.coverage.capturedRenderable);
+    assert.equal(cliFullReport.coverage.renderable, cliFullReport.coverage.planned);
     assert.equal(cliFullReport.coverage.unrenderable, 0);
     assert.equal(cliFullReport.coverage.branchOutcomes, 4);
     assert.equal(cliFullReport.coverage.observedBranchOutcomes, 4);
@@ -277,8 +285,11 @@ try {
     assert.equal(stagnantReport.scenarios[0].termination, "no-improvement");
     assert.equal(stagnantReport.coverage.observedBranchOutcomes, 4);
     assert(stagnantReport.remainingPlans > 0);
-    assert(stagnantReport.coverage.renderable > stagnantReport.coverage.attempted);
-    assert.equal(stagnantReport.cells.length, stagnantReport.coverage.renderable);
+    assert.equal(stagnantReport.coverage.planned, stagnantReport.coverage.renderable);
+    assert.equal(stagnantReport.coverage.captured, stagnantReport.coverage.attempted);
+    assert.equal(stagnantReport.coverage.capturedRenderable, stagnantReport.coverage.attempted);
+    assert(stagnantReport.coverage.renderable > stagnantReport.coverage.capturedRenderable);
+    assert.equal(stagnantReport.cells.length, stagnantReport.coverage.planned);
     const unattempted = stagnantReport.cells.filter((c) => c.reason === "not-rendered");
     assert.equal(
       unattempted.length,

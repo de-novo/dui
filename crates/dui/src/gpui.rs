@@ -366,6 +366,9 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
     }
 
     let renderable = cells.len() - unrenderable;
+    let mut coverage = crate::coverage::base(&cells);
+    coverage["branchOutcomes"] = json!(0);
+    coverage["observedBranchOutcomes"] = json!(0);
     let report = json!({
         "runtime": "gpui-kit",
         "os": env::consts::OS,
@@ -379,14 +382,7 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
         "elementTreeAvailable": element_tree_available,
         "path": path,
         "widths": widths,
-        "coverage": {
-            "verified": verified,
-            "renderable": renderable,
-            "attempted": renderable,
-            "unrenderable": unrenderable,
-            "branchOutcomes": 0,
-            "observedBranchOutcomes": 0,
-        },
+        "coverage": coverage,
         "cells": cells,
     });
 
