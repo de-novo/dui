@@ -86,8 +86,40 @@ struct Rule<'a> {
 
 pub(crate) struct Sheet<'a> {
     rules: BTreeMap<P, Vec<Rule<'a>>>,
+    selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
     vars: BTreeMap<&'a str, Option<&'a str>>,
+}
+
+struct Selector<'a> {
+    text: &'a str,
+    // A necessary type or class on the subject. Ancestors never qualify here.
+    subject: Option<&'a str>,
+}
+
+fn subject<'a>(file: &'a File, node: Ast<'_>) -> Option<&'a str> {
+    let parts = children(node);
+    match node.kind() {
+        "descendant_selector"
+        | "child_selector"
+        | "adjacent_sibling_selector"
+        | "sibling_selector" => subject(file, *parts.last()?),
+        "class_selector" => {
+            let class = file.text(*parts.last()?);
+            if ident(class) {
+                let text = file.text(node);
+                return text
+                    .get(text.len().checked_sub(class.len() + 1)?..)
+                    .filter(|s| s.starts_with('.'));
+            }
+            None
+        }
+        "tag_name" if ident(file.text(node)) => Some(file.text(node)),
+        "pseudo_class_selector" | "attribute_selector" | "id_selector" => {
+            subject(file, *parts.first()?)
+        }
+        _ => None,
+    }
 }
 
 fn ident(s: &str) -> bool {
@@ -96,15 +128,45 @@ fn ident(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
 }
 
+// The CSS grammar may mark a media range or an empty var() fallback as an error.
+// Both remain inside an intact rule; conditions stay unknown and values are parsed from source.
+fn structural_error(f: &File, root: Ast<'_>) -> bool {
+    let mut pending = vec![root];
+    while let Some(n) = pending.pop() {
+        if !n.has_error() {
+            continue;
+        }
+        if n.is_error() || n.is_missing() {
+            let parent = n.parent().map(|p| p.kind());
+            if n.is_error()
+                && (parent == Some("parenthesized_query") && !f.text(n).contains(['{', '}', ';'])
+                    || parent == Some("arguments") && f.text(n) == ",")
+            {
+                continue;
+            }
+            return true;
+        }
+        pending.extend(n.children(&mut n.walk()));
+    }
+    false
+}
+
 impl<'a> Sheet<'a> {
     pub(crate) fn new(f: &'a File) -> Result<Self, String> {
         let root = f.tree.root_node();
-        if root.has_error() {
+        if structural_error(f, root) {
             return Err(format!("Cannot parse built CSS: {}", f.path));
         }
         let mut sheet = Self {
             rules: BTreeMap::new(),
             vars: BTreeMap::new(),
+            selectors: BTreeMap::from([(
+                "",
+                vec![Selector {
+                    text: "",
+                    subject: None,
+                }],
+            )]),
         };
         let mut layers = Vec::new();
         let mut stack = vec![(root, "", usize::MAX, false)];
@@ -155,6 +217,18 @@ impl<'a> Sheet<'a> {
                 }
                 "rule_set" => {
                     if let [selectors, body] = parts.as_slice() {
+                        sheet
+                            .selectors
+                            .entry(f.text(*selectors))
+                            .or_insert_with(|| {
+                                children(*selectors)
+                                    .into_iter()
+                                    .map(|node| Selector {
+                                        text: f.text(node),
+                                        subject: subject(f, node),
+                                    })
+                                    .collect()
+                            });
                         stack.push((
                             *body,
                             f.text(*selectors),
@@ -321,8 +395,14 @@ impl<'a> Sheet<'a> {
         let mut rank = None;
         let mut unknown: Option<&Rule<'_>> = None;
         for rule in rules {
-            for sel in rule.selectors.split(',').map(str::trim) {
-                match specificity(sel, classes, el) {
+            for selector in &self.selectors[rule.selectors] {
+                if selector
+                    .subject
+                    .is_some_and(|s| specificity(s, classes, el) == Some(None))
+                {
+                    continue;
+                }
+                match specificity(selector.text, classes, el) {
                     Some(None) => {}
                     Some(Some(s)) if !rule.uncertain && !rule.important => {
                         if rank.is_none_or(|r| (rule.layer, s) >= r) {

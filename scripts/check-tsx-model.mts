@@ -638,8 +638,10 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     join(builtProject, bundle),
     `
     .card { gap:7px; color:#123456; width:140px; border-radius:5px; }
-    @media (min-width:500px) { .card { gap:9px; color:#abcdef; } }
+    @media (width>=500px) { .card { gap:9px; color:#abcdef; } }
+    .card { transform:var(--rotate, ) translateY(1px) }
     .card { border-top-left-radius:2px }
+    .sidebar .badge:hover, .notice > strong { width:320px }
   `,
   );
   const staticCard = readBuilt().components[0].root.children[0];
