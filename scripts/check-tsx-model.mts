@@ -352,6 +352,44 @@ export default function View(){return <section><p className={sheet.card}/><p sty
       texts.map((t) => ["unresolved", t]),
     );
   }
+  for (const [css, jsx, expected] of [
+    ["2px", "2", { kind: "length", value: 2, unit: "px" }],
+    ["0", "0", { kind: "length", value: 0, unit: "px" }],
+    [
+      "0.2em 0.2em 0.2em 0.2em",
+      '"0.2em 0.2em 0.2em 0.2em"',
+      { kind: "length", value: 0.2, unit: "em" },
+    ],
+    ["1px 2px", '"1px 2px"', null],
+    ["10%", '"10%"', null],
+    ["-2px", "-2", null],
+    ["var(--edge)", "edge", null],
+  ] as const) {
+    writeFileSync(cssPath, `.panel { border-width: ${css}; }`);
+    writeFileSync(
+      join(project, "Border.tsx"),
+      `import s from "./View.module.css"; export function Border({edge}){return <main><p className={s.panel}/><p style={{borderWidth:${jsx}}}/></main>}`,
+    );
+    const model = JSON.parse(extract(project, "Border.tsx"));
+    assert.ok(validate(model));
+    const children = model.components[0].root.children;
+    assert.equal(children.length, 2);
+    for (const [index, child] of children.entries()) {
+      const decl = child.style[0];
+      assert.equal(decl.property, "borderWidth");
+      if (expected) assert.deepEqual(decl.value, expected);
+      else {
+        assert.equal(decl.value.kind, "unresolved");
+        assert.equal(decl.value.text, index === 0 ? css : jsx);
+      }
+      const loc = decl.from.location;
+      assert.equal(loc.file, index === 0 ? "View.module.css" : "Border.tsx");
+      assert.equal(
+        readFileSync(join(project, loc.file)).subarray(loc.start, loc.end).toString(),
+        decl.from.text,
+      );
+    }
+  }
 } finally {
   rmSync(project, { recursive: true, force: true });
 }
