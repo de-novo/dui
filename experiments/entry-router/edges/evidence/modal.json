@@ -1,0 +1,204 @@
+{
+  "literal": {
+    "pairs": {
+      "[\"/invoices/:id/edit\",\"/invoices\"]": [
+        [
+          "app/root.tsx",
+          473
+        ]
+      ],
+      "[\"/invoices/:id/edit\",\"/invoices/add\"]": [
+        [
+          "app/routes/invoices.tsx",
+          675
+        ]
+      ],
+      "[\"/invoices/add\",\"/invoices\"]": [
+        [
+          "app/root.tsx",
+          473
+        ]
+      ],
+      "[\"/invoices\",\"/invoices/add\"]": [
+        [
+          "app/routes/invoices.tsx",
+          675
+        ]
+      ]
+    },
+    "samples": [
+      [
+        46.544833,
+        58.4375
+      ],
+      [
+        50.167458,
+        58.96875
+      ],
+      [
+        48.660375,
+        58.875
+      ],
+      [
+        46.57375,
+        58.6875
+      ],
+      [
+        46.846042,
+        58.765625
+      ],
+      [
+        50.410625,
+        58.96875
+      ],
+      [
+        46.933958,
+        58.65625
+      ]
+    ]
+  },
+  "template": {
+    "pairs": {
+      "[\"/invoices/:id/edit\",\"/invoices\"]": [
+        [
+          "app/routes/invoices.$id.edit.tsx",
+          1086
+        ],
+        [
+          "app/routes/invoices.$id.edit.tsx",
+          1625
+        ],
+        [
+          "app/root.tsx",
+          473
+        ]
+      ],
+      "[\"/invoices/:id/edit\",\"/invoices/add\"]": [
+        [
+          "app/routes/invoices.tsx",
+          675
+        ]
+      ],
+      "[\"/invoices/add\",\"/invoices\"]": [
+        [
+          "app/routes/invoices.add.tsx",
+          840
+        ],
+        [
+          "app/root.tsx",
+          473
+        ]
+      ],
+      "[\"/invoices/add\",\"/invoices/:id/edit\"]": [
+        [
+          "app/routes/invoices.tsx",
+          1276
+        ]
+      ],
+      "[\"/invoices\",\"/invoices/add\"]": [
+        [
+          "app/routes/invoices.tsx",
+          675
+        ]
+      ],
+      "[\"/invoices\",\"/invoices/:id/edit\"]": [
+        [
+          "app/routes/invoices.tsx",
+          1276
+        ]
+      ]
+    },
+    "samples": [
+      [
+        49.343708,
+        59.0
+      ],
+      [
+        51.427875,
+        59.0625
+      ],
+      [
+        49.430125,
+        58.859375
+      ],
+      [
+        49.014667,
+        58.75
+      ],
+      [
+        52.0505,
+        58.8125
+      ],
+      [
+        50.0315,
+        58.859375
+      ],
+      [
+        48.780542,
+        58.96875
+      ]
+    ]
+  },
+  "modal": {
+    "pairs": {
+      "[\"/invoices/:id/edit\",\"/invoices\"]": [
+        [
+          "app/routes/invoices.$id.edit.tsx",
+          1086
+        ],
+        [
+          "app/routes/invoices.$id.edit.tsx",
+          1625
+        ]
+      ],
+      "[\"/invoices/add\",\"/invoices\"]": [
+        [
+          "app/routes/invoices.add.tsx",
+          840
+        ]
+      ],
+      "[\"/invoices\",\"/invoices/add\"]": [
+        [
+          "app/routes/invoices.tsx",
+          675
+        ]
+      ],
+      "[\"/invoices\",\"/invoices/:id/edit\"]": [
+        [
+          "app/routes/invoices.tsx",
+          1276
+        ]
+      ]
+    },
+    "samples": [
+      [
+        48.08025,
+        59.015625
+      ],
+      [
+        48.38875,
+        58.90625
+      ],
+      [
+        48.304417,
+        58.859375
+      ],
+      [
+        49.351958,
+        58.859375
+      ],
+      [
+        48.612708,
+        58.8125
+      ],
+      [
+        48.502,
+        58.796875
+      ],
+      [
+        48.797459,
+        59.140625
+      ]
+    ]
+  }
+}

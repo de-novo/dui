@@ -1,0 +1,26 @@
+[
+  {
+    "width": 1440,
+    "dest": "/invoices/add",
+    "returned": true,
+    "backgroundAddExcludedFromAccessibilityTree": true
+  },
+  {
+    "width": 1440,
+    "dest": "/invoices/1/edit",
+    "returned": true,
+    "backgroundAddExcludedFromAccessibilityTree": true
+  },
+  {
+    "width": 390,
+    "dest": "/invoices/add",
+    "returned": true,
+    "backgroundAddExcludedFromAccessibilityTree": true
+  },
+  {
+    "width": 390,
+    "dest": "/invoices/1/edit",
+    "returned": true,
+    "backgroundAddExcludedFromAccessibilityTree": true
+  }
+]
