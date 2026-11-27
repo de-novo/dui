@@ -31,6 +31,8 @@ The reader also preserves simple font-family lists and text-decoration lines, ex
 
 Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
 
+Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports simple ID selectors, positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
+
 ## 1. Principles
 
 1. **Declared, not observed.** The model holds what the code says. It runs no handlers, calls no APIs and starts no browser. Capture results stay in the [capture context](domain-model.md#2-entities-value-objects-and-identities).

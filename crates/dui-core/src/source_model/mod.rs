@@ -209,6 +209,7 @@ pub enum Expr {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Node {
+    Fragment(Fragment),
     Element(Element),
     Instance(Instance),
     Text(Text),
@@ -216,6 +217,14 @@ pub enum Node {
     List(List),
     Outlet(Outlet),
     Placeholder(Placeholder),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Fragment {
+    pub id: String,
+    pub children: Vec<Node>,
+    pub location: Location,
 }
 
 /// A platform element or a component the model does not describe.
@@ -414,6 +423,26 @@ pub enum StyleProperty {
     TextTransform,
     WhiteSpace,
     BackdropBlur,
+    Position,
+    Top,
+    Right,
+    Bottom,
+    Left,
+    ZIndex,
+    DotRadius,
+    DotColor,
+    TileWidth,
+    TileHeight,
+    ShadowX,
+    ShadowY,
+    ShadowBlur,
+    ShadowSpread,
+    ShadowColor,
+    BorderTopLeftRadius,
+    BorderTopRightRadius,
+    BorderBottomRightRadius,
+    BorderBottomLeftRadius,
+
     BorderStyle,
     BorderTopWidth,
     BorderTopColor,
@@ -706,6 +735,7 @@ pub struct ScreenEdge {
 impl Node {
     pub fn id(&self) -> &str {
         match self {
+            Self::Fragment(node) => &node.id,
             Self::Element(node) => &node.id,
             Self::Instance(node) => &node.id,
             Self::Text(node) => &node.id,
@@ -718,6 +748,7 @@ impl Node {
 
     pub fn location(&self) -> &Location {
         match self {
+            Self::Fragment(node) => &node.location,
             Self::Element(node) => &node.location,
             Self::Instance(node) => &node.location,
             Self::Text(node) => &node.location,
@@ -731,6 +762,7 @@ impl Node {
     /// Direct child nodes, including every branch arm.
     pub fn children(&self) -> Vec<&Node> {
         match self {
+            Self::Fragment(node) => node.children.iter().collect(),
             Self::Element(node) => node.children.iter().collect(),
             Self::Instance(node) => node.children.iter().collect(),
             Self::List(node) => node.children.iter().collect(),

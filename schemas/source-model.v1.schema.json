@@ -185,6 +185,16 @@
       "oneOf": [
         {
           "additionalProperties": false,
+          "required": ["children"],
+          "properties": {
+            "kind": { "const": "fragment" },
+            "id": { "$ref": "#/$defs/id" },
+            "children": { "$ref": "#/$defs/children" },
+            "location": { "$ref": "#/$defs/location" }
+          }
+        },
+        {
+          "additionalProperties": false,
           "required": ["tag"],
           "properties": {
             "kind": { "const": "element" },
@@ -344,6 +354,25 @@
         "textTransform",
         "whiteSpace",
         "backdropBlur",
+        "position",
+        "top",
+        "right",
+        "bottom",
+        "left",
+        "zIndex",
+        "dotRadius",
+        "dotColor",
+        "tileWidth",
+        "tileHeight",
+        "shadowX",
+        "shadowY",
+        "shadowBlur",
+        "shadowSpread",
+        "shadowColor",
+        "borderTopLeftRadius",
+        "borderTopRightRadius",
+        "borderBottomRightRadius",
+        "borderBottomLeftRadius",
         "borderStyle",
         "borderTopWidth",
         "borderTopColor",

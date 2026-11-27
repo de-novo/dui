@@ -416,6 +416,7 @@ impl<'a> Check<'a> {
                 }
                 self.children(&format!("{pointer}/children"), &instance.children, scope);
             }
+            Node::Fragment(f) => self.children(&format!("{pointer}/children"), &f.children, scope),
             Node::Text(text) => {
                 if text.parts.is_empty() {
                     self.error(format!("{pointer}/parts"), "must have at least one part");
@@ -641,6 +642,26 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
             Some(&["auto", "scroll", "hidden", "clip", "visible"]),
         ),
         P::GridColumnMinimum => (true, false, false, Some(&["single"])),
+        P::Position => (
+            false,
+            false,
+            false,
+            Some(&["static", "relative", "absolute", "fixed", "sticky"]),
+        ),
+        P::Top | P::Right | P::Bottom | P::Left => (true, false, false, Some(&["auto"])),
+        P::ZIndex => (false, true, false, Some(&["auto"])),
+        P::DotColor | P::ShadowColor => (false, false, true, Some(&[])),
+        P::DotRadius
+        | P::TileWidth
+        | P::TileHeight
+        | P::ShadowX
+        | P::ShadowY
+        | P::ShadowBlur
+        | P::ShadowSpread
+        | P::BorderTopLeftRadius
+        | P::BorderTopRightRadius
+        | P::BorderBottomRightRadius
+        | P::BorderBottomLeftRadius => (true, false, false, Some(&[])),
         P::Direction => (false, false, false, Some(&["row", "column", "overlay"])),
         P::AlignItems => (
             false,
@@ -769,7 +790,9 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
     };
     match value {
         StyleValue::Length { .. } => length,
-        StyleValue::Number { value } => number && (property != P::Order || value.fract() == 0.0),
+        StyleValue::Number { value } => {
+            number && (!matches!(property, P::Order | P::ZIndex) || value.fract() == 0.0)
+        }
         StyleValue::Color { .. } => color,
         StyleValue::Keyword { value } => {
             keywords.is_none_or(|allowed| allowed.contains(&value.as_str()))

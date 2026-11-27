@@ -111,6 +111,11 @@ export function drawModel(model: Model, componentId: string) {
   }
   function draw(n: Node, slots: Map<string, unknown>, stack: string[]): globalThis.Node {
     if (--budget < 0) throw Error("Model exceeds preview capacity");
+    if (n.kind === "fragment") {
+      const group = doc.createDocumentFragment();
+      for (const child of n.children ?? []) group.append(draw(child, slots, stack));
+      return group;
+    }
     if (n.kind === "instance")
       return component(
         n.component!,
@@ -131,7 +136,26 @@ export function drawModel(model: Model, componentId: string) {
       return placeholder(n.reason ?? n.tag ?? n.kind);
     const el = n.tag === "body" ? doc.body : doc.createElement(n.tag!);
     el.dataset.modelNode = n.id;
+    const composite = new Map<string, string>();
     for (const d of n.style ?? []) {
+      if (
+        [
+          "dotRadius",
+          "dotColor",
+          "tileWidth",
+          "tileHeight",
+          "shadowX",
+          "shadowY",
+          "shadowBlur",
+          "shadowSpread",
+          "shadowColor",
+        ].includes(d.property)
+      ) {
+        const val = cssValue(d.value);
+        if (val && !d.when) composite.set(d.property, val);
+        else unresolved.add(n.id + " · " + d.from.text);
+        continue;
+      }
       if (d.property === "gridColumnMinimum" && !d.when) {
         const min = cssValue(d.value);
         if (min === "single") {
@@ -167,6 +191,13 @@ export function drawModel(model: Model, componentId: string) {
         el.style.borderStyle = "solid";
       el.style.setProperty(key, val);
     }
+    const get = (k: string) => composite.get(k);
+    if (get("dotColor") && get("dotRadius"))
+      el.style.backgroundImage = `radial-gradient(${get("dotColor")} ${get("dotRadius")},transparent ${get("dotRadius")})`;
+    if (get("tileWidth") && get("tileHeight"))
+      el.style.backgroundSize = `${get("tileWidth")} ${get("tileHeight")}`;
+    const shadow = ["shadowX", "shadowY", "shadowBlur", "shadowSpread", "shadowColor"].map(get);
+    if (shadow.every(Boolean)) el.style.boxShadow = shadow.join(" ");
     for (const u of n.unresolvedStyle ?? []) unresolved.add(n.id + " · " + u.text);
     for (const child of n.children ?? []) el.append(draw(child, slots, stack));
     return el;
