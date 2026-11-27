@@ -1,0 +1,20 @@
+--- a/crates/dui-lang-typescript/src/style/built.rs
++++ b/crates/dui-lang-typescript/src/style/built.rs
+@@ -456,6 +456,17 @@
+             {
+                 continue;
+             }
++            // Bounded research exceptions for the pinned Bulletproof CSS asset.
++            if let Some(p) = n.parent() {
++                if n.is_error() && p.kind() == "attribute_selector"
++                    && f.text(n) == "s" && f.text(p).ends_with(" s]") {
++                    continue;
++                }
++                if n.is_missing() && p.kind() == "declaration"
++                    && f.text(p).trim() == "--tw-contain-style:" {
++                    continue;
++                }
++            }
+             return true;
+         }
+         pending.extend(n.children(&mut n.walk()));
