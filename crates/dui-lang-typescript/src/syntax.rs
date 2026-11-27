@@ -85,6 +85,8 @@ impl File {
                 }
                 let f = match n.kind() {
                     "function_declaration" => n,
+                    "class_declaration" => self.class_render(n)?,
+
                     "variable_declarator" => {
                         field(n, "value").filter(|v| v.kind() == "arrow_function")?
                     }
@@ -94,6 +96,38 @@ impl File {
             })
             .collect()
     }
+    fn class_render<'a>(&self, class: Ast<'a>) -> Option<Ast<'a>> {
+        let heritage = children(class)
+            .into_iter()
+            .find(|n| n.kind() == "class_heritage")?;
+        let base = children(heritage)
+            .into_iter()
+            .find(|n| n.kind() == "extends_clause")
+            .and_then(|n| field(n, "value"))?;
+        let (alias, component) = if base.kind() == "member_expression" {
+            let receiver = self.name(base, "object")?;
+            let (module, export) = self.bindings.get(receiver)?;
+            if module != "react" || !matches!(export.as_str(), "*" | "default") {
+                return None;
+            }
+            (receiver, self.name(base, "property")?)
+        } else {
+            let name = self.text(base);
+            (name, self.bindings.get(name)?.1.as_str())
+        };
+        if self.bindings.get(alias)?.0 != "react"
+            || !matches!(component, "Component" | "PureComponent")
+        {
+            return None;
+        }
+        children(field(class, "body")?).into_iter().find(|n| {
+            n.kind() == "method_definition"
+                && self.name(*n, "name") == Some("render")
+                && !n
+                    .children(&mut n.walk())
+                    .any(|child| child.kind() == "static")
+        })
+    }
     pub fn exported(&self, name: &str) -> Option<&str> {
         children(self.tree.root_node())
             .into_iter()
@@ -102,6 +136,16 @@ impl File {
                 let default = n.children(&mut n.walk()).any(|c| c.kind() == "default");
                 if default != (name == "default") {
                     return None;
+                }
+                if field(n, "source").is_none()
+                    && let Some(exports) = children(n)
+                        .into_iter()
+                        .find(|v| v.kind() == "export_clause")
+                {
+                    return children(exports).into_iter().find_map(|spec| {
+                        let original = self.name(spec, "name")?;
+                        (self.name(spec, "alias").unwrap_or(original) == name).then_some(original)
+                    });
                 }
                 let decl = field(n, "declaration")?;
                 let decls = if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration")
@@ -247,6 +291,11 @@ pub fn load(
                 match clause.kind() {
                     "identifier" => {
                         bindings.push((file.text(clause).to_owned(), "default".to_owned()))
+                    }
+                    "namespace_import" => {
+                        if let Some(alias) = first(clause) {
+                            bindings.push((file.text(alias).into(), "*".into()));
+                        }
                     }
                     "named_imports" => {
                         for spec in children(clause) {
