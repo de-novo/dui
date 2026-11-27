@@ -129,7 +129,7 @@ fn relative(root: &Path, path: &Path) -> Option<String> {
             .replace(std::path::MAIN_SEPARATOR, "/"),
     )
 }
-fn resolve(root: &Path, from: &str, request: &str) -> Option<String> {
+pub(crate) fn resolve(root: &Path, from: &str, request: &str) -> Option<String> {
     let path = root.join(Path::new(from).parent()?).join(request);
     let mut paths = vec![path.clone()];
     if path.extension().is_none() {
@@ -154,6 +154,28 @@ pub struct Sources {
     pub entry: String,
     pub artifact: Option<String>,
     pub files: BTreeMap<String, File>,
+}
+
+fn dynamic_requests(file: &File) -> Vec<(String, Location)> {
+    fn walk(file: &File, node: Ast<'_>, out: &mut Vec<(String, Location)>) {
+        if node.kind() == "call_expression"
+            && field(node, "function").is_some_and(|f| f.kind() == "import")
+            && let Some(request) = field(node, "arguments").and_then(first)
+        {
+            let raw = file.text(request);
+            if let Some(text) = raw.get(1..raw.len().saturating_sub(1))
+                && !text.contains('\\')
+            {
+                out.push((text.to_owned(), file.loc(request)));
+            }
+        }
+        for child in children(node) {
+            walk(file, child, out);
+        }
+    }
+    let mut out = Vec::new();
+    walk(file, file.tree.root_node(), &mut out);
+    out
 }
 
 pub fn load(
@@ -263,6 +285,22 @@ pub fn load(
             }
             for (alias, name) in bindings {
                 file.bindings.insert(alias, (module.clone(), name));
+            }
+        }
+        for (request, location) in dynamic_requests(&file) {
+            if !request.starts_with('.') {
+                continue;
+            }
+            if let Some(module) = resolve(&root, &path, &request) {
+                if module != path && file.imports.insert(module.clone()) {
+                    pending.push(module);
+                }
+            } else {
+                diagnostics.push(Diagnostic {
+                    code: "unresolved-import".into(),
+                    message: request,
+                    location: Some(location),
+                });
             }
         }
         files.insert(path, file);

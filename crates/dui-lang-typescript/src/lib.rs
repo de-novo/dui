@@ -1,4 +1,5 @@
-//! Extract schema-v1 models from a TSX entry and its reachable static imports.
+//! Extract schema-v1 models from a TSX entry and its reachable imports.
+mod query_views;
 mod render;
 mod style;
 mod syntax;
@@ -103,6 +104,7 @@ fn returned(f: Ast<'_>) -> Option<Ast<'_>> {
                 | "lexical_declaration"
                 | "variable_declaration"
                 | "expression_statement"
+                | "function_declaration"
         )
     }) || stmts
         .iter()
@@ -404,6 +406,7 @@ pub fn extract_in_context(
             })
         }
     }
+    query_views::apply(project, &files, &entry, &mut model);
     for e in &mut model.edges {
         if let m::EdgeTarget::Route { route } = &e.to
             && model
