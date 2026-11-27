@@ -87,7 +87,7 @@ M0 审核页面的五种状态在 375、768 和 1280 px 下全部通过验证，
 
 一种新语言只需要一个适配器，把它映射到该模型：布局元素、已声明状态与数据、导航，以及样式语法。模型、近似渲染器、热重载和 Figma 导出均可复用。
 
-**近似而非精确。** 渲染器的目标是让每个屏幕及屏幕之间的关系清晰可辨，而不是与浏览器在像素或 CSS 上一致。样式提取覆盖布局、间距、颜色、排版和令牌（[#360](https://github.com/de-novo/dui/issues/360)）。其余内容连同来源保留为 `unresolved`，卡片会标明。跨网站的完整 CSS 兼容不是目标，可在 v1.0.0 之后重新评估（[#393](https://github.com/de-novo/dui/issues/393)）。像素精度只由显式启用的渲染机检查。
+**近似而非精确。** 渲染器的目标是让每个屏幕及屏幕之间的关系清晰可辨，而不是与浏览器在像素或 CSS 上一致。样式提取覆盖布局、间距、颜色、排版和令牌（[#360](https://github.com/de-novo/dui/issues/360)）。其余内容连同来源保留为 `unresolved`，卡片会标明。更广泛的 Web CSS 兼容是一条独立的研究路线（[#393](https://github.com/de-novo/dui/issues/393)）。它放在单独的 crate 或实验性开关之后，不进入默认 map 和 v1 schema，优先级低于基于 TSX 模型的 map（[#405](https://github.com/de-novo/dui/issues/405)），以后可能随渲染机移入 `ee/`。第一项是用库替换手写的层叠实现（[#404](https://github.com/de-novo/dui/issues/404)）。像素精度只由显式启用的渲染机检查。
 
 <a id="swappable-renderers"></a>
 
