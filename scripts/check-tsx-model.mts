@@ -142,6 +142,34 @@ aside.card { height: 40px; }`,
     assert.ok(fallback.unresolvedStyle[0].text.includes("sheet.card"));
     assert.equal(fallback.style.length, 1);
   }
+  writeFileSync(
+    cssPath,
+    `.card {padding-inline-start: 12px; padding-bottom: 1rem; margin-inline-end: auto; margin-top: -4px;}`,
+  );
+  writeFileSync(
+    join(project, "View.tsx"),
+    `import sheet from "./View.module.css";
+export default function View(){return <section><p className={sheet.card}/><p style={{paddingInlineStart:12, paddingBottom:"1rem", marginInlineEnd:"auto", marginTop:-4}}/></section>;}`,
+  );
+  const paired = JSON.parse(extract(project, "View.tsx"));
+  assert.ok(validate(paired));
+  for (const [index, child] of paired.components[0].root.children.entries()) {
+    assert.deepEqual(
+      child.style.map((d: { property: string; value: unknown }) => [d.property, d.value]),
+      [
+        ["paddingStart", { kind: "length", value: 12, unit: "px" }],
+        ["paddingBottom", { kind: "length", value: 1, unit: "rem" }],
+        ["marginEnd", { kind: "keyword", value: "auto" }],
+        ["marginTop", { kind: "length", value: -4, unit: "px" }],
+      ],
+    );
+    assert.ok(
+      child.style.every(
+        (d: { from: { syntax: string } }) =>
+          d.from.syntax === (index === 0 ? "stylesheet" : "inline"),
+      ),
+    );
+  }
 } finally {
   rmSync(project, { recursive: true, force: true });
 }

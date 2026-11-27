@@ -1,7 +1,7 @@
 //! A bounded cascade for statically referenced CSS Modules. Parse each module once.
 //! If its selector or at-rule structure exceeds the supported subset, keep the JSX
 //! reference unresolved instead of claiming an incomplete cascade.
-use super::{P, PADDING, V, color, length};
+use super::{P, V, color, length, spacing, spacing_value};
 use crate::{
     Files,
     syntax::{File, children, field, unwrap_expr},
@@ -216,42 +216,45 @@ fn media(f: &File, query: Ast<'_>) -> Option<m::Condition> {
     })
 }
 fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
-    let (props, value) = match name {
-        "color" => (vec![P::Color], color(raw)),
-        "background-color" => (vec![P::Background], color(raw)),
-        "border-color" => (vec![P::BorderColor], color(raw)),
-        "opacity" => (
-            vec![P::Opacity],
-            raw.parse::<f64>()
-                .ok()
-                .filter(|v| v.is_finite())
-                .map(|value| V::Number { value }),
-        ),
-        "flex-direction" => (
-            vec![P::Direction],
-            matches!(raw, "column" | "row").then(|| V::Keyword { value: raw.into() }),
-        ),
-        _ => {
-            let props = match name {
-                "padding" => PADDING.to_vec(),
-                "gap" => vec![P::Gap],
-                "width" => vec![P::Width],
-                "height" => vec![P::Height],
-                "min-width" => vec![P::MinWidth],
-                "max-width" => vec![P::MaxWidth],
-                "font-size" => vec![P::FontSize],
-                "border-radius" => vec![P::BorderRadius],
-                _ => return None,
-            };
-            let value = if raw == "0" {
-                Some(V::Length {
-                    value: 0.,
-                    unit: m::LengthUnit::Px,
-                })
-            } else {
-                length(raw)
-            };
-            (props, value)
+    let (props, value) = if let Some(props) = spacing(name) {
+        (props.to_vec(), spacing_value(name, raw))
+    } else {
+        match name {
+            "color" => (vec![P::Color], color(raw)),
+            "background-color" => (vec![P::Background], color(raw)),
+            "border-color" => (vec![P::BorderColor], color(raw)),
+            "opacity" => (
+                vec![P::Opacity],
+                raw.parse::<f64>()
+                    .ok()
+                    .filter(|v| v.is_finite())
+                    .map(|value| V::Number { value }),
+            ),
+            "flex-direction" => (
+                vec![P::Direction],
+                matches!(raw, "column" | "row").then(|| V::Keyword { value: raw.into() }),
+            ),
+            _ => {
+                let props = match name {
+                    "gap" => vec![P::Gap],
+                    "width" => vec![P::Width],
+                    "height" => vec![P::Height],
+                    "min-width" => vec![P::MinWidth],
+                    "max-width" => vec![P::MaxWidth],
+                    "font-size" => vec![P::FontSize],
+                    "border-radius" => vec![P::BorderRadius],
+                    _ => return None,
+                };
+                let value = if raw == "0" {
+                    Some(V::Length {
+                        value: 0.,
+                        unit: m::LengthUnit::Px,
+                    })
+                } else {
+                    length(raw)
+                };
+                (props, value)
+            }
         }
     };
     Some((
