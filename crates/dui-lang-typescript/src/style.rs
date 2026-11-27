@@ -36,6 +36,17 @@ fn length(s: &str) -> Option<V> {
     }
     None
 }
+fn letter_spacing(raw: &str) -> Option<V> {
+    let raw = raw.trim();
+    if raw.parse::<f64>().ok() == Some(0.) {
+        return Some(V::Length {
+            value: 0.,
+            unit: m::LengthUnit::Px,
+        });
+    }
+    length(raw)
+}
+
 fn line_height(raw: &str) -> Option<V> {
     let raw = raw.trim();
     if let Ok(value) = raw.parse::<f64>() {
@@ -458,6 +469,29 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         f.text(raw),
     ) {
         return Some(mapped);
+    }
+    if name == "letterSpacing" {
+        let expr = unwrap_expr(raw);
+        let value = match expr.kind() {
+            "number" | "unary_expression" => f
+                .text(expr)
+                .parse::<f64>()
+                .ok()
+                .filter(|n| n.is_finite())
+                .map(|value| V::Length {
+                    value,
+                    unit: m::LengthUnit::Px,
+                }),
+            _ => literal
+                .as_ref()
+                .and_then(|v| v.as_str())
+                .and_then(letter_spacing),
+        }
+        .unwrap_or_else(|| V::Unresolved {
+            text: f.text(raw).into(),
+            reason: "Unsupported letter spacing".into(),
+        });
+        return Some((vec![P::LetterSpacing], value));
     }
     if name == "lineHeight" {
         let value = line_height(

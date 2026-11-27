@@ -278,6 +278,36 @@ export default function View(){return <section><p className={sheet.card}/><p sty
       ],
     );
   }
+  for (const [css, jsx, expected] of [
+    ["-0.75px", "-0.75", { kind: "length", value: -0.75, unit: "px" }],
+    ["0", "0", { kind: "length", value: 0, unit: "px" }],
+    ["0.08em", '"0.08em"', { kind: "length", value: 0.08, unit: "em" }],
+    ["normal", '"normal"', null],
+    ["var(--tracking)", "tracking", null],
+  ] as const) {
+    writeFileSync(cssPath, `.label { letter-spacing: ${css}; }`);
+    writeFileSync(
+      join(project, "Tracking.tsx"),
+      `import s from "./View.module.css"; export function Tracking({tracking}){return <main><p className={s.label}/><p style={{letterSpacing:${jsx}}}/></main>}`,
+    );
+    const model = JSON.parse(extract(project, "Tracking.tsx"));
+    assert.ok(validate(model));
+    for (const [i, child] of model.components[0].root.children.entries()) {
+      const decl = child.style?.[0];
+      assert.equal(decl?.property, "letterSpacing");
+      if (expected) assert.deepEqual(decl.value, expected);
+      else {
+        assert.equal(decl.value.kind, "unresolved");
+        assert.equal(decl.value.text, i === 0 ? css : jsx);
+      }
+      const loc = decl.from.location;
+      assert.equal(loc.file, i === 0 ? "View.module.css" : "Tracking.tsx");
+      assert.equal(
+        readFileSync(join(project, loc.file)).subarray(loc.start, loc.end).toString(),
+        decl.from.text,
+      );
+    }
+  }
   for (const [raw, inline, expected] of [
     ["1.5", "1.5", { kind: "number", value: 1.5 }],
     ["24px", '"24px"', { kind: "length", value: 24, unit: "px" }],
