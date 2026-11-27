@@ -1,0 +1,1 @@
+{"name":"dui-web-basics-research","private":true,"type":"module","dependencies":{"clsx":"2.1.1","esbuild":"0.28.2","oxc-parser":"0.160.0","playwright-core":"1.65.1","pngjs":"7.0.0","react":"19.3.1","react-dom":"19.3.1","tailwindcss":"4.3.5"}}

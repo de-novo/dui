@@ -1,0 +1,1234 @@
+{
+  "and": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "true",
+    "after": "false",
+    "selector": "section",
+    "prop": "text",
+    "expected": "A",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "A[flag]",
+        "final": "A[flag]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2013.9385840000004
+      },
+      {
+        "width": 390,
+        "old": "A[flag]",
+        "final": "A[flag]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2014.230584
+      }
+    ]
+  },
+  "ternary": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "true",
+    "after": "false",
+    "selector": "section",
+    "prop": "text",
+    "expected": "No",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "[flag]",
+        "final": "[flag]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2017.2518750000008
+      },
+      {
+        "width": 390,
+        "old": "[flag]",
+        "final": "[flag]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2017.6845829999993
+      }
+    ]
+  },
+  "map-key": {
+    "scenario": "ABC",
+    "file": "App.tsx",
+    "before": "[\"A\",\"B\",\"C\"]",
+    "after": "[\"C\",\"B\",\"A\"]",
+    "selector": "section",
+    "prop": "text",
+    "expected": "CBA",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "[items]",
+        "final": "[items]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2023.782666000001
+      },
+      {
+        "width": 390,
+        "old": "[items]",
+        "final": "[items]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2023.7516660000001
+      }
+    ]
+  },
+  "fragment": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "<em>B",
+    "after": "<em>Z",
+    "selector": "section",
+    "prop": "text",
+    "expected": "AZ",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "AB",
+        "final": "AZ",
+        "status": "reflected",
+        "ms": 103.3262909999994,
+        "observationEndMs": 103.75424999999996
+      },
+      {
+        "width": 390,
+        "old": "AB",
+        "final": "AZ",
+        "status": "reflected",
+        "ms": 99.96645799999897,
+        "observationEndMs": 100.64949999999953
+      }
+    ]
+  },
+  "props": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "label=\"Ready\"",
+    "after": "label=\"New\"",
+    "selector": "section",
+    "prop": "text",
+    "expected": "New",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "Ready",
+        "final": "New",
+        "status": "reflected",
+        "ms": 82.24966700000004,
+        "observationEndMs": 82.94383299999754
+      },
+      {
+        "width": 390,
+        "old": "Ready",
+        "final": "New",
+        "status": "reflected",
+        "ms": 84.34983300000022,
+        "observationEndMs": 84.96516699999847
+      }
+    ]
+  },
+  "children": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "<em>B",
+    "after": "<em>Z",
+    "selector": "section",
+    "prop": "text",
+    "expected": "AZ",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "[children]",
+        "final": "[children]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2018.8445000000029
+      },
+      {
+        "width": 390,
+        "old": "[children]",
+        "final": "[children]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2019.4509580000013
+      }
+    ]
+  },
+  "default-prop": {
+    "scenario": "omitted",
+    "file": "App.tsx",
+    "before": "=\"Default\"",
+    "after": "=\"Changed\"",
+    "selector": "section",
+    "prop": "text",
+    "expected": "Changed",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "[label]",
+        "final": "[label]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2004.394959000001
+      },
+      {
+        "width": 390,
+        "old": "[label]",
+        "final": "[label]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2004.6041670000013
+      }
+    ]
+  },
+  "spread": {
+    "scenario": "before",
+    "file": "App.tsx",
+    "before": "label=\"Override\"",
+    "after": "label=\"Changed\"",
+    "selector": "section",
+    "prop": "text",
+    "expected": "Changed",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "[Unsupported spread attributes]",
+        "final": "[Unsupported spread attributes]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2006.2335829999975
+      },
+      {
+        "width": 390,
+        "old": "[Unsupported spread attributes]",
+        "final": "[Unsupported spread attributes]",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2006.2576249999984
+      }
+    ]
+  },
+  "expression-text": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "n=7",
+    "after": "n=8",
+    "selector": "section",
+    "prop": "text",
+    "expected": "Count: 8 items",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "Count: [n] items",
+        "final": "Count: [n] items",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2017.752416999996
+      },
+      {
+        "width": 390,
+        "old": "Count: [n] items",
+        "final": "Count: [n] items",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2017.9813339999964
+      }
+    ]
+  },
+  "initial-state": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "useState(true)",
+    "after": "useState(false)",
+    "selector": "section",
+    "prop": "text",
+    "expected": "Closed",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "Open",
+        "final": "Closed",
+        "status": "reflected",
+        "ms": 50.79162499999802,
+        "observationEndMs": 51.382207999995444
+      },
+      {
+        "width": 390,
+        "old": "Open",
+        "final": "Closed",
+        "status": "reflected",
+        "ms": 43.8155409999963,
+        "observationEndMs": 44.466290999997
+      }
+    ]
+  },
+  "inline-style": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "padding:12",
+    "after": "padding:22",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "22px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "12px",
+        "final": "22px",
+        "status": "reflected",
+        "ms": 79.31208299999707,
+        "observationEndMs": 79.94833300000028
+      },
+      {
+        "width": 390,
+        "old": "12px",
+        "final": "22px",
+        "status": "reflected",
+        "ms": 64.2534999999989,
+        "observationEndMs": 64.94483300000138
+      }
+    ]
+  },
+  "class-composition": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "true",
+    "after": "false",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "6px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2013.8962089999986
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2014.5703749999957
+      }
+    ]
+  },
+  "clsx": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "true",
+    "after": "false",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "6px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2015.1402499999967
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2015.7775840000031
+      }
+    ]
+  },
+  "tailwind": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "p-[12px]",
+    "after": "p-[18px]",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "18px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2011.9864579999994
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2011.9581659999967
+      }
+    ]
+  },
+  "stylesheet": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "padding:12px",
+    "after": "padding:22px",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "22px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2002.9622920000038
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2003.1103330000042
+      }
+    ]
+  },
+  "css-module": {
+    "scenario": "default",
+    "file": "a.module.css",
+    "before": "padding:12px",
+    "after": "padding:22px",
+    "selector": "strong",
+    "prop": "paddingLeft",
+    "expected": "22px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "12px",
+        "final": "22px",
+        "status": "reflected",
+        "ms": 94.9517909999995,
+        "observationEndMs": 95.62670800000342
+      },
+      {
+        "width": 390,
+        "old": "12px",
+        "final": "22px",
+        "status": "reflected",
+        "ms": 101.87912499999948,
+        "observationEndMs": 104.75908300000447
+      }
+    ]
+  },
+  "custom-property": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "--p:12px",
+    "after": "--p:22px",
+    "selector": "strong",
+    "prop": "paddingLeft",
+    "expected": "22px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2007.0382079999981
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2006.7096250000031
+      }
+    ]
+  },
+  "media-query": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "padding:6px",
+    "after": "padding:16px",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "16px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2013.9499579999974
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2014.685249999995
+      }
+    ]
+  },
+  "block": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "width:45",
+    "after": "width:65",
+    "selector": "section > div:last-child",
+    "prop": "width",
+    "expected": "65px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "45px",
+        "final": "65px",
+        "status": "reflected",
+        "ms": 80.62716699999874,
+        "observationEndMs": 82.39083399999072
+      },
+      {
+        "width": 390,
+        "old": "45px",
+        "final": "65px",
+        "status": "reflected",
+        "ms": 73.60987499999464,
+        "observationEndMs": 76.27929199999198
+      }
+    ]
+  },
+  "inline": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "width:70",
+    "after": "width:50",
+    "selector": "section",
+    "prop": "width",
+    "expected": "50px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "70px",
+        "final": "50px",
+        "status": "reflected",
+        "ms": 99.8037500000064,
+        "observationEndMs": 104.20112500000687
+      },
+      {
+        "width": 390,
+        "old": "70px",
+        "final": "50px",
+        "status": "reflected",
+        "ms": 100.91583399999945,
+        "observationEndMs": 104.67350000000442
+      }
+    ]
+  },
+  "flex": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "gap:12",
+    "after": "gap:22",
+    "selector": "section",
+    "prop": "columnGap",
+    "expected": "22px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "12px",
+        "final": "22px",
+        "status": "reflected",
+        "ms": 102.09949999999662,
+        "observationEndMs": 107.68987499999639
+      },
+      {
+        "width": 390,
+        "old": "12px",
+        "final": "22px",
+        "status": "reflected",
+        "ms": 103.60558299999684,
+        "observationEndMs": 107.83558300000732
+      }
+    ]
+  },
+  "grid": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "40px 60px",
+    "after": "52px 60px",
+    "selector": "section",
+    "prop": "gridTemplateColumns",
+    "expected": "52px 60px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "none",
+        "final": "none",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2012.661917000005
+      },
+      {
+        "width": 390,
+        "old": "none",
+        "final": "none",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2013.0356670000037
+      }
+    ]
+  },
+  "position": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "left:14",
+    "after": "left:24",
+    "selector": "section > div",
+    "prop": "left",
+    "expected": "24px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2014.583999999988
+      },
+      {
+        "width": 390,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2014.9796669999923
+      }
+    ]
+  },
+  "overflow": {
+    "scenario": "hidden",
+    "file": "App.tsx",
+    "before": "overflow:\"hidden\"",
+    "after": "overflow:\"scroll\"",
+    "selector": "section",
+    "prop": "overflowX",
+    "expected": "scroll",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "visible",
+        "final": "visible",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2003.9116249999934
+      },
+      {
+        "width": 390,
+        "old": "visible",
+        "final": "visible",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2003.866916999992
+      }
+    ]
+  },
+  "percent": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "width:50%",
+    "after": "width:25%",
+    "selector": "strong",
+    "prop": "width",
+    "expected": "40px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2013.4463329999999
+      },
+      {
+        "width": 390,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2013.3022079999937
+      }
+    ]
+  },
+  "rem": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "width:8rem",
+    "after": "width:6rem",
+    "selector": "strong",
+    "prop": "width",
+    "expected": "60px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2021.852125000005
+      },
+      {
+        "width": 390,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2021.8345410000038
+      }
+    ]
+  },
+  "em": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "width:2em",
+    "after": "width:3em",
+    "selector": "strong",
+    "prop": "width",
+    "expected": "90px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2018.6055829999968
+      },
+      {
+        "width": 390,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2019.2434999999969
+      }
+    ]
+  },
+  "vh": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "width:10vh",
+    "after": "width:12vh",
+    "selector": "strong",
+    "prop": "width",
+    "expected": "viewportHeight",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.463334
+      },
+      {
+        "width": 390,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.0075840000063
+      }
+    ]
+  },
+  "vw": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "width:10vw",
+    "after": "width:12vw",
+    "selector": "strong",
+    "prop": "width",
+    "expected": "viewportWidth",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2005.6665409999987
+      },
+      {
+        "width": 390,
+        "old": "auto",
+        "final": "auto",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2006.0827079999872
+      }
+    ]
+  },
+  "text-wrap": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "width:100",
+    "after": "width:60",
+    "selector": "section",
+    "prop": "width",
+    "expected": "60px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "100px",
+        "final": "60px",
+        "status": "reflected",
+        "ms": 75.63104199999361,
+        "observationEndMs": 76.80541699999594
+      },
+      {
+        "width": 390,
+        "old": "100px",
+        "final": "60px",
+        "status": "reflected",
+        "ms": 80.87837500000023,
+        "observationEndMs": 81.88016699999571
+      }
+    ]
+  },
+  "font": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "20px/28px",
+    "after": "24px/28px",
+    "selector": "section",
+    "prop": "fontSize",
+    "expected": "24px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "16px",
+        "final": "16px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2006.5869999999995
+      },
+      {
+        "width": 390,
+        "old": "16px",
+        "final": "16px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2006.9063329999917
+      }
+    ]
+  },
+  "image": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "width={32}",
+    "after": "width={48}",
+    "selector": "img",
+    "prop": "width",
+    "expected": "48px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": null,
+        "final": null,
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2015.6267090000038
+      },
+      {
+        "width": 390,
+        "old": null,
+        "final": null,
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.2501670000056
+      }
+    ]
+  },
+  "icon": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "#16745c",
+    "after": "#921c36",
+    "selector": "svg",
+    "prop": "color",
+    "expected": "rgb(146, 28, 54)",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": null,
+        "final": null,
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2015.280666999999
+      },
+      {
+        "width": 390,
+        "old": null,
+        "final": null,
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2015.435832999996
+      }
+    ]
+  },
+  "input": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "\"Ada\"",
+    "after": "\"Ava\"",
+    "selector": "input",
+    "prop": "value",
+    "expected": "Ava",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "",
+        "final": "",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.4258750000154
+      },
+      {
+        "width": 390,
+        "old": "",
+        "final": "",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.9552080000285
+      }
+    ]
+  },
+  "checkbox": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "defaultChecked={true}",
+    "after": "defaultChecked={false}",
+    "selector": "input",
+    "prop": "checked",
+    "expected": false,
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": false,
+        "final": false,
+        "status": "unchanged-already-equal",
+        "ms": null,
+        "observationEndMs": 2006.169750000001
+      },
+      {
+        "width": 390,
+        "old": false,
+        "final": false,
+        "status": "unchanged-already-equal",
+        "ms": null,
+        "observationEndMs": 2006.2780409999832
+      }
+    ]
+  },
+  "select": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "defaultValue=\"b\"",
+    "after": "defaultValue=\"a\"",
+    "selector": "select",
+    "prop": "value",
+    "expected": "a",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "a",
+        "final": "a",
+        "status": "unchanged-already-equal",
+        "ms": null,
+        "observationEndMs": 2011.2898749999877
+      },
+      {
+        "width": 390,
+        "old": "a",
+        "final": "a",
+        "status": "unchanged-already-equal",
+        "ms": null,
+        "observationEndMs": 2011.6025829999999
+      }
+    ]
+  },
+  "button": {
+    "scenario": "true",
+    "file": "App.tsx",
+    "before": "disabled={true}",
+    "after": "disabled={false}",
+    "selector": "button",
+    "prop": "disabled",
+    "expected": false,
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": true,
+        "final": false,
+        "status": "reflected",
+        "ms": 78.76170800000546,
+        "observationEndMs": 79.32116699998733
+      },
+      {
+        "width": 390,
+        "old": true,
+        "final": false,
+        "status": "reflected",
+        "ms": 86.17633300001035,
+        "observationEndMs": 86.80245799999102
+      }
+    ]
+  },
+  "inherit-style": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "#16745c",
+    "after": "#921c36",
+    "selector": "span",
+    "prop": "color",
+    "expected": "rgb(146, 28, 54)",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "rgb(22, 116, 92)",
+        "final": "rgb(146, 28, 54)",
+        "status": "reflected",
+        "ms": 84.5331250000163,
+        "observationEndMs": 85.481832999998
+      },
+      {
+        "width": 390,
+        "old": "rgb(22, 116, 92)",
+        "final": "rgb(146, 28, 54)",
+        "status": "reflected",
+        "ms": 84.902625000017,
+        "observationEndMs": 85.48666600001161
+      }
+    ]
+  },
+  "cascade": {
+    "scenario": "default",
+    "file": "style.css",
+    "before": "padding:12px",
+    "after": "padding:22px",
+    "selector": "section",
+    "prop": "paddingLeft",
+    "expected": "22px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2028.6924169999838
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2028.757833999989
+      }
+    ]
+  },
+  "color": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "#16745c",
+    "after": "#921c36",
+    "selector": "section",
+    "prop": "backgroundColor",
+    "expected": "rgb(146, 28, 54)",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "rgb(22, 116, 92)",
+        "final": "rgb(146, 28, 54)",
+        "status": "reflected",
+        "ms": 86.00933400000213,
+        "observationEndMs": 86.72012499999255
+      },
+      {
+        "width": 390,
+        "old": "rgb(22, 116, 92)",
+        "final": "rgb(146, 28, 54)",
+        "status": "reflected",
+        "ms": 92.04708399999072,
+        "observationEndMs": 92.61670899999444
+      }
+    ]
+  },
+  "border": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "3px solid",
+    "after": "5px solid",
+    "selector": "section",
+    "prop": "borderLeftWidth",
+    "expected": "5px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2011.8918329999724
+      },
+      {
+        "width": 390,
+        "old": "0px",
+        "final": "0px",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2012.7569999999832
+      }
+    ]
+  },
+  "radius": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "borderRadius:12",
+    "after": "borderRadius:18",
+    "selector": "section",
+    "prop": "borderTopLeftRadius",
+    "expected": "18px",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "12px",
+        "final": "18px",
+        "status": "reflected",
+        "ms": 99.7113749999844,
+        "observationEndMs": 100.40995799997472
+      },
+      {
+        "width": 390,
+        "old": "12px",
+        "final": "18px",
+        "status": "reflected",
+        "ms": 105.73749999998836,
+        "observationEndMs": 106.46241599999485
+      }
+    ]
+  },
+  "translate": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "12px,6px",
+    "after": "20px,6px",
+    "selector": "section",
+    "prop": "transform",
+    "expected": "matrix(1, 0, 0, 1, 20, 6)",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "none",
+        "final": "none",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.1260839999886
+      },
+      {
+        "width": 390,
+        "old": "none",
+        "final": "none",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2016.1946670000034
+      }
+    ]
+  },
+  "transform-order": {
+    "scenario": "default",
+    "file": "App.tsx",
+    "before": "translateX(18px) rotate(20deg) scale(1.2)",
+    "after": "translateX(22px)",
+    "selector": "section",
+    "prop": "transform",
+    "expected": "matrix(1, 0, 0, 1, 22, 0)",
+    "deadlineMs": 2000,
+    "trials": [
+      {
+        "width": 1440,
+        "old": "none",
+        "final": "none",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2026.143584000005
+      },
+      {
+        "width": 390,
+        "old": "none",
+        "final": "none",
+        "status": "deadline",
+        "ms": null,
+        "observationEndMs": 2026.8048750000016
+      }
+    ]
+  }
+}
