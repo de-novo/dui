@@ -44,7 +44,7 @@ pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
         .iter()
         .map(|s| {
             json!({
-                "id":s.id, "kind":"screen", "label":s.route.as_ref().unwrap_or(&s.name),
+                "id":s.id, "kind":"screen", "label":s.route.as_ref().unwrap_or(&s.name), "name":s.name,
                 "component":s.component, "location":s.location
             })
         })
@@ -72,8 +72,8 @@ pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
     }
     let discovery = json!({"kind":"tsx-source","declared":nodes.len(),"resolvedRelations":edges.len(),
         "unresolvedRelations":unresolved,"limitations":limitations,"diagnostics":model.diagnostics});
-    let graph =
-        json!({"nodes":nodes,"edges":edges,"cells":[],"overview":[],"screenDiscovery":discovery});
+    let graph = json!({"nodes":nodes,"edges":edges,"cells":[],"overview":[],"screenDiscovery":discovery,
+         "sourceModel":"source-model.json"});
     let report = json!({"screenDiscovery":discovery,"sourceModel":"source-model.json","browser":null,
         "sourceFiles":model.files.iter().map(|f| &f.path).collect::<Vec<_>>(),"cells":[],
         "coverage":{"attempted":0,"renderable":0,"unrenderable":0,"verified":0}});

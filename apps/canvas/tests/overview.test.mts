@@ -93,3 +93,31 @@ test("screen discovery origins and link evidence remain non-replay-verified", ()
     replayVerified: false,
   });
 });
+
+test("tsx source-model archive screens keep component, name, location and discovery", () => {
+  const decoded = decodeOverview({
+    nodes: [
+      {
+        kind: "screen",
+        id: "route:/",
+        label: "/",
+        name: "Orders",
+        component: "src/Orders.tsx#Orders",
+        location: { file: "src/App.tsx", line: 10, column: 9 },
+      },
+    ],
+    edges: [],
+    overview: [],
+    sourceModel: "source-model.json",
+    screenDiscovery: { kind: "tsx-source", limitations: ["Runtime-only navigation is unknown."] },
+  });
+  assert.equal(decoded.sourceModel, "source-model.json");
+  assert.equal(decoded.screenDiscovery?.kind, "tsx-source");
+  assert.equal(decoded.screens[0].component, "src/Orders.tsx#Orders");
+  assert.equal(decoded.screens[0].name, "Orders");
+  assert.deepEqual(decoded.screens[0].sourceLocation, {
+    file: "src/App.tsx",
+    line: 10,
+    column: 9,
+  });
+});

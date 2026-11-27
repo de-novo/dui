@@ -215,6 +215,11 @@ async function openArchive(root: string) {
     },
   );
   const images = new Set<string>(assets);
+  const hasSourceModel = existsSync(join(root, "source-model.json"));
+  if (hasSourceModel) {
+    graph.sourceModel = "source-model.json";
+    images.add("source-model.json");
+  }
   for (const { image } of [...cells, ...graph.overview]) {
     if (typeof image === "string" && basename(image) === image && image.endsWith(".png"))
       images.add(image);
@@ -348,6 +353,13 @@ const server = await createServer({
               if (name === "graph.json") {
                 res.setHeader("Content-Type", "application/json");
                 res.end(data.graph);
+                return;
+              }
+              if (name === "source-model.json" && data.images.has(name)) {
+                res.setHeader("Content-Type", "application/json; charset=utf-8");
+                createReadStream(join(root, name))
+                  .on("error", () => res.destroy())
+                  .pipe(res);
                 return;
               }
               if (data.images.has(name)) {

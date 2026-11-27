@@ -347,6 +347,59 @@ h2 {
   border-radius: var(--radius-control);
   overflow: hidden;
 }
+
+.model-frame-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: #ffffff;
+  color: #111111;
+}
+.approximate-model-frame {
+  position: relative;
+  min-height: 7rem;
+  overflow: hidden;
+  background: #ffffff;
+}
+.approximate-model-content {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.approximate-model-badge,
+.approximate-model-unresolved {
+  position: absolute;
+  z-index: 2;
+  max-width: calc(100% - 12px);
+  padding: 2px 6px;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 88%);
+  color: #3c3c3c;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.approximate-model-badge {
+  top: 6px;
+  right: 6px;
+}
+.approximate-model-unresolved {
+  right: 6px;
+  bottom: 6px;
+}
+.card-source-location {
+  flex-basis: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
 .native-source-evidence {
   display: grid;
   gap: var(--space-1);
@@ -2565,6 +2618,20 @@ h2 {
       color-mix(in srgb, var(--card) 85%, transparent)
     );
     pointer-events: none;
+  }
+
+  .mobile-deck-frame-model {
+    max-height: none;
+    padding: 0;
+    background: #ffffff;
+  }
+  .mobile-deck-frame-model::after {
+    content: none;
+  }
+  .mobile-model-unresolved {
+    padding: 4px 12px 0;
+    color: var(--muted-foreground);
+    font-size: 11px;
   }
 
   .mobile-deck-frame img {

@@ -53,6 +53,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
+import type { Model, SourceModelRenderer } from "../model/modelDocument";
 import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
 
 /** Where an outgoing link edge starts on a card: the first anchor to its target, and the others. */
@@ -70,6 +71,8 @@ type CardNode = Node<
     anchors?: CardAnchor[];
     /** The run whose cards without a capture are rendered from source, when its project runs. */
     liveRun?: string;
+    sourceModel?: Model;
+    modelRenderer?: SourceModelRenderer;
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -300,6 +303,8 @@ function Card({
         small={small}
         overlay={data.anchors && <LinkAnchors anchors={data.anchors} selected={data.selected} />}
         live={live ? { ...liveFrame, request: () => setRequested(true) } : undefined}
+        sourceModel={data.sourceModel}
+        modelRenderer={data.modelRenderer}
         selected={data.selected}
         related={data.related}
         dimmed={data.dimmed}
@@ -519,6 +524,8 @@ export function ScreenMap({
   mode,
   edgeStart = "element",
   liveRun,
+  sourceModel,
+  modelRenderer,
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -543,6 +550,8 @@ export function ScreenMap({
   edgeStart?: EdgeStart;
   /** Render cards without a capture from source (the run's project can run). */
   liveRun?: string;
+  sourceModel?: Model;
+  modelRenderer?: SourceModelRenderer;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -649,6 +658,8 @@ export function ScreenMap({
             screen,
             anchors: anchors.get(screen.id),
             liveRun,
+            sourceModel,
+            modelRenderer,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -670,6 +681,8 @@ export function ScreenMap({
       layout.nodes,
       anchors,
       liveRun,
+      sourceModel,
+      modelRenderer,
       diffsByPath,
       diffActive,
       mode,

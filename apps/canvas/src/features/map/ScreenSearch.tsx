@@ -22,7 +22,7 @@ export function ScreenSearch({
   const list = useRef<HTMLDivElement>(null);
   const term = query.trim().toLowerCase();
   const matches = screens.filter((s) =>
-    [s.path, routeName(s.path), s.nativeSource?.name, s.nativeSource?.source]
+    [s.path, routeName(s.path), s.name, s.nativeSource?.name, s.nativeSource?.source]
       .join(" ")
       .toLowerCase()
       .includes(term),

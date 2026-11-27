@@ -4,6 +4,8 @@ import { Button } from "../../components/ui/button";
 import { MapCardGuides } from "./MapCardGuides";
 import type { Cell, Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
+import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
+import type { Model, SourceModelRenderer } from "../model/modelDocument";
 import {
   resolveCardDiffImageUrl,
   type CanvasDiffVisualMode,
@@ -41,6 +43,8 @@ export function CaptureCard({
   small = false,
   overlay,
   live,
+  sourceModel,
+  modelRenderer,
 }: {
   screen: Screen;
   cell?: Cell;
@@ -69,8 +73,18 @@ export function CaptureCard({
   diffVisualMode?: CanvasDiffVisualMode;
   beforeRunKey?: string;
   afterRunKey?: string;
+  /** Frozen source model and its replaceable renderer for source-model archives. */
+  sourceModel?: Model;
+  modelRenderer?: SourceModelRenderer;
 }) {
   const { t } = useI18n();
+  const modelRender = useApproximateModelRender(
+    modelRenderer,
+    sourceModel,
+    screen.component,
+    cardWidth && cardWidth > 0 ? cardWidth : 375,
+  );
+  const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
   const missing = screen.cells.filter((c) => c.status === "unverified").length;
   const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
@@ -150,16 +164,18 @@ export function CaptureCard({
     >
       <div
         ref={frameRef}
-        className={sourceCard ? "source-frame" : "capture-frame"}
+        className={sourceCard ? "source-frame" : modelCard ? "model-frame-shell" : "capture-frame"}
         data-showing={
           snapshotUrl && loadedSnapshot === snapshotUrl
             ? "snapshot"
-            : !resolvedSrc && live?.frame
-              ? "live"
-              : "png"
+            : modelCard
+              ? "model"
+              : !resolvedSrc && live?.frame
+                ? "live"
+                : "png"
         }
         style={
-          sourceCard
+          sourceCard || modelCard
             ? undefined
             : !resolvedSrc && live?.frame
               ? { aspectRatio: `${live.frame.width} / ${live.frame.height}` }
@@ -187,6 +203,17 @@ export function CaptureCard({
                 });
               }
             }}
+          />
+        ) : modelCard ? (
+          <ApproximateModelFrame
+            render={modelCard}
+            label={t.approximateModel}
+            unresolvedLabel={
+              modelCard.unresolved.length > 0
+                ? t.unresolvedModelParts(modelCard.unresolved.length)
+                : undefined
+            }
+            showUnresolved={false}
           />
         ) : sourceCard ? (
           <SourceCardBody source={sourceCard} preview={screen.sourcePreview} />
@@ -288,7 +315,18 @@ export function CaptureCard({
         {resolvedSrc && overlay}
       </div>
       <div className="card-caption">
-        <strong>{screen.nativeSource?.name ?? routeName(screen.path)}</strong>
+        <strong>{screen.nativeSource?.name ?? screen.name ?? routeName(screen.path)}</strong>
+        {screen.sourceLocation && (
+          <small className="card-source-location">
+            {screen.sourceLocation.file}
+            {screen.sourceLocation.line === undefined ? "" : ":" + screen.sourceLocation.line}
+          </small>
+        )}
+        {modelCard && modelCard.unresolved.length > 0 && (
+          <small title={modelCard.unresolved.join("\n")}>
+            {t.unresolvedModelParts(modelCard.unresolved.length)}
+          </small>
+        )}
         {openComments > 0 && (
           <small className="card-comment-badge" title={openComments + " unresolved comments"}>
             {t.comments} {openComments}
