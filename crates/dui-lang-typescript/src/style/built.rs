@@ -94,7 +94,7 @@ fn flex_basis(raw: &str) -> Option<V> {
     ) {
         return Some(V::Keyword { value: raw.into() });
     }
-    super::size_value(P::Width, raw).filter(|v| matches!(v, V::Length { .. }))
+    super::size_value(P::Width, raw).filter(|v| matches!(v, V::Length { .. } | V::Clamp { .. }))
 }
 
 const BORDER_STYLES: &[&str] = &[
@@ -307,8 +307,8 @@ struct Rule<'a> {
 pub(crate) struct Sheet<'a> {
     document_vars: BTreeMap<&'a str, Option<&'a str>>,
     root_key: Option<String>,
+    root_value: Option<String>,
     horizontal_block: bool,
-    viewport_width: Option<u32>,
     rules: BTreeMap<P, Vec<Rule<'a>>>,
     selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
@@ -516,8 +516,8 @@ impl<'a> Sheet<'a> {
         let mut sheet = Self {
             document_vars: BTreeMap::new(),
             root_key: root_attribute.map(|(k, _)| k.to_owned()),
+            root_value: root_attribute.map(|(_, v)| v.to_owned()),
             horizontal_block: true,
-            viewport_width: width,
             rules: BTreeMap::new(),
             vars: BTreeMap::new(),
             selectors: BTreeMap::from([(
@@ -702,6 +702,106 @@ impl<'a> Sheet<'a> {
             sheet.vars.insert(name, None);
         }
         Ok(sheet)
+    }
+
+    /// Effective typography on the document root and body, restricted to rules the
+    /// cascade can prove for the static document tree. Uncertain winners stay explicit.
+    pub(crate) fn document_style(&self) -> Option<m::DocumentStyle> {
+        let root = self.document_element_style(DocumentTarget::Root);
+        let body = self.document_element_style(DocumentTarget::Body);
+        if root.is_none() && body.is_none() {
+            return None;
+        }
+        Some(m::DocumentStyle { root, body })
+    }
+
+    fn document_element_style(&self, target: DocumentTarget) -> Option<m::DocumentElementStyle> {
+        let mut style = Vec::new();
+        for property in [
+            P::FontFamily,
+            P::FontSize,
+            P::FontWeight,
+            P::LineHeight,
+            P::LetterSpacing,
+        ] {
+            if let Some(declaration) = self.document_declaration(target, property) {
+                style.push(declaration);
+            }
+        }
+        (!style.is_empty()).then_some(m::DocumentElementStyle { style })
+    }
+
+    fn document_declaration(
+        &self,
+        target: DocumentTarget,
+        property: P,
+    ) -> Option<m::StyleDeclaration> {
+        let rules = self.rules.get(&property)?;
+        type Rank = (bool, usize, u32, usize);
+        let mut best: Option<(Rank, &Rule<'_>)> = None;
+        let mut unknown: Option<(Rank, &Rule<'_>)> = None;
+        for (order, rule) in rules.iter().enumerate() {
+            let mut exact = None;
+            let mut maybe = None;
+            for selector in &self.selectors[rule.selectors] {
+                match document_selector(
+                    selector.text,
+                    target,
+                    self.root_key.as_deref().zip(self.root_value.as_deref()),
+                ) {
+                    DocumentMatch::Yes(specificity) => {
+                        exact = Some(exact.map_or(specificity, |s: u32| s.max(specificity)));
+                    }
+                    DocumentMatch::Maybe(specificity) => {
+                        maybe = Some(maybe.map_or(specificity, |s: u32| s.max(specificity)));
+                    }
+                    DocumentMatch::No => {}
+                }
+            }
+            if let Some(specificity) = exact {
+                let rank = (false, rule.layer, specificity, order);
+                if rule.uncertain || rule.important {
+                    let rank = (rule.important, rule.layer, specificity, order);
+                    if unknown.is_none_or(|(current, _)| rank >= current) {
+                        unknown = Some((rank, rule));
+                    }
+                } else if best.is_none_or(|(current, _)| rank >= current) {
+                    best = Some((rank, rule));
+                }
+            } else if let Some(specificity) = maybe {
+                let rank = (rule.important, rule.layer, specificity, order);
+                if unknown.is_none_or(|(current, _)| rank >= current) {
+                    unknown = Some((rank, rule));
+                }
+            }
+        }
+        let uncertain = match (best, unknown) {
+            (Some((exact, _)), Some((maybe, _))) => maybe >= exact,
+            (None, Some(_)) => true,
+            _ => false,
+        };
+        let rule = if uncertain { unknown?.1 } else { best?.1 };
+        let value = if uncertain {
+            V::Unresolved {
+                text: rule.source.text.clone(),
+                reason: "Cannot prove the effective document style from built CSS".into(),
+                refinement: None,
+            }
+        } else {
+            self.value(property, rule, &self.document_vars)
+                .map(|value| super::export_value(value, &rule.source.text))
+                .unwrap_or_else(|| V::Unresolved {
+                    text: rule.source.text.clone(),
+                    reason: "Cannot determine document style value from built CSS".into(),
+                    refinement: None,
+                })
+        };
+        Some(m::StyleDeclaration {
+            property,
+            value,
+            when: None,
+            from: rule.source.clone(),
+        })
     }
 
     fn value(
@@ -909,24 +1009,6 @@ impl<'a> Sheet<'a> {
                     .strip_prefix("repeat(auto-fit,minmax(")?
                     .strip_suffix(",1fr))")?,
             );
-        }
-        if property == P::FontSize && raw.starts_with("clamp(") {
-            let mut args = raw.strip_prefix("clamp(")?.strip_suffix(')')?.split(',');
-            let mut quantity = |unit: &str| {
-                args.next()?
-                    .trim()
-                    .strip_suffix(unit)?
-                    .parse::<f64>()
-                    .ok()
-                    .filter(|n| n.is_finite() && *n >= 0.)
-            };
-            let lower = quantity("px")?;
-            let preferred = quantity("vw")? * f64::from(self.viewport_width?) / 100.;
-            let upper = quantity("px")?;
-            return args.next().is_none().then_some(V::Length {
-                value: lower.max(preferred.min(upper)),
-                unit: m::LengthUnit::Px,
-            });
         }
         if rule.name == "flex-flow" {
             let mut direction = None;
@@ -1234,13 +1316,392 @@ impl<'a> Sheet<'a> {
             .unwrap_or_else(|| V::Unresolved {
                 text: rule.source.text.clone(),
                 reason: "Cannot determine style value from built CSS".into(),
+                refinement: None,
             });
         el.style.push(m::StyleDeclaration {
             property,
-            value,
+            value: super::export_value(value, &rule.source.text),
             when: None,
             from: rule.source.clone(),
         });
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum DocumentTarget {
+    Root,
+    Body,
+}
+
+impl DocumentTarget {
+    fn tag(self) -> &'static str {
+        match self {
+            Self::Root => "html",
+            Self::Body => "body",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DocumentMatch {
+    Yes(u32),
+    No,
+    Maybe(u32),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Combinator {
+    Descendant,
+    Child,
+    Adjacent,
+    Sibling,
+}
+
+fn ident_end(text: &str) -> usize {
+    text.find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '_')))
+        .unwrap_or(text.len())
+}
+
+fn split_selector_list(text: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    let mut depth = 0usize;
+    for (index, c) in text.char_indices() {
+        match c {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                out.push(text[start..index].trim());
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(text[start..].trim());
+    out
+}
+
+// Split a complex selector into compounds and the combinators before them. Unsupported
+// nesting stays inside a compound and later becomes uncertainty rather than a wrong match.
+fn selector_parts(sel: &str) -> Option<Vec<(String, Option<Combinator>)>> {
+    #[derive(Debug)]
+    enum Token {
+        Compound(String),
+        Combinator(Combinator),
+    }
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0usize;
+    let mut chars = sel.trim().char_indices().peekable();
+    let flush = |current: &mut String, tokens: &mut Vec<Token>| {
+        if !current.trim().is_empty() {
+            tokens.push(Token::Compound(current.trim().to_owned()));
+        }
+        current.clear();
+    };
+    while let Some((_, c)) = chars.next() {
+        match c {
+            '(' | '[' => {
+                depth += 1;
+                current.push(c);
+            }
+            ')' | ']' => {
+                depth = depth.saturating_sub(1);
+                current.push(c);
+            }
+            c if depth == 0 && c.is_ascii_whitespace() => {
+                flush(&mut current, &mut tokens);
+                while chars.peek().is_some_and(|(_, c)| c.is_ascii_whitespace()) {
+                    chars.next();
+                }
+                if !matches!(chars.peek(), Some((_, '>' | '+' | '~')) | None) {
+                    tokens.push(Token::Combinator(Combinator::Descendant));
+                }
+            }
+            '>' | '+' | '~' if depth == 0 => {
+                flush(&mut current, &mut tokens);
+                tokens.push(Token::Combinator(match c {
+                    '>' => Combinator::Child,
+                    '+' => Combinator::Adjacent,
+                    _ => Combinator::Sibling,
+                }));
+                while chars.peek().is_some_and(|(_, c)| c.is_ascii_whitespace()) {
+                    chars.next();
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+    flush(&mut current, &mut tokens);
+    if tokens.len() % 2 == 0 || !matches!(tokens.first(), Some(Token::Compound(_))) {
+        return None;
+    }
+    let mut parts = Vec::new();
+    let mut combinator = None;
+    for token in tokens {
+        match token {
+            Token::Compound(text) => {
+                parts.push((text, combinator.take()));
+            }
+            Token::Combinator(next) => {
+                if combinator.is_some() {
+                    return None;
+                }
+                combinator = Some(next);
+            }
+        }
+    }
+    (!parts.is_empty() && parts[0].1.is_none()).then_some(parts)
+}
+
+fn combine_match(left: DocumentMatch, right: DocumentMatch) -> DocumentMatch {
+    use DocumentMatch as D;
+    match (left, right) {
+        (D::No, _) | (_, D::No) => D::No,
+        (D::Yes(a), D::Yes(b)) => D::Yes(a.saturating_add(b)),
+        (D::Yes(a), D::Maybe(b)) | (D::Maybe(a), D::Yes(b)) | (D::Maybe(a), D::Maybe(b)) => {
+            D::Maybe(a.saturating_add(b))
+        }
+    }
+}
+
+fn document_attribute(
+    inner: &str,
+    target: DocumentTarget,
+    root_attribute: Option<(&str, &str)>,
+) -> DocumentMatch {
+    let (name, expected) = inner
+        .split_once('=')
+        .map_or((inner.trim(), None), |(name, value)| {
+            let value = value.trim();
+            let value = value
+                .strip_prefix('"')
+                .and_then(|v| v.strip_suffix('"'))
+                .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+                .unwrap_or(value);
+            (name.trim(), Some(value))
+        });
+    let Some((root_name, root_value)) = root_attribute else {
+        return DocumentMatch::Maybe(1024);
+    };
+    if name != root_name {
+        return DocumentMatch::Maybe(1024);
+    }
+    if target == DocumentTarget::Body {
+        return DocumentMatch::No;
+    }
+    if expected.is_none_or(|value| value == root_value) {
+        DocumentMatch::Yes(1024)
+    } else {
+        DocumentMatch::No
+    }
+}
+
+fn pseudo_contents(rest: &str) -> Option<(String, Option<&str>, usize)> {
+    let end = rest
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+        .unwrap_or(rest.len());
+    if end == 0 {
+        return None;
+    }
+    let name = rest[..end].to_owned();
+    let tail = &rest[end..];
+    if !tail.starts_with('(') {
+        return Some((name, None, end));
+    }
+    let mut depth = 0usize;
+    for (index, c) in tail.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some((name, Some(&tail[1..index]), end + index + 1));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn document_compound(
+    raw: &str,
+    target: DocumentTarget,
+    root_attribute: Option<(&str, &str)>,
+) -> DocumentMatch {
+    let tag = target.tag();
+    let mut rest = raw.trim();
+    let mut specificity = 0u32;
+    let mut certain = true;
+    let mut anchored = false;
+    if rest.starts_with('*') {
+        anchored = true;
+        rest = &rest[1..];
+    } else {
+        let end = ident_end(rest);
+        if end > 0 && rest.as_bytes()[0].is_ascii_alphabetic() {
+            let name = &rest[..end];
+            if !name.eq_ignore_ascii_case(tag) {
+                return DocumentMatch::No;
+            }
+            anchored = true;
+            specificity = specificity.saturating_add(1);
+            rest = &rest[end..];
+        }
+    }
+    while !rest.is_empty() {
+        if let Some(after) = rest.strip_prefix('.') {
+            let end = ident_end(after);
+            if end == 0 {
+                return DocumentMatch::Maybe(u32::MAX);
+            }
+            specificity = specificity.saturating_add(1024);
+            certain = false;
+            rest = &after[end..];
+        } else if let Some(after) = rest.strip_prefix('#') {
+            let end = ident_end(after);
+            if end == 0 {
+                return DocumentMatch::Maybe(u32::MAX);
+            }
+            specificity = specificity.saturating_add(1_048_576);
+            certain = false;
+            rest = &after[end..];
+        } else if rest.starts_with('[') {
+            let Some(end) = rest.find(']') else {
+                return DocumentMatch::Maybe(u32::MAX);
+            };
+            match document_attribute(&rest[1..end], target, root_attribute) {
+                DocumentMatch::Yes(weight) => specificity = specificity.saturating_add(weight),
+                DocumentMatch::No => return DocumentMatch::No,
+                DocumentMatch::Maybe(weight) => {
+                    specificity = specificity.saturating_add(weight);
+                    certain = false;
+                }
+            }
+            rest = &rest[end + 1..];
+        } else if rest.starts_with("::") {
+            return DocumentMatch::No;
+        } else if let Some(after) = rest.strip_prefix(':') {
+            let Some((name, contents, consumed)) = pseudo_contents(after) else {
+                return DocumentMatch::Maybe(u32::MAX);
+            };
+            match (name.as_str(), contents) {
+                ("root", None) => {
+                    specificity = specificity.saturating_add(1024);
+                    if target == DocumentTarget::Body {
+                        return DocumentMatch::No;
+                    }
+                    anchored = true;
+                }
+                ("is" | "where", Some(list)) => {
+                    let mut matched = None;
+                    for branch in split_selector_list(list) {
+                        let branch = if selector_parts(branch).is_some_and(|parts| parts.len() == 1)
+                        {
+                            document_compound(branch, target, root_attribute)
+                        } else {
+                            DocumentMatch::Maybe(1024)
+                        };
+                        let branch = if name == "where" {
+                            match branch {
+                                DocumentMatch::Yes(_) => DocumentMatch::Yes(0),
+                                DocumentMatch::Maybe(_) => DocumentMatch::Maybe(0),
+                                DocumentMatch::No => DocumentMatch::No,
+                            }
+                        } else {
+                            branch
+                        };
+                        matched = Some(match (matched, branch) {
+                            (None, branch) => branch,
+                            (Some(DocumentMatch::Yes(a)), DocumentMatch::Yes(b)) => {
+                                DocumentMatch::Yes(a.max(b))
+                            }
+                            (Some(DocumentMatch::Yes(a)), _) => DocumentMatch::Yes(a),
+                            (_, DocumentMatch::Yes(b)) => DocumentMatch::Yes(b),
+                            (Some(DocumentMatch::Maybe(a)), DocumentMatch::Maybe(b)) => {
+                                DocumentMatch::Maybe(a.max(b))
+                            }
+                            (Some(DocumentMatch::Maybe(a)), DocumentMatch::No)
+                            | (Some(DocumentMatch::No), DocumentMatch::Maybe(a)) => {
+                                DocumentMatch::Maybe(a)
+                            }
+                            (Some(DocumentMatch::No), DocumentMatch::No) => DocumentMatch::No,
+                        });
+                    }
+                    match matched.unwrap_or(DocumentMatch::No) {
+                        DocumentMatch::Yes(weight) => {
+                            specificity = specificity.saturating_add(weight)
+                        }
+                        DocumentMatch::No => return DocumentMatch::No,
+                        DocumentMatch::Maybe(weight) => {
+                            specificity = specificity.saturating_add(weight);
+                            certain = false;
+                        }
+                    }
+                }
+                ("not", Some(_)) => {
+                    specificity = specificity.saturating_add(1024);
+                    certain = false;
+                }
+                _ => {
+                    specificity = specificity.saturating_add(1024);
+                    certain = false;
+                }
+            }
+            rest = &after[consumed..];
+        } else {
+            return DocumentMatch::Maybe(u32::MAX);
+        }
+    }
+    if !anchored {
+        return DocumentMatch::No;
+    }
+    if certain {
+        DocumentMatch::Yes(specificity)
+    } else {
+        DocumentMatch::Maybe(specificity)
+    }
+}
+
+fn document_selector(
+    sel: &str,
+    target: DocumentTarget,
+    root_attribute: Option<(&str, &str)>,
+) -> DocumentMatch {
+    let Some(parts) = selector_parts(sel) else {
+        return DocumentMatch::Maybe(u32::MAX);
+    };
+    let Some((subject_text, _)) = parts.last() else {
+        return DocumentMatch::Maybe(u32::MAX);
+    };
+    let mut result = document_compound(subject_text, target, root_attribute);
+    if result == DocumentMatch::No || parts.len() == 1 {
+        return result;
+    }
+    if target == DocumentTarget::Root {
+        // The document root has no parent or sibling, so any left-hand requirement is impossible.
+        return DocumentMatch::No;
+    }
+    let ancestors = &parts[..parts.len() - 1];
+    let relationship = parts.last().and_then(|(_, combinator)| *combinator);
+    if ancestors.len() != 1
+        || matches!(
+            relationship,
+            Some(Combinator::Adjacent | Combinator::Sibling)
+        )
+    {
+        return DocumentMatch::Maybe(u32::MAX);
+    }
+    let ancestor = document_compound(&ancestors[0].0, DocumentTarget::Root, root_attribute);
+    result = combine_match(result, ancestor);
+    if matches!(
+        relationship,
+        Some(Combinator::Child | Combinator::Descendant)
+    ) {
+        result
+    } else {
+        DocumentMatch::Maybe(u32::MAX)
     }
 }
 

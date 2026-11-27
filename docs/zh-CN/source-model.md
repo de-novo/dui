@@ -23,6 +23,8 @@
 
 使用 `--built-css FILE` 可读取项目内的单个 CSS 构建产物。适配器可为静态 HTML 元素解析弹性布局的方向、换行、扩展与对齐、间距、内外边距、尺寸及其上下限、前景色与背景色、不透明度、边框宽度、颜色与圆角、字号、行高和字间距。支持的规则按层、选择器优先级和声明顺序处理，并记录生效声明的字节位置。可能生效但条件或取值无法解析的规则保留为未解析值。模型记录元素上的声明，继承值和浏览器默认计算值不在此提取范围内。
 
+同一次样式表读取还可以添加可选的顶层 `documentStyle` 上下文，其中包含 `root` 和 `body` 的排版声明。只有锚定到文档的选择器参与：`html`、`body`、`:root`、它们受支持的复合选择器，以及 `html` 的直接子代或后代。`!important`、层、优先级、源码顺序和调用方提供的根属性共同决定生效声明。无法证明选择器、at-rule 或层叠结果时，声明会明确记为 `unresolved`，而不是猜测。没有文档锚点的裸类选择器或 ID 选择器不参与。
+
 添加 `--viewport-width PX` 可在指定视口下判断单个以像素为单位的宽度媒体条件。支持 `min-width`、`max-width` 和 `(width < 768px)` 等比较。其他媒体条件保留为未解析。
 
 对于由两个简单选择器组成的子代或后代选择器，TSX 适配器会检查组件边界内的 JSX 原生祖先元素。运行 `dui serve`，在工作区选择器中选择**打开源模型**并打开导出的 JSON。查看器根据 v1 模型绘制选定组件，并列出未解析的样式。
@@ -160,12 +162,15 @@ flowchart LR
 
 | 值 `kind` | 字段 |
 | --- | --- |
-| `length` | `value` 和 `unit`：`px`、`rem`、`em`、`percent`、`pt`、`dp` |
+| `length` | `value` 和 `unit`：`px`、`rem`、`em`、`percent`、`pt`、`dp`、`vw`、`vh`、`svw`、`svh`、`lvw`、`lvh`、`dvw`、`dvh`、`vmin`、`vmax` |
+| `clamp` | 字面长度操作数 `min`、`preferred` 和 `max` |
 | `color` | `value`：小写 sRGB `#rrggbb` 或 `#rrggbbaa` |
 | `number` | `value` |
 | `keyword` | 属性列表中的 `value` |
 | `token` | `token` ID，解析后以 `resolved` 给出最终值 |
-| `unresolved` | 源码 `text` 和 `reason`。所有属性都接受 |
+| `unresolved` | 源码 `text` 和 `reason`，以及可选的类型化 `refinement`。所有属性都接受 |
+
+视口长度和有界的字面 `clamp()` 表达式仍在现有 `unresolved` 外壳中输出，并带有类型化的数值 `refinement`，因此不认识该 refinement 的 v1 消费者仍保留原来的回退。任意 calc 表达式、无界或非字面 clamp 以及不支持的单位仍保持未解析，并且没有 refinement。
 
 当条件的所有字段都成立时条件成立：`minWidth` 和 `maxWidth`（length）、`interaction`（`hover`、`focus`、`pressed`、`disabled`）、`colorScheme`（`light`、`dark`），以及必须为真的表达式 `expr`。适配器看到但无法映射到属性的样式（例如 CSS Module 类）连同其 `syntax`、`text`、`reason` 和 `location` 放入 `unresolvedStyle`。浏览器永远不会填补它。
 
@@ -217,7 +222,9 @@ JSON Schema 检查形状、枚举、模式和必填字段。Rust 读取器（`So
 | `color` | `rgba` |
 | `lineHeight` number | `line_height(relative(n))` |
 | `textAlign` `justify` | `start`。GPUI 只有 left、center 和 right |
-| 带 `minWidth` 或 `maxWidth` 的 `when` | 在布局前按格子宽度判定 |
+| 带 `minWidth` 或 `maxWidth` 的 `when` | 相对单位使用逻辑视口的初始用户代理字号，独立于模型化的根字号和父级字号，然后在布局前按格子宽度判定 |
 | 带 `interaction`、`colorScheme` 或 `expr` 的 `when` | 审阅者选择该状态时应用 |
 | `token` | 其 `resolved` 值。没有该值的 token 按 `unresolved` 绘制 |
 | `unresolved`、`unresolvedStyle`、`placeholder`、`opaque` 文本 | 带标签的占位符。绝不由浏览器填充 |
+
+对于网页画布的 TypeScript/DOM 模型预览，`documentStyle` 的根排版应用于隔离的模型文档或 shadow host，body 排版应用于 body 或 document-body 包装元素。普通 `em` 保持为 CSS 长度，因此在其属性上下文中解析。在 shadow-root 卡片中，`rem` 按模型化的根字号解析，视口长度按逻辑卡片视口解析；二者都输出为像素，因此不会使用查看器文档或外部视口。类型化 clamp 对每个操作数使用相同的基础解析，并保留为有界 CSS clamp。

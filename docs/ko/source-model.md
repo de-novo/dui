@@ -23,6 +23,8 @@ React 클래스 컴포넌트에서는 인스턴스 `render()` 메서드를 읽�
 
 프로젝트 안의 단일 CSS 번들을 읽으려면 `--built-css FILE`을 지정한다. 정적 HTML 요소에서 플렉스 방향·줄바꿈·성장·정렬, 간격, 패딩과 마진, 크기와 상하한, 글자색과 배경색, 불투명도, 테두리 두께·색·반경, 글꼴 크기·줄 높이·자간을 추출한다. 지원하는 규칙은 레이어, 선택자 명시도, 선언 순서에 따라 적용하고 선택된 선언의 바이트 위치를 기록한다. 우선 적용될 수 있는 규칙의 조건이나 값을 해석할 수 없으면 미해결로 남긴다. 모델은 요소에 적용되는 선언을 기록하며, 상속값과 브라우저 기본 계산값은 이 추출 범위에서 제외한다.
 
+같은 스타일시트 읽기는 `root`와 `body` 타이포그래피 선언을 담은 선택적 최상위 `documentStyle` 컨텍스트를 추가할 수 있다. 문서에 고정된 선택자만 참여한다: `html`, `body`, `:root`, 지원하는 복합 선택자, 그리고 `html`의 직접 자식 또는 하위 요소다. `!important`, 레이어, 명시도, 소스 순서, 제공된 루트 속성이 최종 선언을 결정한다. 선택자, at-rule 또는 캐스케이드 결과를 증명할 수 없으면 추측하지 않고 선언을 명시적으로 `unresolved`로 남긴다. 문서 고정점이 없는 단독 클래스나 ID 선택자는 참여하지 않는다.
+
 `--viewport-width PX`를 추가하면 주어진 뷰포트에서 픽셀 단위의 단일 너비 미디어 조건을 평가한다. `min-width`, `max-width`, `(width < 768px)` 같은 비교를 지원한다. 다른 미디어 조건은 미해결로 남긴다.
 
 두 단순 선택자를 자식 또는 자손 결합자로 연결하면 TSX 어댑터는 컴포넌트 경계까지 JSX 상위 요소를 확인한다. 모델을 보려면 `dui serve`를 실행한 후 워크스페이스 선택기에서 **소스 모델 열기**를 눌러 내보낸 JSON을 선택한다. 뷰어는 스키마 v1에서 선택한 컴포넌트를 그리고 미해결 스타일을 표시한다.
@@ -160,12 +162,15 @@ flowchart LR
 
 | 값 `kind` | 필드 |
 | --- | --- |
-| `length` | `value`와 `unit`: `px`, `rem`, `em`, `percent`, `pt`, `dp` |
+| `length` | `value`와 `unit`: `px`, `rem`, `em`, `percent`, `pt`, `dp`, `vw`, `vh`, `svw`, `svh`, `lvw`, `lvh`, `dvw`, `dvh`, `vmin`, `vmax` |
+| `clamp` | 리터럴 길이 피연산자 `min`, `preferred`, `max` |
 | `color` | `value`: 소문자 sRGB `#rrggbb` 또는 `#rrggbbaa` |
 | `number` | `value` |
 | `keyword` | 속성 목록에 있는 `value` |
 | `token` | `token` ID, 해석했다면 최종 값 `resolved` |
-| `unresolved` | 소스 `text`와 `reason`. 모든 속성에 허용된다 |
+| `unresolved` | 소스 `text`와 `reason`, 그리고 선택적 타입화된 `refinement`. 모든 속성에 허용된다 |
+
+뷰포트 길이와 경계가 있는 리터럴 `clamp()` 표현은 기존 `unresolved` 봉투 안에 타입화된 숫자 `refinement`와 함께 출력되므로, refinement를 모르는 v1 소비자도 기존 fallback을 유지한다. 임의 calc 표현, 경계가 없거나 리터럴이 아닌 clamp, 지원하지 않는 단위는 refinement 없이 미해결로 남는다.
 
 조건은 모든 필드가 성립할 때 성립한다: `minWidth`와 `maxWidth`(length), `interaction`(`hover`, `focus`, `pressed`, `disabled`), `colorScheme`(`light`, `dark`), 그리고 참이어야 하는 표현식 `expr`. 어댑터가 봤지만 속성에 매핑하지 못한 스타일(예: CSS Module 클래스)은 `syntax`, `text`, `reason`, `location`과 함께 `unresolvedStyle`에 들어간다. 브라우저가 이를 채우는 일은 없다.
 
@@ -217,7 +222,9 @@ JSON Schema는 모양, enum, 패턴, 필수 필드를 검사한다. Rust 리더(
 | `color` | `rgba` |
 | `lineHeight` number | `line_height(relative(n))` |
 | `textAlign` `justify` | `start`. GPUI에는 left, center, right만 있다 |
-| `minWidth`나 `maxWidth`가 있는 `when` | 레이아웃 전에 칸 너비로 판정한다 |
+| `minWidth`나 `maxWidth`가 있는 `when` | 상대 단위는 모델화된 루트 글꼴과 부모 글꼴과 무관하게 논리 뷰포트의 초기 사용자 에이전트 글꼴 크기를 사용한 뒤, 레이아웃 전에 칸 너비로 판정한다 |
 | `interaction`, `colorScheme`, `expr`가 있는 `when` | 리뷰어가 그 상태를 고르면 적용한다 |
 | `token` | `resolved` 값. 값이 없는 토큰은 `unresolved`처럼 그린다 |
 | `unresolved`, `unresolvedStyle`, `placeholder`, `opaque` 텍스트 | 라벨이 붙은 placeholder. 브라우저로 채우지 않는다 |
+
+웹 캔버스의 TypeScript/DOM 모델 미리보기에서는 `documentStyle`의 루트 타이포그래피가 격리된 모델 문서나 shadow host에 적용되고, body 타이포그래피는 body나 document-body 래퍼에 적용된다. 일반 `em`은 CSS 길이로 유지되어 속성 컨텍스트에서 계산된다. shadow-root 카드에서는 `rem`이 모델화된 루트 글꼴에 맞춰 계산되고 뷰포트 길이는 논리 카드 뷰포트에 맞춰 계산된다. 둘 다 픽셀로 출력되므로 뷰어 문서나 바깥 뷰포트를 사용하지 않는다. 타입화된 clamp는 각 피연산자에 같은 기준 계산을 적용하면서 경계가 있는 CSS clamp로 유지된다.

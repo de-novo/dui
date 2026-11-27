@@ -20,22 +20,116 @@ fn color(s: &str) -> Option<V> {
         value: format!("#{}", hex.to_ascii_lowercase()),
     })
 }
-fn length(s: &str) -> Option<V> {
+fn numeric_length(s: &str) -> Option<m::Length> {
+    let s = s.trim();
+    if s == "0" {
+        return Some(m::Length {
+            value: 0.,
+            unit: m::LengthUnit::Px,
+        });
+    }
     for (suffix, unit) in [
+        ("svw", m::LengthUnit::Svw),
+        ("svh", m::LengthUnit::Svh),
+        ("lvw", m::LengthUnit::Lvw),
+        ("lvh", m::LengthUnit::Lvh),
+        ("dvw", m::LengthUnit::Dvw),
+        ("dvh", m::LengthUnit::Dvh),
+        ("vmin", m::LengthUnit::Vmin),
+        ("vmax", m::LengthUnit::Vmax),
+        ("vw", m::LengthUnit::Vw),
+        ("vh", m::LengthUnit::Vh),
         ("rem", m::LengthUnit::Rem),
         ("em", m::LengthUnit::Em),
         ("px", m::LengthUnit::Px),
         ("%", m::LengthUnit::Percent),
     ] {
-        if let Some(n) = s
+        if let Some(value) = s
             .strip_suffix(suffix)
             .and_then(|v| v.parse::<f64>().ok())
             .filter(|n| n.is_finite())
         {
-            return Some(V::Length { value: n, unit });
+            return Some(m::Length { value, unit });
         }
     }
     None
+}
+
+// Parse a bounded clamp() of three literal lengths. Nested or calculated expressions stay unsupported.
+fn clamp_length(s: &str) -> Option<V> {
+    let inner = s.trim().strip_prefix("clamp(")?.strip_suffix(')')?;
+    let parts: Vec<_> = inner.split(',').collect();
+    let [min, preferred, max] = parts.as_slice() else {
+        return None;
+    };
+    Some(V::Clamp {
+        min: numeric_length(min)?,
+        preferred: numeric_length(preferred)?,
+        max: numeric_length(max)?,
+    })
+}
+
+fn length(s: &str) -> Option<V> {
+    if s.trim_start().starts_with("clamp(") {
+        return clamp_length(s);
+    }
+    numeric_length(s).map(|length| V::Length {
+        value: length.value,
+        unit: length.unit,
+    })
+}
+
+fn viewport_unit(unit: m::LengthUnit) -> bool {
+    matches!(
+        unit,
+        m::LengthUnit::Vw
+            | m::LengthUnit::Vh
+            | m::LengthUnit::Svw
+            | m::LengthUnit::Svh
+            | m::LengthUnit::Lvw
+            | m::LengthUnit::Lvh
+            | m::LengthUnit::Dvw
+            | m::LengthUnit::Dvh
+            | m::LengthUnit::Vmin
+            | m::LengthUnit::Vmax
+    )
+}
+
+fn needs_refinement(value: &V) -> bool {
+    match value {
+        V::Length { unit, .. } => viewport_unit(*unit),
+        V::Clamp { .. } => true,
+        V::Color { .. }
+        | V::Number { .. }
+        | V::Keyword { .. }
+        | V::Token { .. }
+        | V::Unresolved { .. } => false,
+    }
+}
+
+// New v1 value shapes stay optional refinements beside the unresolved fallback so
+// consumers written before the shapes existed keep the fallback they already handled.
+pub(crate) fn export_value(value: V, text: &str) -> V {
+    if !needs_refinement(&value) {
+        return value;
+    }
+    V::Unresolved {
+        text: text.into(),
+        reason: "Viewport or clamp length is only available as a typed refinement".into(),
+        refinement: Some(Box::new(value)),
+    }
+}
+
+fn nonnegative_length(value: &V) -> bool {
+    match value {
+        V::Length { value, .. } => *value >= 0.,
+        V::Clamp {
+            min,
+            preferred,
+            max,
+        } => min.value >= 0. && preferred.value >= 0. && max.value >= 0.,
+        _ => false,
+    }
 }
 fn letter_spacing(raw: &str) -> Option<V> {
     let raw = raw.trim();
@@ -53,7 +147,7 @@ fn line_height(raw: &str) -> Option<V> {
     if let Ok(value) = raw.parse::<f64>() {
         return (value.is_finite() && value >= 0.).then_some(V::Number { value });
     }
-    length(raw).filter(|v| matches!(v,V::Length{value,..} if *value>=0.))
+    length(raw).filter(nonnegative_length)
 }
 
 fn size_property(name: &str) -> Option<P> {
@@ -89,7 +183,7 @@ fn size_value(property: P, raw: &str) -> Option<V> {
             unit: m::LengthUnit::Px,
         });
     }
-    length(raw).filter(|v| matches!(v,V::Length{value,..} if *value >= 0.))
+    length(raw).filter(nonnegative_length)
 }
 fn grow_factor(raw: &str) -> Option<V> {
     raw.trim()
@@ -109,8 +203,9 @@ fn uniform_length(raw: &str, max_values: usize, allow_percent: bool) -> Option<V
             });
         }
         length(word).filter(|v| {
-            matches!(v, V::Length { value, unit }
-            if *value >= 0. && (allow_percent || *unit != m::LengthUnit::Percent))
+            nonnegative_length(v)
+                && (allow_percent
+                    || !matches!(v, V::Length { unit, .. } if *unit == m::LengthUnit::Percent))
         })
     };
     let mut words = raw.split_ascii_whitespace();
@@ -156,7 +251,7 @@ pub fn theme(f: &File) -> Vec<m::Token> {
             } else {
                 continue;
             };
-            let value = (if group == m::TokenGroup::Color {
+            let parsed = if group == m::TokenGroup::Color {
                 color(val)
             } else if group == m::TokenGroup::Spacing && val.parse::<f64>().ok() == Some(0.) {
                 Some(V::Length {
@@ -165,11 +260,14 @@ pub fn theme(f: &File) -> Vec<m::Token> {
                 })
             } else {
                 length(val)
-            })
-            .unwrap_or_else(|| V::Unresolved {
-                text: val.into(),
-                reason: "Unsupported theme value".into(),
-            });
+            };
+            let value = parsed
+                .map(|value| export_value(value, val))
+                .unwrap_or_else(|| V::Unresolved {
+                    text: val.into(),
+                    reason: "Unsupported theme value".into(),
+                    refinement: None,
+                });
             tokens.insert(
                 name.to_owned(),
                 m::Token {
@@ -220,7 +318,7 @@ fn resolve_aliases(tokens: &mut BTreeMap<String, m::Token>) {
             }
             let Some(next) = links.get(current) else {
                 break tokens.get(current).and_then(|t| match &t.value {
-                    v @ (V::Color { .. } | V::Length { .. }) => Some(v.clone()),
+                    v @ (V::Color { .. } | V::Length { .. } | V::Clamp { .. }) => Some(v.clone()),
                     V::Number { .. }
                     | V::Keyword { .. }
                     | V::Token { .. }
@@ -287,7 +385,7 @@ fn spacing_value(name: &str, raw: &str) -> Option<V> {
     } else {
         length(raw)?
     };
-    if name.starts_with("padding") && matches!(value,V::Length{value,..} if value<0.) {
+    if name.starts_with("padding") && !nonnegative_length(&value) {
         return None;
     }
     Some(value)
@@ -354,6 +452,7 @@ fn scaled_spacing(class: &str, step: u16, tokens: &[m::Token]) -> V {
     V::Unresolved {
         text: class.into(),
         reason: "Cannot resolve the --spacing scale".into(),
+        refinement: None,
     }
 }
 
@@ -395,6 +494,7 @@ fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
                         V::Token { resolved, .. } => resolved.clone(),
                         V::Unresolved { .. } => None,
                         value @ (V::Length { .. }
+                        | V::Clamp { .. }
                         | V::Color { .. }
                         | V::Number { .. }
                         | V::Keyword { .. }) => Some(Box::new(value.clone())),
@@ -436,6 +536,7 @@ fn flex_keyword(name: &str, literal: Option<&str>, source: &str) -> Option<(Vec<
         None => V::Unresolved {
             text: source.into(),
             reason: "Unsupported flex layout value".into(),
+            refinement: None,
         },
     };
     Some((vec![property], value))
@@ -466,6 +567,7 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         .unwrap_or_else(|| V::Unresolved {
             text: source.into(),
             reason: "Expected a nonnegative flex grow factor".into(),
+            refinement: None,
         });
         return Some((vec![P::Grow], value));
     }
@@ -505,6 +607,7 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
             .unwrap_or_else(|| V::Unresolved {
                 text: f.text(raw).into(),
                 reason: "Unsupported size value".into(),
+                refinement: None,
             });
         return Some((vec![property], value));
     }
@@ -535,6 +638,7 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         .unwrap_or_else(|| V::Unresolved {
             text: f.text(raw).into(),
             reason: "Unsupported letter spacing".into(),
+            refinement: None,
         });
         return Some((vec![P::LetterSpacing], value));
     }
@@ -548,6 +652,7 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         .unwrap_or_else(|| V::Unresolved {
             text: f.text(raw).into(),
             reason: "Unsupported line height".into(),
+            refinement: None,
         });
         return Some((vec![P::LineHeight], value));
     }
@@ -631,7 +736,7 @@ pub fn attribute(
             for property in props {
                 element.style.push(m::StyleDeclaration {
                     property,
-                    value: value.clone(),
+                    value: export_value(value.clone(), text),
                     when: None,
                     from: m::StyleSource {
                         syntax,

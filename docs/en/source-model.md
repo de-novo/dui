@@ -21,6 +21,8 @@ For React class components the adapter reads the instance `render()` method. It 
 
 Pass `--built-css FILE` to read a single bundled stylesheet inside the project. For static HTML elements, the adapter resolves flex direction, wrapping, growth and alignment, gap, padding, margins, dimensions and their limits, foreground and background color, opacity, border width, color and radius, font size, line height and letter spacing. It applies supported rules by layer, selector specificity and declaration order, and records the winning declaration’s byte range. A potentially winning rule with an unknown condition or unsupported value stays unresolved. The model records declarations on the element; inherited or browser-default computed values are outside this extraction.
 
+The same stylesheet read can add optional top-level `documentStyle` context with `root` and `body` typography declarations. Only document-anchored selectors participate: `html`, `body`, `:root`, their supported compound selectors, and a direct child or descendant of `html`. Importance, layers, specificity, source order and the supplied root attribute decide the winner. When a selector, at-rule or cascade result cannot be proven, the declaration is explicit `unresolved` rather than a guess. Bare class or ID selectors that give no document anchor do not participate.
+
 Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
 
 For a direct child or descendant selector with two simple parts, the TSX adapter checks intrinsic JSX ancestors up to the component boundary. To inspect a model, run `dui serve`, choose **Open source model** in the workspace picker and select the exported JSON. The viewer draws the selected component from schema v1 and lists unresolved styles.
@@ -158,12 +160,15 @@ An element's `style` is a list of declarations. Each has a `property`, a `value`
 
 | Value `kind` | Fields |
 | --- | --- |
-| `length` | `value` and `unit`: `px`, `rem`, `em`, `percent`, `pt`, `dp` |
+| `length` | `value` and `unit`: `px`, `rem`, `em`, `percent`, `pt`, `dp`, `vw`, `vh`, `svw`, `svh`, `lvw`, `lvh`, `dvw`, `dvh`, `vmin`, `vmax` |
+| `clamp` | literal length operands `min`, `preferred` and `max` |
 | `color` | `value`: lowercase sRGB `#rrggbb` or `#rrggbbaa` |
 | `number` | `value` |
 | `keyword` | `value` from the property's list |
 | `token` | `token` ID and, when resolved, the final value as `resolved` |
-| `unresolved` | Source `text` and a `reason`. Accepted for every property |
+| `unresolved` | Source `text` and a `reason`, plus optional typed `refinement`. Accepted for every property |
+
+Viewport lengths and bounded literal `clamp()` expressions are exported in the existing `unresolved` envelope with typed numeric `refinement`, so a v1 consumer that does not know the refinement retains its prior fallback. Arbitrary calc expressions, unbounded or non-literal clamps and unsupported units remain unresolved without a refinement.
 
 A condition holds when all its fields hold: `minWidth` and `maxWidth` (lengths), `interaction` (`hover`, `focus`, `pressed`, `disabled`), `colorScheme` (`light`, `dark`), and `expr`, an expression that must be truthy. Style the adapter saw but could not map onto a property, such as a CSS Module class, goes into `unresolvedStyle` with its `syntax`, `text`, `reason` and `location`. A browser never fills it.
 
@@ -215,7 +220,9 @@ A renderer reads `SourceModel` from `dui-core`, which has no I/O and builds for 
 | `color` | `rgba` |
 | `lineHeight` number | `line_height(relative(n))` |
 | `textAlign` `justify` | `start`. GPUI has left, center and right only |
-| `when` with `minWidth` or `maxWidth` | Resolved against the cell width before layout |
+| `when` with `minWidth` or `maxWidth` | Relative units use the initial user-agent font size for the logical viewport, independently of the modeled root and parent fonts, then resolve against the cell width before layout |
 | `when` with `interaction`, `colorScheme` or `expr` | Applied when the reviewer selects that state |
 | `token` | Its `resolved` value. A token without one is drawn like `unresolved` |
 | `unresolved`, `unresolvedStyle`, `placeholder`, `opaque` text | A labeled placeholder. Never filled by a browser |
+
+For the web canvas's TypeScript/DOM model preview, `documentStyle` root typography is applied to the isolated model document or shadow host, and body typography is applied to the body or document-body wrapper. Ordinary `em` remains a CSS length so it resolves in its property context. In a shadow-root card, `rem` resolves against the modeled root font and viewport lengths resolve against the logical card viewport; both are emitted as pixels so they cannot use the viewer document or outer viewport. A typed clamp keeps the same base resolution operand by operand and remains a bounded CSS clamp.
