@@ -42,6 +42,12 @@ jobs:
       - run: npm run check:deps
       - run: npm ci
       - run: npm run check:style
+      - name: Validate the versioned source model
+        run: npm run check:source-model
+      - name: Keep the source model reader building for wasm
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo check --locked -p dui-core --target wasm32-unknown-unknown
       - run: npm ci --prefix apps/canvas
       - run: npm test --prefix apps/canvas
       - run: npm run build --prefix apps/canvas

@@ -13,6 +13,7 @@ dui reads existing UI code, reassembles screens, relations, slots, declared stat
 |---|---|
 | Product design, principles, milestones | [docs/en/design-v0.md](docs/en/design-v0.md) |
 | Web viewer structure, session protocol and acceptance gates | [Web viewer architecture](docs/en/web-viewer.md) |
+| Versioned source model (schema, identifiers, styles, tokens) | [docs/en/source-model.md](docs/en/source-model.md) |
 | Code structure, patterns, crate boundaries, M0/M1 gates | [docs/en/architecture.md](docs/en/architecture.md) |
 | Supported stacks and versions | [docs/en/supported-frameworks.md](docs/en/supported-frameworks.md) |
 | Discussions, issues, labels, milestones, board, PRs, approvals | [docs/en/workflow.md](docs/en/workflow.md) |

@@ -9,6 +9,7 @@
 
 ### Added
 
+- 버전 있는 소스 모델, 스키마 버전 1: 화면, 컴포넌트, 슬롯, 분기, 목록, 아이템 스키마, 이동 엣지, 공통 스타일 속성, 디자인 토큰을 담는다. JSON Schema, 참조를 검사하는 Rust 리더, TSX 참조 예제를 함께 둔다(`npm run check:source-model`) ([#353](https://github.com/de-novo/dui/issues/353)).
 - 로컬 URL이나 정적 빌드로 웹 화면을 탐색하고 네이티브 소스에서 경로를 찾아 시뮬레이터 캡처를 연결할 수 있다. ([#238](https://github.com/de-novo/dui/pull/238), [#241](https://github.com/de-novo/dui/pull/241), [#243](https://github.com/de-novo/dui/pull/243)).
 - 캡처 근거를 검사하고 실패한 칸을 다시 검증하며 PR에서 화면을 비교할 수 있다. ([#199](https://github.com/de-novo/dui/pull/199), [#201](https://github.com/de-novo/dui/pull/201), [#205](https://github.com/de-novo/dui/pull/205)).
 
