@@ -1,0 +1,519 @@
+{
+  "parent": {
+    "css": "#outer{--shift:24px}#box{transform:translateX(var(--shift))}",
+    "cssModel": {
+      "leaf": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {}
+        ]
+      },
+      "flatten": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "24px"
+          }
+        ]
+      },
+      "scopes": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "24px"
+          },
+          {},
+          {}
+        ]
+      }
+    },
+    "views": {
+      "390": {
+        "Chrome": [
+          36,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          36,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          36,
+          12,
+          56,
+          18
+        ]
+      },
+      "1440": {
+        "Chrome": [
+          36,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          36,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          36,
+          12,
+          56,
+          18
+        ]
+      }
+    }
+  },
+  "nearest": {
+    "css": "#outer{--shift:24px}#group{--shift:10px}#box{transform:translateX(var(--shift))}",
+    "cssModel": {
+      "leaf": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {}
+        ]
+      },
+      "flatten": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "10px"
+          }
+        ]
+      },
+      "scopes": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "24px"
+          },
+          {
+            "--shift": "10px"
+          },
+          {}
+        ]
+      }
+    },
+    "views": {
+      "390": {
+        "Chrome": [
+          22,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          22,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          22,
+          12,
+          56,
+          18
+        ]
+      },
+      "1440": {
+        "Chrome": [
+          22,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          22,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          22,
+          12,
+          56,
+          18
+        ]
+      }
+    }
+  },
+  "override": {
+    "css": "#outer{--shift:24px}#box{--shift:6px;transform:translateX(var(--shift))}",
+    "cssModel": {
+      "leaf": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "6px"
+          }
+        ]
+      },
+      "flatten": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "6px"
+          }
+        ]
+      },
+      "scopes": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "24px"
+          },
+          {},
+          {
+            "--shift": "6px"
+          }
+        ]
+      }
+    },
+    "views": {
+      "390": {
+        "Chrome": [
+          18,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          18,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          18,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          18,
+          12,
+          56,
+          18
+        ]
+      },
+      "1440": {
+        "Chrome": [
+          18,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          18,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          18,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          18,
+          12,
+          56,
+          18
+        ]
+      }
+    }
+  },
+  "alias": {
+    "css": "#outer{--base:12px;--shift:var(--base)}#group{--base:30px}#box{transform:translateX(var(--shift))}",
+    "cssModel": {
+      "leaf": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {}
+        ]
+      },
+      "flatten": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--base": "30px",
+            "--shift": "var(--base)"
+          }
+        ]
+      },
+      "scopes": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--base": "12px",
+            "--shift": "var(--base)"
+          },
+          {
+            "--base": "30px"
+          },
+          {}
+        ]
+      }
+    },
+    "views": {
+      "390": {
+        "Chrome": [
+          24,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          42,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          24,
+          12,
+          56,
+          18
+        ]
+      },
+      "1440": {
+        "Chrome": [
+          24,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          42,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          24,
+          12,
+          56,
+          18
+        ]
+      }
+    }
+  },
+  "fallback": {
+    "css": "#outer{--shift:var(--missing,17px)}#box{--missing:33px;transform:translateX(var(--shift))}",
+    "cssModel": {
+      "leaf": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--missing": "33px"
+          }
+        ]
+      },
+      "flatten": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "var(--missing,17px)",
+            "--missing": "33px"
+          }
+        ]
+      },
+      "scopes": {
+        "transform": "translateX(var(--shift))",
+        "levels": [
+          {
+            "--shift": "var(--missing,17px)"
+          },
+          {},
+          {
+            "--missing": "33px"
+          }
+        ]
+      }
+    },
+    "views": {
+      "390": {
+        "Chrome": [
+          29,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          45,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          29,
+          12,
+          56,
+          18
+        ]
+      },
+      "1440": {
+        "Chrome": [
+          29,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          12,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          45,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          29,
+          12,
+          56,
+          18
+        ]
+      }
+    }
+  },
+  "cycle": {
+    "css": "#outer{--a:var(--b);--b:var(--a)}#group{--b:35px}#box{transform:translateX(var(--a,7px))}",
+    "cssModel": {
+      "leaf": {
+        "transform": "translateX(var(--a,7px))",
+        "levels": [
+          {}
+        ]
+      },
+      "flatten": {
+        "transform": "translateX(var(--a,7px))",
+        "levels": [
+          {
+            "--a": "var(--b)",
+            "--b": "35px"
+          }
+        ]
+      },
+      "scopes": {
+        "transform": "translateX(var(--a,7px))",
+        "levels": [
+          {
+            "--a": "var(--b)",
+            "--b": "var(--a)"
+          },
+          {
+            "--b": "35px"
+          },
+          {}
+        ]
+      }
+    },
+    "views": {
+      "390": {
+        "Chrome": [
+          19,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          19,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          47,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          19,
+          12,
+          56,
+          18
+        ]
+      },
+      "1440": {
+        "Chrome": [
+          19,
+          12,
+          56,
+          18
+        ],
+        "leaf": [
+          19,
+          12,
+          56,
+          18
+        ],
+        "flatten": [
+          47,
+          12,
+          56,
+          18
+        ],
+        "scopes": [
+          19,
+          12,
+          56,
+          18
+        ]
+      }
+    }
+  }
+}
