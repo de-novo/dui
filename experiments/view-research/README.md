@@ -15,3 +15,5 @@ node size.cjs "$GPUI_BUNDLE" "$SITE_DIR/startup/dom"
 ```
 
 The Chrome harness is opt-in measurement tooling. The probing script collects a timestamp from a matching compositor screenshot. Each browser launch has two fresh contexts. The offline size script uses the original GPUI index without timing marks.
+
+For the Korean title ablation, run ../entry-router/locale-project.mjs with the pinned renderer checkout's apps/canvas/src/i18n/messages.ts, the extracted ModelView JSON, ko, variant (title, header or weight), and an output model path. Feed that model to real-capture.cjs with the same built stylesheet as the viewport/typography probe. The locale is explicit scenario input. The dictionary is parsed as TS syntax and only literal strings are substituted.

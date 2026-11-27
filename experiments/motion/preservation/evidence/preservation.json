@@ -1,0 +1,733 @@
+{
+  "offset": {
+    "sidecars": {
+      "raw": {
+        "text": "translate(12px,6px)",
+        "location": [
+          "built.css",
+          38,
+          57
+        ]
+      },
+      "ordered": {
+        "operations": [
+          {
+            "op": "translate",
+            "values": [
+              {
+                "n": 12,
+                "unit": "px"
+              },
+              {
+                "n": 6,
+                "unit": "px"
+              }
+            ]
+          }
+        ],
+        "location": [
+          "built.css",
+          38,
+          57
+        ]
+      },
+      "scoped": {
+        "text": "translate(12px,6px)",
+        "location": [
+          "built.css",
+          38,
+          57
+        ],
+        "variables": {},
+        "missing": []
+      }
+    },
+    "base": {
+      "width": 80,
+      "height": 24
+    },
+    "views": {
+      "390": {
+        "Chrome": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        }
+      },
+      "1440": {
+        "Chrome": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            44,
+            38,
+            80,
+            24
+          ],
+          "unresolved": false
+        }
+      }
+    }
+  },
+  "relative": {
+    "sidecars": {
+      "raw": {
+        "text": "translate(50%,-25%)",
+        "location": [
+          "built.css",
+          38,
+          57
+        ]
+      },
+      "ordered": {
+        "operations": [
+          {
+            "op": "translate",
+            "values": [
+              {
+                "n": 50,
+                "unit": "%"
+              },
+              {
+                "n": -25,
+                "unit": "%"
+              }
+            ]
+          }
+        ],
+        "location": [
+          "built.css",
+          38,
+          57
+        ]
+      },
+      "scoped": {
+        "text": "translate(50%,-25%)",
+        "location": [
+          "built.css",
+          38,
+          57
+        ],
+        "variables": {},
+        "missing": []
+      }
+    },
+    "base": {
+      "width": 80,
+      "height": 24
+    },
+    "views": {
+      "390": {
+        "Chrome": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        }
+      },
+      "1440": {
+        "Chrome": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            72,
+            26,
+            80,
+            24
+          ],
+          "unresolved": false
+        }
+      }
+    }
+  },
+  "compound": {
+    "sidecars": {
+      "raw": {
+        "text": "translateX(12px) rotate(30deg) scale(1.2)",
+        "location": [
+          "built.css",
+          38,
+          79
+        ]
+      },
+      "ordered": {
+        "operations": [
+          {
+            "op": "translateX",
+            "values": [
+              {
+                "n": 12,
+                "unit": "px"
+              }
+            ]
+          },
+          {
+            "op": "rotate",
+            "values": [
+              {
+                "n": 30,
+                "unit": "deg"
+              }
+            ]
+          },
+          {
+            "op": "scale",
+            "values": [
+              {
+                "n": 1.2,
+                "unit": ""
+              }
+            ]
+          }
+        ],
+        "location": [
+          "built.css",
+          38,
+          79
+        ]
+      },
+      "scoped": {
+        "text": "translateX(12px) rotate(30deg) scale(1.2)",
+        "location": [
+          "built.css",
+          38,
+          79
+        ],
+        "variables": {},
+        "missing": []
+      }
+    },
+    "base": {
+      "width": 80,
+      "height": 24
+    },
+    "views": {
+      "390": {
+        "Chrome": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        }
+      },
+      "1440": {
+        "Chrome": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            35.230777740478516,
+            7.529232501983643,
+            97.5384521484375,
+            72.9415283203125
+          ],
+          "unresolved": false
+        }
+      }
+    }
+  },
+  "reordered": {
+    "sidecars": {
+      "raw": {
+        "text": "scale(1.2) rotate(30deg) translateX(12px)",
+        "location": [
+          "built.css",
+          38,
+          79
+        ]
+      },
+      "ordered": {
+        "operations": [
+          {
+            "op": "scale",
+            "values": [
+              {
+                "n": 1.2,
+                "unit": ""
+              }
+            ]
+          },
+          {
+            "op": "rotate",
+            "values": [
+              {
+                "n": 30,
+                "unit": "deg"
+              }
+            ]
+          },
+          {
+            "op": "translateX",
+            "values": [
+              {
+                "n": 12,
+                "unit": "px"
+              }
+            ]
+          }
+        ],
+        "location": [
+          "built.css",
+          38,
+          79
+        ]
+      },
+      "scoped": {
+        "text": "scale(1.2) rotate(30deg) translateX(12px)",
+        "location": [
+          "built.css",
+          38,
+          79
+        ],
+        "variables": {},
+        "missing": []
+      }
+    },
+    "base": {
+      "width": 80,
+      "height": 24
+    },
+    "views": {
+      "390": {
+        "Chrome": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        }
+      },
+      "1440": {
+        "Chrome": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        },
+        "ordered": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        },
+        "scoped": {
+          "rect": [
+            35.70154571533203,
+            14.729232788085938,
+            97.53844451904297,
+            72.94153594970703
+          ],
+          "unresolved": false
+        }
+      }
+    }
+  },
+  "dependent": {
+    "sidecars": {
+      "raw": {
+        "text": "translateX(var(--shift))",
+        "location": [
+          "built.css",
+          51,
+          75
+        ]
+      },
+      "ordered": {
+        "unresolved": "translateX(var(--shift))"
+      },
+      "scoped": {
+        "text": "translateX(var(--shift))",
+        "location": [
+          "built.css",
+          51,
+          75
+        ],
+        "variables": {
+          "--shift": "18px"
+        },
+        "missing": []
+      }
+    },
+    "base": {
+      "width": 80,
+      "height": 24
+    },
+    "views": {
+      "390": {
+        "Chrome": {
+          "rect": [
+            50,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": true
+        },
+        "ordered": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": true
+        },
+        "scoped": {
+          "rect": [
+            50,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        }
+      },
+      "1440": {
+        "Chrome": {
+          "rect": [
+            50,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "v1": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        },
+        "raw": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": true
+        },
+        "ordered": {
+          "rect": [
+            32,
+            32,
+            80,
+            24
+          ],
+          "unresolved": true
+        },
+        "scoped": {
+          "rect": [
+            50,
+            32,
+            80,
+            24
+          ],
+          "unresolved": false
+        }
+      }
+    }
+  }
+}
