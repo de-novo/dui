@@ -20,6 +20,7 @@ import { MobileScreenDeck, type MobileViewMode } from "./features/map/MobileScre
 
 import { WorkspaceRail } from "./features/workspace/WorkspaceRail";
 import { DiscoveryLimitations } from "./components/NativeSourceEvidence";
+import { EmptyWorkspace } from "./features/workspace/EmptyWorkspace";
 import { WorkPicker } from "./features/workspace/WorkPicker";
 import { LocaleProvider, useI18n } from "./i18n/LocaleContext";
 import { type AuditReport, decodeAuditReport, openCommentsByPath } from "./model/audit";
@@ -814,6 +815,8 @@ function Viewer({
         </section>
       ) : archive && run ? (
         <MapView archive={archive} run={run} runs={runs} onOpenDiff={() => openDiff()} />
+      ) : !error && !archive ? (
+        <EmptyWorkspace title={t.noSavedMaps} openModel={t.openModel} />
       ) : (
         <output>
           {error === "archive-load-failed"
@@ -834,24 +837,33 @@ function Viewer({
 }
 
 const root = createRoot(document.getElementById("root")!);
-let runs: Run[] = [],
-  run: Run | undefined;
-try {
-  runs = await json(runsIndexUrl());
-  const key = new URLSearchParams(location.search).get("run");
-  run = key === null ? runs[0] : runs.find((r) => r.key === key);
-  if (key !== null && !run) throw Error("workspace-unavailable");
-  const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
+if (new URLSearchParams(location.search).get("view") === "model") {
+  const { ModelView } = await import("./features/model/ModelView");
   root.render(
     <LocaleProvider>
-      <Viewer initialRuns={runs} run={run} archive={archive} />
+      <ModelView />
     </LocaleProvider>,
   );
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  root.render(
-    <LocaleProvider>
-      <Viewer initialRuns={runs} run={run} error={message} />
-    </LocaleProvider>,
-  );
+} else {
+  let runs: Run[] = [],
+    run: Run | undefined;
+  try {
+    runs = await json(runsIndexUrl());
+    const key = new URLSearchParams(location.search).get("run");
+    run = key === null ? runs[0] : runs.find((r) => r.key === key);
+    if (key !== null && !run) throw Error("workspace-unavailable");
+    const archive = run ? decodeOverview(await json(archiveUrl("graph.json", run))) : undefined;
+    root.render(
+      <LocaleProvider>
+        <Viewer initialRuns={runs} run={run} archive={archive} />
+      </LocaleProvider>,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    root.render(
+      <LocaleProvider>
+        <Viewer initialRuns={runs} run={run} error={message} />
+      </LocaleProvider>,
+    );
+  }
 }

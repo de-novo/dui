@@ -2886,3 +2886,62 @@ h2 {
   object-fit: contain;
   object-position: top center;
 }
+
+.empty-workspace {
+  color: var(--foreground);
+  width: fit-content;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 12px;
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.empty-workspace > h2 {
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 26px;
+}
+.empty-workspace > code {
+  font-size: 14px;
+  line-height: 20px;
+}
+.empty-workspace > a {
+  line-height: 20px;
+  font-size: 14px;
+  text-decoration: underline;
+}
+.model-workbench {
+  max-width: 64rem;
+  height: 100dvh;
+  margin: auto;
+  padding: var(--space-4);
+  overflow: auto;
+}
+.model-workbench header,
+.model-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.model-workbench h1 {
+  font-size: var(--text-title);
+}
+.model-workbench iframe {
+  width: 100%;
+  height: 55dvh;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.model-workbench details {
+  overflow-wrap: anywhere;
+}
+.model-controls select {
+  max-width: 100%;
+}

@@ -132,6 +132,7 @@ fn main() {
         "package-lock.json",
         "node_modules/typescript/package.json",
         "apps/canvas/src",
+        "schemas/source-model.v1.schema.json",
         "apps/canvas/index.html",
         "apps/canvas/vite.config.ts",
         "apps/canvas/package.json",

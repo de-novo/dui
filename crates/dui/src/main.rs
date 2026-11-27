@@ -375,7 +375,7 @@ CAPTURE
       --force | --no-cache                Bypass content-addressed cache
       --changed-since REF                 Report screens affected since Git ref
   dui recheck RUN [PROJECT [MANIFEST]]    Re-render unsuccessful cells with current project conditions
-  dui model PROJECT ENTRY.tsx [--built-css FILE [--viewport-width PX]]  Print the TSX source model as JSON
+  dui model PROJECT ENTRY.tsx [--built-css FILE [--viewport-width PX] [--root-attribute NAME=VALUE]]  Print the TSX source model as JSON
   dui scan [PROJECT] [MANIFEST]           Print compiler facts, controls, and auto-mocks (no browser)
   dui transitions PROJECT MANIFEST [RUN]  Replay actions and verify screen transitions
 
@@ -454,16 +454,24 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
     if let [cmd, rest @ ..] = args.as_slice()
         && cmd == "model"
     {
-        let usage = "expected model PROJECT ENTRY.tsx [--built-css FILE [--viewport-width PX]]";
+        let usage = "expected model PROJECT ENTRY.tsx [--built-css FILE [--viewport-width PX] [--root-attribute NAME=VALUE]]";
         let [project, entry, options @ ..] = rest else {
             return Err(failure(2, usage));
         };
         let mut css = None;
         let mut width = None;
+        let mut root_attribute = None;
         for pair in options.chunks(2) {
             match pair {
                 [flag, path] if flag == "--built-css" && css.is_none() => {
                     css = Some(Path::new(path))
+                }
+                [flag, raw] if flag == "--root-attribute" && root_attribute.is_none() => {
+                    root_attribute = Some(
+                        raw.to_str()
+                            .and_then(|s| s.split_once('='))
+                            .ok_or_else(|| failure(2, "expected root attribute NAME=VALUE"))?,
+                    );
                 }
                 [flag, raw] if flag == "--viewport-width" && width.is_none() => {
                     width = Some(
@@ -478,9 +486,14 @@ fn run_with(args: Vec<std::ffi::OsString>) -> Reply {
                 _ => return Err(failure(2, usage)),
             }
         }
-        let model =
-            dui_lang_typescript::extract_at_width(Path::new(project), Path::new(entry), css, width)
-                .map_err(|reason| failure(2, &reason))?;
+        let model = dui_lang_typescript::extract_in_context(
+            Path::new(project),
+            Path::new(entry),
+            css,
+            width,
+            root_attribute,
+        )
+        .map_err(|reason| failure(2, &reason))?;
         let raw = model
             .to_json()
             .map_err(|error| failure(3, &error.to_string()))?;

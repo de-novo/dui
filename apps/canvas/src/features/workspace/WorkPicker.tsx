@@ -8,7 +8,13 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
   const { t } = useI18n();
   const [key, setKey] = useState(current?.key ?? runs[0]?.key);
   const run = runs.find((r) => r.key === key);
-  if (!run) return <p>{t.noSavedMaps}</p>;
+  if (!run)
+    return (
+      <>
+        <p>{t.noSavedMaps}</p>
+        <a href="?view=model">{t.openModel}</a>
+      </>
+    );
   const projects = new Map(runs.map((r) => [r.projectId, r.project]));
   const projectRuns = runs.filter((r) => r.projectId === run.projectId);
   const branches = [...new Set(projectRuns.map((r) => r.branch))];
@@ -56,6 +62,7 @@ export function WorkPicker({ runs, current }: { runs: Run[]; current?: Run }) {
       <Button type="submit" variant="default">
         {t.openWorkspace}
       </Button>
+      <a href="?view=model">{t.openModel}</a>
     </form>
   );
 }
