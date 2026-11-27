@@ -299,6 +299,9 @@
     "styleSyntax": { "enum": ["class", "inline", "modifier", "stylesheet", "theme"] },
     "styleProperty": {
       "enum": [
+        "display",
+        "gridColumnMinimum",
+        "overflowX",
         "direction",
         "alignItems",
         "justifyContent",

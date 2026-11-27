@@ -36,7 +36,7 @@ export function readModel(text: string): Model {
 }
 
 const tags = new Set(
-  "main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label ul ol li dl dt dd small form output".split(
+  "body dialog select option main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label ul ol li dl dt dd small form output".split(
     " ",
   ),
 );
@@ -128,9 +128,20 @@ export function drawModel(model: Model, componentId: string) {
     }
     if (n.kind !== "element" || n.module || !tags.has(n.tag!))
       return placeholder(n.reason ?? n.tag ?? n.kind);
-    const el = doc.createElement(n.tag!);
+    const el = n.tag === "body" ? doc.body : doc.createElement(n.tag!);
     el.dataset.modelNode = n.id;
     for (const d of n.style ?? []) {
+      if (d.property === "gridColumnMinimum" && !d.when) {
+        const min = cssValue(d.value);
+        if (min === "single") {
+          el.style.gridTemplateColumns = "minmax(0,1fr)";
+          continue;
+        }
+        if (min && d.value.kind === "length") {
+          el.style.gridTemplateColumns = `repeat(auto-fit,minmax(${min},1fr))`;
+          continue;
+        }
+      }
       const key = css[d.property] ?? d.property.replace(/[A-Z]/g, (ch) => "-" + ch.toLowerCase());
       const val = cssValue(d.value);
       if (!val || d.when || !CSS.supports(key, val)) {
@@ -143,7 +154,7 @@ export function drawModel(model: Model, componentId: string) {
         d.property === "justifyContent" ||
         d.property === "wrap"
       )
-        el.style.display = "flex";
+        if (!el.style.display) el.style.display = "flex";
       if (d.property === "borderWidth") el.style.borderStyle = "solid";
       el.style.setProperty(key, val);
     }
@@ -151,6 +162,7 @@ export function drawModel(model: Model, componentId: string) {
     for (const child of n.children ?? []) el.append(draw(child, slots, stack));
     return el;
   }
-  doc.body.append(component(componentId, new Map(), []));
+  const root = component(componentId, new Map(), []);
+  if (root !== doc.body) doc.body.append(root);
   return { html: "<!doctype html>" + doc.documentElement.outerHTML, unresolved: [...unresolved] };
 }
