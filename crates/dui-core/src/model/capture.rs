@@ -9,6 +9,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Returns whether an unverified cell was never captured.
+pub fn is_uncaptured_reason(reason: &str) -> bool {
+    matches!(reason, "not-rendered" | "target-not-produced")
+}
+
 /// Pure algebraic cell verdict. `Unverified` and `Unrenderable` are always distinct
 /// and require non-empty reasons.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -828,7 +833,7 @@ impl CoverageSummary {
                 }
                 CellStatus::Unverified { reason } => {
                     summary.renderable += 1;
-                    if reason.as_str() == "not-rendered" {
+                    if is_uncaptured_reason(reason.as_str()) {
                         summary.not_captured += 1;
                     } else {
                         summary.unverified += 1;

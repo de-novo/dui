@@ -1441,7 +1441,7 @@ impl SqliteStore {
                 }
                 CellStatus::Unverified { ref reason } => {
                     summary.renderable += 1;
-                    if reason.as_str() == "not-rendered" {
+                    if dui_core::model::capture::is_uncaptured_reason(reason.as_str()) {
                         summary.not_captured += 1;
                     } else {
                         summary.unverified += 1;

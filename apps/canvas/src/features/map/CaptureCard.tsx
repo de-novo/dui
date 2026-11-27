@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SourceCardBody } from "../../components/NativeSourceEvidence";
 import { Button } from "../../components/ui/button";
 import { MapCardGuides } from "./MapCardGuides";
-import type { Cell, Screen } from "../../data/overview";
+import { isNotCaptured, type Cell, type Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
@@ -27,11 +27,9 @@ export function routeName(path: string) {
 
 export function captureBadgeCounts(cells: Cell[]) {
   return {
-    notCaptured: cells.filter((c) => c.status === "unverified" && c.reason === "not-rendered")
+    notCaptured: cells.filter(isNotCaptured).length,
+    unverifiedAfterCapture: cells.filter((c) => c.status === "unverified" && !isNotCaptured(c))
       .length,
-    unverifiedAfterCapture: cells.filter(
-      (c) => c.status === "unverified" && c.reason !== "not-rendered",
-    ).length,
     unavailable: cells.filter((c) => c.status === "unrenderable").length,
   };
 }

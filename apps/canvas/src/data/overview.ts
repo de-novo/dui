@@ -106,6 +106,13 @@ export type Cell = {
   /** The script-free HTML copy of the capture (docs/en/web-viewer.md#html-cards). */
   snapshot?: CellSnapshot;
 };
+export function isNotCaptured(cell: Cell): boolean {
+  return (
+    cell.status === "unverified" &&
+    (cell.reason === "not-rendered" || cell.reason === "target-not-produced")
+  );
+}
+
 export type CellSnapshot = {
   file: string;
   fidelity?: number;

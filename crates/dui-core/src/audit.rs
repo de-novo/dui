@@ -204,7 +204,7 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
                     path: cell.path,
                     state: cell.state,
                     width: cell.width,
-                    status: if reason == "not-rendered" {
+                    status: if crate::model::capture::is_uncaptured_reason(&reason) {
                         "not-captured".into()
                     } else {
                         "unverified".into()
@@ -213,7 +213,7 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
                     locale: cell.locale,
                 };
                 screen.renderable_cells += 1;
-                if gap.reason == "not-rendered" {
+                if gap.status == "not-captured" {
                     not_captured_cells += 1;
                     screen.not_captured_cells += 1;
                     not_captured.push(gap);

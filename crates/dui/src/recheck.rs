@@ -310,7 +310,7 @@ fn include_missing_in_graph(out: &Path, report: &mut Value) -> Result<(), Error>
         .filter_map(Value::as_str)
         .map(str::to_owned)
         .collect();
-    let mut coverage = crate::coverage::base(&fresh.clone());
+    let mut coverage = crate::coverage::base(fresh);
     if !report["coverage"].is_null() {
         for key in ["branchOutcomes", "observedBranchOutcomes"] {
             if let Some(value) = report["coverage"].get(key).cloned() {

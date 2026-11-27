@@ -14,7 +14,12 @@ pub(crate) fn base(cells: &[Value]) -> Value {
         .count();
     let not_captured = cells
         .iter()
-        .filter(|c| c["status"] == "unverified" && c["reason"] == "not-rendered")
+        .filter(|c| {
+            c["status"] == "unverified"
+                && c["reason"]
+                    .as_str()
+                    .is_some_and(dui_core::model::capture::is_uncaptured_reason)
+        })
         .count();
     let renderable = planned.saturating_sub(unrenderable);
     let captured = planned.saturating_sub(unrenderable + not_captured);
