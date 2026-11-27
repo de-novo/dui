@@ -38,7 +38,8 @@ assert.equal(
   row.style.find((s: { property: string }) => s.property === "borderRadius").value.value,
   8,
 );
-assert.ok(row.children[1].unresolvedStyle[0].text.includes("styles.status"));
+assert.equal(row.children[1].unresolvedStyle[0].text, "text-transform: uppercase;");
+assert.equal(row.children[1].unresolvedStyle[0].location.file, "src/Orders.module.css");
 assert.ok(orders.root.style.some((s: { from: { text: string } }) => s.from.text === "gap-4"));
 assert.equal(orders.root.children[0].style.at(-1).value.token, "src/theme.css#--color-brand");
 
@@ -94,6 +95,53 @@ try {
     themed.tokens.find((t: { name: string }) => t.name === "--color-loop").value.text,
     "var(--color-cycle)",
   );
+  writeFileSync(
+    join(project, "View.tsx"),
+    `import sheet from "./View.module.css";
+export function Shadow({sheet}: {sheet: {card: string}}){return <p className={sheet.card}/>;}
+export default function View(){return <p style={{color:"#ffffff"}} className={sheet.card}/>;}`,
+  );
+  const cssPath = join(project, "View.module.css");
+  writeFileSync(
+    cssPath,
+    `p.card { color: #321; }
+.card { color: #abc; }
+@media (min-width: 40rem) { .card { gap: 12px; } }
+.card { width: var(--runtime-width); }
+aside.card { height: 40px; }`,
+  );
+  const cssModel = JSON.parse(extract(project, "View.tsx"));
+  assert.ok(validate(cssModel));
+  const [shadow, card] = cssModel.components.map((c: { root: unknown }) => c.root);
+  assert.equal(shadow.style, undefined);
+  assert.ok(shadow.unresolvedStyle[0].text.includes("sheet.card"));
+  assert.deepEqual(
+    card.style.map((d: { property: string }) => d.property),
+    ["color", "gap", "width", "color", "color"],
+  );
+  assert.deepEqual(
+    card.style.map((d: { value: { value?: unknown } }) => d.value.value),
+    ["#aabbcc", 12, undefined, "#332211", "#ffffff"],
+  );
+  assert.deepEqual(card.style[1].when, { minWidth: { value: 40, unit: "rem" } });
+  assert.equal(card.style[2].value.kind, "unresolved");
+  const cssSource = card.style[1].from;
+  assert.equal(cssSource.syntax, "stylesheet");
+  assert.equal(cssSource.location.file, "View.module.css");
+  assert.equal(
+    readFileSync(cssPath).subarray(cssSource.location.start, cssSource.location.end).toString(),
+    "gap: 12px;",
+  );
+  for (const unsupported of [
+    ".wrapper .card {color:blue}",
+    ".card {color:red!important}",
+    "@media print {.card {color:blue}}",
+  ]) {
+    writeFileSync(cssPath, `.card {padding:2px;} ${unsupported}`);
+    const fallback = JSON.parse(extract(project, "View.tsx")).components[1].root;
+    assert.ok(fallback.unresolvedStyle[0].text.includes("sheet.card"));
+    assert.equal(fallback.style.length, 1);
+  }
 } finally {
   rmSync(project, { recursive: true, force: true });
 }

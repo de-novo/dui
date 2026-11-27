@@ -13,6 +13,7 @@ pub struct Context<'a> {
     pub files: &'a Files,
     pub slots: &'a [m::Slot],
     pub signatures: &'a BTreeMap<String, Vec<m::Slot>>,
+    pub modules: style::modules::Bindings<'a>,
     pub tailwind: bool,
     pub items: Vec<(String, String)>,
     pub model: &'a mut m::SourceModel,
@@ -294,6 +295,12 @@ impl Context<'_> {
             let Some(k) = parts.first() else { continue };
             let key = self.file.text(*k);
             if component.is_none() && matches!(key, "className" | "style") {
+                if key == "className"
+                    && let Some(value) = parts.get(1)
+                    && self.modules.apply(self.file, *value, &mut el)
+                {
+                    continue;
+                }
                 style::attribute(
                     self.file,
                     attribute,
@@ -316,6 +323,9 @@ impl Context<'_> {
                 .unwrap_or(m::Expr::Literal { value: true.into() });
             el.props.insert(key.into(), expr);
         }
+        // Inline declarations have higher precedence regardless of JSX attribute order.
+        el.style
+            .sort_by_key(|decl| decl.from.syntax == m::StyleSyntax::Inline);
         for c in children(n).into_iter().filter(|c| {
             !(matches!(c.kind(), "jsx_opening_element" | "jsx_closing_element")
                 || c.kind() == "jsx_expression" && first(*c).is_none())

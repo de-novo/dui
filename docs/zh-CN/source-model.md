@@ -147,6 +147,8 @@ flowchart LR
 
 参考示例映射简单语法：Tailwind 类和内联样式。Tailwind 的 spacing 步长记录为解析后的长度。中等和困难语法（[样式与设计 token](roadmap.md#default-pipeline)）在其适配器出现后使用相同的声明。
 
+对于 `.module.css` 的默认导入，`className={styles.card}` 读取匹配的 `.card` 和 `tag.card` 规则。适配器按选择器优先级及源码顺序排列声明，最后应用内联样式，并记录简单的 `min-width` 或 `max-width` 媒体条件。每条声明都指向 CSS 源码位置。未支持的值和属性保留原文。若模块使用此范围之外的选择器或 at-rule、类组合或 `!important`，则类引用保留为未解析。
+
 ## 7. Token
 
 token 保留源码使用的名称（`--color-brand`、`--text-2xl`），以便之后成为设计变量。`group` 是 `color`、`spacing`、`typography`、`radius`、`size` 或 `other`。`value` 是最终值，或指向另一个 token 的 `token` 值（别名）。别名不得形成循环。`modes` 保存各模式的值，例如 `dark`。项目 token 有 `location`。框架默认值有 `package`（`tailwindcss`），没有位置。

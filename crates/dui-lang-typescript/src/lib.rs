@@ -291,6 +291,7 @@ pub fn extract(project: &Path, entry: &Path) -> Result<m::SourceModel, String> {
                         .is_some_and(|p| matches!(f.text(p), "\"tailwindcss\"" | "'tailwindcss'"))
             })
     });
+    let modules = style::modules::Modules::new(&files);
     for file in files.values().filter(|f| f.path.ends_with(".tsx")) {
         for (name, f) in file.functions() {
             let id = format!("{}#{name}", file.path);
@@ -300,6 +301,7 @@ pub fn extract(project: &Path, entry: &Path) -> Result<m::SourceModel, String> {
                 files: &files,
                 slots: slot,
                 tailwind,
+                modules: modules.bindings(file, f),
                 signatures: &signatures,
                 items: vec![],
                 model: &mut model,
