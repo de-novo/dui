@@ -281,7 +281,11 @@ fn width_query(raw: &str, width: u32) -> Option<bool> {
 }
 
 impl<'a> Sheet<'a> {
-    pub(crate) fn new(f: &'a File, width: Option<u32>) -> Result<Self, String> {
+    pub(crate) fn new(
+        f: &'a File,
+        width: Option<u32>,
+        root_attribute: Option<(&str, &str)>,
+    ) -> Result<Self, String> {
         let root = f.tree.root_node();
         if structural_error(f, root) {
             return Err(format!("Cannot parse built CSS: {}", f.path));
@@ -297,6 +301,8 @@ impl<'a> Sheet<'a> {
                 }],
             )]),
         };
+        let mut variable_ranks = BTreeMap::new();
+        let mut ambiguous_variables = std::collections::BTreeSet::new();
         let mut layers = Vec::new();
         let mut stack = vec![(root, "", usize::MAX, false)];
         while let Some((node, selector, layer, uncertain)) = stack.pop() {
@@ -330,12 +336,46 @@ impl<'a> Sheet<'a> {
                                 .split(',')
                                 .map(str::trim)
                                 .all(|s| matches!(s, ":root" | ":host"));
-                        let definition = (root && !uncertain && !important).then_some(value);
-                        sheet
-                            .vars
-                            .entry(prop)
-                            .and_modify(|v| *v = None)
-                            .or_insert(definition);
+                        let root_value = root_attribute.and_then(|(key, value)| {
+                            let (name, raw) = selector
+                                .strip_prefix(":root[")?
+                                .strip_suffix(']')?
+                                .split_once('=')?;
+                            let raw = raw
+                                .strip_prefix('"')
+                                .and_then(|v| v.strip_suffix('"'))
+                                .or_else(|| {
+                                    raw.strip_prefix('\'').and_then(|v| v.strip_suffix('\''))
+                                })
+                                .unwrap_or(raw);
+                            (name == key && ident(raw)).then_some(raw == value)
+                        });
+                        if root_value == Some(false) {
+                            continue;
+                        }
+                        if root_attribute.is_some()
+                            && (root || root_value == Some(true))
+                            && !important
+                            && !uncertain
+                        {
+                            let rank = (layer, root_value == Some(true));
+                            if variable_ranks
+                                .get(prop)
+                                .is_none_or(|previous| rank >= *previous)
+                            {
+                                variable_ranks.insert(prop, rank);
+                                sheet.vars.insert(prop, Some(value));
+                            }
+                        } else if root_attribute.is_some() {
+                            ambiguous_variables.insert(prop);
+                        } else {
+                            let definition = (root && !uncertain && !important).then_some(value);
+                            sheet
+                                .vars
+                                .entry(prop)
+                                .and_modify(|v| *v = None)
+                                .or_insert(definition);
+                        }
                     } else {
                         for property in affected(prop) {
                             sheet.rules.entry(property).or_default().push(Rule {
@@ -411,6 +451,9 @@ impl<'a> Sheet<'a> {
                 }
             }
         }
+        for name in ambiguous_variables {
+            sheet.vars.insert(name, None);
+        }
         Ok(sheet)
     }
 
@@ -446,6 +489,13 @@ impl<'a> Sheet<'a> {
             let mut color = None;
             let mut style = None;
             for word in raw.split_ascii_whitespace() {
+                let word = if let Some(name) =
+                    word.strip_prefix("var(").and_then(|s| s.strip_suffix(')'))
+                {
+                    self.vars.get(name.trim()).copied().flatten()?
+                } else {
+                    word
+                };
                 if let Some(c) = super::color(word) {
                     if color.replace(c).is_some() {
                         return None;

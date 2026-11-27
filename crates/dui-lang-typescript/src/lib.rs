@@ -247,6 +247,31 @@ pub fn extract_at_width(
     built_css: Option<&Path>,
     width: Option<u32>,
 ) -> Result<m::SourceModel, String> {
+    extract_in_context(project, entry, built_css, width, None)
+}
+
+pub fn extract_in_context(
+    project: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+    width: Option<u32>,
+    root_attribute: Option<(&str, &str)>,
+) -> Result<m::SourceModel, String> {
+    if let Some((name, value)) = root_attribute
+        && (built_css.is_none()
+            || !name.starts_with("data-")
+            || name.len() == 5
+            || [name, value].iter().any(|s| {
+                s.is_empty()
+                    || !s
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+            }))
+    {
+        return Err(
+            "root attribute requires built CSS and data-NAME=VALUE with simple identifiers".into(),
+        );
+    }
     if width.is_some() && (built_css.is_none() || width == Some(0)) {
         return Err("viewport width requires built CSS and a positive width in CSS pixels".into());
     }
@@ -258,7 +283,7 @@ pub fn extract_at_width(
     } = syntax::load(project, entry, built_css, &mut diagnostics)?;
     let built = artifact
         .as_ref()
-        .map(|p| style::built::Sheet::new(&files[p], width))
+        .map(|p| style::built::Sheet::new(&files[p], width, root_attribute))
         .transpose()?;
     let mut model = m::SourceModel {
         schema_version: m::SCHEMA_VERSION,

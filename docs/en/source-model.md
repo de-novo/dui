@@ -21,6 +21,8 @@ Add `--viewport-width PX` to evaluate a single pixel-based width media condition
 
 For a direct child or descendant selector with two simple parts, the TSX adapter checks intrinsic JSX ancestors up to the component boundary. To inspect a model, run `dui serve`, choose **Open source model** in the workspace picker and select the exported JSON. The viewer draws the selected component from schema v1 and lists unresolved styles.
 
+When the project selects its theme with a root data attribute, supply the same value during extraction, for example `--root-attribute data-theme=dark`. The adapter resolves simple matching root variable declarations from the bundle. Without that context, conflicting definitions stay unresolved.
+
 ## 1. Principles
 
 1. **Declared, not observed.** The model holds what the code says. It runs no handlers, calls no APIs and starts no browser. Capture results stay in the [capture context](domain-model.md#2-entities-value-objects-and-identities).

@@ -709,6 +709,35 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   assert.equal(valueOf("fontSize").kind, "unresolved"); // External class has higher specificity.
   assert.deepEqual(valueOf("lineHeight"), { kind: "length", value: 20, unit: "px" });
   assert.deepEqual(valueOf("width"), { kind: "keyword", value: "fit" });
+  writeFileSync(
+    join(builtProject, bundle),
+    `
+    :root[data-mode=night] { --ink: #aabbcc; }
+    :root { --ink: #112233; }
+    :root[data-mode=day] { --ink: #445566; }
+    .card { color: var(--ink); border: 1px solid var(--ink); }
+  `,
+  );
+  for (const [mode, ink] of [
+    ["night", "#aabbcc"],
+    ["day", "#445566"],
+    ["other", "#112233"],
+  ]) {
+    const declarations = readBuilt("--root-attribute", "data-mode=" + mode).components[0].root
+      .children[0].style;
+    for (const property of ["color", "borderColor"]) {
+      assert.deepEqual(
+        declarations.find((d: { property: string }) => d.property === property).value,
+        { kind: "color", value: ink },
+      );
+    }
+  }
+  assert.equal(
+    readBuilt().components[0].root.children[0].style.find(
+      (d: { property: string }) => d.property === "color",
+    ).value.kind,
+    "unresolved",
+  );
 } finally {
   rmSync(builtProject, { recursive: true, force: true });
 }

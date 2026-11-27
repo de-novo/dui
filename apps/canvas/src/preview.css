@@ -2888,6 +2888,7 @@ h2 {
 }
 
 .empty-workspace {
+  color: var(--foreground);
   width: fit-content;
   align-self: flex-start;
   display: flex;
