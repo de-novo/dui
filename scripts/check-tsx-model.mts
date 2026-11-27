@@ -170,10 +170,13 @@ export default function View(){return <section><p className={sheet.card}/><p sty
       ),
     );
   }
-  writeFileSync(cssPath, ".card {margin: 1rem auto -4px;}");
+  writeFileSync(
+    cssPath,
+    ".card {margin: 1rem auto -4px; padding-inline: 2px 5%; margin-inline: auto -3px;}",
+  );
   writeFileSync(
     join(project, "View.tsx"),
-    `import s from "./View.module.css"; export function View(){return <div><p className={s.card}/><p style={{margin:"1rem auto -4px"}}/></div>}`,
+    `import s from "./View.module.css"; export function View(){return <div><p className={s.card}/><p style={{margin:"1rem auto -4px",paddingInline:"2px 5%",marginInline:"auto -3px"}}/></div>}`,
   );
   const shorthand = JSON.parse(extract(project, "View.tsx"));
   assert.ok(validate(shorthand));
@@ -188,6 +191,10 @@ export default function View(){return <section><p className={sheet.card}/><p sty
         ["marginEnd", "auto"],
         ["marginBottom", -4],
         ["marginStart", "auto"],
+        ["paddingStart", 2],
+        ["paddingEnd", 5],
+        ["marginStart", "auto"],
+        ["marginEnd", -3],
       ],
     );
   }

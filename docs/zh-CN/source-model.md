@@ -151,6 +151,8 @@ flowchart LR
 
 样式表中的 `padding-inline-start: 12px` 和内联的 `paddingInlineStart: 12` 都输出 `paddingStart`，长度为 `12px`。两种书写方向均保留逻辑起点和终点。外边距也支持负长度和 `auto`。
 
+例如，`padding-inline: 2px 5%` 和 `paddingInline: "2px 5%"` 都输出值为 `2px` 的 `paddingStart` 和值为 `5%` 的 `paddingEnd`。
+
 ## 7. Token
 
 token 保留源码使用的名称（`--color-brand`、`--text-2xl`），以便之后成为设计变量。`group` 是 `color`、`spacing`、`typography`、`radius`、`size` 或 `other`。`value` 是最终值，或指向另一个 token 的 `token` 值（别名）。别名不得形成循环。`modes` 保存各模式的值，例如 `dark`。项目 token 有 `location`。框架默认值有 `package`（`tailwindcss`），没有位置。
