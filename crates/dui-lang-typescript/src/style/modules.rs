@@ -233,6 +233,7 @@ fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {
             "color" => (vec![P::Color], color(raw)),
             "background-color" => (vec![P::Background], color(raw)),
             "border-color" => (vec![P::BorderColor], color(raw)),
+            "flex-grow" => (vec![P::Grow], super::grow_factor(raw)),
             "opacity" => (
                 vec![P::Opacity],
                 raw.parse::<f64>()

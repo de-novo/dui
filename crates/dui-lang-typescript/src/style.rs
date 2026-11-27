@@ -44,6 +44,14 @@ fn line_height(raw: &str) -> Option<V> {
     length(raw).filter(|v| matches!(v,V::Length{value,..} if *value>=0.))
 }
 
+fn grow_factor(raw: &str) -> Option<V> {
+    raw.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|n| n.is_finite() && *n >= 0.)
+        .map(|value| V::Number { value })
+}
+
 // Schema v1 has a single gap. A two-axis CSS shorthand fits only when the
 // specified lengths agree; comparing resolved pixels would depend on layout.
 fn uniform_gap(raw: &str) -> Option<V> {
@@ -335,6 +343,19 @@ fn css_property_name(name: &str) -> String {
 fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
     let name = f.name(pair, "key")?;
     let raw = field(pair, "value")?;
+    if name == "flexGrow" {
+        let source = f.text(raw);
+        let value = match unwrap_expr(raw).kind() {
+            "string" => crate::literal(f, raw).and_then(|v| grow_factor(v.as_str()?)),
+            "number" | "unary_expression" => grow_factor(f.text(unwrap_expr(raw))),
+            _ => None,
+        }
+        .unwrap_or_else(|| V::Unresolved {
+            text: source.into(),
+            reason: "Expected a nonnegative flex grow factor".into(),
+        });
+        return Some((vec![P::Grow], value));
+    }
     // React spells standard CSS properties in camelCase and numeric lengths in logical pixels.
     let css_name = css_property_name(name);
     if let Some(props) = spacing(&css_name) {
