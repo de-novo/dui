@@ -156,6 +156,16 @@ flowchart TD
 | Synthetic static site, 301 pages, 602 cells | 2.3 s / 2.4 s | 312 s / 325 s |
 | dui's site, 4 pages, 8 cells | 0.23 s / 0.19 s | 11.3 s / 9.9 s |
 
+**TSX source maps ([#405](https://github.com/de-novo/dui/issues/405)).** End-to-end milliseconds, fresh / reused dui home, debug build on Apple M1 Pro. OS caches were retained. The fixture row gives medians of seven runs per condition. The other rows give one run per condition.
+
+| Project | AST (ms) | HTML (ms) | `--capture` (ms) | Screens / directed relations in AST, HTML and capture order |
+| --- | ---: | ---: | ---: | --- |
+| Runnable source-model fixture | 28.7 / 21.1 | 37.7 / 26.7 | 6312 / 434 | 2/2 · 1/0 · 2/2 |
+| dui canvas | 144 / 112 | 72 / 57 | 4219 / 2822 | 0/0 · 1/0 · 1/0 |
+| Synthetic 33-route app | 421 / 402 | 305 / 302 | 48297 / 44951 | 33/1089 · 33/1056 · 33/1056 |
+
+The fixture adds a Vite runtime and static orders. Its built HTML contains only the SPA shell. Warm capture restored four cached cells. After a TSX text edit the cache also returned stale evidence, so this measures unchanged-input retrieval. The canvas AST read 35 files and 37 components but could not resolve its conditional root. The synthetic build exposes every route through static links. Its shared navigation produces 33 self-links that only the AST graph retains. Explicit build-directory capture rendered all cells again on the warm runs (2 canvas, 66 synthetic).
+
 **Out of scope for the default path.** Running business logic, calling APIs, or reproducing exact native or web pixels. Those stay on the verification track.
 
 **Pixel verification and the render server (optional, v0.3.x).** A long-lived official-engine render server is optional pixel verification, not the default map ([decision](architecture.md#4-finalized-decisions-2026-11-20)). The default `dui map` and `dui open` do not start a browser. When used, the server is a job dispatcher for `--capture`, `dui run`, and later other surfaces. Work described in [#343](https://github.com/de-novo/dui/issues/343) and [#344](https://github.com/de-novo/dui/issues/344) belongs on this track. It can still grow out of the shared live session owner ([#333](https://github.com/de-novo/dui/issues/333)), but only behind an explicit opt-in.
