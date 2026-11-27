@@ -10,10 +10,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve, relative, join, sep, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const [root, specPath, rulesPath] = process.argv.slice(2);
+const [root, specPath, ...rulePaths] = process.argv.slice(2);
 const spec: Manifest = JSON.parse(readFileSync(specPath, "utf8"));
 const rules: Rule[] = [
-  rulesPath,
+  ...rulePaths,
   ...(spec.rulePacks ?? []).map((p) => resolve(dirname(specPath), p)),
 ].flatMap((path) => {
   const pack = JSON.parse(readFileSync(path, "utf8"));
@@ -35,6 +35,7 @@ const kinds = new Set([
   "schema",
   "search",
   "control",
+  "primitive",
 ]);
 const entries = new Set();
 for (const rule of rules) {
@@ -287,7 +288,14 @@ try {
       return node.children[0].getText().trim() || null;
     }
     function binding(node: Syntax) {
-      const decl = compiler.declaration(checker.getSymbolAtLocation(node)?.valueDeclaration);
+      let sym = checker.getSymbolAtLocation(node);
+      if (node.parent?.kind === K.ShorthandPropertyAssignment && node.parent.name === node) {
+        const shorthand = (
+          checker as { getShorthandAssignmentValueSymbol?: (node: Syntax) => typeof sym }
+        ).getShorthandAssignmentValueSymbol;
+        if (typeof shorthand === "function") sym = shorthand.call(checker, node.parent) ?? sym;
+      }
+      const decl = compiler.declaration(sym?.valueDeclaration);
       return decl && decl.getSourceFile().fileName === node.getSourceFile().fileName
         ? decl.getStart()
         : null;
@@ -337,6 +345,358 @@ try {
       let sym = checker.getSymbolAtLocation(node);
       if (sym && sym.flags & SymbolFlags.Alias) sym = checker.getAliasedSymbol(sym);
       return sym;
+    }
+    function unwrapAll(node: Syntax | undefined): Syntax | undefined {
+      while (
+        node &&
+        [
+          K.ParenthesizedExpression,
+          K.AsExpression,
+          K.SatisfiesExpression,
+          K.NonNullExpression,
+        ].includes(node.kind)
+      )
+        node = node.expression;
+      return node;
+    }
+    function objectProperty(obj: Syntax | undefined, name: string) {
+      return obj?.properties?.find(
+        (prop) =>
+          [K.PropertyAssignment, K.ShorthandPropertyAssignment, K.MethodDeclaration].includes(
+            prop.kind,
+          ) && propertyName(prop.name) === name,
+      );
+    }
+    function propertyName(node: Syntax | undefined) {
+      if (!node) return undefined;
+      return node.kind === K.StringLiteral || node.kind === K.NumericLiteral
+        ? node.text
+        : (node.text ?? node.getText());
+    }
+    function functionValue(prop: Syntax | undefined) {
+      if (!prop) return undefined;
+      if ([K.ArrowFunction, K.FunctionExpression, K.MethodDeclaration].includes(prop.kind))
+        return prop;
+      if (prop.kind !== K.PropertyAssignment) return undefined;
+      const value = unwrapAll(prop.initializer);
+      return value && [K.ArrowFunction, K.FunctionExpression].includes(value.kind)
+        ? value
+        : undefined;
+    }
+    function returnedObject(fn: Syntax | undefined) {
+      const body = fn?.body;
+      if (!body) return undefined;
+      const direct = unwrapAll(body);
+      if (direct?.kind === K.ObjectLiteralExpression) return direct;
+      if (body.kind !== K.Block) return undefined;
+      const returns = (body.statements ?? []).filter((stmt) => stmt.kind === K.ReturnStatement);
+      if (returns.length !== 1) return undefined;
+      const value = unwrapAll(returns[0].expression);
+      return value?.kind === K.ObjectLiteralExpression ? value : undefined;
+    }
+    function signatureReturnType(signature: unknown) {
+      if (!signature) return undefined;
+      const direct = (signature as { getReturnType?: () => Type }).getReturnType;
+      if (typeof direct === "function") return direct.call(signature);
+      const throughChecker = (
+        checker as { getReturnTypeOfSignature?: (signature: unknown) => Type | undefined }
+      ).getReturnTypeOfSignature;
+      return typeof throughChecker === "function"
+        ? throughChecker.call(checker, signature)
+        : undefined;
+    }
+    function objectShape(t: Type | undefined, at: Syntax, depth = 0): Shape {
+      if (!t || depth > 4) return { kind: "unknown" };
+      if (t.flags & TypeFlags.Object) {
+        const props = checker.getPropertiesOfType(t);
+        if (
+          checker.isTupleType(t) ||
+          checker.getIndexInfosOfType(t).length ||
+          !props.length ||
+          props.length > 64 ||
+          checker.getSignaturesOfType(t, SignatureKind.Call).length ||
+          checker.getSignaturesOfType(t, SignatureKind.Construct).length
+        )
+          return { kind: "unknown" };
+        const fields: { name: string; shape: Shape }[] = [];
+        for (const prop of props) {
+          const propType = checker.getTypeOfSymbolAtLocation(prop, at);
+          if (checker.getSignaturesOfType(propType, SignatureKind.Call).length) continue;
+          fields.push({
+            name: prop.name,
+            shape:
+              propType.flags & TypeFlags.Object && !checker.isArrayType(propType)
+                ? objectShape(propType, at, depth + 1)
+                : shape(propType, depth + 1),
+          });
+        }
+        fields.sort((a, b) => (a.name < b.name ? -1 : Number(a.name > b.name)));
+        return fields.length ? { kind: "object", fields } : { kind: "unknown" };
+      }
+      return shape(t, depth);
+    }
+    function firstOptionKey(node: Syntax | undefined, parameter: string): string | undefined {
+      if (!node) return undefined;
+      if (
+        node.kind === K.PropertyAccessExpression &&
+        node.expression?.kind === K.Identifier &&
+        node.expression.text === parameter
+      )
+        return node.name?.text;
+      let found: string | undefined;
+      node.forEachChild((child) => {
+        found ??= firstOptionKey(child as Syntax, parameter);
+      });
+      return found;
+    }
+    function stateControlMap(stateFn: Syntax | undefined) {
+      const parameter = stateFn?.parameters?.[0]?.name;
+      const object = returnedObject(stateFn);
+      if (!parameter || parameter.kind !== K.Identifier || !object) return {};
+      const controls: Record<string, string> = {};
+      for (const prop of object.properties ?? []) {
+        if (prop.kind !== K.PropertyAssignment) continue;
+        const stateKey = propertyName(prop.name);
+        const optionKey = stateKey && firstOptionKey(prop.initializer, parameter.text);
+        if (stateKey && optionKey) controls[stateKey] = optionKey;
+      }
+      return controls;
+    }
+    function literalAt(node: Syntax | undefined) {
+      if (!node) return undefined;
+      if (node.kind === K.TrueKeyword) return true;
+      if (node.kind === K.FalseKeyword) return false;
+      if (node.kind === K.NullKeyword) return null;
+      const value = shape(checker.getTypeAtLocation(node));
+      return value.kind === "literal" ? value.value : undefined;
+    }
+    function stateKeyAccess(node: Syntax | undefined, parameter: string) {
+      const expr = unwrapAll(node);
+      if (!expr || expr.kind !== K.PropertyAccessExpression) return undefined;
+      const receiver = expr.expression;
+      if (receiver?.kind === K.Identifier && receiver.text === parameter)
+        return expr.name?.text as string | undefined;
+      return undefined;
+    }
+    function presenceBody(fn: Syntax) {
+      const body = fn.body;
+      if (!body) return undefined;
+      if (body.kind !== K.Block) return unwrapAll(body);
+      const returns = (body.statements ?? []).filter((stmt) => stmt.kind === K.ReturnStatement);
+      return returns.length === 1 ? unwrapAll(returns[0].expression) : undefined;
+    }
+    function analyzePresence(fn: Syntax, stateKeys: Set<string>) {
+      const parameter = fn.parameters?.[0]?.name;
+      if (!parameter || parameter.kind !== K.Identifier) {
+        return {
+          status: "unresolved",
+          reason: "presence predicate does not expose a state parameter",
+        };
+      }
+      const expr = presenceBody(fn);
+      if (!expr) {
+        return {
+          status: "unresolved",
+          reason: "presence predicate body is not a single expression",
+        };
+      }
+      let key = stateKeyAccess(expr, parameter.text);
+      let operator = "truthy";
+      let value: unknown;
+      if (!key && expr.kind === K.PrefixUnaryExpression && expr.operator === K.ExclamationToken) {
+        key = stateKeyAccess(expr.operand, parameter.text);
+        operator = "falsy";
+      }
+      if (!key && expr.kind === K.BinaryExpression) {
+        const op = expr.operatorToken.kind;
+        if ([K.EqualsEqualsEqualsToken, K.ExclamationEqualsEqualsToken].includes(op)) {
+          for (const flip of [false, true]) {
+            const access = flip ? expr.right : expr.left;
+            const literalNode = flip ? expr.left : expr.right;
+            key = stateKeyAccess(access, parameter.text);
+            if (!key) continue;
+            value = literalAt(literalNode);
+            if (value === undefined) key = undefined;
+            else operator = op === K.EqualsEqualsEqualsToken ? "eq" : "neq";
+            if (key) break;
+          }
+        }
+      }
+      if (!key) {
+        return {
+          status: "unresolved",
+          reason:
+            "presence predicate is not a state key, its negation, or a strict literal equality",
+        };
+      }
+      if (stateKeys.size && !stateKeys.has(key)) {
+        return {
+          status: "unresolved",
+          reason: `presence predicate reads ${key}, which is absent from the inferred state shape`,
+        };
+      }
+      return {
+        status: "resolved",
+        predicate:
+          operator === "eq" || operator === "neq" ? { operator, key, value } : { operator, key },
+      };
+    }
+    function primitiveFact(call: Syntax, sf: SourceFile, filename: string, packageName: string) {
+      const start = call.getStart(sf);
+      const base = {
+        file: filename,
+        owner: "(module)",
+        start,
+        end: call.end,
+        line: sf.getLineAndCharacterOfPosition(start).line + 1,
+      };
+      const limitations: Record<string, unknown>[] = [];
+      const definition = unwrapAll(call.arguments[0]);
+      const nameProp = definition && objectProperty(definition, "name");
+      const nameInitial =
+        nameProp && nameProp.kind === K.PropertyAssignment
+          ? unwrapAll(nameProp.initializer)
+          : undefined;
+      const primitiveName =
+        nameInitial && nameInitial.kind === K.StringLiteral && nameInitial.text.length > 0
+          ? nameInitial.text
+          : undefined;
+      if (definition?.kind !== K.ObjectLiteralExpression) {
+        limitations.push({ reason: "definePrimitive argument is not an object literal" });
+      }
+      if (!primitiveName) {
+        limitations.push({ reason: "primitive name is not a string literal" });
+      }
+      const stateFn = functionValue(definition && objectProperty(definition, "state"));
+      let stateShape: Shape = { kind: "unknown" };
+      let controls: Record<string, string> = {};
+      if (!stateFn) {
+        limitations.push({ reason: "state is not a function literal" });
+      } else {
+        const fnType = checker.getTypeAtLocation(stateFn);
+        const signature = fnType && checker.getSignaturesOfType(fnType, SignatureKind.Call)[0];
+        stateShape = objectShape(signatureReturnType(signature), stateFn);
+        if (stateShape.kind !== "object") {
+          limitations.push({ reason: "state return type is not an object shape" });
+        }
+        controls = stateControlMap(stateFn);
+        if (!Object.keys(controls).length) {
+          limitations.push({
+            reason: "state return does not map state keys directly from options",
+          });
+        }
+      }
+      const stateKeys = new Set(
+        stateShape.kind === "object" ? stateShape.fields.map((field) => field.name) : [],
+      );
+      const slots: Record<string, unknown>[] = [];
+      const slotsFn = functionValue(definition && objectProperty(definition, "slots"));
+      const slotsObject = returnedObject(slotsFn);
+      if (!slotsObject) {
+        limitations.push({ reason: "slots does not return one object literal" });
+      } else {
+        for (const slotProp of slotsObject.properties ?? []) {
+          if (slotProp.kind !== K.PropertyAssignment) {
+            limitations.push({ reason: "a slots entry is not a direct property assignment" });
+            continue;
+          }
+          const slotName = propertyName(slotProp.name);
+          const slotCall = unwrapAll(slotProp.initializer);
+          const slotDef = unwrapAll(slotCall?.arguments?.[0]);
+          const slotStart = slotProp.getStart(sf);
+          if (
+            !slotName ||
+            slotCall?.kind !== K.CallExpression ||
+            slotDef?.kind !== K.ObjectLiteralExpression
+          ) {
+            limitations.push({
+              slot: slotName,
+              reason: "slot is not a direct slot({ ... }) call",
+              line: sf.getLineAndCharacterOfPosition(slotStart).line + 1,
+            });
+            continue;
+          }
+          const presentProp = objectProperty(slotDef, "present");
+          const presentFn = functionValue(presentProp);
+          const entry: Record<string, unknown> = {
+            name: slotName,
+            start: slotStart,
+            end: slotProp.end,
+            line: sf.getLineAndCharacterOfPosition(slotStart).line + 1,
+          };
+          if (presentProp && !presentFn) {
+            entry.present = { status: "unresolved", reason: "present is not a function literal" };
+            limitations.push({ slot: slotName, reason: "present is not a function literal" });
+          } else if (presentFn) {
+            entry.present = analyzePresence(presentFn, stateKeys);
+            if ((entry.present as { status?: string }).status !== "resolved") {
+              limitations.push({
+                slot: slotName,
+                reason: (entry.present as { reason?: string }).reason,
+                line: entry.line,
+              });
+            }
+          }
+          slots.push(entry);
+        }
+      }
+      return {
+        ...base,
+        kind: "primitive",
+        package: packageName,
+        label: primitiveName ?? "definePrimitive",
+        primitive: primitiveName,
+        state: { shape: stateShape, controls },
+        slots,
+        limitations,
+      } as Fact;
+    }
+    function primitiveReference(call: Syntax) {
+      const adapterCallee = symbol(call.expression?.name ?? call.expression);
+      const adapterPath = compiler.declarationPath(adapterCallee?.declarations?.[0]) ?? "";
+      if (
+        adapterCallee?.name !== "usePrimitive" ||
+        !adapterPath.includes("/node_modules/@ui-sdk/react/")
+      )
+        return undefined;
+      const expr = call.arguments[0];
+      if (!expr || expr.kind !== K.Identifier) return undefined;
+      const decl = compiler.declaration(symbol(expr)?.valueDeclaration);
+      if (!decl) return undefined;
+      const init = decl.initializer;
+      if (decl.kind !== K.VariableDeclaration || !init || init.kind !== K.CallExpression)
+        return undefined;
+      const callee = symbol(init.expression?.name ?? init.expression);
+      const path = compiler.declarationPath(callee?.declarations?.[0]) ?? "";
+      const primitiveRule = rules.find(
+        (rule) =>
+          rule.kind === "primitive" &&
+          callee?.name === rule.symbol &&
+          (path.includes("/node_modules/" + rule.package + "/") ||
+            path.includes("/node_modules/@types/" + rule.package + "/")),
+      );
+      if (!primitiveRule) return undefined;
+      const declSf = decl.getSourceFile();
+      const file = relative(root, declSf.fileName).split(sep).join("/");
+      if (file.startsWith("..")) return undefined;
+      return `${file}#${init.getStart(declSf)}:${init.end}:primitive`;
+    }
+    function primitiveOptions(obj: Syntax | undefined) {
+      const object = unwrapAll(obj);
+      if (!object || object.kind !== K.ObjectLiteralExpression) return {};
+      const options: Record<string, { binding: number }> = {};
+      for (const prop of object.properties ?? []) {
+        const name = propertyName(prop.name);
+        const value =
+          prop.kind === K.PropertyAssignment
+            ? unwrapAll(prop.initializer)
+            : prop.kind === K.ShorthandPropertyAssignment
+              ? prop.name
+              : undefined;
+        const at = value && value.kind === K.Identifier ? binding(value) : null;
+        if (name && at !== null && at !== undefined) options[name] = { binding: at };
+      }
+      return options;
     }
     // Bind the JSON decoder to the fetch that produced its Response.
     function unwrap(node: Syntax | undefined): Syntax | undefined {
@@ -612,7 +972,19 @@ try {
               (path.includes("/node_modules/" + r.package + "/") ||
                 path.includes("/node_modules/@types/" + r.package + "/")),
           );
-          if (
+          const primitiveTarget = primitiveReference(n);
+          if (primitiveTarget) {
+            facts.push({
+              ...base,
+              kind: "primitiveInstance",
+              label: n.arguments[0].getText(),
+              primitive: primitiveTarget,
+              options: primitiveOptions(n.arguments[1]),
+            });
+          }
+          if (rule?.kind === "primitive") {
+            facts.push(primitiveFact(n, sf, filename, rule.package));
+          } else if (
             rule?.kind === "slot" &&
             n.parent.kind === K.VariableDeclaration &&
             n.parent.name.elements?.[0]?.name
@@ -929,6 +1301,107 @@ try {
     allFacts.push(...facts);
     allDiagnostics.push(...diagnostics);
   }
+  function factKey(fact: Fact) {
+    return `${fact.file}#${fact.start}:${fact.end}:${fact.kind}`;
+  }
+  function addLimitation(primitive: Fact, reason: string, option?: string) {
+    const list = (primitive.limitations ??= []) as Record<string, unknown>[];
+    const entry = option ? { option, reason } : { reason };
+    if (!list.some((item) => item.option === option && item.reason === reason)) list.push(entry);
+  }
+  for (const instance of allFacts.filter((fact) => fact.kind === "primitiveInstance")) {
+    const primitive = allFacts.find(
+      (fact) => fact.kind === "primitive" && factKey(fact) === instance.primitive,
+    );
+    if (!primitive) continue;
+    const state = primitive.state as { controls?: Record<string, string>; shape?: Shape };
+    const controls = state.controls ?? {};
+    const stateForOption = Object.fromEntries(
+      Object.entries(controls).map(([stateKey, option]) => [option, stateKey]),
+    );
+    const slots = (primitive.slots ?? []) as Record<string, unknown>[];
+    for (const [option, target] of Object.entries(instance.options ?? {})) {
+      const stateKey = stateForOption[option];
+      if (!stateKey) continue;
+      const binding = (target as { binding?: number }).binding;
+      const candidates = allFacts.filter(
+        (fact) => fact.kind === "slot" && fact.file === instance.file && fact.binding === binding,
+      );
+      if (candidates.length !== 1) {
+        addLimitation(
+          primitive,
+          candidates.length
+            ? "controlled option binding is ambiguous"
+            : "controlled option is not a compiler-resolved state slot",
+          option,
+        );
+        continue;
+      }
+      const presence = slots
+        .filter((slot) => {
+          const present = slot.present as
+            | { status?: string; predicate?: { key?: string } }
+            | undefined;
+          return present?.status === "resolved" && present.predicate?.key === stateKey;
+        })
+        .map((slot) => ({
+          slot: slot.name,
+          line: slot.line,
+          predicate: (slot.present as { predicate: unknown }).predicate,
+        }));
+      if (!presence.length) continue;
+      const slotFact = candidates[0] as Fact & { primitive?: unknown };
+      if (slotFact.primitive) {
+        addLimitation(
+          primitive,
+          "controlled state slot is shared by more than one primitive",
+          option,
+        );
+        continue;
+      }
+      slotFact.primitive = {
+        fact: factKey(primitive),
+        name: primitive.primitive,
+        state: stateKey,
+        stateShape:
+          state.shape?.kind === "object"
+            ? state.shape.fields.find((field) => field.name === stateKey)?.shape
+            : undefined,
+        presence,
+      };
+    }
+  }
+  for (const primitive of allFacts.filter((fact) => fact.kind === "primitive")) {
+    const slots = (primitive.slots ?? []) as Record<string, unknown>[];
+    const keys = new Set(
+      slots.flatMap((slot) => {
+        const present = slot.present as
+          | { status?: string; predicate?: { key?: string } }
+          | undefined;
+        return present?.status === "resolved" && present.predicate?.key
+          ? [present.predicate.key]
+          : [];
+      }),
+    );
+    for (const stateKey of [...keys].sort()) {
+      const linked = allFacts.some(
+        (fact) =>
+          fact.kind === "slot" &&
+          (fact.primitive as { fact?: string; state?: string } | undefined)?.fact ===
+            factKey(primitive) &&
+          (fact.primitive as { state?: string } | undefined)?.state === stateKey,
+      );
+      if (!linked) {
+        addLimitation(
+          primitive,
+          `no compiler-resolved usePrimitive instance links controlled state key ${stateKey} to a React state slot`,
+        );
+      }
+    }
+  }
+  const factsWithoutInstances = allFacts.filter((fact) => fact.kind !== "primitiveInstance");
+  allFacts.length = 0;
+  allFacts.push(...factsWithoutInstances);
   const unique = new Map(
     allFacts.map((f) => [
       JSON.stringify([f.file, f.start, f.end, f.kind, f.kind === "searchParam" ? f.label : ""]),

@@ -1,0 +1,12 @@
+schema_version = 1
+
+[[stack]]
+id = "ui-sdk-primitives"
+status = "experimental"
+language = "typescript"
+adapter = "typescript"
+packages = ["@ui-sdk/core", "@ui-sdk/react"]
+baseline = "0.1.0-beta.13"
+rule_pack = "rules/ui-sdk.json"
+fixture = "fixtures/ui-sdk-primitives"
+check = "check:ui-sdk-primitives"

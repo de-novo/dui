@@ -12,6 +12,8 @@ export type Syntax = Node & {
   type: Syntax;
   condition: Syntax;
   operatorToken: Syntax;
+  operator: number;
+  operand: Syntax;
   left: Syntax;
   right: Syntax;
   thenStatement: Syntax;
@@ -24,6 +26,10 @@ export type Syntax = Node & {
   arguments: Syntax[];
   elements: Syntax[];
   children: Syntax[];
+  properties?: Syntax[];
+  parameters?: Syntax[];
+  body?: Syntax;
+  statements?: Syntax[];
 };
 export type { Type };
 export interface Scope {

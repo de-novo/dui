@@ -18,11 +18,13 @@ impl TypeOracle for TypeScript {
         let temp = tempfile::tempdir().map_err(|e| failure(3, &e.to_string()))?;
         let script = temp.path().join("facts.mjs");
         let rules = temp.path().join("rules.json");
+        let ui_sdk_rules = temp.path().join("rules-ui-sdk.json");
         fs::write(
             &script,
             include_str!(concat!(env!("OUT_DIR"), "/typescript/facts.mjs")),
         )
         .and_then(|_| fs::write(&rules, include_str!("../../../rules/web.json")))
+        .and_then(|_| fs::write(&ui_sdk_rules, include_str!("../../../rules/ui-sdk.json")))
         .map_err(|e| failure(3, &e.to_string()))?;
         let version = Command::new("node")
             .arg("--version")
@@ -44,6 +46,7 @@ impl TypeOracle for TypeScript {
             )
             .arg(spec)
             .arg(rules)
+            .arg(ui_sdk_rules)
             .output()
             .map_err(|e| failure(3, &e.to_string()))?;
         if output.status.code() == Some(4) {

@@ -24,6 +24,7 @@
     "check:design-audit": "tsc --project scripts && cargo build --locked && node scripts/check-design-audit.mts",
     "check:query-params": "tsc --project scripts && cargo build --locked && node scripts/check-query-params.mts",
     "check:p2-rules": "tsc --project scripts && cargo build --locked && node scripts/check-p2-rules.mts",
+    "check:ui-sdk-primitives": "tsc --project scripts && cargo build --locked && node scripts/check-ui-sdk-primitives.mts",
     "check:real-api": "tsc --project scripts && cargo build --locked && node scripts/check-real-api.mts",
     "check:branch-diff": "tsc --project scripts && cargo build --locked && node scripts/check-branch-diff.mts",
     "check:universal-web": "tsc --project scripts && cargo build --locked && node scripts/check-universal-web.mts",
