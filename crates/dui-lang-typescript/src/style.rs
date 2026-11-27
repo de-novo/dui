@@ -44,6 +44,32 @@ fn line_height(raw: &str) -> Option<V> {
     length(raw).filter(|v| matches!(v,V::Length{value,..} if *value>=0.))
 }
 
+fn size_property(name: &str) -> Option<P> {
+    Some(match name {
+        "width" => P::Width,
+        "height" => P::Height,
+        "min-width" => P::MinWidth,
+        "max-width" => P::MaxWidth,
+        "min-height" => P::MinHeight,
+        "max-height" => P::MaxHeight,
+        _ => return None,
+    })
+}
+fn size_value(property: P, raw: &str) -> Option<V> {
+    let raw = raw.trim();
+    if raw.eq_ignore_ascii_case("auto") && !matches!(property, P::MaxWidth | P::MaxHeight) {
+        return Some(V::Keyword {
+            value: "auto".into(),
+        });
+    }
+    if raw.parse::<f64>().ok() == Some(0.) {
+        return Some(V::Length {
+            value: 0.,
+            unit: m::LengthUnit::Px,
+        });
+    }
+    length(raw).filter(|v| matches!(v,V::Length{value,..} if *value >= 0.))
+}
 fn grow_factor(raw: &str) -> Option<V> {
     raw.trim()
         .parse::<f64>()
@@ -407,6 +433,25 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
         return Some((props.to_vec(), value));
     }
     let literal = crate::literal(f, raw);
+    if let Some(property) = size_property(&css_name) {
+        let value = literal
+            .as_ref()
+            .and_then(|v| {
+                if let Some(n) = v.as_f64().filter(|n| *n >= 0.) {
+                    Some(V::Length {
+                        value: n,
+                        unit: m::LengthUnit::Px,
+                    })
+                } else {
+                    size_value(property, v.as_str()?)
+                }
+            })
+            .unwrap_or_else(|| V::Unresolved {
+                text: f.text(raw).into(),
+                reason: "Unsupported size value".into(),
+            });
+        return Some((vec![property], value));
+    }
     if let Some(mapped) = flex_keyword(
         &css_name,
         literal.as_ref().and_then(|v| v.as_str()),
@@ -440,8 +485,6 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
             };
             return Some((vec![P::Gap], value));
         }
-        "width" => vec![P::Width],
-        "height" => vec![P::Height],
         "borderRadius" => vec![P::BorderRadius],
         "fontSize" => vec![P::FontSize],
         "color" | "backgroundColor" => {

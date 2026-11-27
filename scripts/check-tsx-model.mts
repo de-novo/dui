@@ -102,6 +102,39 @@ export function Shadow({sheet}: {sheet: {card: string}}){return <p className={sh
 export default function View(){return <p style={{color:"#ffffff"}} className={sheet.card}/>;}`,
   );
   const cssPath = join(project, "View.module.css");
+  writeFileSync(
+    cssPath,
+    ".box {width: auto; height: 0; min-width: 24px; max-width: 75%; min-height: 1em; max-height: 12rem;}",
+  );
+  writeFileSync(
+    join(project, "Sizes.tsx"),
+    `import sheet from "./View.module.css"; export function Sizes(){return <main><p className={sheet.box}/><p style={{width:"auto",height:0,minWidth:24,maxWidth:"75%",minHeight:"1em",maxHeight:"12rem"}}/></main>}`,
+  );
+  const sizes = JSON.parse(extract(project, "Sizes.tsx"));
+  assert.ok(validate(sizes));
+  for (const [index, child] of sizes.components[0].root.children.entries()) {
+    const expected = [
+      ["width", { kind: "keyword", value: "auto" }],
+      ["height", { kind: "length", value: 0, unit: "px" }],
+      ["minWidth", { kind: "length", value: 24, unit: "px" }],
+      ["maxWidth", { kind: "length", value: 75, unit: "percent" }],
+      ["minHeight", { kind: "length", value: 1, unit: "em" }],
+      ["maxHeight", { kind: "length", value: 12, unit: "rem" }],
+    ];
+    assert.deepEqual(
+      child.style.map((d: { property: string; value: unknown }) => [d.property, d.value]),
+      expected,
+    );
+    for (const d of child.style) {
+      const loc = d.from.location;
+      assert.equal(loc.file, index === 0 ? "View.module.css" : "Sizes.tsx");
+      assert.equal(
+        readFileSync(join(project, loc.file)).subarray(loc.start, loc.end).toString(),
+        d.from.text,
+      );
+    }
+  }
+
   for (const [css, tsx, expected] of [
     ["0", "0", 0],
     ["2.5", "2.5", 2.5],
