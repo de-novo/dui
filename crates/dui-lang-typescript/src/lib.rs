@@ -2,14 +2,15 @@
 mod class_view;
 mod hash_routes;
 mod render;
+mod routes;
 mod style;
 mod syntax;
-pub use syntax::{LoadStats, ParseCache};
 use dui_core::source_model as m;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, path::Path};
 use syntax::{File, children, field, first, unwrap_expr};
+pub use syntax::{LoadStats, ParseCache};
 use tree_sitter::Node as Ast;
 
 type Files = BTreeMap<String, File>;
@@ -417,6 +418,7 @@ fn extract_in_context_impl(
             });
         }
     }
+    routes::discover(&files, &mut model);
     if model.screens.is_empty() {
         let candidates: Vec<_> = model
             .components

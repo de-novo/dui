@@ -84,6 +84,9 @@ pub(crate) fn project_model(model: &SourceModel) -> SourceProjection {
     }
     let mut limitations = vec![
         "Only navigation declared in supported TSX syntax is mapped. Runtime-only navigation is unknown.",
+        "React Router object routes support statically resolvable paths, nested children, element components and literal lazy imports; wildcard routes are not named screens.",
+        "Imperative navigation is mapped only when a useNavigate call is reachable from an onClick handler. Forwarded callbacks, effects and runtime-only navigation are not resolved.",
+        "Nested routes that resolve to the same path use the deepest leaf screen; parent layout composition is not represented.",
     ];
     if nodes.is_empty() {
         limitations.push(
