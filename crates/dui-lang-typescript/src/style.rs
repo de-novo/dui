@@ -36,6 +36,14 @@ fn length(s: &str) -> Option<V> {
     }
     None
 }
+fn line_height(raw: &str) -> Option<V> {
+    let raw = raw.trim();
+    if let Ok(value) = raw.parse::<f64>() {
+        return (value.is_finite() && value >= 0.).then_some(V::Number { value });
+    }
+    length(raw).filter(|v| matches!(v,V::Length{value,..} if *value>=0.))
+}
+
 // Schema v1 has a single gap. A two-axis CSS shorthand fits only when the
 // specified lengths agree; comparing resolved pixels would depend on layout.
 fn uniform_gap(raw: &str) -> Option<V> {
@@ -345,6 +353,20 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
             _ => return None,
         };
         return Some((props.to_vec(), value));
+    }
+    if name == "lineHeight" {
+        let literal = crate::literal(f, raw);
+        let value = line_height(
+            literal
+                .as_ref()
+                .and_then(|v| v.as_str())
+                .unwrap_or(f.text(raw)),
+        )
+        .unwrap_or_else(|| V::Unresolved {
+            text: f.text(raw).into(),
+            reason: "Unsupported line height".into(),
+        });
+        return Some((vec![P::LineHeight], value));
     }
     let val = crate::literal(f, raw)?;
     let props = match name {

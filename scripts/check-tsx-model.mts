@@ -214,6 +214,38 @@ export default function View(){return <section><p className={sheet.card}/><p sty
       ],
     );
   }
+  for (const [raw, inline, expected] of [
+    ["1.5", "1.5", { kind: "number", value: 1.5 }],
+    ["24px", '"24px"', { kind: "length", value: 24, unit: "px" }],
+    ["120%", '"120%"', { kind: "length", value: 120, unit: "percent" }],
+    ["0", "0", { kind: "number", value: 0 }],
+    ["normal", '"normal"', null],
+    ["-1", "-1", null],
+    ["var(--leading)", "props.leading", null],
+  ] as const) {
+    writeFileSync(cssPath, `.sample {line-height: ${raw};}`);
+    writeFileSync(
+      join(project, "Leading.tsx"),
+      `import s from "./View.module.css"; export function Leading(props){return <div><p className={s.sample}/><p style={{lineHeight:${inline}}}/></div>}`,
+    );
+    const leading = JSON.parse(extract(project, "Leading.tsx"));
+    assert.ok(validate(leading));
+    for (const [index, child] of leading.components[0].root.children.entries()) {
+      const [decl] = child.style;
+      assert.equal(decl.property, "lineHeight");
+      if (expected) assert.deepEqual(decl.value, expected);
+      else {
+        assert.equal(decl.value.kind, "unresolved");
+        assert.equal(decl.value.text, index === 0 ? raw : inline);
+      }
+      const loc = decl.from.location;
+      assert.equal(loc.file, index === 0 ? "View.module.css" : "Leading.tsx");
+      assert.equal(
+        readFileSync(join(project, loc.file)).subarray(loc.start, loc.end).toString(),
+        decl.from.text,
+      );
+    }
+  }
 } finally {
   rmSync(project, { recursive: true, force: true });
 }
