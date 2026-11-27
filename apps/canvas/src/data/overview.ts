@@ -182,6 +182,8 @@ export type EdgeAction = {
 export type ScreenLink = {
   source: string;
   target: string;
+  /** Stable source-model edge id used by hot-update patches. */
+  modelEdge?: string;
   observedWidths?: number[];
   confirmedWidths?: number[];
   failedWidths?: Record<string, string>;
@@ -482,6 +484,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
     const link: ScreenLink = {
       source: edge.source,
       target: edge.target,
+      ...(typeof edge.modelEdge === "string" ? { modelEdge: edge.modelEdge } : {}),
       observedWidths: widths,
       origin: typeof edge.origin === "string" ? edge.origin : undefined,
       provenance,

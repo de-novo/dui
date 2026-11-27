@@ -2,6 +2,7 @@
 mod render;
 mod style;
 mod syntax;
+pub use syntax::{LoadStats, ParseCache};
 use dui_core::source_model as m;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -257,6 +258,30 @@ pub fn extract_in_context(
     width: Option<u32>,
     root_attribute: Option<(&str, &str)>,
 ) -> Result<m::SourceModel, String> {
+    let mut cache = ParseCache::default();
+    extract_in_context_impl(project, entry, built_css, width, root_attribute, &mut cache)
+        .map(|(model, _)| model)
+}
+
+/// Extract with a caller-owned parse cache. Unchanged files reuse their trees; changed files are
+/// the only files parsed again. Import declarations are re-read against the filesystem without
+/// re-parsing so added and deleted imports stay correct.
+pub fn extract_incremental(
+    project: &Path,
+    entry: &Path,
+    cache: &mut ParseCache,
+) -> Result<(m::SourceModel, LoadStats), String> {
+    extract_in_context_impl(project, entry, None, None, None, cache)
+}
+
+fn extract_in_context_impl(
+    project: &Path,
+    entry: &Path,
+    built_css: Option<&Path>,
+    width: Option<u32>,
+    root_attribute: Option<(&str, &str)>,
+    cache: &mut ParseCache,
+) -> Result<(m::SourceModel, LoadStats), String> {
     if let Some((name, value)) = root_attribute
         && (built_css.is_none()
             || !name.starts_with("data-")
@@ -276,11 +301,14 @@ pub fn extract_in_context(
         return Err("viewport width requires built CSS and a positive width in CSS pixels".into());
     }
     let mut diagnostics = Vec::new();
-    let syntax::Sources {
-        entry,
-        artifact,
-        files,
-    } = syntax::load(project, entry, built_css, &mut diagnostics)?;
+    let (
+        syntax::Sources {
+            entry,
+            artifact,
+            files,
+        },
+        stats,
+    ) = syntax::load_cached(project, entry, built_css, &mut diagnostics, cache)?;
     let built = artifact
         .as_ref()
         .map(|p| style::built::Sheet::new(&files[p], width, root_attribute))
@@ -422,5 +450,5 @@ pub fn extract_in_context(
     model.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
     model.tokens.sort_by(|a, b| a.id.cmp(&b.id));
     m::validate(&model).map_err(|errs| format!("invalid source model: {errs:?}"))?;
-    Ok(model)
+    Ok((model, stats))
 }

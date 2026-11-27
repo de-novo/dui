@@ -12,7 +12,7 @@ import { routeName } from "./CaptureCard";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
 import { liveCell, useLiveFrame } from "./liveFrames";
-import { useState } from "react";
+import { memo, useState } from "react";
 
 /** A deck card without a capture, rendered from source when asked: rendering holds a browser. */
 function LiveDeckFrame({
@@ -52,31 +52,38 @@ function LiveDeckFrame({
   );
 }
 
-function MobileApproximateCard({
-  renderer,
-  model,
-  screen,
-}: {
-  renderer?: SourceModelRenderer;
-  model?: Model;
-  screen: Screen;
-}) {
-  const { t } = useI18n();
-  const render = useApproximateModelRender(renderer, model, screen.component, 375);
-  if (!render) return null;
-  return (
-    <>
-      <div className="mobile-deck-frame mobile-deck-frame-model" data-showing="model">
-        <ApproximateModelFrame render={render} label={t.approximateModel} showUnresolved={false} />
-      </div>
-      {render.unresolved.length > 0 && (
-        <div className="mobile-model-unresolved" title={render.unresolved.join("\n")}>
-          {t.unresolvedModelParts(render.unresolved.length)}
+const MobileApproximateCard = memo(
+  function MobileApproximateCard({
+    renderer,
+    model,
+    screen,
+  }: {
+    renderer?: SourceModelRenderer;
+    model?: Model;
+    screen: Screen;
+  }) {
+    const { t } = useI18n();
+    const render = useApproximateModelRender(renderer, model, screen.component, 375);
+    if (!render) return null;
+    return (
+      <>
+        <div className="mobile-deck-frame mobile-deck-frame-model" data-showing="model">
+          <ApproximateModelFrame
+            render={render}
+            label={t.approximateModel}
+            showUnresolved={false}
+          />
         </div>
-      )}
-    </>
-  );
-}
+        {render.unresolved.length > 0 && (
+          <div className="mobile-model-unresolved" title={render.unresolved.join("\n")}>
+            {t.unresolvedModelParts(render.unresolved.length)}
+          </div>
+        )}
+      </>
+    );
+  },
+  (before, after) => before.renderer === after.renderer && before.screen === after.screen,
+);
 
 export type MobileViewMode = "deck" | "map";
 
