@@ -726,12 +726,7 @@ impl Session {
                         "edits": self.edits,
                         "environment": self.environment,
                     },
-                    "coverage": {
-                        "verified": u8::from(reason.is_none()),
-                        "renderable": 1,
-                        "attempted": 1,
-                        "unrenderable": 0,
-                    },
+                    "coverage": crate::coverage::base(std::slice::from_ref(&cell)),
                     "cells": [cell],
                 });
                 let published = crate::archive::publish(self.provenance["live"].clone(), |dir| {
@@ -837,7 +832,7 @@ impl Session {
                     "status":if reason.is_some(){"unverified"}else{"verified"},"reason":reason,"image":filename,"imageSha256":digest,"observation":observation,
                     "assertion":assertion});
                 let report = json!({"path":self.path,"live":{"sourceRun":self.source_run,"sourceCell":self.cell,"revision":self.revision,"edits":self.edits,"environment":self.environment},
-                    "coverage":{"verified":u8::from(reason.is_none()),"renderable":1,"attempted":1,"unrenderable":0},"cells":[cell]});
+                    "coverage":crate::coverage::base(std::slice::from_ref(&cell)),"cells":[cell]});
                 let published = crate::archive::publish(self.provenance["live"].clone(), |dir| {
                     fs::create_dir(dir).map_err(io)?;
                     fs::write(dir.join(&filename), &bytes).map_err(io)?;

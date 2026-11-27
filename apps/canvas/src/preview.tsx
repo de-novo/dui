@@ -161,7 +161,7 @@ function MapView({
   }, []);
   const [audit, setAudit] = useState<AuditReport | null>(null);
   const openCommentCount = audit?.summary.openComments ?? 0;
-  const showAuditPill = openCommentCount > 0;
+  const showAuditPill = audit !== null;
   const [compareBeforeKey, setCompareBeforeKey] = useState<string>(() => {
     const fromUrl = new URLSearchParams(location.search).get("compare");
     return fromUrl ?? "";
@@ -500,11 +500,31 @@ function MapView({
               </section>
             )}
 
-            {showAuditPill && (
-              <output className="audit-summary-pill glass-panel">
-                <span className="audit-open-comments">
-                  {t.auditOpenCommentsLabel(openCommentCount)}
+            {showAuditPill && audit && (
+              <output
+                className="audit-summary-pill glass-panel"
+                data-audit-meets-goal={String(audit.meetsGoal)}
+              >
+                <strong>
+                  {t.auditCoverageLabel(
+                    audit.summary.verifiedPercent,
+                    audit.goalPercent,
+                    audit.summary.capturedRenderableCells,
+                  )}
+                </strong>
+                <span>
+                  {t.auditCapturedCellsLabel(
+                    audit.summary.verifiedCells,
+                    audit.summary.capturedRenderableCells,
+                    audit.summary.capturedCells,
+                    audit.summary.plannedCells,
+                  )}
                 </span>
+                {openCommentCount > 0 && (
+                  <span className="audit-open-comments">
+                    {t.auditOpenCommentsLabel(openCommentCount)}
+                  </span>
+                )}
               </output>
             )}
 

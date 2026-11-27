@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SourceCardBody } from "../../components/NativeSourceEvidence";
 import { Button } from "../../components/ui/button";
 import { MapCardGuides } from "./MapCardGuides";
-import type { Cell, Screen } from "../../data/overview";
+import { isNotCaptured, type Cell, type Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
@@ -23,6 +23,15 @@ export function routeName(path: string) {
     return slug.replace(/-/g, " ") || "Overlay";
   }
   return path.split("?")[0].split("/").filter(Boolean).slice(-2).join("/") || path;
+}
+
+export function captureBadgeCounts(cells: Cell[]) {
+  return {
+    notCaptured: cells.filter(isNotCaptured).length,
+    unverifiedAfterCapture: cells.filter((c) => c.status === "unverified" && !isNotCaptured(c))
+      .length,
+    unavailable: cells.filter((c) => c.status === "unrenderable").length,
+  };
 }
 
 export function CaptureCard({
@@ -86,8 +95,7 @@ export function CaptureCard({
   );
   const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
-  const missing = screen.cells.filter((c) => c.status === "unverified").length;
-  const unavailable = screen.cells.filter((c) => c.status === "unrenderable").length;
+  const { notCaptured, unverifiedAfterCapture, unavailable } = captureBadgeCounts(screen.cells);
   const large = Boolean(cardWidth && cardWidth >= 800);
   const thumbnail = small && !screenDiff ? cell?.thumbnail : undefined;
   const fallbackSrc = thumbnail
@@ -332,9 +340,14 @@ export function CaptureCard({
             {t.comments} {openComments}
           </small>
         )}
-        {missing > 0 && (
-          <small title={missing + " unverified cells"}>
-            {t.unverified} {missing}
+        {notCaptured > 0 && (
+          <small title={notCaptured + " planned cells never captured"}>
+            {t.notCaptured} {notCaptured}
+          </small>
+        )}
+        {unverifiedAfterCapture > 0 && (
+          <small title={unverifiedAfterCapture + " captured cells without passing verification"}>
+            {t.unverifiedAfterCapture} {unverifiedAfterCapture}
           </small>
         )}
         {unavailable > 0 && (

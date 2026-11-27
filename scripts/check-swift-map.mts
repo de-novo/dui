@@ -31,7 +31,15 @@ try {
       timeout: 30 * 60 * 1000,
     }),
   );
-  assert.deepEqual(run.coverage, { attempted: 0, renderable: 0, unrenderable: 0, verified: 0 });
+  assert.deepEqual(run.coverage, {
+    planned: 0,
+    captured: 0,
+    verified: 0,
+    capturedRenderable: 0,
+    attempted: 0,
+    renderable: 0,
+    unrenderable: 0,
+  });
   const graph = JSON.parse(readFileSync(join(run.output, "graph.json"), "utf8"));
   const screens = (graph.nodes as Node[])
     .map(({ label, nativeSource: n }) =>

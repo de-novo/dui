@@ -14,6 +14,10 @@ type AuditReport = {
   meetsGoal: boolean;
   summary: {
     totalCells: number;
+    plannedCells: number;
+    capturedCells: number;
+    capturedRenderableCells: number;
+    notCapturedCells: number;
     verifiedCells: number;
     renderableCells: number;
     unverifiedCells: number;
@@ -135,6 +139,10 @@ try {
 
   assert.equal(mcpAudit.goalPercent, 99);
   assert(mcpAudit.summary.totalCells >= 2, "audited cells present");
+  assert.equal(mcpAudit.summary.plannedCells, mcpAudit.summary.totalCells);
+  assert.equal(mcpAudit.summary.capturedCells, mcpAudit.summary.totalCells);
+  assert.equal(mcpAudit.summary.capturedRenderableCells, mcpAudit.summary.renderableCells);
+  assert.equal(mcpAudit.summary.notCapturedCells, 0);
   assert.equal(mcpAudit.summary.openComments, 1);
   assert.equal(mcpAudit.summary.resolvedComments, 1);
   assert.equal(mcpAudit.screens[0]?.openComments, 1);
@@ -186,8 +194,10 @@ try {
     );
     assert.equal(chrome.status, 0, chrome.stderr);
     assert(
-      chrome.stdout.includes("audit-summary-pill") && chrome.stdout.includes("1 unresolved"),
-      "viewer renders coverage audit pill and unresolved comment count",
+      chrome.stdout.includes("audit-summary-pill") &&
+        chrome.stdout.includes("captured renderable") &&
+        chrome.stdout.includes("1 unresolved"),
+      "viewer renders captured-renderable coverage pill and unresolved comment count",
     );
   } finally {
     viewer.kill("SIGTERM");

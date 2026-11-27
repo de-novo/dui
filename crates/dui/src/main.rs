@@ -3,6 +3,7 @@ mod android;
 mod archive;
 use archive::Capture;
 mod chromium;
+mod coverage;
 mod design_audit;
 mod electron;
 mod gpui;

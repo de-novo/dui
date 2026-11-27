@@ -1,4 +1,4 @@
-import type { Cell } from "../../data/overview";
+import { isNotCaptured, type Cell } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 
 export function CaptureStatus({ cell }: { cell?: Cell }) {
@@ -11,10 +11,16 @@ export function CaptureStatus({ cell }: { cell?: Cell }) {
         : t.verified
       : cell.status === "unrenderable"
         ? t.unrenderable
-        : t.unverified;
+        : isNotCaptured(cell)
+          ? t.notCaptured
+          : t.unverifiedAfterCapture;
   return (
     <>
-      <span className="capture-status" data-status={cell.status}>
+      <span
+        className="capture-status"
+        data-status={cell.status}
+        data-capture-state={isNotCaptured(cell) ? "not-captured" : "captured"}
+      >
         {label}
       </span>
       {cell.reason && <span className="capture-reason">{cell.reason}</span>}

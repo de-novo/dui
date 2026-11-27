@@ -69,6 +69,10 @@ pub struct AuditGap {
 #[serde(rename_all = "camelCase")]
 pub struct AuditSummary {
     pub total_cells: usize,
+    pub planned_cells: usize,
+    pub captured_cells: usize,
+    pub captured_renderable_cells: usize,
+    pub not_captured_cells: usize,
     pub verified_cells: usize,
     pub renderable_cells: usize,
     pub unverified_cells: usize,
@@ -88,6 +92,9 @@ pub struct AuditSummary {
 pub struct ScreenAudit {
     pub path: String,
     pub total_cells: usize,
+    pub captured_cells: usize,
+    pub captured_renderable_cells: usize,
+    pub not_captured_cells: usize,
     pub verified_cells: usize,
     pub renderable_cells: usize,
     pub unverified_cells: usize,
@@ -106,6 +113,7 @@ pub struct AuditReport {
     pub summary: AuditSummary,
     pub runtime_only_branches: Vec<String>,
     pub gaps: Vec<AuditGap>,
+    pub not_captured: Vec<AuditGap>,
     pub screens: Vec<ScreenAudit>,
 }
 
@@ -120,10 +128,14 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
     let goal = input.goal_percent.clamp(0.0, 100.0);
 
     let mut total_cells = 0usize;
+    let mut captured_cells = 0usize;
+    let mut captured_renderable_cells = 0usize;
+    let mut not_captured_cells = 0usize;
     let mut verified_cells = 0usize;
     let mut unverified_cells = 0usize;
     let mut unrenderable_cells = 0usize;
     let mut gaps = Vec::new();
+    let mut not_captured = Vec::new();
     let mut by_screen: BTreeMap<String, ScreenAudit> = BTreeMap::new();
 
     let mut sorted_cells = input.cells.clone();
@@ -142,6 +154,9 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
             .or_insert_with(|| ScreenAudit {
                 path: cell.path.clone(),
                 total_cells: 0,
+                captured_cells: 0,
+                captured_renderable_cells: 0,
+                not_captured_cells: 0,
                 verified_cells: 0,
                 renderable_cells: 0,
                 unverified_cells: 0,
@@ -156,7 +171,11 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
         match cell.status.as_str() {
             "verified" => {
                 verified_cells += 1;
+                captured_cells += 1;
+                captured_renderable_cells += 1;
                 screen.verified_cells += 1;
+                screen.captured_cells += 1;
+                screen.captured_renderable_cells += 1;
                 screen.renderable_cells += 1;
             }
             "unrenderable" => {
@@ -177,22 +196,37 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
                 gaps.push(gap);
             }
             _ => {
-                unverified_cells += 1;
-                screen.unverified_cells += 1;
-                screen.renderable_cells += 1;
+                let reason = cell
+                    .reason
+                    .filter(|s| !s.trim().is_empty())
+                    .unwrap_or_else(|| "missing-verification-evidence".into());
                 let gap = AuditGap {
                     path: cell.path,
                     state: cell.state,
                     width: cell.width,
-                    status: "unverified".into(),
-                    reason: cell
-                        .reason
-                        .filter(|s| !s.trim().is_empty())
-                        .unwrap_or_else(|| "missing-verification-evidence".into()),
+                    status: if crate::model::capture::is_uncaptured_reason(&reason) {
+                        "not-captured".into()
+                    } else {
+                        "unverified".into()
+                    },
+                    reason,
                     locale: cell.locale,
                 };
-                screen.gaps.push(gap.clone());
-                gaps.push(gap);
+                screen.renderable_cells += 1;
+                if gap.status == "not-captured" {
+                    not_captured_cells += 1;
+                    screen.not_captured_cells += 1;
+                    not_captured.push(gap);
+                } else {
+                    unverified_cells += 1;
+                    captured_cells += 1;
+                    captured_renderable_cells += 1;
+                    screen.unverified_cells += 1;
+                    screen.captured_cells += 1;
+                    screen.captured_renderable_cells += 1;
+                    screen.gaps.push(gap.clone());
+                    gaps.push(gap);
+                }
             }
         }
     }
@@ -216,7 +250,7 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
     }
 
     let renderable_cells = total_cells.saturating_sub(unrenderable_cells);
-    let verified_percent = pct(verified_cells as u64, total_cells as u64);
+    let verified_percent = pct(verified_cells as u64, captured_renderable_cells as u64);
     let renderable_percent = pct(renderable_cells as u64, total_cells as u64);
     let observed_branches = input.observed_branch_outcomes.min(input.branch_outcomes);
     let missing_branch_outcomes = input.branch_outcomes.saturating_sub(observed_branches);
@@ -226,14 +260,14 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
         pct(observed_branches, input.branch_outcomes)
     };
 
-    let meets_goal = total_cells > 0
+    let meets_goal = captured_renderable_cells > 0
         && unrenderable_cells == 0
         && verified_percent >= goal
         && (input.branch_outcomes == 0 || branch_percent >= goal);
 
     let mut screens: Vec<ScreenAudit> = by_screen.into_values().collect();
     for s in &mut screens {
-        s.verified_percent = pct(s.verified_cells as u64, s.total_cells as u64);
+        s.verified_percent = pct(s.verified_cells as u64, s.captured_renderable_cells as u64);
     }
 
     let mut runtime_only_branches = input.runtime_only_branches.clone();
@@ -245,6 +279,10 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
         meets_goal,
         summary: AuditSummary {
             total_cells,
+            planned_cells: total_cells,
+            captured_cells,
+            captured_renderable_cells,
+            not_captured_cells,
             verified_cells,
             renderable_cells,
             unverified_cells,
@@ -260,6 +298,7 @@ pub fn evaluate(input: &AuditInput) -> AuditReport {
         },
         runtime_only_branches,
         gaps,
+        not_captured,
         screens,
     }
 }
@@ -350,5 +389,32 @@ mod tests {
         assert_eq!(order.open_comments, 1);
         assert_eq!(order.unresolved_comments.len(), 1);
         assert_eq!(order.unresolved_comments[0].body, "Check mobile spacing");
+    }
+    #[test]
+    fn not_captured_cells_are_separate_from_unverified_after_capture() {
+        let input = AuditInput {
+            goal_percent: 99.0,
+            cells: vec![
+                cell("/", 375, "verified", None),
+                cell("/", 1280, "unverified", Some("assert-failed")),
+                cell("/", 768, "unverified", Some("not-rendered")),
+            ],
+            branch_outcomes: 0,
+            observed_branch_outcomes: 0,
+            runtime_only_branches: Vec::new(),
+            comments: Vec::new(),
+        };
+        let report = evaluate(&input);
+        assert_eq!(report.summary.planned_cells, 3);
+        assert_eq!(report.summary.captured_cells, 2);
+        assert_eq!(report.summary.captured_renderable_cells, 2);
+        assert_eq!(report.summary.not_captured_cells, 1);
+        assert_eq!(report.summary.renderable_cells, 3);
+        assert_eq!(report.summary.unverified_cells, 1);
+        assert_eq!(report.summary.verified_percent, 50.0);
+        assert_eq!(report.gaps.len(), 1);
+        assert_eq!(report.not_captured.len(), 1);
+        assert_eq!(report.not_captured[0].status, "not-captured");
+        assert_eq!(report.not_captured[0].reason, "not-rendered");
     }
 }

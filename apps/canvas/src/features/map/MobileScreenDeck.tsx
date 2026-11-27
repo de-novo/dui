@@ -8,7 +8,7 @@ import {
   resolveCardDiffImageUrl,
   type ScreenCanvasDiff,
 } from "../../model/canvasDiff";
-import { routeName } from "./CaptureCard";
+import { captureBadgeCounts, routeName } from "./CaptureCard";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
 import { liveCell, useLiveFrame } from "./liveFrames";
@@ -200,6 +200,9 @@ export function MobileScreenDeck({
                 fallbackSrc,
               )
             : fallbackSrc;
+          const { notCaptured, unverifiedAfterCapture, unavailable } = captureBadgeCounts(
+            screen.cells,
+          );
           const outgoing = archive.links
             .filter((l) => l.source === screen.id && l.target !== screen.id)
             .map((l) => screenById.get(l.target))
@@ -246,6 +249,26 @@ export function MobileScreenDeck({
                         : screen.cells.length}
                   </span>
                 </div>
+
+                {(notCaptured > 0 || unverifiedAfterCapture > 0 || unavailable > 0) && (
+                  <div className="mobile-deck-status-row">
+                    {notCaptured > 0 && (
+                      <span>
+                        {t.notCaptured} {notCaptured}
+                      </span>
+                    )}
+                    {unverifiedAfterCapture > 0 && (
+                      <span>
+                        {t.unverifiedAfterCapture} {unverifiedAfterCapture}
+                      </span>
+                    )}
+                    {unavailable > 0 && (
+                      <span>
+                        {t.unrenderable} {unavailable}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {!cell && !src && sourceModel && screen.component && (
                   <MobileApproximateCard

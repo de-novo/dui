@@ -2,13 +2,17 @@ export type AuditGap = {
   path: string;
   state?: string;
   width: number;
-  status: "unverified" | "unrenderable";
+  status: "unverified" | "unrenderable" | "not-captured";
   reason: string;
   locale?: string;
 };
 
 export type AuditSummary = {
   totalCells: number;
+  plannedCells: number;
+  capturedCells: number;
+  capturedRenderableCells: number;
+  notCapturedCells: number;
   verifiedCells: number;
   renderableCells: number;
   unverifiedCells: number;
@@ -26,6 +30,9 @@ export type AuditSummary = {
 export type ScreenAudit = {
   path: string;
   totalCells: number;
+  capturedCells: number;
+  capturedRenderableCells: number;
+  notCapturedCells: number;
   verifiedCells: number;
   renderableCells: number;
   unverifiedCells: number;
@@ -39,6 +46,7 @@ export type AuditReport = {
   meetsGoal: boolean;
   summary: AuditSummary;
   gaps: AuditGap[];
+  notCaptured: AuditGap[];
   screens: ScreenAudit[];
 };
 
@@ -50,6 +58,20 @@ function num(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function decodeGaps(raw: unknown): AuditGap[] {
+  return Array.isArray(raw)
+    ? raw.filter(isRecord).map((g) => ({
+        path: typeof g.path === "string" ? g.path : "/",
+        state: typeof g.state === "string" ? g.state : undefined,
+        width: num(g.width),
+        status:
+          g.status === "unrenderable" || g.status === "not-captured" ? g.status : "unverified",
+        reason: typeof g.reason === "string" ? g.reason : "missing-verification-evidence",
+        locale: typeof g.locale === "string" ? g.locale : undefined,
+      }))
+    : [];
+}
+
 export function decodeAuditReport(raw: unknown): AuditReport | null {
   if (!isRecord(raw) || !isRecord(raw.summary)) return null;
   const s = raw.summary;
@@ -57,6 +79,9 @@ export function decodeAuditReport(raw: unknown): AuditReport | null {
     ? raw.screens.filter(isRecord).map((sc) => ({
         path: typeof sc.path === "string" ? sc.path : "/",
         totalCells: num(sc.totalCells),
+        capturedCells: num(sc.capturedCells),
+        capturedRenderableCells: num(sc.capturedRenderableCells),
+        notCapturedCells: num(sc.notCapturedCells),
         verifiedCells: num(sc.verifiedCells),
         renderableCells: num(sc.renderableCells),
         unverifiedCells: num(sc.unverifiedCells),
@@ -65,21 +90,17 @@ export function decodeAuditReport(raw: unknown): AuditReport | null {
         openComments: num(sc.openComments),
       }))
     : [];
-  const gaps: AuditGap[] = Array.isArray(raw.gaps)
-    ? raw.gaps.filter(isRecord).map((g) => ({
-        path: typeof g.path === "string" ? g.path : "/",
-        state: typeof g.state === "string" ? g.state : undefined,
-        width: num(g.width),
-        status: g.status === "unrenderable" ? "unrenderable" : "unverified",
-        reason: typeof g.reason === "string" ? g.reason : "missing-verification-evidence",
-        locale: typeof g.locale === "string" ? g.locale : undefined,
-      }))
-    : [];
+  const gaps = decodeGaps(raw.gaps);
+  const notCaptured = decodeGaps(raw.notCaptured);
   return {
     goalPercent: num(raw.goalPercent) || 99,
     meetsGoal: Boolean(raw.meetsGoal),
     summary: {
       totalCells: num(s.totalCells),
+      plannedCells: num(s.plannedCells) || num(s.totalCells),
+      capturedCells: num(s.capturedCells),
+      capturedRenderableCells: num(s.capturedRenderableCells),
+      notCapturedCells: num(s.notCapturedCells),
       verifiedCells: num(s.verifiedCells),
       renderableCells: num(s.renderableCells),
       unverifiedCells: num(s.unverifiedCells),
@@ -94,6 +115,7 @@ export function decodeAuditReport(raw: unknown): AuditReport | null {
       resolvedComments: num(s.resolvedComments),
     },
     gaps,
+    notCaptured,
     screens,
   };
 }

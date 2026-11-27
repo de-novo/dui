@@ -347,7 +347,7 @@ dui audit ./capture --design examples/design-audit/dui.json
 
 1. From React, TanStack Router, TanStack Query, and zod fixtures, screens, slots, representative values, and target branches are extracted automatically. The original import, an alias, and a re-export must produce the same facts. At least one case gets real type answers from the official stable TS. Beta APIs or AI inference alone cannot pass this gate.
 2. With the same snapshot, compiler answers, packs, inferred inputs, and budget, facts, IR, plan, and cell IDs are identical even when execution order changes. Checked with `insta` snapshots; `proptest` checks budget compliance and that uncovered valid value pairs are reported.
-3. For the review screen, JSON output gives **executed target branches / all target branches** and **verified cells / renderable cells** separately, plus branches found at runtime outside the denominator, the unverified list, and unrenderable reasons. The fill-in loop stops on no improvement or at the configured limit.
+3. For the review screen, JSON output gives **executed target branches / all target branches** and **verified cells / captured renderable cells** separately, plus branches found at runtime outside the denominator, the not-captured and unverified-after-capture lists, and unrenderable reasons. The fill-in loop stops on no improvement or at the configured limit.
 4. CLI and MCP return the same plan and verdicts for the same input.
 
 Reproducible M1 gate inputs, commands, and verified outputs live in [M1 gates](m1-gates.md) (`npm run check:m1`).

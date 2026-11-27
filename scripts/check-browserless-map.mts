@@ -15,6 +15,14 @@ const stage = mkdtempSync(join(tmpdir(), "dui-browserless-"));
 type Report = {
   browser: unknown;
   output: string;
+  coverage: {
+    planned: number;
+    captured: number;
+    verified: number;
+    capturedRenderable: number;
+    renderable: number;
+    attempted: number;
+  };
   cells: { path: string; status: string; reason?: string; image?: string }[];
   discoveredRoutes: string[];
   screenDiscovery: { limitations?: string[] };
@@ -66,6 +74,19 @@ const check = (label: string, report: Report) => {
   assert.ok(
     report.cells.every((c) => c.status === "unverified" && c.reason === "not-rendered" && !c.image),
     `${label}: cells are planned, not captured`,
+  );
+  assert.equal(report.coverage.planned, report.cells.length, `${label}: planned cells`);
+  assert.equal(report.coverage.captured, 0, `${label}: no captured cells`);
+  assert.equal(report.coverage.attempted, 0, `${label}: legacy attempted count stays zero`);
+  assert.equal(
+    report.coverage.capturedRenderable,
+    0,
+    `${label}: no captured renderable denominator`,
+  );
+  assert.equal(
+    report.coverage.renderable,
+    report.cells.length,
+    `${label}: planned renderable compatibility count`,
   );
   assert.deepEqual([...new Set(report.cells.map((c) => c.path))].sort(), [
     "/",
@@ -192,6 +213,34 @@ export class Filter extends UI.Component {
   }
   const built = await map([site, "--build-dir", site], "home-build");
   check("--build-dir", built.report);
+  const audit = JSON.parse(
+    execFileSync(binary, ["audit", built.report.output], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: join(stage, "home-build") },
+    }),
+  ) as {
+    meetsGoal: boolean;
+    summary: {
+      plannedCells: number;
+      capturedCells: number;
+      capturedRenderableCells: number;
+      notCapturedCells: number;
+      unverifiedCells: number;
+    };
+    gaps: unknown[];
+    notCaptured: { status: string; reason: string }[];
+  };
+  assert.equal(audit.meetsGoal, false);
+  assert.equal(audit.summary.plannedCells, built.report.cells.length);
+  assert.equal(audit.summary.capturedCells, 0);
+  assert.equal(audit.summary.capturedRenderableCells, 0);
+  assert.equal(audit.summary.notCapturedCells, built.report.cells.length);
+  assert.equal(audit.summary.unverifiedCells, 0);
+  assert.equal(audit.gaps.length, 0);
+  assert.equal(audit.notCaptured.length, built.report.cells.length);
+  assert.ok(
+    audit.notCaptured.every((c) => c.status === "not-captured" && c.reason === "not-rendered"),
+  );
   const again = await map([site, "--build-dir", site], "home-build");
   check("--build-dir again", again.report);
 

@@ -223,7 +223,7 @@ impl Inventory {
             json!({"kind":"native-source", "declared":nodes.len(), "limitations":self.limitations});
         let graph = json!({"nodes":nodes, "overview":[], "cells":[], "edges":[], "screenDiscovery":discovery});
         let report = json!({"screenDiscovery":discovery, "sourceFiles":sources, "cells":[],
-            "coverage":{"attempted":0,"renderable":0,"unrenderable":0,"verified":0}});
+            "coverage":crate::coverage::base(&[])});
         analysis::store(&out.join("graph.json"), &graph)?;
         analysis::store(&out.join("report.json"), &report)?;
         Ok(report)

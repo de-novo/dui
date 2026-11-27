@@ -297,11 +297,6 @@ fn include_missing_in_graph(out: &Path, report: &mut Value) -> Result<(), Error>
     let fresh = report["cells"]
         .as_array()
         .ok_or_else(|| failure(3, "expected capture cells"))?;
-    let unrenderable = fresh
-        .iter()
-        .filter(|c| c["status"] == "unrenderable")
-        .count();
-
     let facts = read(&out.join("facts.json")).ok();
     let facts = facts
         .as_ref()
@@ -315,12 +310,15 @@ fn include_missing_in_graph(out: &Path, report: &mut Value) -> Result<(), Error>
         .filter_map(Value::as_str)
         .map(str::to_owned)
         .collect();
-    let renderable = fresh.len() - unrenderable;
-    if report["coverage"].is_null() {
-        report["coverage"] = json!({"verified":0,"attempted":0});
+    let mut coverage = crate::coverage::base(fresh);
+    if !report["coverage"].is_null() {
+        for key in ["branchOutcomes", "observedBranchOutcomes"] {
+            if let Some(value) = report["coverage"].get(key).cloned() {
+                coverage[key] = value;
+            }
+        }
     }
-    report["coverage"]["renderable"] = json!(renderable);
-    report["coverage"]["unrenderable"] = json!(unrenderable);
+    report["coverage"] = coverage;
     let graph = crate::graph_view::with_cells(dui_core::discovery::graph(facts, &hits), report)?;
     analysis::store(&out.join("graph.json"), &graph)
 }

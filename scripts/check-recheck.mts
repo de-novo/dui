@@ -92,6 +92,10 @@ try {
   const missing = await dui(["recheck", remaining.output], 5);
   assert.equal(missing.recheck.remaining, 1);
   assert.equal(missing.cells[0].reason, "target-not-produced");
+  assert.equal(missing.coverage.planned, 1);
+  assert.equal(missing.coverage.captured, 0);
+  assert.equal(missing.coverage.capturedRenderable, 0);
+  assert.equal(missing.coverage.verified, 0);
   assert.equal(missing.coverage.attempted, 0);
   assert.deepEqual(visits, []);
   writeFileSync(join(project, "dui.json"), JSON.stringify(manifest));
