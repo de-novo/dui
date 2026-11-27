@@ -1,4 +1,6 @@
 //! Extract schema-v1 models from a TSX entry and its reachable static imports.
+mod class_view;
+mod hash_routes;
 mod render;
 mod style;
 mod syntax;
@@ -90,6 +92,9 @@ fn fields(files: &Files, file: &File, body: Ast<'_>) -> Vec<m::Field> {
         .collect()
 }
 fn returned(f: Ast<'_>) -> Option<Ast<'_>> {
+    if f.kind() == "method_definition" {
+        return class_view::tail(f);
+    }
     let body = field(f, "body")?;
     if body.kind() != "statement_block" {
         return Some(unwrap_expr(body));
@@ -119,6 +124,9 @@ fn returned(f: Ast<'_>) -> Option<Ast<'_>> {
         .map(unwrap_expr)
 }
 fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
+    if f.kind() == "method_definition" {
+        return class_view::props(file, f, id);
+    }
     let mut out = Vec::new();
     if let Some(param) = field(f, "parameters").and_then(first)
         && let Some(pat) = field(param, "pattern").filter(|p| p.kind() == "object_pattern")
@@ -356,6 +364,7 @@ pub fn extract_in_context(
                 file,
                 files: &files,
                 slots: slot,
+                class_render: f.kind() == "method_definition",
                 tailwind,
                 built: built.as_ref(),
                 modules: modules.bindings(file, f),
@@ -404,6 +413,8 @@ pub fn extract_in_context(
             })
         }
     }
+    model.components.sort_by(|a, b| a.id.cmp(&b.id));
+    hash_routes::apply(&files[&entry], &mut model);
     for e in &mut model.edges {
         if let m::EdgeTarget::Route { route } = &e.to
             && model
@@ -417,7 +428,6 @@ pub fn extract_in_context(
         }
     }
     model.screens.sort_by(|a, b| a.id.cmp(&b.id));
-    model.components.sort_by(|a, b| a.id.cmp(&b.id));
     model.edges.sort_by(|a, b| a.id.cmp(&b.id));
     model.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
     model.tokens.sort_by(|a, b| a.id.cmp(&b.id));
