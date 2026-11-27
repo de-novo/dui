@@ -5,12 +5,9 @@
 //! component. Runtime gates and imperative history writes remain opaque.
 use crate::{
     Ast, Files, literal, m, symbol,
-    syntax::{File, children, field, first, resolve, unwrap_expr},
+    syntax::{File, children, field, first, unwrap_expr},
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct QueryEq {
@@ -185,18 +182,12 @@ fn lazy_export(file: &File, import: Ast<'_>) -> String {
 }
 
 /// Literal dynamic-import aliases used as components. Static imports still win.
-fn dynamic_bindings(project: &Path, file: &File) -> BTreeMap<String, (String, String)> {
-    fn walk<'a>(
-        project: &Path,
-        file: &'a File,
-        node: Ast<'a>,
-        out: &mut BTreeMap<String, (String, String)>,
-    ) {
+fn dynamic_bindings(file: &File) -> BTreeMap<String, (String, String)> {
+    fn walk<'a>(file: &'a File, node: Ast<'a>, out: &mut BTreeMap<String, (String, String)>) {
         if node.kind() == "variable_declarator"
             && let Some(value) = field(node, "value")
             && let Some((request, import)) = find_import(file, value)
-            && request.starts_with('.')
-            && let Some(module) = resolve(project, &file.path, &request)
+            && let Some(module) = file.dynamic_imports.get(&request)
         {
             match field(node, "name") {
                 Some(pattern) if pattern.kind() == "object_pattern" => {
@@ -224,11 +215,11 @@ fn dynamic_bindings(project: &Path, file: &File) -> BTreeMap<String, (String, St
             }
         }
         for child in children(node) {
-            walk(project, file, child, out);
+            walk(file, child, out);
         }
     }
     let mut out = BTreeMap::new();
-    walk(project, file, file.tree.root_node(), &mut out);
+    walk(file, file.tree.root_node(), &mut out);
     out
 }
 
@@ -305,13 +296,12 @@ fn view_leaves<'a>(file: &'a File, node: Ast<'a>) -> Vec<Ast<'a>> {
 }
 
 fn resolve_component(
-    project: &Path,
     files: &Files,
     file: &File,
     model: &m::SourceModel,
     name: &str,
 ) -> Option<String> {
-    let dynamic = dynamic_bindings(project, file);
+    let dynamic = dynamic_bindings(file);
     let (target, export) = if let Some((module, export)) = dynamic.get(name) {
         (files.get(module)?, export.as_str())
     } else {
@@ -322,7 +312,6 @@ fn resolve_component(
 }
 
 fn view_target(
-    project: &Path,
     files: &Files,
     file: &File,
     model: &m::SourceModel,
@@ -335,7 +324,7 @@ fn view_target(
     let mut found = BTreeMap::new();
     for leaf in leaves {
         let name = tag_name(file, leaf)?;
-        let id = resolve_component(project, files, file, model, name)?;
+        let id = resolve_component(files, file, model, name)?;
         found.insert(id, file.loc(leaf));
     }
     if found.len() == 1 {
@@ -447,12 +436,7 @@ fn function_named<'a>(file: &'a File, name: &str) -> Option<Ast<'a>> {
         .find_map(|(n, f)| (n == name).then_some(f))
 }
 
-fn nested_query_screens(
-    project: &Path,
-    files: &Files,
-    model: &mut m::SourceModel,
-    component: &str,
-) {
+fn nested_query_screens(files: &Files, model: &mut m::SourceModel, component: &str) {
     let Some(component_model) = model.components.iter().find(|c| c.id == component) else {
         return;
     };
@@ -492,7 +476,7 @@ fn nested_query_screens(
             continue;
         };
         if let Some(branch) = field(ternary, "consequence")
-            && let Some(target) = view_target(project, files, file, model, branch)
+            && let Some(target) = view_target(files, file, model, branch)
         {
             additions.push((eq, target, gated));
         } else {
@@ -570,11 +554,7 @@ fn resolve_query_links(model: &mut m::SourceModel) {
 }
 
 /// Add corroborated query views and resolve same-page query links after component extraction.
-pub(crate) fn apply(project: &Path, files: &Files, entry: &str, model: &mut m::SourceModel) {
-    let Ok(root) = project.canonicalize() else {
-        return;
-    };
-    let project = root.as_path();
+pub(crate) fn apply(files: &Files, entry: &str, model: &mut m::SourceModel) {
     let Some(file) = files.get(entry) else {
         return;
     };
@@ -591,7 +571,7 @@ pub(crate) fn apply(project: &Path, files: &Files, entry: &str, model: &mut m::S
             continue;
         };
         if let Some(branch) = field(statement, "consequence") {
-            if let Some(target) = view_target(project, files, file, model, branch) {
+            if let Some(target) = view_target(files, file, model, branch) {
                 positives.push((eq, target, gated));
             } else {
                 diagnostic(
@@ -603,7 +583,7 @@ pub(crate) fn apply(project: &Path, files: &Files, entry: &str, model: &mut m::S
             }
         }
         if let Some(branch) = field(statement, "alternative")
-            && let Some(target) = view_target(project, files, file, model, branch)
+            && let Some(target) = view_target(files, file, model, branch)
             && default.is_none()
         {
             default = Some(target);
@@ -624,7 +604,7 @@ pub(crate) fn apply(project: &Path, files: &Files, entry: &str, model: &mut m::S
         if has_default {
             add_screen(model, "/".into(), component.clone(), location);
         }
-        nested_query_screens(project, files, model, &component);
+        nested_query_screens(files, model, &component);
     }
     resolve_query_links(model);
 }

@@ -161,6 +161,7 @@ dependencies = [
  "dui-core",
  "serde_json",
  "sha2",
+ "tempfile",
  "tree-sitter",
  "tree-sitter-css",
  "tree-sitter-typescript",

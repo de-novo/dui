@@ -3,6 +3,7 @@ mod class_view;
 mod hash_routes;
 mod query_views;
 mod render;
+mod routes;
 mod style;
 mod syntax;
 use dui_core::source_model as m;
@@ -419,6 +420,7 @@ fn extract_in_context_impl(
             });
         }
     }
+    routes::discover(&files, &mut model);
     if model.screens.is_empty() {
         let candidates: Vec<_> = model
             .components
@@ -445,7 +447,7 @@ fn extract_in_context_impl(
     }
     model.components.sort_by(|a, b| a.id.cmp(&b.id));
     hash_routes::apply(&files[&entry], &mut model);
-    query_views::apply(project, &files, &entry, &mut model);
+    query_views::apply(&files, &entry, &mut model);
     for e in &mut model.edges {
         if let m::EdgeTarget::Route { route } = &e.to
             && model

@@ -308,7 +308,7 @@ impl Context<'_> {
                 location: Some(location.clone()),
             });
         }
-        if name == "a" || router == Some("Link") {
+        if name == "a" || matches!(router, Some("Link" | "NavLink")) {
             let key = if name == "a" { "href" } else { "to" };
             if let Some(v) = attr(self.file, open, key) {
                 let expr = self.expr(v);

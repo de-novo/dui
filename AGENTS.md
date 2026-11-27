@@ -61,6 +61,7 @@ For viewer UI changes, choose the skill for the stage of work:
 - **Implement** with [shadcn/ui](.agents/skills/shadcn/SKILL.md). Reuse viewer tokens and shared controls.
 - **Review** with [Vercel Web Interface Guidelines](.agents/skills/web-design-guidelines/SKILL.md). Check keyboard access, focus, navigation, responsive layout and themes.
 - **Self-dogfood before shipping**: verify every `apps/canvas` or `site/` change across both mobile (`390x844`) and desktop (`1440x920`) viewports (zero horizontal overflow, zero clipped primary controls, zero broken images, and non-blank `renderTree` captures via `npm run verify:pages-demo` for Pages deploys).
+- **UI merge evidence**: For work that displays or changes a UI, attach real desktop (1440×920) and mobile (390×844) screenshots to both the PR body and the completion report. For a UI behavior change, also attach a short video demonstrating the behavior in both places. Before merging, verify that the required attachments open and show the current change. Hold the PR until the evidence is present.
 
 The [viewer contract](docs/en/web-viewer.md) defines archive evidence, capture status and map behavior.
 
