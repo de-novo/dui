@@ -126,6 +126,28 @@ try {
       ],
     );
   }
+  const dynamic = join(stage, "dynamic");
+  mkdirSync(dynamic);
+  writeFileSync(
+    join(dynamic, "App.tsx"),
+    [
+      'import { Link, Route } from "react-router";',
+      "export function App(){return <><Route path={runtimePath} element={<App/>}/><Link to={runtimeTarget}>Open</Link></>}",
+    ].join("\n"),
+  );
+  const dynamicReport = JSON.parse(
+    execFileSync(binary, ["map", dynamic], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: join(stage, "dynamic-home"), PATH: "", DUI_CHROMIUM: "/absent" },
+    }),
+  );
+  assert.equal(dynamicReport.screenDiscovery.resolvedRelations, 0);
+  assert.equal(dynamicReport.screenDiscovery.unresolvedRelations.length, 1);
+  const unresolvedRoute = dynamicReport.screenDiscovery.diagnostics.find(
+    (d: { code: string }) => d.code === "unresolved-route",
+  );
+  assert.equal(unresolvedRoute.location.file, "App.tsx");
+  assert.equal(unresolvedRoute.location.line, 2);
   const built = await map([site, "--build-dir", site], "home-build");
   check("--build-dir", built.report);
   const again = await map([site, "--build-dir", site], "home-build");
