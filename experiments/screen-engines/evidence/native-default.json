@@ -1,0 +1,132 @@
+{
+  "fixtures/android-compose": [
+    {
+      "ms": 110.87179199989805,
+      "rssBytes": 9256960,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 64.96816699996089,
+      "rssBytes": 9240576,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 63.5962080000354,
+      "rssBytes": 9256960,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 62.2656669997923,
+      "rssBytes": 9289728,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    }
+  ],
+  "fixtures/source-preview-native/android": [
+    {
+      "ms": 70.59170800016545,
+      "rssBytes": 9273344,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 68.08141700003034,
+      "rssBytes": 9256960,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 67.82395800019003,
+      "rssBytes": 9322496,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 64.32566700004827,
+      "rssBytes": 9306112,
+      "code": 5,
+      "status": "no-android-emulator",
+      "files": [
+        "report.json",
+        "snapshot.json"
+      ]
+    }
+  ],
+  "fixtures/swiftui-map": [
+    {
+      "ms": 9354.948874999991,
+      "rssBytes": 151896064,
+      "code": 0,
+      "status": null,
+      "files": [
+        "graph.json",
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 5708.726666000075,
+      "rssBytes": 151945216,
+      "code": 0,
+      "status": null,
+      "files": [
+        "graph.json",
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 4656.8306250001115,
+      "rssBytes": 153698304,
+      "code": 0,
+      "status": null,
+      "files": [
+        "graph.json",
+        "report.json",
+        "snapshot.json"
+      ]
+    },
+    {
+      "ms": 4885.484124999948,
+      "rssBytes": 153894912,
+      "code": 0,
+      "status": null,
+      "files": [
+        "graph.json",
+        "report.json",
+        "snapshot.json"
+      ]
+    }
+  ]
+}

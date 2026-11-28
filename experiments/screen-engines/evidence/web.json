@@ -1,0 +1,585 @@
+{
+  "sizes": {
+    "DOM": [
+      161776,
+      48235
+    ],
+    "Yoga": [
+      291186,
+      100886
+    ]
+  },
+  "screens": {
+    "403": {
+      "analysis": [
+        {
+          "ms": 18.414958000001207,
+          "rssBytes": 7634944
+        },
+        {
+          "ms": 74.88987500000076,
+          "rssBytes": 7749632
+        },
+        {
+          "ms": 17.14891699999862,
+          "rssBytes": 7618560
+        },
+        {
+          "ms": 17.69341700000041,
+          "rssBytes": 7651328
+        },
+        {
+          "ms": 17.518041999999696,
+          "rssBytes": 7733248
+        }
+      ],
+      "views": {
+        "390": {
+          "DOM": {
+            "pixels": {
+              "ink": 19248,
+              "bad": 19248,
+              "ratio": 1
+            },
+            "refText": "403 Access Forbidden You don't have necessary permission to view this resource. Go Back Back to Home",
+            "text": "403Access Forbidden You don't have necessary permission to view this resource. [Unsupported component prop][Unsupported component prop]",
+            "heapBytes": 5897848,
+            "match": false,
+            "edits": [
+              74.46704099999988,
+              66.05208299999867,
+              50.02837500000169,
+              66.62495800000033,
+              66.69283300000097,
+              49.969750000000204,
+              66.64949999999953,
+              66.63999999999942
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 17181,
+              "bad": 17181,
+              "ratio": 1
+            },
+            "refText": "403 Access Forbidden You don't have necessary permission to view this resource. Go Back Back to Home",
+            "text": "403Access Forbidden You don't have necessary permission to view this resource. [Unsupported component prop][Unsupported component prop]",
+            "heapBytes": 6253160,
+            "match": false,
+            "edits": [
+              69.0982499999991,
+              66.6561249999977,
+              49.83229199999914,
+              66.742083000001,
+              49.94495800000004,
+              66.1919160000034,
+              50.49825000000055,
+              66.60733299999993
+            ]
+          }
+        },
+        "1440": {
+          "DOM": {
+            "pixels": {
+              "ink": 22166,
+              "bad": 22166,
+              "ratio": 1
+            },
+            "refText": "403 Access Forbidden You don't have necessary permission to view this resource. Go Back Back to Home",
+            "text": "403Access Forbidden You don't have necessary permission to view this resource. [Unsupported component prop][Unsupported component prop]",
+            "heapBytes": 6970696,
+            "match": false,
+            "edits": [
+              102.4497080000001,
+              64.9520420000008,
+              50.93770899999981,
+              66.99083400000018,
+              67.10629100000006,
+              66.57150000000001,
+              49.90754199999901,
+              66.45908400000008
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 22199,
+              "bad": 22199,
+              "ratio": 1
+            },
+            "refText": "403 Access Forbidden You don't have necessary permission to view this resource. Go Back Back to Home",
+            "text": "403Access Forbidden You don't have necessary permission to view this resource. [Unsupported component prop][Unsupported component prop]",
+            "heapBytes": 7349628,
+            "match": false,
+            "edits": [
+              72.09858299999905,
+              66.47583300000042,
+              50.20195799999783,
+              67.11424999999872,
+              67.73675000000003,
+              66.68787499999962,
+              49.785791999998764,
+              65.15258299999914
+            ]
+          }
+        }
+      }
+    },
+    "503": {
+      "analysis": [
+        {
+          "ms": 27.302625000000262,
+          "rssBytes": 7700480
+        },
+        {
+          "ms": 28.99437499999931,
+          "rssBytes": 7684096
+        },
+        {
+          "ms": 35.29454199999964,
+          "rssBytes": 7766016
+        },
+        {
+          "ms": 38.790500000000065,
+          "rssBytes": 7667712
+        },
+        {
+          "ms": 38.46741699999984,
+          "rssBytes": 7733248
+        }
+      ],
+      "views": {
+        "390": {
+          "DOM": {
+            "pixels": {
+              "ink": 15901,
+              "bad": 15899,
+              "ratio": 0.99987422174706
+            },
+            "refText": "503 Website is under maintenance! The site is not available at the moment. We'll be back online shortly. Learn more",
+            "text": "503Website is under maintenance! The site is not available at the moment. We'll be back online shortly. [Unresolved component]",
+            "heapBytes": 5911636,
+            "match": false,
+            "edits": [
+              46.41079200000058,
+              66.4457080000011,
+              65.27862500000083,
+              101.1278340000008,
+              50.64158299999872,
+              66.32937500000116,
+              48.72216599999956,
+              66.31045799999993
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 14689,
+              "bad": 14687,
+              "ratio": 0.9998638436925591
+            },
+            "refText": "503 Website is under maintenance! The site is not available at the moment. We'll be back online shortly. Learn more",
+            "text": "503Website is under maintenance! The site is not available at the moment. We'll be back online shortly. [Unresolved component]",
+            "heapBytes": 6251536,
+            "match": false,
+            "edits": [
+              101.417958,
+              67.5346669999999,
+              49.94979200000125,
+              50.09950000000026,
+              66.49129200000061,
+              66.66158300000097,
+              50.04270799999904,
+              66.62183299999924
+            ]
+          }
+        },
+        "1440": {
+          "DOM": {
+            "pixels": {
+              "ink": 18833,
+              "bad": 18833,
+              "ratio": 1
+            },
+            "refText": "503 Website is under maintenance! The site is not available at the moment. We'll be back online shortly. Learn more",
+            "text": "503Website is under maintenance! The site is not available at the moment. We'll be back online shortly. [Unresolved component]",
+            "heapBytes": 6959852,
+            "match": false,
+            "edits": [
+              81.99629099999947,
+              113.14775000000009,
+              50.8895420000008,
+              48.98108300000058,
+              76.12366699999984,
+              113.46441700000105,
+              60.30762499999946,
+              56.08495799999946
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 19091,
+              "bad": 19091,
+              "ratio": 1
+            },
+            "refText": "503 Website is under maintenance! The site is not available at the moment. We'll be back online shortly. Learn more",
+            "text": "503Website is under maintenance! The site is not available at the moment. We'll be back online shortly. [Unresolved component]",
+            "heapBytes": 7277724,
+            "match": false,
+            "edits": [
+              68.0130420000005,
+              99.95449999999983,
+              66.51333300000078,
+              49.90062500000022,
+              66.69879199999923,
+              66.3305419999997,
+              50.32358299999942,
+              65.55633299999863
+            ]
+          }
+        }
+      }
+    },
+    "workspace": {
+      "analysis": [
+        {
+          "ms": 43.936250000002474,
+          "rssBytes": 9027584
+        },
+        {
+          "ms": 58.03174999999828,
+          "rssBytes": 9175040
+        },
+        {
+          "ms": 28.609040999999706,
+          "rssBytes": 9256960
+        },
+        {
+          "ms": 50.052417000002606,
+          "rssBytes": 9175040
+        },
+        {
+          "ms": 29.264666999999463,
+          "rssBytes": 9109504
+        }
+      ],
+      "views": {
+        "390": {
+          "DOM": {
+            "pixels": {
+              "ink": 4585,
+              "bad": 4522,
+              "ratio": 0.9862595419847329
+            },
+            "refText": "Empty workspace dui map . Open model",
+            "text": "Empty workspacedui map .Open model",
+            "heapBytes": 6090864,
+            "match": false,
+            "edits": [
+              92.28287500000079,
+              66.10862500000076,
+              68.05125000000044,
+              65.38883300000089,
+              51.03154200000063,
+              65.42375000000175,
+              50.05829200000153,
+              66.46108300000196
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 4765,
+              "bad": 4751,
+              "ratio": 0.9970619097586568
+            },
+            "refText": "Empty workspace dui map . Open model",
+            "text": "Empty workspacedui map .Open model",
+            "heapBytes": 6461420,
+            "match": false,
+            "edits": [
+              99.80412500000239,
+              66.59954199999993,
+              49.90033299999777,
+              66.5423750000009,
+              66.6350829999974,
+              49.92820800000118,
+              66.58041599999706,
+              66.4283749999995
+            ]
+          }
+        },
+        "1440": {
+          "DOM": {
+            "pixels": {
+              "ink": 4585,
+              "bad": 4522,
+              "ratio": 0.9862595419847329
+            },
+            "refText": "Empty workspace dui map . Open model",
+            "text": "Empty workspacedui map .Open model",
+            "heapBytes": 7153164,
+            "match": false,
+            "edits": [
+              74.66766600000119,
+              99.716290999997,
+              66.93787499999962,
+              48.45987499999683,
+              66.76533299999937,
+              66.27095899999767,
+              67.85599999999977,
+              49.00075000000288
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 4765,
+              "bad": 4751,
+              "ratio": 0.9970619097586568
+            },
+            "refText": "Empty workspace dui map . Open model",
+            "text": "Empty workspacedui map .Open model",
+            "heapBytes": 7444268,
+            "match": false,
+            "edits": [
+              65.3674170000013,
+              67.99895900000047,
+              48.5190419999999,
+              66.66466700000092,
+              67.70475000000079,
+              66.02045899999939,
+              65.59620899999936,
+              51.658666999999696
+            ]
+          }
+        }
+      }
+    },
+    "inline": {
+      "analysis": [
+        {
+          "ms": 17.759416999997484,
+          "rssBytes": 7028736
+        },
+        {
+          "ms": 19.70645799999693,
+          "rssBytes": 7012352
+        },
+        {
+          "ms": 18.974459000000934,
+          "rssBytes": 7012352
+        },
+        {
+          "ms": 19.67583300000115,
+          "rssBytes": 7012352
+        },
+        {
+          "ms": 17.275165999999444,
+          "rssBytes": 7012352
+        }
+      ],
+      "views": {
+        "390": {
+          "DOM": {
+            "pixels": {
+              "ink": 718,
+              "bad": 0,
+              "ratio": 0
+            },
+            "refText": "one two three four",
+            "text": "one two three four",
+            "heapBytes": 5744476,
+            "match": true,
+            "edits": [
+              69.01058399999965,
+              65.71895799999766,
+              49.88437499999782,
+              66.17091699999946,
+              51.43712499999674,
+              66.4150840000002,
+              50.38000000000102,
+              66.41579199999978
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 806,
+              "bad": 338,
+              "ratio": 0.41935483870967744
+            },
+            "refText": "one two three four",
+            "text": "one two three four",
+            "heapBytes": 6110080,
+            "match": false,
+            "edits": [
+              54.31129200000214,
+              66.0870419999992,
+              49.65837500000271,
+              49.75641600000017,
+              51.297499999996944,
+              65.62637499999983,
+              50.36479200000031,
+              66.98312499999884
+            ]
+          }
+        },
+        "1440": {
+          "DOM": {
+            "pixels": {
+              "ink": 718,
+              "bad": 0,
+              "ratio": 0
+            },
+            "refText": "one two three four",
+            "text": "one two three four",
+            "heapBytes": 6819136,
+            "match": true,
+            "edits": [
+              104.94724999999744,
+              50.07641600000352,
+              66.62662500000079,
+              50.09320900000239,
+              66.90058399999907,
+              49.590541999998095,
+              65.89166599999953,
+              50.69954200000211
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 806,
+              "bad": 338,
+              "ratio": 0.41935483870967744
+            },
+            "refText": "one two three four",
+            "text": "one two three four",
+            "heapBytes": 7119756,
+            "match": false,
+            "edits": [
+              73.26420900000085,
+              49.260417000001326,
+              49.8672910000023,
+              68.20691699999952,
+              48.680083999999624,
+              51.38662500000282,
+              49.98425000000134,
+              66.3247080000001
+            ]
+          }
+        }
+      }
+    },
+    "grid": {
+      "analysis": [
+        {
+          "ms": 42.64879199999996,
+          "rssBytes": 7028736
+        },
+        {
+          "ms": 20.318041999998968,
+          "rssBytes": 7012352
+        },
+        {
+          "ms": 46.45524999999907,
+          "rssBytes": 7012352
+        },
+        {
+          "ms": 17.13787500000035,
+          "rssBytes": 7028736
+        },
+        {
+          "ms": 20.412500000002183,
+          "rssBytes": 7012352
+        }
+      ],
+      "views": {
+        "390": {
+          "DOM": {
+            "pixels": {
+              "ink": 214,
+              "bad": 152,
+              "ratio": 0.7102803738317757
+            },
+            "refText": "A B",
+            "text": "AB",
+            "heapBytes": 5751504,
+            "match": false,
+            "edits": [
+              53.94012500000099,
+              49.655666999999085,
+              50.2586659999979,
+              67.3293330000015,
+              99.43195800000103,
+              49.87645799999882,
+              66.7687919999953,
+              49.852749999998196
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 214,
+              "bad": 152,
+              "ratio": 0.7102803738317757
+            },
+            "refText": "A B",
+            "text": "AB",
+            "heapBytes": 6116996,
+            "match": false,
+            "edits": [
+              50.43641700000444,
+              49.74416599999677,
+              66.66512499999953,
+              66.6183749999982,
+              49.99954100000468,
+              66.74225000000297,
+              49.90295800000604,
+              50.06462499999907
+            ]
+          }
+        },
+        "1440": {
+          "DOM": {
+            "pixels": {
+              "ink": 214,
+              "bad": 152,
+              "ratio": 0.7102803738317757
+            },
+            "refText": "A B",
+            "text": "AB",
+            "heapBytes": 6895516,
+            "match": false,
+            "edits": [
+              106.8023749999993,
+              49.98595800000112,
+              66.64091700000063,
+              50.07795900000201,
+              49.894083000002865,
+              66.61200000000099,
+              66.32700000000114,
+              100.47825000000012
+            ]
+          },
+          "Yoga": {
+            "pixels": {
+              "ink": 214,
+              "bad": 152,
+              "ratio": 0.7102803738317757
+            },
+            "refText": "A B",
+            "text": "AB",
+            "heapBytes": 7126828,
+            "match": false,
+            "edits": [
+              73.03691600000093,
+              49.82724999999846,
+              67.4138329999987,
+              49.32887500000288,
+              67.42358299999978,
+              50.59020800000144,
+              64.68379199999981,
+              50.63004199999705
+            ]
+          }
+        }
+      }
+    }
+  },
+  "chrome": "158.0.8127.37"
+}
