@@ -146,6 +146,24 @@ fn pair_entries<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
         .collect()
 }
 
+fn object_entries<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
+    children(object)
+        .into_iter()
+        .filter_map(|node| {
+            if node.kind() == "pair" {
+                Some((
+                    object_key(file, field(node, "key")?)?,
+                    field(node, "value")?,
+                ))
+            } else if node.kind() == "shorthand_property_identifier" {
+                Some((file.text(node).to_owned(), node))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn find_declarator<'a>(file: &File, root: Ast<'a>, name: &str) -> Option<Ast<'a>> {
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
@@ -159,12 +177,228 @@ fn find_declarator<'a>(file: &File, root: Ast<'a>, name: &str) -> Option<Ast<'a>
     None
 }
 
+type VariantConfig = (
+    String,
+    Vec<(String, Vec<(String, String)>)>,
+    BTreeMap<String, String>,
+);
+
+fn cva_config(file: &File, local: &str) -> Option<VariantConfig> {
+    if file.bindings.get(local).is_some() {
+        return None;
+    }
+    let factory = find_declarator(file, file.tree.root_node(), local)
+        .and_then(|node| field(node, "value"))
+        .map(unwrap_expr)
+        .filter(|value| value.kind() == "call_expression")?;
+    let arguments = field(factory, "arguments")?;
+    let base = first(arguments)
+        .and_then(|v| literal(file, v))
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default();
+    let config = children(arguments)
+        .get(1)
+        .copied()
+        .filter(|v| v.kind() == "object")?;
+    let variants_node = object_pair(file, config, "variants").filter(|v| v.kind() == "object")?;
+    let mut variants = Vec::new();
+    for (group, choices_node) in pair_entries(file, variants_node) {
+        if choices_node.kind() != "object" {
+            continue;
+        }
+        let mut choices = Vec::new();
+        for (choice, value) in pair_entries(file, choices_node) {
+            if let Some(classes) = literal(file, value).and_then(|v| v.as_str().map(str::to_owned))
+            {
+                choices.push((choice, classes));
+            }
+        }
+        variants.push((group, choices));
+    }
+    let mut defaults = BTreeMap::new();
+    if let Some(node) =
+        object_pair(file, config, "defaultVariants").filter(|v| v.kind() == "object")
+    {
+        for (group, value) in pair_entries(file, node) {
+            if let Some(choice) = literal(file, value).and_then(|v| v.as_str().map(str::to_owned)) {
+                defaults.insert(group, choice);
+            }
+        }
+    }
+    Some((base, variants, defaults))
+}
+
+fn join_classes(parts: impl IntoIterator<Item = String>) -> String {
+    parts
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Add a variant equality to a stylesheet condition. Width, color-scheme and interaction
+/// constraints survive; a second expression cannot be represented as a conjunction in schema v1.
+fn variant_condition(
+    base: Option<&m::Condition>,
+    on: &m::Expr,
+    choice: &str,
+) -> Option<m::Condition> {
+    let mut condition = base.cloned().unwrap_or(m::Condition {
+        min_width: None,
+        max_width: None,
+        interaction: None,
+        color_scheme: None,
+        expr: None,
+        equals: None,
+    });
+    if condition.expr.is_some() || condition.equals.is_some() {
+        return None;
+    }
+    condition.expr = Some(on.clone());
+    condition.equals = Some(choice.into());
+    Some(condition)
+}
+
+/// cva's defaultVariants are runtime defaults of the props read by the call. Preserve
+/// them as prop defaults so an omitted caller prop and an explicit default value draw alike.
+pub(crate) fn apply_variant_defaults(file: &File, root: Ast<'_>, slots: &mut [m::Slot]) {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        pending.extend(children(node));
+        if node.kind() != "call_expression" {
+            continue;
+        }
+        let Some(function) = field(node, "function").filter(|f| f.kind() == "identifier") else {
+            continue;
+        };
+        let local = file.text(function);
+        let Some((_, _, defaults)) = cva_config(file, local) else {
+            continue;
+        };
+        let Some(options) = field(node, "arguments")
+            .and_then(first)
+            .filter(|v| v.kind() == "object")
+        else {
+            continue;
+        };
+        for (group, value) in object_entries(file, options) {
+            let Some(choice) = defaults.get(&group) else {
+                continue;
+            };
+            let value = unwrap_expr(value);
+            if !matches!(value.kind(), "identifier" | "shorthand_property_identifier") {
+                continue;
+            }
+            let name = file.text(value);
+            if let Some(slot) = slots
+                .iter_mut()
+                .find(|slot| slot.name == name && slot.initial.is_none())
+            {
+                slot.initial = Some(m::Expr::Literal {
+                    value: choice.clone().into(),
+                });
+            }
+        }
+    }
+}
+
+struct VariantClasses {
+    base: String,
+    on: m::Expr,
+    cases: Vec<(String, String)>,
+}
+
 impl Context<'_> {
     fn component(&self, name: &str) -> Option<String> {
         let (file, export) = symbol(self.files, self.file, name)?;
         let id = format!("{}#{export}", file.path);
         self.signatures.contains_key(&id).then_some(id)
     }
+    fn variant_classes(&self, node: Ast<'_>) -> Option<VariantClasses> {
+        let mut pending = vec![unwrap_expr(node)];
+        let mut invocation = None;
+        while let Some(current) = pending.pop() {
+            if current.kind() == "call_expression"
+                && field(current, "function").is_some_and(|f| {
+                    f.kind() == "identifier" && cva_config(self.file, self.file.text(f)).is_some()
+                })
+            {
+                invocation = Some(current);
+                break;
+            }
+            pending.extend(children(current));
+        }
+        let invocation = invocation?;
+        let local = field(invocation, "function").map(|f| self.file.text(f))?;
+        let (base, variants, defaults) = cva_config(self.file, local)?;
+        let options = field(invocation, "arguments")
+            .and_then(first)
+            .filter(|v| v.kind() == "object");
+        let mut selected: BTreeMap<String, String> = BTreeMap::new();
+        let mut dynamic: Vec<(String, m::Expr)> = Vec::new();
+        for (group, _) in &variants {
+            let supplied = options.and_then(|object| {
+                object_entries(self.file, object)
+                    .into_iter()
+                    .find(|(key, _)| key == group)
+                    .map(|(_, value)| value)
+            });
+            let supplied_expr = supplied.and_then(|value| {
+                let value = unwrap_expr(value);
+                self.binding(value).and_then(|expr| match &expr {
+                    m::Expr::Slot { path, .. } if path.is_empty() => Some(expr),
+                    _ => None,
+                })
+            });
+            if let Some(expr) = supplied_expr {
+                dynamic.push((group.clone(), expr));
+                continue;
+            }
+            let choice = supplied
+                .and_then(|value| literal(self.file, unwrap_expr(value)))
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .or_else(|| defaults.get(group).cloned());
+            if let Some(choice) = choice {
+                selected.insert(group.clone(), choice.clone());
+            }
+        }
+        let (dynamic_group, on) = dynamic.first()?;
+        for (group, _) in dynamic.iter().skip(1) {
+            if let Some(choice) = defaults.get(group) {
+                selected.insert(group.clone(), choice.clone());
+            }
+        }
+        let dynamic_group = dynamic_group.clone();
+        let choices = variants
+            .iter()
+            .find(|(group, _)| group == &dynamic_group)?
+            .1
+            .clone();
+        let mut cases = Vec::new();
+        for (choice, classes) in choices {
+            let mut parts = vec![base.clone()];
+            for (group, group_choices) in &variants {
+                if group == &dynamic_group {
+                    parts.push(classes.clone());
+                } else if let Some(wanted) = selected.get(group) {
+                    parts.push(
+                        group_choices
+                            .iter()
+                            .find(|(choice, _)| choice == wanted)
+                            .map(|(_, classes)| classes.clone())
+                            .unwrap_or_default(),
+                    );
+                }
+            }
+            cases.push((choice, join_classes(parts)));
+        }
+        Some(VariantClasses {
+            base,
+            on: on.clone(),
+            cases,
+        })
+    }
+
     fn binding(&self, mut n: Ast<'_>) -> Option<m::Expr> {
         let mut path = Vec::new();
         while n.kind() == "member_expression" {
@@ -184,7 +418,7 @@ impl Context<'_> {
             }
             return None;
         }
-        if n.kind() != "identifier" {
+        if !matches!(n.kind(), "identifier" | "shorthand_property_identifier") {
             return None;
         }
         path.reverse();
@@ -747,19 +981,49 @@ impl Context<'_> {
                 .unwrap_or(m::Expr::Literal { value: true.into() });
             el.props.insert(key.into(), expr);
         }
-        let class_text = attr(self.file, open, "className").map_or_else(
-            || Some(String::new()),
-            |value| match self.expr(value) {
-                m::Expr::Literal { value } => value.as_str().map(str::to_owned),
-                _ => None,
-            },
-        );
+        let variant_classes =
+            attr(self.file, open, "className").and_then(|v| self.variant_classes(v));
+        let class_text = if let Some(variant) = &variant_classes {
+            Some(variant.base.clone())
+        } else {
+            attr(self.file, open, "className").map_or_else(
+                || Some(String::new()),
+                |value| match self.expr(value) {
+                    m::Expr::Literal { value } => value.as_str().map(str::to_owned),
+                    _ => None,
+                },
+            )
+        };
         if name.starts_with(char::is_lowercase) {
-            if let Some(sheet) = self.built {
-                sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+            let sheets: Vec<&style::built::Sheet<'_>> = if let Some(sheet) = self.built {
+                vec![sheet]
             } else {
-                for sheet in self.sources {
-                    sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+                self.sources.iter().collect()
+            };
+            for sheet in &sheets {
+                sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+            }
+            if let Some(variant) = variant_classes {
+                for (choice, classes) in variant.cases {
+                    let mut conditional = el.clone();
+                    conditional
+                        .unresolved_style
+                        .retain(|item| item.syntax == m::StyleSyntax::Inline);
+                    for sheet in &sheets {
+                        sheet.apply_classes(self.file, open, &mut conditional, Some(&classes));
+                    }
+                    for mut declaration in conditional.style {
+                        if el.style.iter().any(|existing| *existing == declaration) {
+                            continue;
+                        }
+                        let Some(when) =
+                            variant_condition(declaration.when.as_ref(), &variant.on, &choice)
+                        else {
+                            continue;
+                        };
+                        declaration.when = Some(when);
+                        el.style.push(declaration);
+                    }
                 }
             }
             if class_text.is_some()

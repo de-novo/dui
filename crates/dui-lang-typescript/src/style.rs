@@ -164,7 +164,7 @@ pub(crate) fn export_value(value: V, text: &str) -> V {
     }
 }
 
-fn nonnegative_length(value: &V) -> bool {
+pub(crate) fn nonnegative_length(value: &V) -> bool {
     match value {
         V::Length { value, .. } => *value >= 0.,
         V::Clamp {

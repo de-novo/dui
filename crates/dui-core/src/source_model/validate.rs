@@ -706,6 +706,12 @@ impl<'a> Check<'a> {
                 self.error(format!("{pointer}/{name}/value"), "must be a finite number");
             }
         }
+        if condition.equals.is_some() && condition.expr.is_none() {
+            self.error(
+                format!("{pointer}/equals"),
+                "requires expr so the compared value is explicit",
+            );
+        }
         if let Some(expr) = &condition.expr {
             self.expr(&format!("{pointer}/expr"), expr, scope);
         }

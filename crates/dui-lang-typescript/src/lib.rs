@@ -620,7 +620,9 @@ fn extract_in_context_impl(
     for file in files.values().filter(|f| f.path.ends_with(".tsx")) {
         for (name, f) in file.functions() {
             let id = format!("{}#{name}", file.path);
-            let slot = &signatures[&id];
+            let mut slot_values = signatures[&id].clone();
+            render::apply_variant_defaults(file, f, &mut slot_values);
+            let slot = &slot_values;
             let mut cx = render::Context {
                 file,
                 files: &files,

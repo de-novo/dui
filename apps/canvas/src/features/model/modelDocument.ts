@@ -46,6 +46,7 @@ type Condition = {
   interaction?: "hover" | "focus" | "pressed" | "disabled";
   colorScheme?: "light" | "dark";
   expr?: Expr;
+  equals?: Json;
 };
 type Declaration = {
   property: string;
@@ -225,8 +226,7 @@ const compositeProperties = new Set([
 ]);
 
 const baseCss = `
-html{line-height:1.15}body{margin:0;color:#111;background:#fff}h1{font-size:2em;font-weight:700;margin:.67em 0}h2{font-size:1.5em;font-weight:700;margin:.83em 0}p{margin:1em 0}ul,ol,dl{margin:1em 0;padding-inline-start:40px}button{font:inherit;color:inherit;background:buttonface;border:1px solid buttonborder;border-radius:0;padding:1px 6px}*,*::before,*::after{box-sizing:border-box}
-*{box-sizing:border-box}:host{display:block;color:#111;background:#fff}a{text-decoration:underline}button,input,textarea,select{font:inherit}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
+:host{display:block}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
 `;
 
 type LengthEnvironment = {
@@ -512,7 +512,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (when.expr) {
         const value = resolveExpr(when.expr, scope);
         if (!value.known) unknown = true;
-        else if (!truthy(value.value)) return "no";
+        else if (when.equals !== undefined ? !sameJson(value.value, when.equals) : !truthy(value.value))
+          return "no";
       }
       return unknown ? "unknown" : "yes";
     }
@@ -607,6 +608,22 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       for (const u of n.unresolvedStyle ?? []) note(n, u.text);
     }
 
+    function resolvedPropEntries(n: Node, scope: Scope): [string, unknown][] {
+      const entries: [string, unknown][] = [];
+      for (const [name, expr] of Object.entries(n.props ?? {})) {
+        const value = resolveExpr(expr, scope);
+        if (!value.known || value.value === undefined || value.value === null) continue;
+        if (
+          name.startsWith("...") &&
+          typeof value.value === "object" &&
+          !Array.isArray(value.value)
+        ) {
+          for (const [key, spread] of Object.entries(value.value)) entries.push([key, spread]);
+        } else entries.push([name, value.value]);
+      }
+      return entries;
+    }
+
     function applyProps(el: HTMLElement, n: Node, scope: Scope) {
       const visualAttributes = new Set([
         "type",
@@ -627,19 +644,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         "rowspan",
         "for",
       ]);
-      const entries: [string, unknown][] = [];
-      for (const [name, expr] of Object.entries(n.props ?? {})) {
-        const value = resolveExpr(expr, scope);
-        if (!value.known || value.value === undefined || value.value === null) continue;
-        if (
-          name.startsWith("...") &&
-          typeof value.value === "object" &&
-          !Array.isArray(value.value)
-        ) {
-          for (const [key, spread] of Object.entries(value.value)) entries.push([key, spread]);
-        } else entries.push([name, value.value]);
-      }
-      for (const [name, raw] of entries) {
+      for (const [name, raw] of resolvedPropEntries(n, scope)) {
         if (!visualAttributes.has(name)) continue;
         const attr = name === "for" ? "for" : name;
         if (typeof raw === "boolean") {
@@ -706,9 +711,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
             nodes: n.children,
             scope: copyScope(scope),
           };
-          for (const slot of target.slots ?? [])
-            if (slot.type.kind === "node" && slot.name === "children" && !props.has(slot.name))
-              props.set(slot.name, content);
+          const acceptsChildren = (target.slots ?? []).some(
+            (slot) => slot.name === "children" || slot.name.startsWith("..."),
+          );
+          if (acceptsChildren && !props.has("children")) props.set("children", content);
         }
         return component(n.component!, props, stack);
       }
@@ -776,7 +782,16 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       el.dataset.modelNode = n.id;
       applyStyles(el, n, scope);
       applyProps(el, n, scope);
-      drawChildren(n.children, scope, stack, el);
+      const childrenProp = resolvedPropEntries(n, scope)
+        .reverse()
+        .find(([name]) => name === "children")?.[1];
+      if (isNodeContent(childrenProp)) {
+        drawChildren(childrenProp.nodes, childrenProp.scope, stack, el);
+      } else if (typeof childrenProp === "string" || typeof childrenProp === "number") {
+        el.append(String(childrenProp));
+      } else {
+        drawChildren(n.children, scope, stack, el);
+      }
       return el;
     }
 

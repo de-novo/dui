@@ -200,8 +200,33 @@ fn alpha_mix(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<V> {
         ),
     })
 }
+fn css_words(raw: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut start = None;
+    let mut depth = 0usize;
+    for (index, c) in raw.char_indices() {
+        match c {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            c if c.is_ascii_whitespace() && depth == 0 => {
+                if let Some(from) = start.take() {
+                    out.push(&raw[from..index]);
+                }
+            }
+            _ => {}
+        }
+        if !c.is_ascii_whitespace() && start.is_none() {
+            start = Some(index);
+        }
+    }
+    if let Some(from) = start {
+        out.push(&raw[from..]);
+    }
+    out
+}
+
 fn four_sides(raw: &str) -> Option<[&str; 4]> {
-    let tokens: Vec<_> = raw.split_ascii_whitespace().collect();
+    let tokens = css_words(raw);
     match tokens.as_slice() {
         [a] => Some([a, a, a, a]),
         [a, b] => Some([a, b, a, b]),
@@ -536,6 +561,7 @@ fn merge_width_condition(base: Option<&m::Condition>, next: m::Condition) -> m::
         interaction: None,
         color_scheme: None,
         expr: None,
+        equals: None,
     });
     if let Some(width) = next.min_width {
         out.min_width = Some(match out.min_width {
@@ -584,6 +610,7 @@ fn width_condition(raw: &str) -> Option<m::Condition> {
         interaction: None,
         color_scheme: None,
         expr: None,
+        equals: None,
     })
 }
 
@@ -615,7 +642,13 @@ fn resolved_var<'a>(
     }
     let (name, fallback) = split_var_argument(raw)?;
     if let Some(value) = vars.get(name).copied().flatten() {
-        return Some(value);
+        // Theme variables commonly alias another variable (`--default-font-family:
+        // var(--font-sans)`). Follow that chain; a cycle or unknown link stays unresolved.
+        return if value.starts_with("var(") {
+            resolved_var(value, vars, depth + 1)
+        } else {
+            Some(value)
+        };
     }
     let fallback = fallback?;
     if fallback.starts_with("var(") {
@@ -1137,7 +1170,8 @@ impl<'a> Sheet<'a> {
             } else {
                 raw
             };
-            return uniform_gap(token);
+            return model_length(property, token, vars)
+                .filter(|value| matches!(value, V::Length { .. } | V::Clamp { .. }));
         }
         if rule.name == "background-image" {
             let (first, last) = raw
@@ -1207,6 +1241,12 @@ impl<'a> Sheet<'a> {
             return Some(values[index].clone());
         }
         if matches!(rule.name, "padding-block" | "margin-block") && self.horizontal_block {
+            let trimmed = raw.trim();
+            if trimmed.starts_with("calc(") && trimmed.ends_with(')') {
+                let value = model_length(property, trimmed, vars)?;
+                return (rule.name.starts_with("margin") || super::nonnegative_length(&value))
+                    .then_some(value);
+            }
             let mut parts = raw.split_ascii_whitespace();
             let first = parts.next()?;
             let last = parts.next().unwrap_or(first);
@@ -1675,9 +1715,10 @@ impl<'a> Sheet<'a> {
         // With a proven class list, selectors whose outcome cannot be proven are almost always
         // pseudo, responsive or content-dependent variants that do not apply to the resting card.
         // Keep uncertainty only for dynamic class strings, where the base rule itself may exist.
-        let unknown = unknown.filter(|_| {
-            classes.is_none()
-                && (unknown_rank.is_some_and(|(important, _)| important) || rank.is_none())
+        let unknown = unknown.filter(|rule| {
+            rule.uncertain
+                || (classes.is_none()
+                    && (unknown_rank.is_some_and(|(important, _)| important) || rank.is_none()))
         });
         if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
         {

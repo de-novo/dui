@@ -594,7 +594,8 @@
         "maxWidth": { "$ref": "#/$defs/length" },
         "interaction": { "enum": ["hover", "focus", "pressed", "disabled"] },
         "colorScheme": { "enum": ["light", "dark"] },
-        "expr": { "$ref": "#/$defs/expr" }
+        "expr": { "$ref": "#/$defs/expr" },
+        "equals": true
       }
     },
     "styleSource": {

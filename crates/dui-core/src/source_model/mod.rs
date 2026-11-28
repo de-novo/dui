@@ -567,6 +567,9 @@ pub struct Condition {
     pub color_scheme: Option<ColorScheme>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expr: Option<Expr>,
+    /// When present, `expr` must resolve to exactly this JSON value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equals: Option<Value>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
