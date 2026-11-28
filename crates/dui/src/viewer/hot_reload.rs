@@ -119,11 +119,67 @@ fn diff_graph(
     patch
 }
 
-fn entity_values<T: serde::Serialize>(items: &[T]) -> Vec<Value> {
-    items
+fn diff_entities<T: serde::Serialize + PartialEq>(
+    old: &[T],
+    new: &[T],
+    key: impl Fn(&T) -> &str,
+) -> Value {
+    let old: BTreeMap<String, &T> = old
         .iter()
-        .filter_map(|item| serde_json::to_value(item).ok())
-        .collect()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let new: BTreeMap<String, &T> = new
+        .iter()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let mut upsert = Vec::new();
+    let mut remove = Vec::new();
+    for (id, value) in &new {
+        if old.get(id).copied() != Some(*value)
+            && let Ok(value) = serde_json::to_value(*value)
+        {
+            upsert.push(value);
+        }
+    }
+    for id in old.keys() {
+        if !new.contains_key(id) {
+            remove.push(id.clone());
+        }
+    }
+    json!({"upsert":upsert,"remove":remove})
+}
+
+fn diff_entities_except<T: serde::Serialize + PartialEq>(
+    old: &[T],
+    new: &[T],
+    key: impl Fn(&T) -> &str,
+    assume_unchanged: &BTreeSet<String>,
+) -> Value {
+    let old: BTreeMap<String, &T> = old
+        .iter()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let new: BTreeMap<String, &T> = new
+        .iter()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let mut upsert = Vec::new();
+    let mut remove = Vec::new();
+    for (id, value) in &new {
+        let unchanged = assume_unchanged.contains(id) && old.contains_key(id);
+        if !unchanged
+            && old.get(id).copied() != Some(*value)
+            && let Ok(value) = serde_json::to_value(*value)
+        {
+            upsert.push(value);
+        }
+    }
+    for id in old.keys() {
+        if !new.contains_key(id) {
+            remove.push(id.clone());
+        }
+    }
+    json!({"upsert":upsert,"remove":remove})
 }
 
 fn dependency_graph(model: &SourceModel) -> BTreeMap<String, Vec<String>> {
@@ -199,13 +255,11 @@ fn affected_metadata(
             changed.insert((*path).clone());
         }
     }
-    let style_global = changed
-        .iter()
-        .any(|path| path.ends_with(".css") && !path.ends_with(".module.css"));
+    let style_global = changed.iter().any(|path| path.ends_with(".css"));
     let mut affected_files = reverse_closure(&old_graph, &new_graph, &changed);
     if style_global {
-        // Theme and ordinary stylesheet cascade is global in schema v1. Module CSS stays scoped
-        // to its importers; other CSS invalidates every card rather than hiding a stale style.
+        // Theme extraction and the ordinary stylesheet cascade are global in schema v1.
+        // Any CSS edit therefore invalidates every card rather than hiding a stale style.
         affected_files.extend(new.files.iter().map(|file| file.path.clone()));
     }
     let mut affected_components: BTreeSet<String> = new
@@ -240,34 +294,25 @@ fn diff_model(
     scan_changed: &[String],
     parsed_files: &[String],
 ) -> (Value, bool) {
-    let files = diff_keyed(
-        &entity_values(&old.files),
-        &entity_values(&new.files),
-        "path",
-    );
-    let screens = diff_keyed(
-        &entity_values(&old.screens),
-        &entity_values(&new.screens),
-        "id",
-    );
-    let components = diff_keyed(
-        &entity_values(&old.components),
-        &entity_values(&new.components),
-        "id",
-    );
-    let item_schemas = diff_keyed(
-        &entity_values(&old.item_schemas),
-        &entity_values(&new.item_schemas),
-        "id",
-    );
-    let tokens = diff_keyed(
-        &entity_values(&old.tokens),
-        &entity_values(&new.tokens),
-        "id",
-    );
-    let edges = diff_keyed(&entity_values(&old.edges), &entity_values(&new.edges), "id");
     let (changed_files, affected_files, affected_components, affected_screens) =
         affected_metadata(old, new, scan_changed);
+    let files = diff_entities(&old.files, &new.files, |file| &file.path);
+    let screens = diff_entities(&old.screens, &new.screens, |screen| &screen.id);
+    let unchanged_components = new
+        .components
+        .iter()
+        .filter(|component| !affected_components.contains(&component.id))
+        .map(|component| component.id.clone())
+        .collect();
+    let components = diff_entities_except(
+        &old.components,
+        &new.components,
+        |component| &component.id,
+        &unchanged_components,
+    );
+    let item_schemas = diff_entities(&old.item_schemas, &new.item_schemas, |schema| &schema.id);
+    let tokens = diff_entities(&old.tokens, &new.tokens, |token| &token.id);
+    let edges = diff_entities(&old.edges, &new.edges, |edge| &edge.id);
     let mut patch = json!({
         "baseRevision":base_revision,
         "files":files,
@@ -379,6 +424,8 @@ fn scan_changed(
         .chain(after.keys())
         .filter(|path| before.get(*path) != after.get(*path))
         .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect()
 }
 
@@ -569,7 +616,9 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
             scan = next;
             match extract_incremental(&project, &entry, &mut cache) {
                 Ok((model, stats)) => {
-                    if model == previous {
+                    let (patch, model_changed) =
+                        diff_model(&previous, &model, 0, &changed, &stats.parsed);
+                    if !model_changed {
                         continue;
                     }
                     let current_projection = tsx_map::project_model(&previous);
@@ -582,8 +631,6 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         &projection.edges,
                         &projection.discovery,
                     );
-                    let (patch, model_changed) =
-                        diff_model(&previous, &model, 0, &changed, &stats.parsed);
                     publish_state(&inner, |state| {
                         state.revision += 1;
                         state.status_revision += 1;
@@ -609,5 +656,150 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                 }),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dui_core::source_model::{
+        Component, Extractor, Language, Location, Placeholder, SourceFile,
+    };
+
+    fn location(file: &str) -> Location {
+        Location {
+            file: file.into(),
+            line: 1,
+            column: 1,
+            start: 0,
+            end: 1,
+        }
+    }
+
+    fn source_file(path: &str, sha256: &str, imports: &[&str]) -> SourceFile {
+        SourceFile {
+            path: path.into(),
+            language: if path.ends_with(".css") {
+                Language::Css
+            } else {
+                Language::Typescript
+            },
+            sha256: sha256.into(),
+            imports: imports.iter().map(|import| (*import).to_owned()).collect(),
+        }
+    }
+
+    fn component(id: &str, file: &str, text: &str) -> Component {
+        Component {
+            id: id.into(),
+            name: id.rsplit('#').next().unwrap_or(id).into(),
+            location: location(file),
+            slots: vec![],
+            root: Node::Placeholder(Placeholder {
+                id: format!("{id}@0"),
+                reason: text.into(),
+                location: location(file),
+            }),
+        }
+    }
+
+    fn model(files: Vec<SourceFile>, components: Vec<Component>) -> SourceModel {
+        SourceModel {
+            schema_version: dui_core::source_model::SCHEMA_VERSION,
+            extractor: Extractor {
+                name: "test".into(),
+                version: "0".into(),
+            },
+            files,
+            screens: vec![],
+            components,
+            document_style: None,
+            item_schemas: vec![],
+            tokens: vec![],
+            edges: vec![],
+            diagnostics: vec![],
+        }
+    }
+
+    fn upsert_ids(patch: &Value, entity: &str) -> BTreeSet<String> {
+        patch[entity]["upsert"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|value| value["id"].as_str().map(str::to_owned))
+            .collect()
+    }
+
+    #[test]
+    fn scan_changed_reports_each_changed_path_once() {
+        let before = BTreeMap::from([("src/a.tsx".to_owned(), (10, 20))]);
+        let after = BTreeMap::from([("src/a.tsx".to_owned(), (10, 21))]);
+        assert_eq!(scan_changed(&before, &after), vec!["src/a.tsx"]);
+    }
+
+    #[test]
+    fn identical_models_produce_an_empty_patch() {
+        let model = model(
+            vec![source_file("src/a.tsx", "same", &[])],
+            vec![component("src/a.tsx#A", "src/a.tsx", "same")],
+        );
+        let (patch, changed) = diff_model(&model, &model, 0, &[], &[]);
+        assert!(!changed);
+        for entity in [
+            "files",
+            "screens",
+            "components",
+            "itemSchemas",
+            "tokens",
+            "edges",
+        ] {
+            assert_eq!(patch[entity]["upsert"], json!([]), "{entity} upsert");
+            assert_eq!(patch[entity]["remove"], json!([]), "{entity} remove");
+        }
+    }
+
+    #[test]
+    fn dependency_edits_mark_dependents_without_marking_unrelated_files() {
+        let old = model(
+            vec![
+                source_file("src/app.tsx", "app", &["src/child.tsx"]),
+                source_file("src/child.tsx", "child-before", &[]),
+                source_file("src/other.tsx", "other", &[]),
+            ],
+            vec![
+                component("src/app.tsx#App", "src/app.tsx", "before app"),
+                component("src/child.tsx#Child", "src/child.tsx", "before child"),
+                component("src/other.tsx#Other", "src/other.tsx", "same other"),
+            ],
+        );
+        let mut new = old.clone();
+        new.files[1].sha256 = "child-after".into();
+        new.components[0].root = Node::Placeholder(Placeholder {
+            id: "src/app.tsx#App@0".into(),
+            reason: "after app".into(),
+            location: location("src/app.tsx"),
+        });
+        new.components[1].root = Node::Placeholder(Placeholder {
+            id: "src/child.tsx#Child@0".into(),
+            reason: "after child".into(),
+            location: location("src/child.tsx"),
+        });
+        let (patch, changed) = diff_model(&old, &new, 0, &["src/child.tsx".into()], &[]);
+        assert!(changed);
+        assert_eq!(
+            patch["affectedFiles"],
+            json!(["src/app.tsx", "src/child.tsx"])
+        );
+        assert_eq!(
+            patch["affectedComponents"],
+            json!(["src/app.tsx#App", "src/child.tsx#Child"])
+        );
+        assert_eq!(
+            upsert_ids(&patch, "components"),
+            BTreeSet::from([
+                "src/app.tsx#App".to_owned(),
+                "src/child.tsx#Child".to_owned()
+            ])
+        );
     }
 }
