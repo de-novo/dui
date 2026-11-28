@@ -60,7 +60,8 @@ function scan(target, root) {
   }
 }
 function component(model, wanted) {
-  return model.components?.find((c) => c.name === wanted) ?? model.components?.[0];
+  if (!wanted) return model.components?.[0];
+  return model.components?.find((c) => c.name === wanted || c.id === wanted);
 }
 function sourceTraces(root, traces) {
   return (traces ?? []).map((trace) => {
@@ -114,7 +115,11 @@ function valuesFor(model, comp, byName, ignoredKeys = new Set()) {
       bindings.push({ key: name, matched: false, valueSha256: payloadHash(value) });
     }
   }
-  return { values, missing, bindings };
+  const supplied = new Set(Object.keys(values));
+  const unsuppliedQuerySlots = (comp?.slots ?? [])
+    .filter((slot) => slot.kind === "query" && !supplied.has(slot.id))
+    .map((slot) => slot.name);
+  return { values, missing, bindings, unsuppliedQuerySlots };
 }
 function comparePng(aPath, bPath, diffPath) {
   if (!fs.existsSync(aPath) || !fs.existsSync(bPath)) return undefined;
@@ -182,6 +187,7 @@ for (const [target, config] of Object.entries(fixtures.targets)) {
     const expressionValues = config.expressions?.[state] ?? {};
     const stateRecord = {
       missingSlots: assignment.missing,
+      unsuppliedQuerySlots: assignment.unsuppliedQuerySlots,
       inputBindings: assignment.bindings,
       expressionBindings: Object.keys(expressionValues).sort(),
       payloadSha256: payloadHash({ slots: input, expressions: expressionValues }),
