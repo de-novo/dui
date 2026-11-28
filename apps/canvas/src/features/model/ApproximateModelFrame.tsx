@@ -68,12 +68,10 @@ export function useApproximateModelRender(
 /** Mounts the renderer's inert markup in a shadow root. It cannot receive clicks or run code. */
 export function ApproximateModelFrame({
   render,
-  label,
   unresolvedLabel,
   showUnresolved = true,
 }: {
   render: ModelRenderResult;
-  label: string;
   unresolvedLabel?: string;
   /** Mobile cards have no caption, so they keep the compact unresolved pill in the frame. */
   showUnresolved?: boolean;
@@ -124,7 +122,6 @@ export function ApproximateModelFrame({
           transform: scale === 1 ? undefined : `scale(${scale})`,
         }}
       />
-      <span className="approximate-model-badge">{label}</span>
       {showUnresolved && render.unresolved.length > 0 && unresolvedLabel && (
         <span className="approximate-model-unresolved" title={unresolvedTitle}>
           {unresolvedLabel}

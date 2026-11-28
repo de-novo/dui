@@ -220,7 +220,6 @@ export function CaptureCard({
         ) : modelCard ? (
           <ApproximateModelFrame
             render={modelCard}
-            label={t.approximateModel}
             unresolvedLabel={
               modelCard.unresolved.length > 0
                 ? t.unresolvedModelParts(modelCard.unresolved.length)
@@ -335,6 +334,7 @@ export function CaptureCard({
             {screen.sourceLocation.line === undefined ? "" : ":" + screen.sourceLocation.line}
           </small>
         )}
+        {modelCard && <small>{t.approximateModel}</small>}
         {modelCard && modelCard.unresolved.length > 0 && (
           <small title={modelCard.unresolved.join("\n")}>
             {t.unresolvedModelParts(modelCard.unresolved.length)}
