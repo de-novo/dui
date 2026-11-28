@@ -14,9 +14,12 @@
     "ajv": "8.20.0",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.2",
+    "harfbuzzjs": "1.6.4",
     "lucide-react": "1.77.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "taffy-layout": "4.0.0",
+    "typeface-roboto": "1.1.13"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.5",

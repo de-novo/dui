@@ -37,10 +37,18 @@ import {
   formatShowcaseRunLabel,
 } from "./model/runLabels";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
-import { createDomModelRenderer, decodeModel, type Model } from "./features/model/modelDocument";
+import { decodeModel, type Model, type SourceModelRenderer } from "./features/model/modelDocument";
+import { createEngineModelRenderer } from "./features/model/engineModelRenderer";
 import { useSourceModelHotReload } from "./features/model/useSourceModelHotReload";
 
-const modelRenderer = createDomModelRenderer();
+const engineUnavailableRenderer: SourceModelRenderer = {
+  render: (_model, _componentId) => {
+    const markup =
+      '<div class="dui-engine-error" style="padding:8px;color:#b00020">dui layout engine unavailable</div>';
+    return { html: markup, markup, unresolved: ["engine-unavailable"] };
+  },
+};
+const modelRendererPromise = createEngineModelRenderer().catch(() => engineUnavailableRenderer);
 
 const CaptureDiffView = lazy(() =>
   import("./features/diff/CaptureDiffView").then((m) => ({ default: m.CaptureDiffView })),
@@ -127,6 +135,16 @@ function MapView({
   );
   const archive = hot.archive;
   const sourceModel = hot.model;
+  const [modelRenderer, setModelRenderer] = useState<SourceModelRenderer>();
+  useEffect(() => {
+    let active = true;
+    void modelRendererPromise.then((renderer) => {
+      if (active) setModelRenderer(() => renderer);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
