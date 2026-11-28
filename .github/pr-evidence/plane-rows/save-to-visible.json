@@ -1,0 +1,114 @@
+{
+  "desktop": {
+    "samples": [
+      {
+        "iteration": 0,
+        "status": "reflected",
+        "ms": 4655
+      },
+      {
+        "iteration": 1,
+        "status": "reflected",
+        "ms": 934.9
+      },
+      {
+        "iteration": 2,
+        "status": "reflected",
+        "ms": 932.1
+      },
+      {
+        "iteration": 3,
+        "status": "reflected",
+        "ms": 939
+      },
+      {
+        "iteration": 4,
+        "status": "reflected",
+        "ms": 966.3
+      },
+      {
+        "iteration": 5,
+        "status": "reflected",
+        "ms": 933.5
+      },
+      {
+        "iteration": 6,
+        "status": "reflected",
+        "ms": 950
+      },
+      {
+        "iteration": 7,
+        "status": "reflected",
+        "ms": 933
+      },
+      {
+        "iteration": 8,
+        "status": "reflected",
+        "ms": 954.7
+      },
+      {
+        "iteration": 9,
+        "status": "reflected",
+        "ms": 934.5
+      }
+    ],
+    "medianMs": 934.9,
+    "p95Ms": 4655
+  },
+  "mobile": {
+    "samples": [
+      {
+        "iteration": 0,
+        "status": "reflected",
+        "ms": 4664.8
+      },
+      {
+        "iteration": 1,
+        "status": "reflected",
+        "ms": 929.1
+      },
+      {
+        "iteration": 2,
+        "status": "reflected",
+        "ms": 943
+      },
+      {
+        "iteration": 3,
+        "status": "reflected",
+        "ms": 933.6
+      },
+      {
+        "iteration": 4,
+        "status": "reflected",
+        "ms": 960.9
+      },
+      {
+        "iteration": 5,
+        "status": "reflected",
+        "ms": 927.2
+      },
+      {
+        "iteration": 6,
+        "status": "reflected",
+        "ms": 943.6
+      },
+      {
+        "iteration": 7,
+        "status": "reflected",
+        "ms": 943.2
+      },
+      {
+        "iteration": 8,
+        "status": "reflected",
+        "ms": 949.7
+      },
+      {
+        "iteration": 9,
+        "status": "reflected",
+        "ms": 944.8
+      }
+    ],
+    "medianMs": 943.2,
+    "p95Ms": 4664.8
+  }
+}
