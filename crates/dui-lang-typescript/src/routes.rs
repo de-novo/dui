@@ -171,7 +171,7 @@ fn identifier_expression_located<'a>(
     let (module, exported) = file.bindings.get(name)?;
     let target = files.get(module)?;
     let local = target.exported(exported)?;
-    top_level_expression(target, local).map(|expression| (target, expression))
+    top_level_expression(target, local).map(|expression| (target.as_ref(), expression))
 }
 
 fn object_value<'a>(file: &File, object: Ast<'a>, key: &str) -> Option<Ast<'a>> {
@@ -728,6 +728,16 @@ fn discover_object_routes(files: &Files, model: &mut m::SourceModel) {
         diagnostics: Vec::new(),
     };
     for file in files.values().filter(|file| !file.path.ends_with(".css")) {
+        if ![
+            "createBrowserRouter",
+            "createHashRouter",
+            "createMemoryRouter",
+        ]
+        .iter()
+        .any(|needle| file.src.contains(needle))
+        {
+            continue;
+        }
         for node in descendants(file.tree.root_node()) {
             if node.kind() != "call_expression" || !is_router_factory(file, node) {
                 continue;
@@ -963,6 +973,9 @@ fn discover_navigate_edges(files: &Files, model: &mut m::SourceModel) {
         let Some(file) = files.get(path) else {
             continue;
         };
+        if !file.src.contains("useNavigate") {
+            continue;
+        }
         let Some((_, function)) = file.functions().into_iter().find(|(n, _)| *n == name) else {
             continue;
         };

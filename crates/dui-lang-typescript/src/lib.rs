@@ -11,13 +11,12 @@ mod syntax;
 use dui_core::source_model as m;
 pub use fonts::cached_font_bytes;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 use syntax::{File, children, field, first, unwrap_expr};
 pub use syntax::{LoadStats, ParseCache};
 use tree_sitter::Node as Ast;
 
-type Files = BTreeMap<String, File>;
+type Files = BTreeMap<String, Arc<File>>;
 fn symbol<'a>(files: &'a Files, file: &'a File, name: &'a str) -> Option<(&'a File, &'a str)> {
     if let Some((module, export)) = file.bindings.get(name) {
         let target = files.get(module)?;
@@ -585,7 +584,7 @@ fn extract_in_context_impl(
             } else {
                 m::Language::Typescript
             },
-            sha256: format!("{:x}", Sha256::digest(file.src.as_bytes())),
+            sha256: file.sha256.clone(),
             imports: file.imports.iter().cloned().collect(),
         });
         if css {

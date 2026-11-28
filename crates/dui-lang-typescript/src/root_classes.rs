@@ -24,7 +24,11 @@ fn first_array_string(src: &str, array: &str) -> Option<String> {
     None
 }
 
-fn array_first(files: &BTreeMap<String, File>, file: &File, array: &str) -> Option<String> {
+fn array_first(
+    files: &BTreeMap<String, std::sync::Arc<File>>,
+    file: &File,
+    array: &str,
+) -> Option<String> {
     if let Some((module, export)) = file.bindings.get(array) {
         let target = files.get(module)?;
         return first_array_string(&target.src, export);
@@ -60,7 +64,9 @@ fn template_parts(src: &str, add: usize) -> Option<(String, String, String)> {
 /// enumerable default. This deliberately recognizes only a narrow provider shape: a template
 /// class with one state variable, and a same-file `<array>[0]` fallback whose first item is a
 /// string literal. Anything more dynamic remains unknown rather than guessed.
-pub(crate) fn default_document_classes(files: &BTreeMap<String, File>) -> Vec<String> {
+pub(crate) fn default_document_classes(
+    files: &BTreeMap<String, std::sync::Arc<File>>,
+) -> Vec<String> {
     let mut out = BTreeSet::new();
     for file in files.values() {
         if !matches!(
