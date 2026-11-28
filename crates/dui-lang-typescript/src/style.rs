@@ -611,6 +611,53 @@ fn inline(f: &File, pair: Ast<'_>) -> Option<(Vec<P>, V)> {
             });
         return Some((vec![property], value));
     }
+    if matches!(
+        css_name.as_str(),
+        "display" | "position" | "overflow" | "overflow-x"
+    ) {
+        let keyword = literal
+            .as_ref()
+            .and_then(|v| v.as_str())?
+            .trim()
+            .to_ascii_lowercase();
+        let valid = match css_name.as_str() {
+            "display" => matches!(
+                keyword.as_str(),
+                "block" | "inline" | "inline-block" | "flex" | "inline-flex" | "grid" | "none"
+            ),
+            "position" => matches!(
+                keyword.as_str(),
+                "static" | "relative" | "absolute" | "fixed" | "sticky"
+            ),
+            _ => matches!(keyword.as_str(), "visible" | "hidden" | "scroll" | "auto"),
+        };
+        if !valid {
+            return None;
+        }
+        let property = match css_name.as_str() {
+            "display" => P::Display,
+            "position" => P::Position,
+            _ => P::OverflowX,
+        };
+        return Some((vec![property], V::Keyword { value: keyword }));
+    }
+    if matches!(css_name.as_str(), "top" | "right" | "bottom" | "left") {
+        let value = if let Some(n) = literal.as_ref().and_then(|v| v.as_f64()) {
+            V::Length {
+                value: n,
+                unit: m::LengthUnit::Px,
+            }
+        } else {
+            length(literal.as_ref().and_then(|v| v.as_str())?)?
+        };
+        let property = match css_name.as_str() {
+            "top" => P::Top,
+            "right" => P::Right,
+            "bottom" => P::Bottom,
+            _ => P::Left,
+        };
+        return Some((vec![property], value));
+    }
     if let Some(mapped) = flex_keyword(
         &css_name,
         literal.as_ref().and_then(|v| v.as_str()),

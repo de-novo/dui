@@ -1,19 +1,28 @@
 import { useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { useI18n } from "../../i18n/LocaleContext";
-import { drawModel, readModel, type Model } from "./modelDocument";
+import { readModel, type Model, type ModelRenderResult, type SourceModelRenderer } from "./modelDocument";
+import { createEngineModelRenderer } from "./engineModelRenderer";
+
+const unavailableRenderer: SourceModelRenderer = {
+  render: () => {
+    const markup = '<div class="dui-engine-error" style="padding:8px;color:#b00020">dui layout engine unavailable</div>';
+    return { html: markup, markup, unresolved: ["engine-unavailable"] };
+  },
+};
+const renderer = await createEngineModelRenderer().catch(() => unavailableRenderer);
 
 export function ModelView() {
   const { t } = useI18n();
   const [model, setModel] = useState<Model>();
   const [id, setId] = useState("");
   const [error, setError] = useState(false);
-  const [preview, setPreview] = useState<ReturnType<typeof drawModel>>();
+  const [preview, setPreview] = useState<ModelRenderResult>();
   const input = useRef<HTMLInputElement>(null);
   const revision = useRef(0);
   function show(m: Model, key: string) {
     try {
-      const view = drawModel(m, key);
+      const view = renderer.render(m, key);
       setPreview(view);
       setId(key);
       setError(false);

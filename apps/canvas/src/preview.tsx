@@ -37,10 +37,17 @@ import {
   formatShowcaseRunLabel,
 } from "./model/runLabels";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
-import { createDomModelRenderer, decodeModel, type Model } from "./features/model/modelDocument";
+import { decodeModel, type Model, type SourceModelRenderer } from "./features/model/modelDocument";
+import { createEngineModelRenderer } from "./features/model/engineModelRenderer";
 import { useSourceModelHotReload } from "./features/model/useSourceModelHotReload";
 
-const modelRenderer = createDomModelRenderer();
+const engineUnavailableRenderer: SourceModelRenderer = {
+  render: (_model, _componentId) => {
+    const markup = '<div class="dui-engine-error" style="padding:8px;color:#b00020">dui layout engine unavailable</div>';
+    return { html: markup, markup, unresolved: ["engine-unavailable"] };
+  },
+};
+const modelRenderer = await createEngineModelRenderer().catch(() => engineUnavailableRenderer);
 
 const CaptureDiffView = lazy(() =>
   import("./features/diff/CaptureDiffView").then((m) => ({ default: m.CaptureDiffView })),
