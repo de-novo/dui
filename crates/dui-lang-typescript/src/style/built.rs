@@ -298,6 +298,7 @@ struct Rule<'a> {
     selectors: &'a str,
     layer: usize,
     uncertain: bool,
+    when: Option<m::Condition>,
     name: &'a str,
     important: bool,
     value: &'a str,
@@ -305,11 +306,13 @@ struct Rule<'a> {
 }
 
 pub(crate) struct Sheet<'a> {
+    evaluate_width: bool,
     document_vars: BTreeMap<&'a str, Option<&'a str>>,
     root_key: Option<String>,
     root_value: Option<String>,
     horizontal_block: bool,
     rules: BTreeMap<P, Vec<Rule<'a>>>,
+    custom_rules: BTreeMap<&'a str, Vec<Rule<'a>>>,
     selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
     vars: BTreeMap<&'a str, Option<&'a str>>,
@@ -503,22 +506,97 @@ fn width_query(raw: &str, width: u32) -> Option<bool> {
     Some(matched != negate)
 }
 
+fn merge_width_condition(base: Option<&m::Condition>, next: m::Condition) -> m::Condition {
+    let mut out = base.cloned().unwrap_or(m::Condition {
+        min_width: None,
+        max_width: None,
+        interaction: None,
+        color_scheme: None,
+        expr: None,
+    });
+    if let Some(width) = next.min_width {
+        out.min_width = Some(match out.min_width {
+            Some(current) if current.value >= width.value => current,
+            _ => width,
+        });
+    }
+    if let Some(width) = next.max_width {
+        out.max_width = Some(match out.max_width {
+            Some(current) if current.value <= width.value => current,
+            _ => width,
+        });
+    }
+    out
+}
+
+/// Parse a width-only media feature into the model's viewport condition. Unsupported logic stays
+/// uncertain; units remain symbolic so the renderer evaluates them against each logical card.
+fn width_condition(raw: &str) -> Option<m::Condition> {
+    let raw = raw.trim();
+    if raw.starts_with("not all and ") {
+        return None;
+    }
+    let feature = raw.strip_prefix('(')?.strip_suffix(')')?.trim();
+    let (name, value) = feature.split_once(':')?;
+    let super::V::Length { value, unit } = super::length(value.trim())? else {
+        return None;
+    };
+    if value < 0.
+        || !matches!(
+            unit,
+            m::LengthUnit::Px | m::LengthUnit::Rem | m::LengthUnit::Em
+        )
+    {
+        return None;
+    }
+    let width = Some(m::Length { value, unit });
+    let (min_width, max_width) = match name.trim() {
+        "min-width" => (width, None),
+        "max-width" => (None, width),
+        _ => return None,
+    };
+    Some(m::Condition {
+        min_width,
+        max_width,
+        interaction: None,
+        color_scheme: None,
+        expr: None,
+    })
+}
+
 impl<'a> Sheet<'a> {
     pub(crate) fn new(
         f: &'a File,
         width: Option<u32>,
         root_attribute: Option<(&str, &str)>,
     ) -> Result<Self, String> {
+        Self::parse(f, width, root_attribute, true)
+    }
+
+    /// Parse a source-owned stylesheet. Unlike a built bundle, its `@import` statements are
+    /// already represented in the module graph, so the import node itself is not an error.
+    pub(crate) fn source(f: &'a File) -> Result<Self, String> {
+        Self::parse(f, None, None, false)
+    }
+
+    fn parse(
+        f: &'a File,
+        width: Option<u32>,
+        root_attribute: Option<(&str, &str)>,
+        require_bundle: bool,
+    ) -> Result<Self, String> {
         let root = f.tree.root_node();
         if structural_error(f, root) {
             return Err(format!("Cannot parse built CSS: {}", f.path));
         }
         let mut sheet = Self {
+            evaluate_width: width.is_some(),
             document_vars: BTreeMap::new(),
             root_key: root_attribute.map(|(k, _)| k.to_owned()),
             root_value: root_attribute.map(|(_, v)| v.to_owned()),
             horizontal_block: true,
             rules: BTreeMap::new(),
+            custom_rules: BTreeMap::new(),
             vars: BTreeMap::new(),
             selectors: BTreeMap::from([(
                 "",
@@ -532,21 +610,41 @@ impl<'a> Sheet<'a> {
         let mut scoped_variables = std::collections::BTreeSet::new();
         let mut ambiguous_variables = std::collections::BTreeSet::new();
         let mut layers = Vec::new();
-        let mut stack = vec![(root, "", usize::MAX, false)];
-        while let Some((node, selector, layer, uncertain)) = stack.pop() {
+        let mut stack = vec![(root, "", usize::MAX, false, None)];
+        while let Some((node, selector, layer, uncertain, when)) = stack.pop() {
             let parts = children(node);
             match node.kind() {
                 "import_statement" => {
-                    return Err("Built CSS must include its imports in one bundle".into());
+                    if require_bundle {
+                        return Err("Built CSS must include its imports in one bundle".into());
+                    }
                 }
                 "media_statement" => {
                     if let [query, body] = parts.as_slice() {
                         let matches = width.and_then(|w| width_query(f.text(*query), w));
-                        if matches != Some(false) {
-                            stack.push((*body, selector, layer, uncertain || matches.is_none()));
+                        if width.is_some() {
+                            if matches != Some(false) {
+                                stack.push((
+                                    *body,
+                                    selector,
+                                    layer,
+                                    uncertain || matches.is_none(),
+                                    when.clone(),
+                                ));
+                            }
+                        } else if let Some(condition) = width_condition(f.text(*query)) {
+                            let condition = merge_width_condition(when.as_ref(), condition);
+                            stack.push((*body, selector, layer, uncertain, Some(condition)));
+                        } else {
+                            stack.push((*body, selector, layer, true, when.clone()));
                         }
                     } else {
-                        stack.extend(parts.into_iter().rev().map(|p| (p, selector, layer, true)));
+                        stack.extend(
+                            parts
+                                .into_iter()
+                                .rev()
+                                .map(|p| (p, selector, layer, true, when.clone())),
+                        );
                     }
                 }
                 "declaration" => {
@@ -562,6 +660,20 @@ impl<'a> Sheet<'a> {
                         sheet.horizontal_block = false;
                     }
                     if prop.starts_with("--") {
+                        sheet.custom_rules.entry(prop).or_default().push(Rule {
+                            selectors: selector,
+                            layer,
+                            uncertain,
+                            when: when.clone(),
+                            important,
+                            name: prop,
+                            value,
+                            source: m::StyleSource {
+                                syntax: m::StyleSyntax::Stylesheet,
+                                text: f.text(node).into(),
+                                location: f.loc(node),
+                            },
+                        });
                         let root = selector.split(',').map(str::trim).any(|s| s == ":root")
                             && selector
                                 .split(',')
@@ -626,6 +738,7 @@ impl<'a> Sheet<'a> {
                                 layer,
                                 uncertain,
                                 important,
+                                when: when.clone(),
                                 name: prop,
                                 value,
                                 source: m::StyleSource {
@@ -656,6 +769,7 @@ impl<'a> Sheet<'a> {
                             f.text(*selectors),
                             layer,
                             uncertain || !selector.is_empty(),
+                            when.clone(),
                         ));
                     }
                 }
@@ -680,7 +794,7 @@ impl<'a> Sheet<'a> {
                         }
                     }
                     if let Some(body) = body {
-                        stack.push((*body, selector, rank, uncertain));
+                        stack.push((*body, selector, rank, uncertain, when.clone()));
                     }
                 }
                 _ => {
@@ -689,7 +803,7 @@ impl<'a> Sheet<'a> {
                         parts
                             .into_iter()
                             .rev()
-                            .map(|p| (p, selector, layer, unknown)),
+                            .map(|p| (p, selector, layer, unknown, when.clone())),
                     );
                 }
             }
@@ -1173,15 +1287,15 @@ impl<'a> Sheet<'a> {
         (value.is_finite() && value >= 0.).then_some(V::Length { value, unit })
     }
 
-    pub(crate) fn apply(&self, file: &File, open: Ast<'_>, el: &mut m::Element) {
-        let classes = open
-            .children_by_field_name("attribute", &mut open.walk())
-            .find(|a| first(*a).is_some_and(|k| file.text(k) == "className"))
-            .map(|a| children(a).get(1).and_then(|v| crate::literal(file, *v)));
-        let classes = match &classes {
-            None => Some(""),
-            Some(v) => v.as_ref().and_then(|v| v.as_str()),
-        };
+    /// Apply with the class string already proven by the TSX expression evaluator. `None` means
+    /// a dynamic class whose outcome cannot be proven, so class requirements stay uncertain.
+    pub(crate) fn apply_classes(
+        &self,
+        file: &File,
+        open: Ast<'_>,
+        el: &mut m::Element,
+        classes: Option<&str>,
+    ) {
         let mut tag = open;
         let document_scope = loop {
             let name = tag
@@ -1215,9 +1329,97 @@ impl<'a> Sheet<'a> {
             };
             tag = parent;
         };
+        let scoped_vars = self.scoped_vars(file, open, el, classes);
         for &(_, property) in DIRECT {
-            self.apply_property(property, classes, el, file, open, document_scope);
+            self.apply_property(
+                property,
+                classes,
+                el,
+                file,
+                open,
+                document_scope,
+                &scoped_vars,
+            );
         }
+    }
+
+    fn scoped_vars(
+        &self,
+        file: &File,
+        open: Ast<'_>,
+        el: &m::Element,
+        classes: Option<&str>,
+    ) -> BTreeMap<&'a str, Option<&'a str>> {
+        let mut vars = self.vars.clone();
+        let mut chain = vec![(open, el.clone(), classes.map(str::to_owned))];
+        let mut tag = open;
+        loop {
+            let owner = if tag.kind() == "jsx_opening_element" {
+                tag.parent()
+            } else {
+                Some(tag)
+            };
+            let Some(parent) = owner.and_then(|n| n.parent()).and_then(|mut n| {
+                while !matches!(n.kind(), "jsx_element" | "jsx_self_closing_element") {
+                    n = n.parent()?;
+                }
+                n.child_by_field_name("open_tag")
+            }) else {
+                break;
+            };
+            let name = parent
+                .child_by_field_name("name")
+                .map(|n| file.text(n))
+                .unwrap_or("")
+                .to_owned();
+            let class = parent
+                .children_by_field_name("attribute", &mut parent.walk())
+                .find(|a| first(*a).is_some_and(|k| file.text(k) == "className"))
+                .and_then(|a| children(a).get(1).copied())
+                .and_then(|v| crate::literal(file, v))
+                .and_then(|v| v.as_str().map(str::to_owned));
+            let ancestor = m::Element {
+                id: String::new(),
+                tag: name,
+                module: None,
+                props: BTreeMap::new(),
+                style: vec![],
+                unresolved_style: vec![],
+                children: vec![],
+                location: file.loc(parent),
+            };
+            chain.push((parent, ancestor, class));
+            tag = parent;
+        }
+        chain.reverse();
+        for (open, element, classes) in chain {
+            let classes = classes.as_deref();
+            for (name, rules) in &self.custom_rules {
+                let mut best: Option<((usize, u32, usize), &str)> = None;
+                for (order, rule) in rules.iter().enumerate() {
+                    if rule.uncertain || rule.important || rule.when.is_some() {
+                        continue;
+                    }
+                    for selector in &self.selectors[rule.selectors] {
+                        if selector.subject.excludes(classes, &element, false) {
+                            continue;
+                        }
+                        if let Some(Some(specificity)) =
+                            contextual_specificity(selector.text, classes, &element, file, open)
+                        {
+                            let rank = (rule.layer, specificity, order);
+                            if best.as_ref().is_none_or(|(old, _)| rank >= *old) {
+                                best = Some((rank, rule.value));
+                            }
+                        }
+                    }
+                }
+                if let Some((_, value)) = best {
+                    vars.insert(name, Some(value));
+                }
+            }
+        }
+        vars
     }
 
     fn apply_property(
@@ -1228,14 +1430,14 @@ impl<'a> Sheet<'a> {
         file: &File,
         open: Ast<'_>,
         document_scope: bool,
+        scoped_vars: &BTreeMap<&'a str, Option<&'a str>>,
     ) {
-        el.style
-            .retain(|d| d.property != property || d.from.syntax == m::StyleSyntax::Inline);
         let Some(rules) = self.rules.get(&property) else {
             return;
         };
-        let mut best = None;
-        let mut rank = None;
+        el.style
+            .retain(|d| d.property != property || d.from.syntax == m::StyleSyntax::Inline);
+        let mut exact: Vec<((usize, u32, usize), &Rule<'_>)> = Vec::new();
         let mut unknown: Option<&Rule<'_>> = None;
         let spread = children(open).iter().any(|n| n.kind() == "jsx_expression");
         let mut unknown_rank = None;
@@ -1247,9 +1449,9 @@ impl<'a> Sheet<'a> {
                 match contextual_specificity(selector.text, classes, el, file, open) {
                     Some(None) => {}
                     Some(Some(s)) if !rule.uncertain && !rule.important => {
-                        if rank.is_none_or(|r| (rule.layer, s, order) >= r) {
-                            rank = Some((rule.layer, s, order));
-                            best = Some(rule);
+                        let candidate = (rule.layer, s, order);
+                        if !exact.iter().any(|(_, old)| std::ptr::eq(*old, rule)) {
+                            exact.push((candidate, rule));
                         }
                     }
                     outcome => {
@@ -1266,6 +1468,7 @@ impl<'a> Sheet<'a> {
                 }
             }
         }
+        let rank = exact.iter().map(|(rank, _)| *rank).max();
         // Unknown selectors can only displace a normal winner in the same or a higher layer.
         let unknown = unknown.filter(|_| {
             unknown_rank.is_some_and(|(important, candidate)| important || Some(candidate) >= rank)
@@ -1294,7 +1497,52 @@ impl<'a> Sheet<'a> {
         {
             return;
         }
-        let Some(rule) = unknown.or(best) else { return };
+        if unknown.is_none()
+            && !self.evaluate_width
+            && exact.iter().any(|(_, rule)| rule.when.is_some())
+        {
+            exact.sort_by_key(|(rank, _)| *rank);
+            el.style.retain(|d| d.property != property);
+            let opaque_inline = el
+                .unresolved_style
+                .iter()
+                .any(|d| d.syntax == m::StyleSyntax::Inline);
+            for (_, rule) in exact {
+                let value = (!opaque_inline)
+                    .then(|| {
+                        self.value(
+                            property,
+                            rule,
+                            if document_scope {
+                                &self.document_vars
+                            } else {
+                                scoped_vars
+                            },
+                        )
+                    })
+                    .flatten()
+                    .unwrap_or_else(|| V::Unresolved {
+                        text: rule.source.text.clone(),
+                        reason: "Cannot determine style value from built CSS".into(),
+                        refinement: None,
+                    });
+                el.style.push(m::StyleDeclaration {
+                    property,
+                    value: super::export_value(value, &rule.source.text),
+                    when: rule.when.clone(),
+                    from: rule.source.clone(),
+                });
+            }
+            return;
+        }
+        let Some(rule) = unknown.or_else(|| {
+            exact
+                .iter()
+                .max_by_key(|(rank, _)| *rank)
+                .map(|(_, rule)| *rule)
+        }) else {
+            return;
+        };
         el.style.retain(|d| d.property != property);
         let opaque_inline = el
             .unresolved_style
@@ -1308,7 +1556,7 @@ impl<'a> Sheet<'a> {
                     if document_scope {
                         &self.document_vars
                     } else {
-                        &self.vars
+                        scoped_vars
                     },
                 )
             })
@@ -1321,7 +1569,7 @@ impl<'a> Sheet<'a> {
         el.style.push(m::StyleDeclaration {
             property,
             value: super::export_value(value, &rule.source.text),
-            when: None,
+            when: rule.when.clone(),
             from: rule.source.clone(),
         });
     }
@@ -1842,8 +2090,116 @@ fn contextual_specificity(
     }
 }
 
+fn css_ident(raw: &str) -> Option<String> {
+    let mut out = String::new();
+    let mut chars = raw.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            let escaped = chars.next()?;
+            if !escaped.is_ascii_punctuation() {
+                return None;
+            }
+            out.push(escaped);
+        } else {
+            out.push(c);
+        }
+    }
+    (!out.is_empty()).then_some(out)
+}
+
+/// Match one compound selector (no combinators). This covers the common stylesheet form
+/// `.a.b`, `tag.a`, `#id.a` and data attributes without treating their conjunction as unknown.
+fn compound_specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
+    if sel.is_empty() || sel.contains([' ', '>', '+', '~', ':']) {
+        return None;
+    }
+    let mut rest = sel;
+    let mut weight = 0u32;
+    let mut required_class = Vec::new();
+    if let Some(end) = rest.find(['.', '#', '[']) {
+        let tag = &rest[..end];
+        if !tag.is_empty() {
+            if tag == "*" {
+                // Universal selector.
+            } else if ident(tag) && tag.eq_ignore_ascii_case(&el.tag) {
+                weight += 1;
+            } else if ident(tag) {
+                return Some(None);
+            } else {
+                return None;
+            }
+        }
+        rest = &rest[end..];
+    } else if !rest.is_empty() {
+        if rest == "*" {
+            return Some(Some(0));
+        }
+        if !ident(rest) {
+            return None;
+        }
+        return Some(rest.eq_ignore_ascii_case(&el.tag).then_some(1));
+    }
+    while !rest.is_empty() {
+        if let Some(class) = rest.strip_prefix('.') {
+            let end = class.find(['.', '#', '[']).unwrap_or(class.len());
+            let raw = &class[..end];
+            if raw.is_empty() {
+                return None;
+            }
+            required_class.push(css_ident(raw)?);
+            weight += 1024;
+            rest = &class[end..];
+        } else if let Some(id) = rest.strip_prefix('#') {
+            let end = id.find(['.', '#', '[']).unwrap_or(id.len());
+            let raw = &id[..end];
+            if !ident(raw) {
+                return None;
+            }
+            let Some(m::Expr::Literal { value }) = el.props.get("id") else {
+                return Some(None);
+            };
+            if value.as_str() != Some(raw) {
+                return Some(None);
+            }
+            weight += 1024 * 1024;
+            rest = &id[end..];
+        } else if let Some(attribute) = rest.strip_prefix('[') {
+            let end = attribute.find(']')?;
+            let name = &attribute[..end];
+            if !name.starts_with("data-") || !ident(name) {
+                return None;
+            }
+            let present = match el.props.get(name) {
+                None => false,
+                Some(m::Expr::Literal { value }) => !value.is_null(),
+                Some(_) => return None,
+            };
+            if !present {
+                return Some(None);
+            }
+            weight += 1024;
+            rest = &attribute[end + 1..];
+        } else {
+            return None;
+        }
+    }
+    if required_class.is_empty() {
+        return Some(Some(weight));
+    }
+    let classes = classes?;
+    let matched = required_class.iter().all(|class| {
+        classes
+            .split_ascii_whitespace()
+            .any(|actual| actual == class)
+    });
+    Some(matched.then_some(weight))
+}
+
 // Outer None means the selector may match, but its outcome is unknown.
 fn specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
+    if let Some(result) = compound_specificity(sel, classes, el) {
+        return Some(result);
+    }
     if let Some((tag, class)) = sel.split_once('.')
         && ident(tag)
         && ident(class)

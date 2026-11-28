@@ -139,22 +139,54 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             .map(unwrap_expr)
             .map(|n| fields(files, file, n))
             .unwrap_or_default();
-        for bind in children(pat)
-            .into_iter()
-            .filter(|p| p.kind() == "shorthand_property_identifier_pattern")
-        {
-            let name = file.text(bind);
+        for bind in children(pat) {
+            let (name_node, default) = match bind.kind() {
+                "shorthand_property_identifier_pattern" => (Some(bind), None),
+                "object_assignment_pattern" => (field(bind, "left"), field(bind, "right")),
+                "pair_pattern" => {
+                    let value = field(bind, "value");
+                    if value.is_some_and(|v| v.kind() == "assignment_pattern") {
+                        (
+                            field(value.unwrap(), "left"),
+                            field(value.unwrap(), "right"),
+                        )
+                    } else {
+                        (value, None)
+                    }
+                }
+                _ => (None, None),
+            };
+            let Some(name_node) = name_node.filter(|n| {
+                matches!(
+                    n.kind(),
+                    "identifier" | "shorthand_property_identifier_pattern"
+                )
+            }) else {
+                continue;
+            };
+            let name = file.text(name_node);
             let prop = props.iter().find(|p| p.name == name);
+            let mut ty = prop.map(|p| p.ty.clone()).unwrap_or_else(unknown);
+            if name == "children" && matches!(ty, m::TypeRef::Unknown { .. } | m::TypeRef::Node) {
+                ty = m::TypeRef::Node;
+            }
             out.push(m::Slot {
                 id: format!("{id}.{name}"),
                 name: name.into(),
                 kind: m::SlotKind::Prop,
-                ty: prop.map(|p| p.ty.clone()).unwrap_or_else(unknown),
-                optional: prop.is_some_and(|p| p.optional),
-                initial: None,
+                ty,
+                optional: prop.is_some_and(|p| p.optional) || default.is_some(),
+                initial: default.map(|n| {
+                    literal(file, n)
+                        .map(|value| m::Expr::Literal { value })
+                        .unwrap_or_else(|| m::Expr::Opaque {
+                            text: file.text(n).into(),
+                            reads: vec![],
+                        })
+                }),
                 source: None,
                 origin: m::Origin::Syntax,
-                location: file.loc(bind),
+                location: file.loc(name_node),
             });
         }
     }
@@ -237,6 +269,104 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             origin: m::Origin::Syntax,
             location: file.loc(var),
         });
+    }
+    out
+}
+
+fn stylesheet_order(files: &Files, entry: &str) -> Vec<String> {
+    fn visit(
+        files: &Files,
+        path: &str,
+        active: &mut std::collections::BTreeSet<String>,
+        seen: &mut std::collections::BTreeSet<String>,
+        out: &mut Vec<String>,
+    ) {
+        if !active.insert(path.to_owned()) {
+            return;
+        }
+        if seen.insert(path.to_owned())
+            && let Some(file) = files.get(path)
+        {
+            for import in &file.ordered_imports {
+                if import.ends_with(".css") {
+                    if !out.contains(import) {
+                        out.push(import.clone());
+                    }
+                } else {
+                    visit(files, import, active, seen, out);
+                }
+            }
+        }
+        active.remove(path);
+    }
+    let mut out = Vec::new();
+    visit(
+        files,
+        entry,
+        &mut std::collections::BTreeSet::new(),
+        &mut std::collections::BTreeSet::new(),
+        &mut out,
+    );
+    out
+}
+
+fn const_declaration(file: &File, declarator: Ast<'_>) -> Option<(String, Value)> {
+    if declarator.kind() != "variable_declarator" {
+        return None;
+    }
+    let parent = declarator.parent()?;
+    if !matches!(
+        parent.kind(),
+        "lexical_declaration" | "variable_declaration"
+    ) || !file.text(parent).trim_start().starts_with("const")
+    {
+        return None;
+    }
+    let name = field(declarator, "name").filter(|n| n.kind() == "identifier")?;
+    let value = field(declarator, "value").and_then(|v| render::static_literal(file, v))?;
+    Some((file.text(name).into(), value))
+}
+
+/// Immutable literal bindings visible to a straightforward component body. This is deliberately
+/// narrower than JavaScript scope: only module constants and constants directly preceding the
+/// component return participate, so nested shadowing cannot make an unrelated value look proven.
+fn constant_env(file: &File, function: Ast<'_>) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    for node in children(file.tree.root_node()) {
+        let declarators: Vec<_> = if node.kind() == "export_statement" {
+            field(node, "declaration").into_iter().collect()
+        } else {
+            vec![node]
+        };
+        for declaration in declarators {
+            if matches!(
+                declaration.kind(),
+                "lexical_declaration" | "variable_declaration"
+            ) {
+                for declarator in children(declaration) {
+                    if let Some((name, value)) = const_declaration(file, declarator) {
+                        out.insert(name, value);
+                    }
+                }
+            }
+        }
+    }
+    if let Some(body) = field(function, "body").filter(|body| body.kind() == "statement_block") {
+        for statement in children(body) {
+            if statement.kind() == "return_statement" {
+                break;
+            }
+            if matches!(
+                statement.kind(),
+                "lexical_declaration" | "variable_declaration"
+            ) {
+                for declarator in children(statement) {
+                    if let Some((name, value)) = const_declaration(file, declarator) {
+                        out.insert(name, value);
+                    }
+                }
+            }
+        }
     }
     out
 }
@@ -324,6 +454,29 @@ fn extract_in_context_impl(
         .as_ref()
         .map(|p| style::built::Sheet::new(&files[p], width, root_attribute))
         .transpose()?;
+    let mut sheet_diagnostics = Vec::new();
+    let source_sheets: Vec<_> = stylesheet_order(&files, &entry)
+        .into_iter()
+        .filter(|path| {
+            path.ends_with(".css")
+                && !path.ends_with(".module.css")
+                && artifact.as_ref() != Some(path)
+        })
+        .filter_map(|path| {
+            let file = files.get(&path)?;
+            match style::built::Sheet::source(file) {
+                Ok(sheet) => Some(sheet),
+                Err(reason) => {
+                    sheet_diagnostics.push(m::Diagnostic {
+                        code: "unsupported-stylesheet".into(),
+                        message: reason,
+                        location: None,
+                    });
+                    None
+                }
+            }
+        })
+        .collect();
     let mut model = m::SourceModel {
         schema_version: m::SCHEMA_VERSION,
         extractor: m::Extractor {
@@ -339,6 +492,7 @@ fn extract_in_context_impl(
         edges: vec![],
         diagnostics,
     };
+    model.diagnostics.extend(sheet_diagnostics);
     let mut signatures = BTreeMap::new();
     for file in files.values() {
         let css = file.path.ends_with(".css");
@@ -399,9 +553,11 @@ fn extract_in_context_impl(
                 class_render: f.kind() == "method_definition",
                 tailwind,
                 built: built.as_ref(),
+                sources: &source_sheets,
                 modules: modules.bindings(file, f),
                 signatures: &signatures,
                 items: vec![],
+                constants: constant_env(file, f),
                 model: &mut model,
             };
             let root = match returned(f) {
@@ -467,6 +623,11 @@ fn extract_in_context_impl(
     model.tokens.sort_by(|a, b| a.id.cmp(&b.id));
     if let Some(sheet) = &built {
         model.document_style = sheet.document_style();
+    } else {
+        model.document_style = source_sheets
+            .iter()
+            .rev()
+            .find_map(|sheet| sheet.document_style());
     }
     m::validate(&model).map_err(|errs| format!("invalid source model: {errs:?}"))?;
     Ok((model, stats))

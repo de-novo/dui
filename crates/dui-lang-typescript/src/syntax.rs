@@ -14,6 +14,9 @@ pub struct File {
     pub src: String,
     pub tree: Tree,
     pub imports: BTreeSet<String>,
+    /// Resolved static imports in source order. The schema stores the sorted set in `imports`;
+    /// stylesheet discovery uses this evaluation-order trace without executing the modules.
+    pub ordered_imports: Vec<String>,
     // Local alias -> (module or relative file, exported name).
     pub bindings: BTreeMap<String, (String, String)>,
     pub dynamic_imports: BTreeMap<String, String>,
@@ -313,6 +316,7 @@ fn resolve(root: &Path, from: &str, request: &str, aliases: &[Alias]) -> Option<
 /// refreshes added and removed imports without re-parsing the file's source.
 struct ImportScan {
     imports: BTreeSet<String>,
+    ordered_imports: Vec<String>,
     bindings: BTreeMap<String, (String, String)>,
     diagnostics: Vec<Diagnostic>,
     dynamic_imports: BTreeMap<String, String>,
@@ -320,6 +324,7 @@ struct ImportScan {
 
 fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
     let mut imports = BTreeSet::new();
+    let mut ordered_imports = Vec::new();
     let mut bindings = BTreeMap::new();
     let mut diagnostics = Vec::new();
     let mut dynamic_imports = BTreeMap::new();
@@ -340,6 +345,7 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
                 module = resolved;
                 if module != file.path {
                     imports.insert(module.clone());
+                    ordered_imports.push(module.clone());
                 }
             } else {
                 diagnostics.push(Diagnostic {
@@ -406,6 +412,7 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
     }
     ImportScan {
         imports,
+        ordered_imports,
         bindings,
         diagnostics,
         dynamic_imports,
@@ -431,6 +438,7 @@ fn parse_file(path: &str, src: String, parser: &mut Parser) -> Result<File, Stri
         src,
         tree,
         imports: BTreeSet::new(),
+        ordered_imports: Vec::new(),
         bindings: BTreeMap::new(),
         dynamic_imports: BTreeMap::new(),
     })
@@ -523,6 +531,7 @@ fn load_inner(
         }
         let mut scan = scan_imports(&root, &file, &aliases);
         file.imports = scan.imports;
+        file.ordered_imports = scan.ordered_imports;
         file.bindings = scan.bindings;
         file.dynamic_imports = scan.dynamic_imports;
         diagnostics.append(&mut scan.diagnostics);
