@@ -720,3 +720,77 @@ export default function App() { return <section><Observed /><Forwarded label="fo
         );
     }
 }
+
+#[test]
+fn react_route_composition_preserves_keys_props_objects_and_exported_entries() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("organization.tsx"),
+        r#"type Shared = { entityType: string } & ({ isTemporary: true; entityId?: string } | { isTemporary?: false; entityId: string });
+function Boundary(props: Shared & { children?: any }) {
+  if (!props.entityType) return null;
+  return <>{props.children}</>;
+}
+function Row(props: { id: string; rows: Record<string, string> }) {
+  if (!props.id || !props.rows[props.id]) return null;
+  return <p>{props.rows[props.id]}</p>;
+}
+function Rows({ ids, rows }: { ids: string[]; rows: Record<string, string> }) {
+  let entities: Record<string, string[]> = {};
+  if (ids.length) {
+    entities = { all: ids };
+  }
+  return <div>{ids.map((id, index) => <Row key={id} id={id} rows={rows} />)}</div>;
+}
+export function OrganizationScreen() {
+  return <Boundary entityType="project" entityId="project-benchmark"><Rows ids={["a"]} rows={{ a: "Benchmark issue" }} /></Boundary>;
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("organization.tsx")).expect("extract");
+    let boundary = model
+        .components
+        .iter()
+        .find(|component| component.name == "Boundary")
+        .expect("Boundary");
+    assert!(
+        boundary.slots.iter().any(|slot| slot.name == "entityId"),
+        "union-intersection prop types must expose entityId: {:#?}",
+        boundary.slots
+    );
+    assert!(
+        matches!(&boundary.root, m::Node::Branch(branch) if matches!(&branch.arms[1].children[0], m::Node::Fragment(_))),
+        "object-form props children must remain in the composition: {:#?}",
+        boundary.root
+    );
+    let rows = model
+        .components
+        .iter()
+        .find(|component| component.name == "Rows")
+        .expect("Rows");
+    assert!(
+        !matches!(rows.root, m::Node::Placeholder(_)),
+        "imperative non-return statements must not erase the render tree: {:#?}",
+        rows.root
+    );
+    fn contains_placeholder(node: &m::Node) -> bool {
+        match node {
+            m::Node::Placeholder(_) => true,
+            _ => node.children().into_iter().any(contains_placeholder),
+        }
+    }
+    assert!(
+        !contains_placeholder(&rows.root),
+        "React keys are list metadata, not unsupported component props: {:#?}",
+        rows.root
+    );
+    assert!(
+        model
+            .screens
+            .iter()
+            .any(|screen| screen.name == "OrganizationScreen"),
+        "a single exported entry component becomes the explicit-entry screen: {:#?}",
+        model.screens
+    );
+}

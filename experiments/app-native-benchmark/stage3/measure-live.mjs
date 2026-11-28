@@ -15,9 +15,9 @@ const targets = {
     entry: "modules/event-types/views/event-types-listing-view.tsx",
     file: "modules/event-types/views/event-types-listing-view.tsx",
     before: "  return (\n    <InfiniteScrollMain",
-    after: "  return (\n    <>Benchmark save marker {n}<InfiniteScrollMain",
-    close: "    </InfiniteScrollMain>\n  );",
-    closeAfter: "    </InfiniteScrollMain></>\n  );",
+    after: "  return (\n    <>Benchmark save marker {n}\n    <InfiniteScrollMain",
+    close: "    />\n  );\n};\n\nexport const SearchContext",
+    closeAfter: "    />\n    </>\n  );\n};\n\nexport const SearchContext",
     probe: "Benchmark save marker {n}",
   },
   plane: {

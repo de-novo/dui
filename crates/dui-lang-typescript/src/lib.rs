@@ -135,7 +135,7 @@ fn object_type_fields(files: &Files, file: &File, node: Ast<'_>) -> Vec<m::Field
     if matches!(n.kind(), "object_type" | "interface_body") {
         return fields(files, file, n);
     }
-    if n.kind() == "intersection_type" {
+    if matches!(n.kind(), "intersection_type" | "union_type" | "parenthesized_type") {
         return children(n)
             .into_iter()
             .flat_map(|part| object_type_fields(files, file, part))
@@ -427,6 +427,13 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
     out
 }
 
+fn props_object_name<'a>(file: &'a File, f: Ast<'_>) -> Option<&'a str> {
+    let param = field(f, "parameters").and_then(first)?;
+    field(param, "pattern")
+        .filter(|pattern| pattern.kind() == "identifier")
+        .map(|pattern| file.text(pattern))
+}
+
 fn return_expression(statement: Ast<'_>) -> Option<Ast<'_>> {
     if statement.kind() != "return_statement" {
         return None;
@@ -440,7 +447,9 @@ fn conditional_return(statement: Ast<'_>) -> Option<(Ast<'_>, Ast<'_>)> {
     }
     let condition = field(statement, "condition")?;
     let consequence = field(statement, "consequence")?;
-    if consequence.kind() == "return_statement" || consequence.kind() == "statement_block" {
+    if consequence.kind() == "return_statement"
+        || consequence.kind() == "statement_block" && contains_return(consequence)
+    {
         return Some((condition, consequence));
     }
     None
@@ -527,6 +536,14 @@ fn consequence_node(
     None
 }
 
+fn contains_return(node: Ast<'_>) -> bool {
+    node.kind() == "return_statement"
+        || !matches!(
+            node.kind(),
+            "arrow_function" | "function_expression" | "function_declaration" | "method_definition"
+        ) && children(node).into_iter().any(contains_return)
+}
+
 fn statements_root(
     cx: &mut render::Context<'_>,
     statements: Vec<Ast<'_>>,
@@ -549,7 +566,7 @@ fn statements_root(
             "if_statement" if final_return.is_none() => {
                 if let Some(early) = conditional_return(*statement) {
                     conditional.push(early);
-                } else {
+                } else if contains_return(*statement) {
                     return None;
                 }
             }
@@ -629,8 +646,10 @@ fn switch_root(cx: &mut render::Context<'_>, statement: Ast<'_>, id: String) -> 
 
 fn component_root(cx: &mut render::Context<'_>, f: Ast<'_>, id: String) -> m::Node {
     if f.kind() == "method_definition" {
-        return crate::returned(f)
-            .map(|n| cx.node(n, id.clone()))
+        let body = field(f, "body").filter(|body| body.kind() == "statement_block");
+        return body
+            .and_then(|body| statements_root(cx, children(body), id.clone()))
+            .or_else(|| crate::returned(f).map(|n| cx.node(n, id.clone())))
             .unwrap_or_else(|| {
                 m::Node::Placeholder(m::Placeholder {
                     id,
@@ -1000,6 +1019,7 @@ fn extract_in_context_impl(
                 file,
                 files: &files,
                 slots: slot,
+                props_object: props_object_name(file, f),
                 class_render: f.kind() == "method_definition",
                 tailwind,
                 built: built.as_ref(),
@@ -1028,9 +1048,18 @@ fn extract_in_context_impl(
             .filter(|c| c.location.file == entry)
             .collect();
         let default = files[&entry].exported("default");
+        let exported: Vec<_> = files[&entry]
+            .exported_names()
+            .into_iter()
+            .filter_map(|exported| candidates.iter().find(|c| c.name == exported).copied())
+            .collect();
         let root = default
             .and_then(|n| candidates.iter().find(|c| c.name == n).copied())
             .or(match candidates.as_slice() {
+                [root] => Some(*root),
+                _ => None,
+            })
+            .or(match exported.as_slice() {
                 [root] => Some(*root),
                 _ => None,
             });

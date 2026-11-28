@@ -12,6 +12,7 @@ pub struct Context<'a> {
     pub file: &'a File,
     pub files: &'a Files,
     pub slots: &'a [m::Slot],
+    pub props_object: Option<&'a str>,
     pub class_render: bool,
     pub signatures: &'a BTreeMap<String, Vec<m::Slot>>,
     pub modules: style::modules::Bindings<'a>,
@@ -428,6 +429,15 @@ impl Context<'_> {
         }
         path.reverse();
         let name = self.file.text(n);
+        if Some(name) == self.props_object
+            && let [first, rest @ ..] = path.as_slice()
+            && let Some(slot) = self.slots.iter().find(|s| &s.name == first)
+        {
+            return Some(m::Expr::Slot {
+                slot: slot.id.clone(),
+                path: rest.to_vec(),
+            });
+        }
         if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
             Some(m::Expr::Item {
                 list: list.clone(),
@@ -725,25 +735,24 @@ impl Context<'_> {
                 location: loc,
             });
         }
-        if node.kind() == "jsx_expression" && n.kind() == "identifier" {
-            if let Some(slot) = self
+        if let m::Expr::Slot { slot, path } = self.expr(n)
+            && path.is_empty()
+            && let Some(slot) = self
                 .slots
                 .iter()
-                .find(|slot| slot.name == self.file.text(n) && slot.ty == m::TypeRef::Node)
-            {
-                return m::Node::Outlet(m::Outlet {
-                    id,
-                    slot: slot.id.clone(),
-                    location: loc,
-                });
-            }
+                .find(|candidate| candidate.id == slot && candidate.ty == m::TypeRef::Node)
+        {
+            return m::Node::Outlet(m::Outlet {
+                id,
+                slot: slot.id.clone(),
+                location: loc,
+            });
         }
-        if node.kind() == "jsx_expression"
-            && n.kind() == "call_expression"
+        if n.kind() == "call_expression"
             && field(n, "function").is_some_and(|function| {
                 function.kind() == "identifier"
                     && self.slots.iter().any(|slot| {
-                        slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node
+                        slot.name == self.file.text(function) && matches!(slot.ty, m::TypeRef::Node | m::TypeRef::Function)
                     })
             })
         {
@@ -751,7 +760,7 @@ impl Context<'_> {
             let slot = self
                 .slots
                 .iter()
-                .find(|slot| slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node)
+                .find(|slot| slot.name == self.file.text(function) && matches!(slot.ty, m::TypeRef::Node | m::TypeRef::Function))
                 .unwrap();
             return m::Node::Outlet(m::Outlet {
                 id,
@@ -1063,6 +1072,10 @@ impl Context<'_> {
             let parts = children(attribute);
             let Some(k) = parts.first() else { continue };
             let key = self.file.text(*k);
+            // React keys identify list instances; they are metadata rather than component inputs.
+            if key == "key" {
+                continue;
+            }
             if component.is_none() && matches!(key, "className" | "style") {
                 if key == "className"
                     && let Some(value) = parts.get(1)

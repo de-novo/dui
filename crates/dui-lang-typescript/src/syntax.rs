@@ -180,6 +180,40 @@ impl File {
                     .any(|child| child.kind() == "static")
         })
     }
+    /// Local component names exported by this module, excluding the default export.
+    pub fn exported_names(&self) -> Vec<&str> {
+        let mut out = Vec::new();
+        for node in children(self.tree.root_node()) {
+            if node.kind() != "export_statement" {
+                continue;
+            }
+            if node.children(&mut node.walk()).any(|c| c.kind() == "default") {
+                continue;
+            }
+            if let Some(decl) = field(node, "declaration") {
+                let decls = if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration") {
+                    children(decl)
+                } else {
+                    vec![decl]
+                };
+                out.extend(decls.into_iter().filter_map(|d| self.name(d, "name")));
+                continue;
+            }
+            if field(node, "source").is_some() {
+                continue;
+            }
+            for clause in children(node).into_iter().filter(|c| c.kind() == "export_clause") {
+                for spec in children(clause) {
+                    if spec.kind() == "export_specifier"
+                        && let Some(local) = field(spec, "name")
+                    {
+                        out.push(export_text(self.text(local)));
+                    }
+                }
+            }
+        }
+        out
+    }
     pub fn exported(&self, name: &str) -> Option<&str> {
         children(self.tree.root_node())
             .into_iter()
