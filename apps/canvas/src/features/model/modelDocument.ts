@@ -7,6 +7,8 @@ export type Expr =
   | { kind: "literal"; value: Json }
   | { kind: "slot"; slot: string; path?: string[] }
   | { kind: "item"; list: string; path?: string[] }
+  | { kind: "binding"; name: string; path?: string[] }
+  | { kind: "object"; properties: Record<string, Expr> }
   | { kind: "unary"; operator: string; value: Expr }
   | { kind: "binary"; operator: string; left: Expr; right: Expr }
   | { kind: "opaque"; text: string; reads?: Expr[] };
@@ -59,7 +61,18 @@ type Declaration = {
 type Arm = { when: "otherwise" | { equals: Json } | { truthy: boolean }; children?: Node[] };
 export type ModelNode = {
   id: string;
-  kind: "fragment" | "element" | "instance" | "text" | "branch" | "list" | "outlet" | "placeholder";
+  kind:
+    | "fragment"
+    | "element"
+    | "instance"
+    | "text"
+    | "branch"
+    | "list"
+    | "outlet"
+    | "renderFunction"
+    | "invoke"
+    | "createElement"
+    | "placeholder";
   tag?: string;
   module?: string;
   component?: string;
@@ -74,6 +87,12 @@ export type ModelNode = {
   item?: string;
   itemType?: TypeRef;
   key?: Expr;
+  parameters?: (
+    | { kind: "identifier"; name: string }
+    | { kind: "object"; properties: Record<string, string> }
+  )[];
+  callee?: Expr;
+  arguments?: Expr[];
   style?: Declaration[];
   unresolvedStyle?: { text: string; reason?: string }[];
 };
@@ -351,11 +370,20 @@ type Resolved = { known: boolean; value?: unknown };
 type Scope = {
   slots: Map<string, unknown>;
   items: Map<string, unknown>;
+  bindings: Map<string, unknown>;
   expressions: Map<string, unknown>;
 };
 type NodeContent = { nodeContent: true; nodes: Node[]; scope: Scope };
+type FunctionContent = {
+  functionContent: true;
+  parameters: NonNullable<Node["parameters"]>;
+  nodes: Node[];
+  scope: Scope;
+};
 const isNodeContent = (value: unknown): value is NodeContent =>
   typeof value === "object" && value !== null && (value as NodeContent).nodeContent === true;
+const isFunctionContent = (value: unknown): value is FunctionContent =>
+  typeof value === "object" && value !== null && (value as FunctionContent).functionContent === true;
 
 function lookupPath(value: unknown, path: string[] | undefined): Resolved {
   let current = value;
@@ -380,8 +408,21 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
     if (!scope.items.has(e.list)) return { known: false };
     return lookupPath(scope.items.get(e.list), e.path);
   }
+  if (e.kind === "binding") {
+    if (!scope.bindings.has(e.name)) return { known: false };
+    return lookupPath(scope.bindings.get(e.name), e.path);
+  }
   if (e.kind === "opaque" && scope.expressions.has(e.text)) {
     return { known: true, value: scope.expressions.get(e.text) };
+  }
+  if (e.kind === "object") {
+    const value: Record<string, unknown> = {};
+    for (const [key, property] of Object.entries(e.properties)) {
+      const resolved = resolveExpr(property, scope);
+      if (!resolved.known) return { known: false };
+      value[key] = resolved.value;
+    }
+    return { known: true, value };
   }
   if (e.kind === "unary") {
     if (e.operator !== "!") return { known: false };
@@ -430,7 +471,7 @@ function exprLabel(e: Expr): string {
   if (e.kind === "opaque") return e.text.length > 42 ? e.text.slice(0, 41) + "…" : e.text;
   if (e.kind === "unary") return e.operator + exprLabel(e.value);
   if (e.kind === "binary") return `${exprLabel(e.left)}${e.operator}${exprLabel(e.right)}`;
-  const base = e.kind === "slot" ? e.slot : `${e.list} item`;
+  const base = e.kind === "slot" ? e.slot : e.kind === "binding" ? e.name : `${e.list} item`;
   const name = base.split("#").at(-1)?.split(".").at(-1) ?? base;
   return name + (e.path?.length ? "." + e.path.join(".") : "");
 }
@@ -449,6 +490,7 @@ function copyScope(scope: Scope): Scope {
   return {
     slots: new Map(scope.slots),
     items: new Map(scope.items),
+    bindings: new Map(scope.bindings),
     expressions: scope.expressions,
   };
 }
@@ -857,6 +899,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       const scope: Scope = {
         slots,
         items: new Map(),
+        bindings: new Map(),
         expressions: new Map(Object.entries(context.expressionValues ?? {})),
       };
       const ordinary = new Set(
@@ -897,11 +940,20 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
           }),
         );
         if (target && n.children?.length) {
-          const content: NodeContent = {
-            nodeContent: true,
-            nodes: n.children,
-            scope: copyScope(scope),
-          };
+          const functionChild =
+            n.children.length === 1 && n.children[0].kind === "renderFunction" ? n.children[0] : undefined;
+          const content: NodeContent | FunctionContent = functionChild
+            ? {
+                functionContent: true,
+                parameters: functionChild.parameters ?? [],
+                nodes: functionChild.children ?? [],
+                scope: copyScope(scope),
+              }
+            : {
+                nodeContent: true,
+                nodes: n.children,
+                scope: copyScope(scope),
+              };
           const acceptsChildren = (target.slots ?? []).some(
             (slot) => slot.name === "children" || slot.name.startsWith("..."),
           );
@@ -953,6 +1005,38 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         const group = doc.createDocumentFragment();
         drawChildren(value.nodes, value.scope, stack, group);
         return group;
+      }
+      if (n.kind === "renderFunction") return placeholder("render function value");
+      if (n.kind === "invoke") {
+        const value = n.callee ? resolveExpr(n.callee, scope) : { known: false };
+        if (!value.known || !isFunctionContent(value.value)) return placeholder(exprLabel(n.callee!));
+        const args = (n.arguments ?? []).map((argument) => resolveExpr(argument, scope));
+        const nested = copyScope(value.value.scope);
+        (value.value.parameters ?? []).forEach((parameter, index) => {
+          const argument = args[index];
+          if (parameter.kind === "identifier") {
+            if (argument?.known) nested.bindings.set(parameter.name, argument.value);
+            return;
+          }
+          for (const [key, name] of Object.entries(parameter.properties)) {
+            if (!argument?.known) continue;
+            const property = lookupPath(argument.value, [key]);
+            if (property.known) nested.bindings.set(name, property.value);
+          }
+        });
+        const group = doc.createDocumentFragment();
+        drawChildren(value.value.nodes, nested, stack, group);
+        return group;
+      }
+      if (n.kind === "createElement") {
+        const resolved = n.tag ? resolveExpr(n.tag, scope) : { known: false };
+        const tag = resolved.known && typeof resolved.value === "string" ? resolved.value : undefined;
+        if (!tag || !tags.has(tag)) return placeholder(n.tag ? exprLabel(n.tag) : "createElement");
+        const el = doc.createElement(tag);
+        el.dataset.modelNode = n.id;
+        applyProps(el, n, scope);
+        drawChildren(n.children, scope, stack, el);
+        return el;
       }
       if (n.kind !== "element") return placeholder(n.reason ?? n.kind);
       if (n.module) {

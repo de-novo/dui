@@ -609,6 +609,30 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
             bindings.insert(alias, (module.clone(), name));
         }
     }
+    for stmt in children(file.tree.root_node())
+        .into_iter()
+        .filter(|n| n.kind() == "export_statement")
+    {
+        let Some(source) = field(stmt, "source") else {
+            continue;
+        };
+        let raw = file.text(source);
+        let Some(request) = raw.get(1..raw.len().saturating_sub(1)) else {
+            continue;
+        };
+        if let Some(resolved) = resolve(root, &file.path, request, aliases) {
+            if resolved != file.path {
+                imports.insert(resolved.clone());
+                ordered_imports.push(resolved);
+            }
+        } else if request.starts_with('.') || uses_alias(request, aliases) {
+            diagnostics.push(Diagnostic {
+                code: "unresolved-import".into(),
+                message: request.into(),
+                location: Some(file.loc(source)),
+            });
+        }
+    }
     let mut pending_nodes = if may_contain_dynamic_import(&file.src) {
         vec![file.tree.root_node()]
     } else {

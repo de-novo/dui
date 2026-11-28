@@ -109,6 +109,9 @@ fn reference_model_covers_styles_tokens_branches_and_lists() {
             Node::List(_) => "list",
             Node::Fragment(_) => "fragment",
             Node::Outlet(_) => "outlet",
+            Node::RenderFunction(_) => "renderFunction",
+            Node::Invoke(_) => "invoke",
+            Node::CreateElement(_) => "createElement",
             Node::Placeholder(_) => "placeholder",
         });
         stack.extend(node.children());

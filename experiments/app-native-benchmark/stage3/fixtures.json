@@ -381,8 +381,8 @@
             "richFilters": {}
           },
           "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
-          "boundaryIssues": [
-            {
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.issueMap": {
+            "issue-benchmark-1": {
               "id": "issue-benchmark-1",
               "name": "Benchmark issue one",
               "project_id": "project-benchmark",
@@ -393,7 +393,7 @@
               "is_draft": false,
               "archived_at": null
             },
-            {
+            "issue-benchmark-2": {
               "id": "issue-benchmark-2",
               "name": "Benchmark issue two",
               "project_id": "project-benchmark",
@@ -404,7 +404,41 @@
               "is_draft": false,
               "archived_at": null
             }
-          ]
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.groupedIssueIds": {
+            "All Issues": [
+              "issue-benchmark-1",
+              "issue-benchmark-2"
+            ]
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.displayFilters": {
+            "layout": "list"
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.displayProperties": {
+            "key": true,
+            "issue_type": false
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.group_by": null,
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.orderBy": "sort_order",
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.showEmptyGroup": true,
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.collapsedGroups": [],
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.isEditingAllowed": true,
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.canEditProperties": true,
+          "components/issues/issue-layouts/list/default.tsx#List.groups": [
+            {
+              "id": "All Issues",
+              "name": "All work items",
+              "payload": {}
+            }
+          ],
+          "components/issues/issue-layouts/list/default.tsx#List.groupIds": [
+            "All Issues"
+          ],
+          "components/issues/issue-layouts/list/default.tsx#List.is_list": true,
+          "components/issues/issue-layouts/list/list-group.tsx#ListGroup.isExpanded": true,
+          "components/issues/issue-layouts/list/list-group.tsx#ListGroup.shouldExpand": true,
+          "components/issues/issue-layouts/list/list-group.tsx#ListGroup.groupIssueCount": 2,
+          "components/core/render-if-visible-HOC.tsx#RenderIfVisible.isVisible": true
         },
         "loading": {
           "params": {
@@ -531,47 +565,7 @@
             "{issue.name}"
           ]
         }
-      ],
-      "projection": {
-        "states": [
-          "populated"
-        ],
-        "component": "IssueBlock",
-        "itemsKey": "boundaryIssues",
-        "itemSlot": "components/issues/issue-layouts/list/block.tsx#IssueBlock.issue",
-        "itemIdSlot": "components/issues/issue-layouts/list/block.tsx#IssueBlock.issueId",
-        "issuesMapSlot": "components/issues/issue-layouts/list/block.tsx#IssueBlock.issuesMap",
-        "shared": {
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.groupId": "all",
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.displayProperties": {
-            "key": true,
-            "issue_type": false
-          },
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.nestingLevel": 0,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.spacingLeft": 0,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isExpanded": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isCurrentBlockDragging": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.canDrag": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isEpic": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.workspaceSlug": "bench",
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.projectId": "project-benchmark",
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isSidebarCollapsed": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.currentProjectNextSequenceId": 3,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.subIssuesCount": 0,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.canEditIssueProperties": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isDraggingAllowed": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isMobile": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.projectIdentifier": "BEN",
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isIssueSelected": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isIssueActive": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isSubIssue": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.canSelectIssues": false,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.maxSequenceId": 3,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.keyMinWidth": 0,
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.workItemLink": "/bench/projects/project-benchmark/issues/issue-benchmark",
-          "components/issues/issue-layouts/list/block.tsx#IssueBlock.budgetPx": 0
-        }
-      }
+      ]
     }
   }
 }

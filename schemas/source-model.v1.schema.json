@@ -5,301 +5,851 @@
   "description": "What source code declares about its UI. See docs/en/source-model.md. Cross-references, sort order and per-property style values are checked by dui_core::source_model::validate.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "extractor", "files"],
+  "required": [
+    "schemaVersion",
+    "extractor",
+    "files"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": {
+      "const": 1
+    },
     "extractor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
-        "name": { "$ref": "#/$defs/text" },
-        "version": { "$ref": "#/$defs/text" }
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/text"
+        }
       }
     },
-    "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
-    "screens": { "type": "array", "items": { "$ref": "#/$defs/screen" } },
-    "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
-    "documentStyle": { "$ref": "#/$defs/documentStyle" },
-    "itemSchemas": { "type": "array", "items": { "$ref": "#/$defs/itemSchema" } },
-    "tokens": { "type": "array", "items": { "$ref": "#/$defs/token" } },
-    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
-    "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } }
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "screens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/screen"
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "documentStyle": {
+      "$ref": "#/$defs/documentStyle"
+    },
+    "itemSchemas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/itemSchema"
+      }
+    },
+    "tokens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/token"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    }
   },
   "$defs": {
-    "text": { "type": "string", "minLength": 1 },
-    "id": { "type": "string", "minLength": 1 },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
     "path": {
       "type": "string",
       "minLength": 1,
       "pattern": "^(?!/)(?!.*\\\\)(?!(.*/)?\\.\\.?(/|$))(?!.*//).+$"
     },
-    "route": { "type": "string", "pattern": "^/" },
-    "origin": { "enum": ["syntax", "compiler", "inferred"] },
+    "route": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "origin": {
+      "enum": [
+        "syntax",
+        "compiler",
+        "inferred"
+      ]
+    },
     "location": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["file", "line", "column", "start", "end"],
+      "required": [
+        "file",
+        "line",
+        "column",
+        "start",
+        "end"
+      ],
       "properties": {
-        "file": { "$ref": "#/$defs/path" },
-        "line": { "type": "integer", "minimum": 1 },
-        "column": { "type": "integer", "minimum": 1 },
-        "start": { "type": "integer", "minimum": 0 },
-        "end": { "type": "integer", "minimum": 0 }
+        "file": {
+          "$ref": "#/$defs/path"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "file": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "language", "sha256"],
+      "required": [
+        "path",
+        "language",
+        "sha256"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/path" },
-        "language": { "enum": ["typescript", "swift", "kotlin", "dart", "css", "html"] },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "imports": { "type": "array", "items": { "$ref": "#/$defs/path" } }
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "language": {
+          "enum": [
+            "typescript",
+            "swift",
+            "kotlin",
+            "dart",
+            "css",
+            "html"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "imports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/path"
+          }
+        }
       }
     },
     "screen": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "component", "origin", "location"],
+      "required": [
+        "id",
+        "name",
+        "component",
+        "origin",
+        "location"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "$ref": "#/$defs/text" },
-        "route": { "$ref": "#/$defs/route" },
-        "component": { "$ref": "#/$defs/id" },
-        "origin": { "$ref": "#/$defs/origin" },
-        "location": { "$ref": "#/$defs/location" }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "route": {
+          "$ref": "#/$defs/route"
+        },
+        "component": {
+          "$ref": "#/$defs/id"
+        },
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "component": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "location", "root"],
+      "required": [
+        "id",
+        "name",
+        "location",
+        "root"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "$ref": "#/$defs/text" },
-        "location": { "$ref": "#/$defs/location" },
-        "slots": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
-        "root": { "$ref": "#/$defs/node" }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        },
+        "root": {
+          "$ref": "#/$defs/node"
+        }
       }
     },
     "slot": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "kind", "type", "origin", "location"],
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "type",
+        "origin",
+        "location"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "$ref": "#/$defs/text" },
-        "kind": { "enum": ["prop", "local", "store", "context", "route", "query", "external"] },
-        "type": { "$ref": "#/$defs/type" },
-        "optional": { "type": "boolean" },
-        "initial": { "$ref": "#/$defs/expr" },
-        "source": { "$ref": "#/$defs/text" },
-        "origin": { "$ref": "#/$defs/origin" },
-        "location": { "$ref": "#/$defs/location" }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "kind": {
+          "enum": [
+            "prop",
+            "local",
+            "store",
+            "context",
+            "route",
+            "query",
+            "external"
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/type"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "initial": {
+          "$ref": "#/$defs/expr"
+        },
+        "source": {
+          "$ref": "#/$defs/text"
+        },
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "type": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "properties": { "kind": { "enum": ["boolean", "string", "number", "node", "function"] } }
-        },
-        {
-          "additionalProperties": false,
-          "required": ["values"],
           "properties": {
-            "kind": { "const": "enum" },
-            "values": { "type": "array", "minItems": 1, "uniqueItems": true }
+            "kind": {
+              "enum": [
+                "boolean",
+                "string",
+                "number",
+                "node",
+                "function"
+              ]
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["item"],
-          "properties": { "kind": { "const": "array" }, "item": { "$ref": "#/$defs/type" } }
+          "required": [
+            "values"
+          ],
+          "properties": {
+            "kind": {
+              "const": "enum"
+            },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
         },
         {
           "additionalProperties": false,
-          "required": ["schema"],
-          "properties": { "kind": { "const": "object" }, "schema": { "$ref": "#/$defs/id" } }
+          "required": [
+            "item"
+          ],
+          "properties": {
+            "kind": {
+              "const": "array"
+            },
+            "item": {
+              "$ref": "#/$defs/type"
+            }
+          }
         },
         {
           "additionalProperties": false,
-          "properties": { "kind": { "const": "unknown" }, "text": { "type": "string" } }
+          "required": [
+            "schema"
+          ],
+          "properties": {
+            "kind": {
+              "const": "object"
+            },
+            "schema": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unknown"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
         }
       ]
     },
-    "fieldPath": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+    "fieldPath": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
     "read": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["slot"],
+          "required": [
+            "slot"
+          ],
           "properties": {
-            "kind": { "const": "slot" },
-            "slot": { "$ref": "#/$defs/id" },
-            "path": { "$ref": "#/$defs/fieldPath" }
+            "kind": {
+              "const": "slot"
+            },
+            "slot": {
+              "$ref": "#/$defs/id"
+            },
+            "path": {
+              "$ref": "#/$defs/fieldPath"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["list"],
+          "required": [
+            "list"
+          ],
           "properties": {
-            "kind": { "const": "item" },
-            "list": { "$ref": "#/$defs/id" },
-            "path": { "$ref": "#/$defs/fieldPath" }
+            "kind": {
+              "const": "item"
+            },
+            "list": {
+              "$ref": "#/$defs/id"
+            },
+            "path": {
+              "$ref": "#/$defs/fieldPath"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "binding"
+            },
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "path": {
+              "$ref": "#/$defs/fieldPath"
+            }
           }
         }
       ]
     },
     "expr": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["value"],
-          "properties": { "kind": { "const": "literal" }, "value": true }
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "literal"
+            },
+            "value": true
+          }
         },
-        { "$ref": "#/$defs/read" },
+        {
+          "$ref": "#/$defs/read"
+        },
         {
           "additionalProperties": false,
-          "required": ["operator", "value"],
+          "required": [
+            "properties"
+          ],
           "properties": {
-            "kind": { "const": "unary" },
-            "operator": { "const": "!" },
-            "value": { "$ref": "#/$defs/expr" }
+            "kind": {
+              "const": "object"
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/expr"
+              }
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["operator", "left", "right"],
+          "required": [
+            "operator",
+            "value"
+          ],
           "properties": {
-            "kind": { "const": "binary" },
+            "kind": {
+              "const": "unary"
+            },
+            "operator": {
+              "const": "!"
+            },
+            "value": {
+              "$ref": "#/$defs/expr"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "operator",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "kind": {
+              "const": "binary"
+            },
             "operator": {
               "type": "string",
-              "enum": ["&&", "||", "??", "===", "!==", ">", ">=", "<", "<="]
+              "enum": [
+                "&&",
+                "||",
+                "??",
+                "===",
+                "!==",
+                ">",
+                ">=",
+                "<",
+                "<="
+              ]
             },
-            "left": { "$ref": "#/$defs/expr" },
-            "right": { "$ref": "#/$defs/expr" }
+            "left": {
+              "$ref": "#/$defs/expr"
+            },
+            "right": {
+              "$ref": "#/$defs/expr"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["text"],
+          "required": [
+            "text"
+          ],
           "properties": {
-            "kind": { "const": "opaque" },
-            "text": { "$ref": "#/$defs/text" },
-            "reads": { "type": "array", "items": { "$ref": "#/$defs/read" } }
+            "kind": {
+              "const": "opaque"
+            },
+            "text": {
+              "$ref": "#/$defs/text"
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/read"
+              }
+            }
           }
         }
       ]
     },
-    "props": { "type": "object", "additionalProperties": { "$ref": "#/$defs/expr" } },
-    "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "props": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/expr"
+      }
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
     "node": {
       "type": "object",
-      "required": ["kind", "id", "location"],
+      "required": [
+        "kind",
+        "id",
+        "location"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["children"],
+          "required": [
+            "children"
+          ],
           "properties": {
-            "kind": { "const": "fragment" },
-            "id": { "$ref": "#/$defs/id" },
-            "children": { "$ref": "#/$defs/children" },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "fragment"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "children": {
+              "$ref": "#/$defs/children"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["tag"],
+          "required": [
+            "tag"
+          ],
           "properties": {
-            "kind": { "const": "element" },
-            "id": { "$ref": "#/$defs/id" },
-            "tag": { "$ref": "#/$defs/text" },
-            "module": { "$ref": "#/$defs/text" },
-            "props": { "$ref": "#/$defs/props" },
-            "style": { "type": "array", "items": { "$ref": "#/$defs/styleDeclaration" } },
-            "unresolvedStyle": { "type": "array", "items": { "$ref": "#/$defs/unresolvedStyle" } },
-            "children": { "$ref": "#/$defs/children" },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "element"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "tag": {
+              "$ref": "#/$defs/text"
+            },
+            "module": {
+              "$ref": "#/$defs/text"
+            },
+            "props": {
+              "$ref": "#/$defs/props"
+            },
+            "style": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/styleDeclaration"
+              }
+            },
+            "unresolvedStyle": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/unresolvedStyle"
+              }
+            },
+            "children": {
+              "$ref": "#/$defs/children"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["component"],
+          "required": [
+            "component"
+          ],
           "properties": {
-            "kind": { "const": "instance" },
-            "id": { "$ref": "#/$defs/id" },
-            "component": { "$ref": "#/$defs/id" },
-            "props": { "$ref": "#/$defs/props" },
-            "children": { "$ref": "#/$defs/children" },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "instance"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "component": {
+              "$ref": "#/$defs/id"
+            },
+            "props": {
+              "$ref": "#/$defs/props"
+            },
+            "children": {
+              "$ref": "#/$defs/children"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["parts"],
+          "required": [
+            "parts"
+          ],
           "properties": {
-            "kind": { "const": "text" },
-            "id": { "$ref": "#/$defs/id" },
-            "parts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/expr" } },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "text"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "parts": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/expr"
+              }
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["on", "arms"],
+          "required": [
+            "on",
+            "arms"
+          ],
           "properties": {
-            "kind": { "const": "branch" },
-            "id": { "$ref": "#/$defs/id" },
-            "on": { "$ref": "#/$defs/expr" },
-            "arms": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/arm" } },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "branch"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "on": {
+              "$ref": "#/$defs/expr"
+            },
+            "arms": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/arm"
+              }
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["source", "item", "itemType", "children"],
+          "required": [
+            "source",
+            "item",
+            "itemType",
+            "children"
+          ],
           "properties": {
-            "kind": { "const": "list" },
-            "id": { "$ref": "#/$defs/id" },
-            "source": { "$ref": "#/$defs/expr" },
-            "item": { "$ref": "#/$defs/text" },
-            "itemType": { "$ref": "#/$defs/type" },
-            "key": { "$ref": "#/$defs/expr" },
+            "kind": {
+              "const": "list"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "source": {
+              "$ref": "#/$defs/expr"
+            },
+            "item": {
+              "$ref": "#/$defs/text"
+            },
+            "itemType": {
+              "$ref": "#/$defs/type"
+            },
+            "key": {
+              "$ref": "#/$defs/expr"
+            },
             "children": {
               "type": "array",
               "minItems": 1,
-              "items": { "$ref": "#/$defs/node" }
+              "items": {
+                "$ref": "#/$defs/node"
+              }
             },
-            "location": { "$ref": "#/$defs/location" }
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["slot"],
+          "required": [
+            "slot"
+          ],
           "properties": {
-            "kind": { "const": "outlet" },
-            "id": { "$ref": "#/$defs/id" },
-            "slot": { "$ref": "#/$defs/id" },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "outlet"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "slot": {
+              "$ref": "#/$defs/id"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["reason"],
+          "required": [
+            "children"
+          ],
           "properties": {
-            "kind": { "const": "placeholder" },
-            "id": { "$ref": "#/$defs/id" },
-            "reason": { "$ref": "#/$defs/text" },
-            "location": { "$ref": "#/$defs/location" }
+            "kind": {
+              "const": "renderFunction"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "parameters": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/bindingPattern"
+              }
+            },
+            "children": {
+              "$ref": "#/$defs/children"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "callee"
+          ],
+          "properties": {
+            "kind": {
+              "const": "invoke"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "callee": {
+              "$ref": "#/$defs/expr"
+            },
+            "arguments": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/expr"
+              }
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "tag"
+          ],
+          "properties": {
+            "kind": {
+              "const": "createElement"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "tag": {
+              "$ref": "#/$defs/expr"
+            },
+            "props": {
+              "type": "object",
+              "default": {},
+              "additionalProperties": {
+                "$ref": "#/$defs/expr"
+              }
+            },
+            "children": {
+              "$ref": "#/$defs/children"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "const": "placeholder"
+            },
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "reason": {
+              "$ref": "#/$defs/text"
+            },
+            "location": {
+              "$ref": "#/$defs/location"
+            }
           }
         }
       ]
@@ -307,29 +857,53 @@
     "arm": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["when"],
+      "required": [
+        "when"
+      ],
       "properties": {
         "when": {
           "oneOf": [
-            { "const": "otherwise" },
             {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["equals"],
-              "properties": { "equals": true }
+              "const": "otherwise"
             },
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["truthy"],
-              "properties": { "truthy": { "type": "boolean" } }
+              "required": [
+                "equals"
+              ],
+              "properties": {
+                "equals": true
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "truthy"
+              ],
+              "properties": {
+                "truthy": {
+                  "type": "boolean"
+                }
+              }
             }
           ]
         },
-        "children": { "$ref": "#/$defs/children" }
+        "children": {
+          "$ref": "#/$defs/children"
+        }
       }
     },
-    "styleSyntax": { "enum": ["class", "inline", "modifier", "stylesheet", "theme"] },
+    "styleSyntax": {
+      "enum": [
+        "class",
+        "inline",
+        "modifier",
+        "stylesheet",
+        "theme"
+      ]
+    },
     "styleProperty": {
       "enum": [
         "display",
@@ -417,9 +991,14 @@
     "length": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["value", "unit"],
+      "required": [
+        "value",
+        "unit"
+      ],
       "properties": {
-        "value": { "type": "number" },
+        "value": {
+          "type": "number"
+        },
         "unit": {
           "enum": [
             "px",
@@ -444,101 +1023,23 @@
     },
     "finalValue": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["value", "unit"],
+          "required": [
+            "value",
+            "unit"
+          ],
           "properties": {
-            "kind": { "const": "length" },
-            "value": { "type": "number" },
-            "unit": {
-          "enum": [
-            "px",
-            "rem",
-            "em",
-            "percent",
-            "pt",
-            "dp",
-            "vw",
-            "vh",
-            "svw",
-            "svh",
-            "lvw",
-            "lvh",
-            "dvw",
-            "dvh",
-            "vmin",
-            "vmax"
-          ]
-        }
-          }
-        },
-        {
-          "additionalProperties": false,
-          "required": ["min", "preferred", "max"],
-          "properties": {
-            "kind": { "const": "clamp" },
-            "min": { "$ref": "#/$defs/length" },
-            "preferred": { "$ref": "#/$defs/length" },
-            "max": { "$ref": "#/$defs/length" }
-          }
-        },
-        {
-          "additionalProperties": false,
-          "required": ["value"],
-          "properties": {
-            "kind": { "const": "color" },
-            "value": { "type": "string", "pattern": "^#[0-9a-f]{6}([0-9a-f]{2})?$" }
-          }
-        },
-        {
-          "additionalProperties": false,
-          "required": ["value"],
-          "properties": { "kind": { "const": "number" }, "value": { "type": "number" } }
-        },
-        {
-          "additionalProperties": false,
-          "required": ["value"],
-          "properties": { "kind": { "const": "keyword" }, "value": { "$ref": "#/$defs/text" } }
-        },
-        {
-          "additionalProperties": false,
-          "required": ["text", "reason"],
-          "properties": {
-            "kind": { "const": "unresolved" },
-            "text": { "$ref": "#/$defs/text" },
-            "reason": { "$ref": "#/$defs/text" },
-            "refinement": { "$ref": "#/$defs/refinedValue" }
-          }
-        }
-      ]
-    },
-    "styleValue": {
-      "oneOf": [
-        { "$ref": "#/$defs/finalValue" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["kind", "token"],
-          "properties": {
-            "kind": { "const": "token" },
-            "token": { "$ref": "#/$defs/id" },
-            "resolved": { "$ref": "#/$defs/finalValue" }
-          }
-        }
-      ]
-    },
-    "refinedValue": {
-      "type": "object",
-      "required": ["kind"],
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "required": ["value", "unit"],
-          "properties": {
-            "kind": { "const": "length" },
-            "value": { "type": "number" },
+            "kind": {
+              "const": "length"
+            },
+            "value": {
+              "type": "number"
+            },
             "unit": {
               "enum": [
                 "px",
@@ -563,31 +1064,223 @@
         },
         {
           "additionalProperties": false,
-          "required": ["min", "preferred", "max"],
+          "required": [
+            "min",
+            "preferred",
+            "max"
+          ],
           "properties": {
-            "kind": { "const": "clamp" },
-            "min": { "$ref": "#/$defs/length" },
-            "preferred": { "$ref": "#/$defs/length" },
-            "max": { "$ref": "#/$defs/length" }
+            "kind": {
+              "const": "clamp"
+            },
+            "min": {
+              "$ref": "#/$defs/length"
+            },
+            "preferred": {
+              "$ref": "#/$defs/length"
+            },
+            "max": {
+              "$ref": "#/$defs/length"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["value"],
+          "required": [
+            "value"
+          ],
           "properties": {
-            "kind": { "const": "color" },
-            "value": { "type": "string", "pattern": "^#[0-9a-f]{6}([0-9a-f]{2})?$" }
+            "kind": {
+              "const": "color"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^#[0-9a-f]{6}([0-9a-f]{2})?$"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["value"],
-          "properties": { "kind": { "const": "number" }, "value": { "type": "number" } }
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "number"
+            },
+            "value": {
+              "type": "number"
+            }
+          }
         },
         {
           "additionalProperties": false,
-          "required": ["value"],
-          "properties": { "kind": { "const": "keyword" }, "value": { "$ref": "#/$defs/text" } }
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "keyword"
+            },
+            "value": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unresolved"
+            },
+            "text": {
+              "$ref": "#/$defs/text"
+            },
+            "reason": {
+              "$ref": "#/$defs/text"
+            },
+            "refinement": {
+              "$ref": "#/$defs/refinedValue"
+            }
+          }
+        }
+      ]
+    },
+    "styleValue": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/finalValue"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "token"
+          ],
+          "properties": {
+            "kind": {
+              "const": "token"
+            },
+            "token": {
+              "$ref": "#/$defs/id"
+            },
+            "resolved": {
+              "$ref": "#/$defs/finalValue"
+            }
+          }
+        }
+      ]
+    },
+    "refinedValue": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "length"
+            },
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "enum": [
+                "px",
+                "rem",
+                "em",
+                "percent",
+                "pt",
+                "dp",
+                "vw",
+                "vh",
+                "svw",
+                "svh",
+                "lvw",
+                "lvh",
+                "dvw",
+                "dvh",
+                "vmin",
+                "vmax"
+              ]
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "preferred",
+            "max"
+          ],
+          "properties": {
+            "kind": {
+              "const": "clamp"
+            },
+            "min": {
+              "$ref": "#/$defs/length"
+            },
+            "preferred": {
+              "$ref": "#/$defs/length"
+            },
+            "max": {
+              "$ref": "#/$defs/length"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "color"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^#[0-9a-f]{6}([0-9a-f]{2})?$"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "number"
+            },
+            "value": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "keyword"
+            },
+            "value": {
+              "$ref": "#/$defs/text"
+            }
+          }
         }
       ]
     },
@@ -596,70 +1289,161 @@
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "root": { "$ref": "#/$defs/documentElementStyle" },
-        "body": { "$ref": "#/$defs/documentElementStyle" },
+        "root": {
+          "$ref": "#/$defs/documentElementStyle"
+        },
+        "body": {
+          "$ref": "#/$defs/documentElementStyle"
+        },
         "externalStylesheets": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "fontFaces": {
           "type": "array",
-          "items": { "$ref": "#/$defs/fontFace" }
+          "items": {
+            "$ref": "#/$defs/fontFace"
+          }
         }
       }
     },
     "fontFace": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "family", "sources", "origin", "location"],
+      "required": [
+        "id",
+        "family",
+        "sources",
+        "origin",
+        "location"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "family": { "$ref": "#/$defs/text" },
-        "style": { "$ref": "#/$defs/text" },
-        "weight": { "$ref": "#/$defs/text" },
-        "stretch": { "$ref": "#/$defs/text" },
-        "display": { "$ref": "#/$defs/text" },
-        "unicodeRange": { "$ref": "#/$defs/text" },
-        "stylesheet": { "$ref": "#/$defs/text" },
-        "stylesheetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "family": {
+          "$ref": "#/$defs/text"
+        },
+        "style": {
+          "$ref": "#/$defs/text"
+        },
+        "weight": {
+          "$ref": "#/$defs/text"
+        },
+        "stretch": {
+          "$ref": "#/$defs/text"
+        },
+        "display": {
+          "$ref": "#/$defs/text"
+        },
+        "unicodeRange": {
+          "$ref": "#/$defs/text"
+        },
+        "stylesheet": {
+          "$ref": "#/$defs/text"
+        },
+        "stylesheetSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "sources": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/fontSource" }
+          "items": {
+            "$ref": "#/$defs/fontSource"
+          }
         },
-        "origin": { "$ref": "#/$defs/origin" },
-        "location": { "$ref": "#/$defs/location" }
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "fontSource": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["kind", "path", "asset", "sha256", "bytes"],
+          "required": [
+            "kind",
+            "path",
+            "asset",
+            "sha256",
+            "bytes"
+          ],
           "properties": {
-            "kind": { "const": "asset" },
-            "path": { "$ref": "#/$defs/path" },
-            "asset": { "type": "string", "pattern": "^asset-[0-9a-f]{64}\\.(woff2|woff|ttf|otf)$" },
-            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-            "bytes": { "type": "integer", "minimum": 1, "maximum": 4194304 },
-            "format": { "$ref": "#/$defs/text" },
-            "license": { "$ref": "#/$defs/text" }
+            "kind": {
+              "const": "asset"
+            },
+            "path": {
+              "$ref": "#/$defs/path"
+            },
+            "asset": {
+              "type": "string",
+              "pattern": "^asset-[0-9a-f]{64}\\.(woff2|woff|ttf|otf)$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4194304
+            },
+            "format": {
+              "$ref": "#/$defs/text"
+            },
+            "license": {
+              "$ref": "#/$defs/text"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["kind", "url"],
+          "required": [
+            "kind",
+            "url"
+          ],
           "properties": {
-            "kind": { "const": "external" },
-            "url": { "type": "string", "minLength": 1 },
-            "format": { "$ref": "#/$defs/text" },
-            "asset": { "type": "string", "pattern": "^asset-[0-9a-f]{64}\\.(woff2|woff|ttf|otf)$" },
-            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-            "bytes": { "type": "integer", "minimum": 1, "maximum": 4194304 },
-            "retrievedUrl": { "type": "string", "minLength": 1 },
-            "license": { "$ref": "#/$defs/text" }
+            "kind": {
+              "const": "external"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "format": {
+              "$ref": "#/$defs/text"
+            },
+            "asset": {
+              "type": "string",
+              "pattern": "^asset-[0-9a-f]{64}\\.(woff2|woff|ttf|otf)$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4194304
+            },
+            "retrievedUrl": {
+              "type": "string",
+              "minLength": 1
+            },
+            "license": {
+              "$ref": "#/$defs/text"
+            }
           }
         }
       ]
@@ -667,9 +1451,16 @@
     "documentElementStyle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["style"],
+      "required": [
+        "style"
+      ],
       "properties": {
-        "style": { "type": "array", "items": { "$ref": "#/$defs/styleDeclaration" } }
+        "style": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/styleDeclaration"
+          }
+        }
       }
     },
     "condition": {
@@ -677,128 +1468,346 @@
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "minWidth": { "$ref": "#/$defs/length" },
-        "maxWidth": { "$ref": "#/$defs/length" },
-        "interaction": { "enum": ["hover", "focus", "pressed", "disabled"] },
-        "colorScheme": { "enum": ["light", "dark"] },
-        "expr": { "$ref": "#/$defs/expr" },
+        "minWidth": {
+          "$ref": "#/$defs/length"
+        },
+        "maxWidth": {
+          "$ref": "#/$defs/length"
+        },
+        "interaction": {
+          "enum": [
+            "hover",
+            "focus",
+            "pressed",
+            "disabled"
+          ]
+        },
+        "colorScheme": {
+          "enum": [
+            "light",
+            "dark"
+          ]
+        },
+        "expr": {
+          "$ref": "#/$defs/expr"
+        },
         "equals": true
       }
     },
     "styleSource": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["syntax", "text", "location"],
+      "required": [
+        "syntax",
+        "text",
+        "location"
+      ],
       "properties": {
-        "syntax": { "$ref": "#/$defs/styleSyntax" },
-        "text": { "$ref": "#/$defs/text" },
-        "location": { "$ref": "#/$defs/location" }
+        "syntax": {
+          "$ref": "#/$defs/styleSyntax"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "styleDeclaration": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["property", "value", "from"],
+      "required": [
+        "property",
+        "value",
+        "from"
+      ],
       "properties": {
-        "property": { "$ref": "#/$defs/styleProperty" },
-        "value": { "$ref": "#/$defs/styleValue" },
-        "when": { "$ref": "#/$defs/condition" },
-        "from": { "$ref": "#/$defs/styleSource" }
+        "property": {
+          "$ref": "#/$defs/styleProperty"
+        },
+        "value": {
+          "$ref": "#/$defs/styleValue"
+        },
+        "when": {
+          "$ref": "#/$defs/condition"
+        },
+        "from": {
+          "$ref": "#/$defs/styleSource"
+        }
       }
     },
     "unresolvedStyle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["syntax", "text", "reason", "location"],
+      "required": [
+        "syntax",
+        "text",
+        "reason",
+        "location"
+      ],
       "properties": {
-        "syntax": { "$ref": "#/$defs/styleSyntax" },
-        "text": { "$ref": "#/$defs/text" },
-        "reason": { "$ref": "#/$defs/text" },
-        "location": { "$ref": "#/$defs/location" }
+        "syntax": {
+          "$ref": "#/$defs/styleSyntax"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "itemSchema": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "fields", "origin", "location"],
+      "required": [
+        "id",
+        "name",
+        "fields",
+        "origin",
+        "location"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "$ref": "#/$defs/text" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
         "fields": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "type"],
+            "required": [
+              "name",
+              "type"
+            ],
             "properties": {
-              "name": { "$ref": "#/$defs/text" },
-              "type": { "$ref": "#/$defs/type" },
-              "optional": { "type": "boolean" }
+              "name": {
+                "$ref": "#/$defs/text"
+              },
+              "type": {
+                "$ref": "#/$defs/type"
+              },
+              "optional": {
+                "type": "boolean"
+              }
             }
           }
         },
-        "origin": { "$ref": "#/$defs/origin" },
-        "location": { "$ref": "#/$defs/location" }
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "token": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "group", "value", "syntax"],
-      "anyOf": [{ "required": ["location"] }, { "required": ["package"] }],
+      "required": [
+        "id",
+        "name",
+        "group",
+        "value",
+        "syntax"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "location"
+          ]
+        },
+        {
+          "required": [
+            "package"
+          ]
+        }
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "$ref": "#/$defs/text" },
-        "group": { "enum": ["color", "spacing", "typography", "radius", "size", "other"] },
-        "value": { "$ref": "#/$defs/styleValue" },
-        "modes": { "type": "object", "additionalProperties": { "$ref": "#/$defs/styleValue" } },
-        "syntax": { "$ref": "#/$defs/styleSyntax" },
-        "location": { "$ref": "#/$defs/location" },
-        "package": { "$ref": "#/$defs/text" }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "group": {
+          "enum": [
+            "color",
+            "spacing",
+            "typography",
+            "radius",
+            "size",
+            "other"
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/styleValue"
+        },
+        "modes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/styleValue"
+          }
+        },
+        "syntax": {
+          "$ref": "#/$defs/styleSyntax"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "package": {
+          "$ref": "#/$defs/text"
+        }
       }
     },
     "edge": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "from", "kind", "to", "origin", "location"],
+      "required": [
+        "id",
+        "from",
+        "kind",
+        "to",
+        "origin",
+        "location"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "from": { "$ref": "#/$defs/id" },
-        "kind": { "enum": ["link", "navigate", "present"] },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "from": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "link",
+            "navigate",
+            "present"
+          ]
+        },
         "to": {
           "type": "object",
-          "required": ["kind"],
+          "required": [
+            "kind"
+          ],
           "oneOf": [
             {
               "additionalProperties": false,
-              "required": ["screen"],
-              "properties": { "kind": { "const": "screen" }, "screen": { "$ref": "#/$defs/id" } }
+              "required": [
+                "screen"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "screen"
+                },
+                "screen": {
+                  "$ref": "#/$defs/id"
+                }
+              }
             },
             {
               "additionalProperties": false,
-              "required": ["route"],
-              "properties": { "kind": { "const": "route" }, "route": { "$ref": "#/$defs/route" } }
+              "required": [
+                "route"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "route"
+                },
+                "route": {
+                  "$ref": "#/$defs/route"
+                }
+              }
             },
             {
               "additionalProperties": false,
-              "required": ["expr"],
-              "properties": { "kind": { "const": "opaque" }, "expr": { "$ref": "#/$defs/expr" } }
+              "required": [
+                "expr"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "opaque"
+                },
+                "expr": {
+                  "$ref": "#/$defs/expr"
+                }
+              }
             }
           ]
         },
-        "origin": { "$ref": "#/$defs/origin" },
-        "location": { "$ref": "#/$defs/location" }
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
     },
     "diagnostic": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message"],
+      "required": [
+        "code",
+        "message"
+      ],
       "properties": {
-        "code": { "$ref": "#/$defs/text" },
-        "message": { "$ref": "#/$defs/text" },
-        "location": { "$ref": "#/$defs/location" }
+        "code": {
+          "$ref": "#/$defs/text"
+        },
+        "message": {
+          "$ref": "#/$defs/text"
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        }
       }
+    },
+    "bindingPattern": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "identifier"
+            },
+            "name": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
+            "properties"
+          ],
+          "properties": {
+            "kind": {
+              "const": "object"
+            },
+            "properties": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

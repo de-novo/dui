@@ -18,10 +18,102 @@ pub use syntax::{LoadStats, ParseCache};
 use tree_sitter::Node as Ast;
 
 type Files = BTreeMap<String, Arc<File>>;
+fn resolve_relative_module(files: &Files, from: &str, request: &str) -> Option<String> {
+    if !request.starts_with('.') {
+        return None;
+    }
+    let mut parts: Vec<&str> = from.split('/').collect();
+    parts.pop();
+    for part in request.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            part => parts.push(part),
+        }
+    }
+    let base = parts.join("/");
+    let candidates = [
+        base.clone(),
+        format!("{base}.tsx"),
+        format!("{base}.ts"),
+        format!("{base}.jsx"),
+        format!("{base}.js"),
+        format!("{base}/index.tsx"),
+        format!("{base}/index.ts"),
+    ];
+    candidates
+        .into_iter()
+        .find(|candidate| files.contains_key(candidate))
+}
+fn export_text(text: &str) -> &str {
+    text.strip_prefix('"')
+        .and_then(|text| text.strip_suffix('"'))
+        .or_else(|| text.strip_prefix('\'').and_then(|text| text.strip_suffix('\'')))
+        .unwrap_or(text)
+}
+fn reexported_symbol<'a>(
+    files: &'a Files,
+    file: &'a File,
+    name: &'a str,
+    depth: usize,
+) -> Option<(&'a File, &'a str)> {
+    if depth > 8 {
+        return None;
+    }
+    for statement in children(file.tree.root_node())
+        .into_iter()
+        .filter(|node| node.kind() == "export_statement")
+    {
+        let Some(source) = field(statement, "source") else {
+            continue;
+        };
+        let request = export_text(file.text(source));
+        let Some(module) = resolve_relative_module(files, &file.path, request) else {
+            continue;
+        };
+        let target = files.get(&module)?;
+        let clause = children(statement)
+            .into_iter()
+            .find(|node| node.kind() == "export_clause");
+        if let Some(clause) = clause {
+            for specifier in children(clause) {
+                if specifier.kind() != "export_specifier" {
+                    continue;
+                }
+                let Some(local) = field(specifier, "name") else {
+                    continue;
+                };
+                let exported = field(specifier, "alias")
+                    .map(|alias| export_text(file.text(alias)))
+                    .unwrap_or_else(|| export_text(file.text(local)));
+                if exported == name {
+                    let local = export_text(file.text(local));
+                    if let Some(export) = target.exported(local) {
+                        return Some((target, export));
+                    }
+                    return reexported_symbol(files, target, local, depth + 1);
+                }
+            }
+        } else {
+            if let Some(export) = target.exported(name) {
+                return Some((target, export));
+            }
+            if let Some(found) = reexported_symbol(files, target, name, depth + 1) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
 fn symbol<'a>(files: &'a Files, file: &'a File, name: &'a str) -> Option<(&'a File, &'a str)> {
     if let Some((module, export)) = file.bindings.get(name) {
         let target = files.get(module)?;
-        Some((target, target.exported(export)?))
+        if let Some(export) = target.exported(export) {
+            return Some((target, export));
+        }
+        return reexported_symbol(files, target, export, 0);
     } else {
         Some((file, name))
     }
@@ -226,7 +318,7 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             let name = file.text(name_node);
             let prop = props.iter().find(|p| p.name == name);
             let mut ty = prop.map(|p| p.ty.clone()).unwrap_or_else(unknown);
-            if name == "children" && matches!(ty, m::TypeRef::Unknown { .. } | m::TypeRef::Node) {
+            if name == "children" && matches!(ty, m::TypeRef::Unknown { ref text, .. } if !text.as_deref().is_some_and(|text| text.contains("=>"))) {
                 ty = m::TypeRef::Node;
             }
             out.push(m::Slot {
@@ -255,7 +347,7 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
     {
         for prop in object_type_fields(files, file, ty) {
             let ty = if prop.name == "children"
-                && matches!(prop.ty, m::TypeRef::Unknown { .. } | m::TypeRef::Node)
+                && matches!(prop.ty, m::TypeRef::Unknown { ref text, .. } if !text.as_deref().is_some_and(|text| text.contains("=>")))
             {
                 m::TypeRef::Node
             } else {
@@ -1130,6 +1222,7 @@ fn extract_in_context_impl(
                 modules: modules.bindings(file, f),
                 signatures: &signatures,
                 items: vec![],
+                bindings: vec![],
                 constants: constant_env(file, f, slot),
                 model: &mut model,
             };

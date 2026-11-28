@@ -42,6 +42,7 @@ struct Scope<'a> {
     component: &'a Component,
     slots: BTreeMap<&'a str, &'a Slot>,
     lists: Vec<&'a str>,
+    bindings: BTreeSet<&'a str>,
 }
 
 struct Check<'a> {
@@ -546,6 +547,7 @@ impl<'a> Check<'a> {
             component,
             slots: BTreeMap::new(),
             lists: Vec::new(),
+            bindings: BTreeSet::new(),
         };
         let mut names = BTreeSet::new();
         for (index, slot) in component.slots.iter().enumerate() {
@@ -616,6 +618,9 @@ impl<'a> Check<'a> {
                             slot.kind == super::SlotKind::Prop && slot.name.starts_with("...")
                         });
                         for name in instance.props.keys() {
+                            if name.starts_with("...") {
+                                continue;
+                            }
                             if !props.contains(name.as_str()) && !accepts_rest {
                                 self.error(
                                     format!("{pointer}/props/{name}"),
@@ -682,6 +687,64 @@ impl<'a> Check<'a> {
                     ),
                 ),
             },
+            Node::RenderFunction(function) => {
+                let mut inner = scope.clone();
+                let mut bound = BTreeSet::new();
+                for (index, parameter) in function.parameters.iter().enumerate() {
+                    let parameter_pointer = format!("{pointer}/parameters/{index}");
+                    match parameter {
+                        super::BindingPattern::Identifier { name } => {
+                            self.non_empty(format!("{parameter_pointer}/name"), name);
+                            if !bound.insert(name.as_str()) {
+                                self.error(
+                                    format!("{parameter_pointer}/name"),
+                                    format!("duplicate binding {name:?}"),
+                                );
+                            }
+                            inner.bindings.insert(name.as_str());
+                        }
+                        super::BindingPattern::Object { properties } => {
+                            if properties.is_empty() {
+                                self.error(
+                                    format!("{parameter_pointer}/properties"),
+                                    "must not be empty",
+                                );
+                            }
+                            for (key, name) in properties {
+                                self.non_empty(format!("{parameter_pointer}/properties"), key);
+                                self.non_empty(format!("{parameter_pointer}/properties/{key}"), name);
+                                if !bound.insert(name.as_str()) {
+                                    self.error(
+                                        format!("{parameter_pointer}/properties/{key}"),
+                                        format!("duplicate binding {name:?}"),
+                                    );
+                                }
+                                inner.bindings.insert(name.as_str());
+                            }
+                        }
+                    }
+                }
+                if function.children.is_empty() {
+                    self.error(format!("{pointer}/children"), "must have a body template");
+                }
+                self.children(&format!("{pointer}/children"), &function.children, &inner);
+            }
+            Node::Invoke(invoke) => {
+                self.expr(&format!("{pointer}/callee"), &invoke.callee, scope);
+                if !matches!(invoke.callee, Expr::Slot { .. }) {
+                    self.error(format!("{pointer}/callee"), "must be a slot read");
+                }
+                for (index, argument) in invoke.arguments.iter().enumerate() {
+                    self.expr(&format!("{pointer}/arguments/{index}"), argument, scope);
+                }
+            }
+            Node::CreateElement(create) => {
+                self.expr(&format!("{pointer}/tag"), &create.tag, scope);
+                for (name, value) in &create.props {
+                    self.expr(&format!("{pointer}/props/{name}"), value, scope);
+                }
+                self.children(&format!("{pointer}/children"), &create.children, scope);
+            }
             Node::Placeholder(placeholder) => {
                 self.non_empty(format!("{pointer}/reason"), &placeholder.reason);
             }
@@ -715,6 +778,21 @@ impl<'a> Check<'a> {
                 }
                 self.field_path(pointer, path);
             }
+            Expr::Binding { name, path } => {
+                if !scope.bindings.contains(name.as_str()) {
+                    self.error(
+                        format!("{pointer}/name"),
+                        format!("{name:?} is not a render-function binding around this value"),
+                    );
+                }
+                self.field_path(pointer, path);
+            }
+            Expr::Object { properties } => {
+                for (key, value) in properties {
+                    self.non_empty(format!("{pointer}/properties"), key);
+                    self.expr(&format!("{pointer}/properties/{key}"), value, scope);
+                }
+            }
             Expr::Unary { operator, value } => {
                 if operator != "!" {
                     self.error(format!("{pointer}/operator"), "unsupported unary operator");
@@ -740,10 +818,11 @@ impl<'a> Check<'a> {
                 for (index, read) in reads.iter().enumerate() {
                     let read_pointer = format!("{pointer}/reads/{index}");
                     match read {
-                        Expr::Slot { .. } | Expr::Item { .. } => {
+                        Expr::Slot { .. } | Expr::Item { .. } | Expr::Binding { .. } => {
                             self.expr(&read_pointer, read, scope);
                         }
                         Expr::Literal { .. }
+                        | Expr::Object { .. }
                         | Expr::Opaque { .. }
                         | Expr::Unary { .. }
                         | Expr::Binary { .. } => {

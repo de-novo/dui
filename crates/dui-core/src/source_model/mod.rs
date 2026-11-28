@@ -202,6 +202,16 @@ pub enum Expr {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         path: Vec<String>,
     },
+    /// A read of a render-function parameter bound by an enclosing `invoke` node.
+    Binding {
+        name: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        path: Vec<String>,
+    },
+    /// A bounded object literal with statically visible keys.
+    Object {
+        properties: BTreeMap<String, Expr>,
+    },
     /// A deterministic unary operation over a modeled value.
     Unary {
         operator: String,
@@ -231,6 +241,13 @@ pub enum Node {
     Branch(Branch),
     List(List),
     Outlet(Outlet),
+    /// A function passed as renderable UI input. The node is a value template; it is
+    /// drawn only through an `invoke` node, never executed as code.
+    RenderFunction(RenderFunction),
+    /// A bounded render-prop invocation: one callee expression and positional arguments.
+    Invoke(Invoke),
+    /// A bounded `React.createElement` call with statically visible props and children.
+    CreateElement(CreateElement),
     Placeholder(Placeholder),
 }
 
@@ -330,6 +347,52 @@ pub struct List {
 pub struct Outlet {
     pub id: String,
     pub slot: String,
+    pub location: Location,
+}
+
+/// A positional render-function parameter. Object patterns are bounded to one level of
+/// `key: localName` destructuring; anything else stays a placeholder in the adapter.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum BindingPattern {
+    Identifier { name: String },
+    Object { properties: BTreeMap<String, String> },
+}
+
+/// A render-function value template. `children` is the function body's UI template.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RenderFunction {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parameters: Vec<BindingPattern>,
+    pub children: Vec<Node>,
+    pub location: Location,
+}
+
+/// A render-prop invocation. Arguments are positional and evaluated only as model
+/// expressions; no application code runs.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Invoke {
+    pub id: String,
+    pub callee: Expr,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<Expr>,
+    pub location: Location,
+}
+
+/// A bounded `React.createElement` call. `tag` may be a literal intrinsic name or a
+/// model expression; the renderer resolves only modeled values and otherwise uses a placeholder.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateElement {
+    pub id: String,
+    pub tag: Expr,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub props: BTreeMap<String, Expr>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<Node>,
     pub location: Location,
 }
 
@@ -879,6 +942,9 @@ impl Node {
             Self::Branch(node) => &node.id,
             Self::List(node) => &node.id,
             Self::Outlet(node) => &node.id,
+            Self::RenderFunction(node) => &node.id,
+            Self::Invoke(node) => &node.id,
+            Self::CreateElement(node) => &node.id,
             Self::Placeholder(node) => &node.id,
         }
     }
@@ -892,6 +958,9 @@ impl Node {
             Self::Branch(node) => &node.location,
             Self::List(node) => &node.location,
             Self::Outlet(node) => &node.location,
+            Self::RenderFunction(node) => &node.location,
+            Self::Invoke(node) => &node.location,
+            Self::CreateElement(node) => &node.location,
             Self::Placeholder(node) => &node.location,
         }
     }
@@ -904,7 +973,9 @@ impl Node {
             Self::Instance(node) => node.children.iter().collect(),
             Self::List(node) => node.children.iter().collect(),
             Self::Branch(node) => node.arms.iter().flat_map(|arm| &arm.children).collect(),
-            Self::Text(_) | Self::Outlet(_) | Self::Placeholder(_) => Vec::new(),
+            Self::RenderFunction(node) => node.children.iter().collect(),
+            Self::CreateElement(node) => node.children.iter().collect(),
+            Self::Text(_) | Self::Outlet(_) | Self::Invoke(_) | Self::Placeholder(_) => Vec::new(),
         }
     }
 }

@@ -794,3 +794,75 @@ export function OrganizationScreen() {
         model.screens
     );
 }
+
+#[test]
+fn render_prop_invocations_and_create_element_have_explicit_nodes() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import React from 'react'
+function Frame({ children }: { children: any }) {
+  return <>{typeof children === 'function' ? children({ filter: true }) : children}</>
+}
+function Dynamic({ as = 'div', children }: { as?: string; children?: any }) {
+  const child = children
+  return React.createElement(as, { className: 'box' }, child)
+}
+export default function App() {
+  return <Frame>{({ filter }: { filter: boolean }) => <main>{filter && <Dynamic>Row</Dynamic>}</main>}</Frame>
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let kinds = |component: &str| -> Vec<&'static str> {
+        let component = model
+            .components
+            .iter()
+            .find(|candidate| candidate.name == component)
+            .unwrap_or_else(|| panic!("missing {component}"));
+        let mut out = Vec::new();
+        let mut stack = vec![&component.root];
+        while let Some(node) = stack.pop() {
+            out.push(match node {
+                m::Node::RenderFunction(_) => "renderFunction",
+                m::Node::Invoke(_) => "invoke",
+                m::Node::CreateElement(_) => "createElement",
+                m::Node::Fragment(_) => "fragment",
+                m::Node::Element(_) => "element",
+                m::Node::Instance(_) => "instance",
+                m::Node::Text(_) => "text",
+                m::Node::Branch(_) => "branch",
+                m::Node::List(_) => "list",
+                m::Node::Outlet(_) => "outlet",
+                m::Node::Placeholder(_) => "placeholder",
+            });
+            stack.extend(node.children());
+        }
+        out
+    };
+    assert!(kinds("Frame").contains(&"invoke"), "Frame: {:?}", kinds("Frame"));
+    assert!(kinds("App").contains(&"renderFunction"), "App: {:?}", kinds("App"));
+    assert!(
+        kinds("Dynamic").contains(&"createElement"),
+        "Dynamic: {:?}",
+        kinds("Dynamic")
+    );
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let mut stack = vec![&app.root];
+    let mut found = false;
+    while let Some(node) = stack.pop() {
+        if let m::Node::RenderFunction(function) = node {
+            found = function.parameters.iter().any(|parameter| matches!(
+                parameter,
+                m::BindingPattern::Object { properties } if properties.get("filter").is_some()
+            ));
+        }
+        stack.extend(node.children());
+    }
+    assert!(found, "object render-prop parameter missing: {:#?}", app.root);
+}

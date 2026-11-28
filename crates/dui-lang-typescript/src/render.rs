@@ -20,6 +20,7 @@ pub struct Context<'a> {
     pub built: Option<&'a style::built::Sheet<'a>>,
     pub sources: &'a [style::built::Sheet<'a>],
     pub items: Vec<(String, String)>,
+    pub bindings: Vec<std::collections::BTreeSet<String>>,
     pub constants: BTreeMap<String, serde_json::Value>,
     pub model: &'a mut m::SourceModel,
 }
@@ -438,6 +439,12 @@ impl Context<'_> {
                 path: rest.to_vec(),
             });
         }
+        if self.bindings.iter().rev().any(|scope| scope.contains(name)) {
+            return Some(m::Expr::Binding {
+                name: name.into(),
+                path,
+            });
+        }
         if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
             Some(m::Expr::Item {
                 list: list.clone(),
@@ -748,30 +755,42 @@ impl Context<'_> {
                 location: loc,
             });
         }
+        if n.kind() == "call_expression" && self.is_react_create_element(n) {
+            return self.create_element(n, id);
+        }
         if n.kind() == "call_expression"
             && field(n, "function").is_some_and(|function| {
                 function.kind() == "identifier"
-                    && self.slots.iter().any(|slot| {
-                        slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node
-                    })
+                    && self
+                        .slots
+                        .iter()
+                        .any(|slot| slot.name == self.file.text(function))
             })
         {
             let function = field(n, "function").unwrap();
             let slot = self
                 .slots
                 .iter()
-                .find(|slot| slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node)
+                .find(|slot| slot.name == self.file.text(function))
                 .unwrap();
-            return m::Node::Outlet(m::Outlet {
+            let arguments = field(n, "arguments")
+                .map(children)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|argument| self.expr(argument))
+                .collect();
+            return m::Node::Invoke(m::Invoke {
                 id,
-                slot: slot.id.clone(),
+                callee: m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: vec![],
+                },
+                arguments,
                 location: loc,
             });
         }
         if matches!(n.kind(), "arrow_function" | "function_expression") {
-            return crate::returned(n)
-                .map(|returned| self.node(returned, id.clone()))
-                .unwrap_or_else(|| self.placeholder(n, id, "Unsupported render function body"));
+            return self.render_function(n, id);
         }
         match n.kind() {
             "jsx_element" | "jsx_self_closing_element" => self.element(n, id),
@@ -874,6 +893,162 @@ impl Context<'_> {
             item_type: ty,
             key,
             children: vec![child],
+            location: self.file.loc(n),
+        })
+    }
+    fn parameter_nodes<'a>(&self, f: Ast<'a>) -> Vec<Ast<'a>> {
+        if let Some(parameter) = field(f, "parameter") {
+            return vec![parameter];
+        }
+        field(f, "parameters")
+            .map(children)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|parameter| {
+                matches!(
+                    parameter.kind(),
+                    "required_parameter" | "optional_parameter" | "identifier" | "object_pattern"
+                )
+            })
+            .collect()
+    }
+    fn pattern_node<'a>(&self, parameter: Ast<'a>) -> Ast<'a> {
+        field(parameter, "pattern")
+            .or_else(|| field(parameter, "name"))
+            .unwrap_or(parameter)
+    }
+    fn binding_pattern(&self, parameter: Ast<'_>) -> Option<m::BindingPattern> {
+        let pattern = self.pattern_node(parameter);
+        if pattern.kind() == "identifier" {
+            return Some(m::BindingPattern::Identifier {
+                name: self.file.text(pattern).into(),
+            });
+        }
+        if pattern.kind() != "object_pattern" {
+            return None;
+        }
+        let mut properties = BTreeMap::new();
+        for binding in children(pattern) {
+            match binding.kind() {
+                "shorthand_property_identifier_pattern" => {
+                    let name = self.file.text(binding);
+                    properties.insert(name.into(), name.into());
+                }
+                "pair_pattern" | "object_assignment_pattern" => {
+                    let key = field(binding, "key")
+                        .and_then(|key| object_key(self.file, key))
+                        .or_else(|| first(binding).map(|key| self.file.text(key).to_owned()))?;
+                    let value = field(binding, "value").or_else(|| field(binding, "right"))?;
+                    let value = if value.kind() == "assignment_pattern" {
+                        field(value, "left")?
+                    } else {
+                        value
+                    };
+                    if !matches!(
+                        value.kind(),
+                        "identifier" | "shorthand_property_identifier_pattern"
+                    ) {
+                        return None;
+                    }
+                    properties.insert(key, self.file.text(value).into());
+                }
+                _ => return None,
+            }
+        }
+        (!properties.is_empty()).then_some(m::BindingPattern::Object { properties })
+    }
+    fn render_function(&mut self, n: Ast<'_>, id: String) -> m::Node {
+        let parameters = self.parameter_nodes(n);
+        let mut patterns = Vec::new();
+        for parameter in parameters {
+            let Some(pattern) = self.binding_pattern(parameter) else {
+                return self.placeholder(n, id, "Unsupported render function parameters");
+            };
+            patterns.push(pattern);
+        }
+        let names = patterns
+            .iter()
+            .flat_map(|pattern| match pattern {
+                m::BindingPattern::Identifier { name } => vec![name.clone()],
+                m::BindingPattern::Object { properties } => properties.values().cloned().collect(),
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        let Some(body) = crate::returned(n) else {
+            return self.placeholder(n, id, "Unsupported render function body");
+        };
+        self.bindings.push(names);
+        let child = self.node(body, format!("{id}.0"));
+        self.bindings.pop();
+        m::Node::RenderFunction(m::RenderFunction {
+            id,
+            parameters: patterns,
+            children: vec![child],
+            location: self.file.loc(n),
+        })
+    }
+    fn is_react_create_element(&self, n: Ast<'_>) -> bool {
+        field(n, "function").is_some_and(|function| {
+            function.kind() == "member_expression"
+                && self.file.name(function, "property") == Some("createElement")
+                && field(function, "object")
+                    .is_some_and(|object| self.file.text(object) == "React")
+        })
+    }
+    fn unique_declarator<'a>(file: &'a File, name: &str) -> Option<Ast<'a>> {
+        let mut pending = vec![file.tree.root_node()];
+        let mut found = None;
+        while let Some(node) = pending.pop() {
+            if node.kind() == "variable_declarator"
+                && field(node, "name").is_some_and(|n| file.text(n) == name)
+            {
+                if found.is_some() {
+                    return None;
+                }
+                found = Some(node);
+            }
+            pending.extend(children(node));
+        }
+        found
+    }
+    fn expression_child(&mut self, node: Ast<'_>, id: String, depth: usize) -> m::Node {
+        let n = unwrap_expr(node);
+        if depth < 8 && n.kind() == "identifier" {
+            let name = self.file.text(n);
+            if let Some(initial) = Self::unique_declarator(self.file, name)
+                .and_then(|declarator| field(declarator, "value"))
+                .filter(|value| value.id() != n.id())
+            {
+                return self.expression_child(initial, id, depth + 1);
+            }
+        }
+        self.node(n, id)
+    }
+    fn create_element(&mut self, n: Ast<'_>, id: String) -> m::Node {
+        let arguments = field(n, "arguments").map(children).unwrap_or_default();
+        let Some(tag) = arguments.first() else {
+            return self.placeholder(n, id, "Incomplete createElement");
+        };
+        let mut props = BTreeMap::new();
+        if let Some(object) = arguments.get(1).map(|v| unwrap_expr(*v)) {
+            if object.kind() == "object" {
+                for (key, value) in object_entries(self.file, object) {
+                    props.insert(key, self.expr(value));
+                }
+            } else if !matches!(object.kind(), "null") {
+                return self.placeholder(n, id, "Unsupported createElement props");
+            }
+        }
+        let children = arguments
+            .iter()
+            .skip(2)
+            .enumerate()
+            .map(|(index, child)| self.expression_child(*child, format!("{id}.{index}"), 0))
+            .collect();
+        m::Node::CreateElement(m::CreateElement {
+            id,
+            tag: self.expr(*tag),
+            props,
+            children,
             location: self.file.loc(n),
         })
     }
