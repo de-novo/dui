@@ -8,13 +8,24 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        Arc, Condvar, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
-const POLL_INTERVAL: Duration = Duration::from_millis(10);
+const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const CLIENT_ACTIVITY_GRACE: Duration = Duration::from_secs(2);
 const LONG_POLL: Duration = Duration::from_secs(8);
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_millis() as u64)
+}
 
 #[derive(Clone)]
 pub(crate) struct HotSession {
@@ -24,6 +35,7 @@ pub(crate) struct HotSession {
 struct Inner {
     state: Mutex<HotState>,
     changed: Condvar,
+    client_active_until_ms: AtomicU64,
 }
 
 struct HotState {
@@ -452,6 +464,7 @@ impl HotSession {
                 graph_patch: None,
             }),
             changed: Condvar::new(),
+            client_active_until_ms: AtomicU64::new(0),
         });
         let thread_inner = Arc::clone(&inner);
         thread::spawn(move || {
@@ -469,6 +482,10 @@ impl HotSession {
         let Ok(mut guard) = self.inner.state.lock() else {
             return json!({"status":"error","reason":"watch-state-poisoned"});
         };
+        self.inner.client_active_until_ms.store(
+            now_millis() + CLIENT_ACTIVITY_GRACE.as_millis() as u64,
+            Ordering::Relaxed,
+        );
         if wait {
             let deadline = Instant::now() + LONG_POLL;
             loop {
@@ -607,7 +624,12 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
             }),
         }
         loop {
-            thread::sleep(POLL_INTERVAL);
+            let active = inner.client_active_until_ms.load(Ordering::Relaxed) >= now_millis();
+            thread::sleep(if active {
+                ACTIVE_POLL_INTERVAL
+            } else {
+                IDLE_POLL_INTERVAL
+            });
             let next = scan_sources(&project);
             if next == scan {
                 continue;
