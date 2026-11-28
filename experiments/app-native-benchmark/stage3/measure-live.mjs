@@ -78,7 +78,7 @@ function modelCardProbe(title){
  const frame=[...card.querySelectorAll(".approximate-model-content")][0];
  const shadow=frame?.shadowRoot;
  const visibleText=shadow?[...shadow.children].filter(el=>el.tagName!=="STYLE").map(el=>el.textContent).join(" ").replace(/\s+/g," ").trim():"";
- return{found:true,selected:card.dataset.selected==="true"||card.classList.contains("selected"),title:card.getAttribute("title")??card.dataset.screenId,logicalWidth:frame?.dataset.logicalWidth,logicalHeight:frame?.dataset.logicalHeight,visibleTextLength:visibleText.length,visibleText:visibleText.slice(0,240)};
+ return{found:true,selected:card.dataset.selected==="true"||card.classList.contains("selected"),title:card.getAttribute("title")??card.dataset.screenId,logicalWidth:frame?.dataset.logicalWidth,logicalHeight:frame?.dataset.logicalHeight,visibleTextLength:visibleText.length,visibleText};
 }
 function viewerUrl(url,screen,viewport,state){
  const next=new URL(url);
