@@ -1371,7 +1371,7 @@ fn intake_sheet(
 /// Extract font facts from built/source sheets and the public font stylesheets those facts link to.
 pub(crate) fn font_faces(
     project: &Path,
-    files: &BTreeMap<String, File>,
+    files: &BTreeMap<String, std::sync::Arc<File>>,
     artifact: Option<&str>,
     resources: &DocumentResources,
     diagnostics: &mut Vec<m::Diagnostic>,
