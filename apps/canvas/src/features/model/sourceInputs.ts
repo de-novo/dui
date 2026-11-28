@@ -45,6 +45,7 @@ export function decodeSourceInputs(raw: unknown): SourceInputs {
   return { defaultState, states };
 }
 
+const emptyContext: SourceInputRenderContext = Object.freeze({});
 const contextCache = new WeakMap<SourceInputs, Map<string, SourceInputRenderContext>>();
 
 /** Resolve the viewer's selected state exactly. An unknown explicit state selects no values;
@@ -55,9 +56,9 @@ export function sourceInputContext(
   inputs: SourceInputs | undefined,
   requestedState: string | null,
 ): SourceInputRenderContext {
-  if (!inputs) return {};
+  if (!inputs) return emptyContext;
   const state = requestedState === null ? inputs.defaultState : requestedState;
-  if (!state || !inputs.states[state]) return {};
+  if (!state || !inputs.states[state]) return emptyContext;
   const cached = contextCache.get(inputs);
   const hit = cached?.get(state);
   if (hit) return hit;
