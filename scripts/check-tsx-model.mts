@@ -938,7 +938,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   writeFileSync(
     join(builtProject, bundle),
     `.card { width: 20vw; }
-     html { font-size: 20px; }
+     html { font-size: 20px; color: #102030; }
      :root { font-size: 18px; }
      html[data-mode=night] { font-size: 22px; }
      html body { font-size: 1.2em; }`,
@@ -954,6 +954,12 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     { kind: "length", value: 18, unit: "px" },
   );
   assert.deepEqual(
+    readBuilt("--root-attribute", "data-mode=night").documentStyle.root.style.find(
+      (d: { property: string }) => d.property === "fontSize",
+    ).value,
+    { kind: "length", value: 22, unit: "px" },
+  );
+  assert.deepEqual(
     documentCascade.body.style.find((d: { property: string }) => d.property === "fontSize").value,
     { kind: "length", value: 1.2, unit: "em" },
   );
@@ -962,6 +968,14 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     uncertainDocument.root.style.find((d: { property: string }) => d.property === "fontSize").value
       .kind,
     "unresolved",
+  );
+  assert.deepEqual(
+    uncertainDocument.root.style.find((d: { property: string }) => d.property === "color").value,
+    { kind: "color", value: "#102030" },
+  );
+  assert.deepEqual(
+    uncertainDocument.body.style.find((d: { property: string }) => d.property === "fontSize").value,
+    { kind: "length", value: 1.2, unit: "em" },
   );
   writeFileSync(
     join(builtProject, "App.tsx"),

@@ -1110,8 +1110,16 @@ impl<'a> Sheet<'a> {
     ) -> Option<m::StyleDeclaration> {
         let rules = self.rules.get(&property)?;
         type Rank = (bool, usize, u32, usize);
-        let mut best: Option<(Rank, &Rule<'_>)> = None;
-        let mut unknown: Option<(Rank, &Rule<'_>)> = None;
+        fn rank(rule: &Rule<'_>, specificity: u32, order: usize) -> Rank {
+            let layer = if rule.important {
+                usize::MAX.saturating_sub(rule.layer.saturating_add(1))
+            } else {
+                rule.layer
+            };
+            (rule.important, layer, specificity, order)
+        }
+        let mut certain = Vec::new();
+        let mut possible = Vec::new();
         for (order, rule) in rules.iter().enumerate() {
             let mut exact = None;
             let mut maybe = None;
@@ -1130,27 +1138,41 @@ impl<'a> Sheet<'a> {
                     DocumentMatch::No => {}
                 }
             }
-            if let Some(specificity) = exact {
-                let rank = (false, rule.layer, specificity, order);
-                if rule.uncertain || rule.important {
-                    let rank = (rule.important, rule.layer, specificity, order);
-                    if unknown.is_none_or(|(current, _)| rank >= current) {
-                        unknown = Some((rank, rule));
-                    }
-                } else if best.is_none_or(|(current, _)| rank >= current) {
-                    best = Some((rank, rule));
-                }
-            } else if let Some(specificity) = maybe {
-                let rank = (rule.important, rule.layer, specificity, order);
-                if unknown.is_none_or(|(current, _)| rank >= current) {
-                    unknown = Some((rank, rule));
-                }
+            let conditional = rule.uncertain || rule.when.is_some();
+            if let Some(specificity) = exact
+                && !conditional
+            {
+                certain.push((rank(rule, specificity, order), rule));
+            }
+            let potential = match (exact, maybe) {
+                (Some(exact), Some(maybe)) => Some(exact.max(maybe)),
+                (Some(specificity), None) | (None, Some(specificity)) => Some(specificity),
+                (None, None) => None,
+            };
+            if let Some(specificity) = potential
+                && (conditional || maybe.is_some())
+            {
+                possible.push((rank(rule, specificity, order), rule));
             }
         }
-        let uncertain = unknown.is_some_and(|(unknown_rank, _)| {
-            best.is_none_or(|(best_rank, _)| unknown_rank >= best_rank)
-        });
-        let rule = if uncertain { unknown?.1 } else { best?.1 };
+        let best = certain.into_iter().max_by_key(|(rank, _)| *rank);
+        let challenge = possible
+            .into_iter()
+            .filter(|(rank, _)| {
+                best.as_ref()
+                    .is_none_or(|(best_rank, _)| rank.3 != best_rank.3)
+            })
+            .max_by_key(|(rank, _)| *rank);
+        let (uncertain, rule) = match (best, challenge) {
+            (Some((best_rank, certain_rule)), Some((challenge_rank, possible_rule)))
+                if challenge_rank > best_rank =>
+            {
+                (true, possible_rule)
+            }
+            (Some((_, certain_rule)), _) => (false, certain_rule),
+            (None, Some((_, possible_rule))) => (true, possible_rule),
+            (None, None) => return None,
+        };
         let value = if uncertain {
             V::Unresolved {
                 text: rule.source.text.clone(),
