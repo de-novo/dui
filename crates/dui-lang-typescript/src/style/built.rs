@@ -959,6 +959,7 @@ impl<'a> Sheet<'a> {
                         }
                     }
                 }
+                "keyframes_statement" => {}
                 "rule_set" => {
                     if let [selectors, body] = parts.as_slice() {
                         sheet
@@ -1040,6 +1041,14 @@ impl<'a> Sheet<'a> {
             P::FontWeight,
             P::LineHeight,
             P::LetterSpacing,
+            P::Color,
+            P::Background,
+            P::Width,
+            P::MinWidth,
+            P::MaxWidth,
+            P::Height,
+            P::MinHeight,
+            P::MaxHeight,
         ] {
             if let Some(declaration) = self.document_declaration(target, property) {
                 style.push(declaration);
@@ -1092,11 +1101,7 @@ impl<'a> Sheet<'a> {
                 }
             }
         }
-        let uncertain = match (best, unknown) {
-            (Some((exact, _)), Some((maybe, _))) => maybe >= exact,
-            (None, Some(_)) => true,
-            _ => false,
-        };
+        let uncertain = best.is_none() && unknown.is_some();
         let rule = if uncertain { unknown?.1 } else { best?.1 };
         let value = if uncertain {
             V::Unresolved {

@@ -366,6 +366,12 @@ h2 {
   min-width: 0;
   overflow: hidden;
   pointer-events: none;
+  transform-origin: 0 0;
+}
+.approximate-model-frame[data-viewport] .approximate-model-content {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 .approximate-model-badge,
 .approximate-model-unresolved {

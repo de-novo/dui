@@ -54,6 +54,7 @@ export function CaptureCard({
   live,
   sourceModel,
   modelRenderer,
+  modelHeight,
 }: {
   screen: Screen;
   cell?: Cell;
@@ -85,6 +86,8 @@ export function CaptureCard({
   /** Frozen source model and its replaceable renderer for source-model archives. */
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit logical viewport height for the source model, when one is selected. */
+  modelHeight?: number;
 }) {
   const { t } = useI18n();
   const modelRender = useApproximateModelRender(
@@ -92,7 +95,7 @@ export function CaptureCard({
     sourceModel,
     screen.component,
     cardWidth && cardWidth > 0 ? cardWidth : 375,
-    frameHeight,
+    modelHeight ?? frameHeight,
   );
   const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);

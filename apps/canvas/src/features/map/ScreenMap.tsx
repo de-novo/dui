@@ -73,6 +73,7 @@ type CardNode = Node<
     liveRun?: string;
     sourceModel?: Model;
     modelRenderer?: SourceModelRenderer;
+    modelHeight?: number;
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -310,6 +311,7 @@ function Card({
         dimmed={data.dimmed}
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
+        modelHeight={data.modelHeight}
         openComments={data.openComments}
         screenDiff={data.screenDiff}
         diffVisualMode={data.diffVisualMode}
@@ -526,6 +528,7 @@ export function ScreenMap({
   liveRun,
   sourceModel,
   modelRenderer,
+  modelHeight,
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -552,6 +555,8 @@ export function ScreenMap({
   liveRun?: string;
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit logical viewport height for source-model cards. */
+  modelHeight?: number;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -660,6 +665,7 @@ export function ScreenMap({
             liveRun,
             sourceModel,
             modelRenderer,
+            modelHeight,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -683,6 +689,7 @@ export function ScreenMap({
       liveRun,
       sourceModel,
       modelRenderer,
+      modelHeight,
       diffsByPath,
       diffActive,
       mode,

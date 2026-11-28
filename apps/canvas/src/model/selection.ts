@@ -8,6 +8,8 @@ export type ViewerSelection = {
   screen: string | null;
   state: string | null;
   width: number;
+  /** Optional explicit logical viewport height for source-model cards. */
+  height: number | null;
   widths: number[];
   locale: string | null;
   locales: string[];
@@ -39,6 +41,9 @@ export function parseSelection(search: string, archive: ScreenMap): ViewerSelect
   const rawWidth = params.get("width");
   const parsedWidth = rawWidth !== null ? Number(rawWidth) : NaN;
   const width = Number.isInteger(parsedWidth) && parsedWidth > 0 ? parsedWidth : (widths[0] ?? 0);
+  const rawHeight = params.get("height");
+  const parsedHeight = rawHeight !== null ? Number(rawHeight) : NaN;
+  const height = Number.isInteger(parsedHeight) && parsedHeight > 0 ? parsedHeight : null;
   const rawLocale = params.get("locale");
   const locale = rawLocale && locales.includes(rawLocale) ? rawLocale : null;
   const screen = params.get("screen");
@@ -51,7 +56,7 @@ export function parseSelection(search: string, archive: ScreenMap): ViewerSelect
   else if (rawView === "live" && screen !== null) view = "live";
   else if (screen !== null) view = "details";
   else view = "overview";
-  return { screen, state, width, widths, locale, locales, view, links, edges };
+  return { screen, state, width, height, widths, locale, locales, view, links, edges };
 }
 
 export function stateKeyFor(cells: Cell[], index: number): string {

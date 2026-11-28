@@ -54,7 +54,17 @@ export function ApproximateModelFrame({
   /** Mobile cards have no caption, so they keep the compact unresolved pill in the frame. */
   showUnresolved?: boolean;
 }) {
+  const frame = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
+  const [fitWidth, setFitWidth] = useState(0);
+  useLayoutEffect(() => {
+    const element = frame.current;
+    if (!element) return;
+    const measure = ([entry]: ResizeObserverEntry[]) => setFitWidth(entry?.contentRect.width ?? 0);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
@@ -63,9 +73,32 @@ export function ApproximateModelFrame({
     shadow.innerHTML = render.markup;
   }, [render.markup]);
   const unresolvedTitle = render.unresolved.join("\n");
+  const logicalWidth = render.viewport.width;
+  const logicalHeight = render.viewport.height;
+  const scale = logicalWidth > 0 && fitWidth > 0 ? Math.min(1, fitWidth / logicalWidth) : 1;
   return (
-    <div className="approximate-model-frame">
-      <div ref={host} className="approximate-model-content" aria-hidden="true" />
+    <div
+      ref={frame}
+      className="approximate-model-frame"
+      data-viewport={logicalHeight === undefined ? undefined : "true"}
+      style={
+        logicalHeight === undefined
+          ? undefined
+          : { aspectRatio: `${logicalWidth} / ${logicalHeight}` }
+      }
+    >
+      <div
+        ref={host}
+        className="approximate-model-content"
+        aria-hidden="true"
+        data-logical-width={logicalWidth}
+        data-logical-height={logicalHeight}
+        style={{
+          width: `${logicalWidth}px`,
+          height: logicalHeight === undefined ? undefined : `${logicalHeight}px`,
+          transform: scale === 1 ? undefined : `scale(${scale})`,
+        }}
+      />
       <span className="approximate-model-badge">{label}</span>
       {showUnresolved && render.unresolved.length > 0 && unresolvedLabel && (
         <span className="approximate-model-unresolved" title={unresolvedTitle}>

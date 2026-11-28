@@ -57,13 +57,17 @@ const MobileApproximateCard = memo(
     renderer,
     model,
     screen,
+    width,
+    height,
   }: {
     renderer?: SourceModelRenderer;
     model?: Model;
     screen: Screen;
+    width: number;
+    height?: number;
   }) {
     const { t } = useI18n();
-    const render = useApproximateModelRender(renderer, model, screen.component, 375);
+    const render = useApproximateModelRender(renderer, model, screen.component, width, height);
     if (!render) return null;
     return (
       <>
@@ -114,11 +118,14 @@ export function MobileScreenDeck({
   liveRun,
   sourceModel,
   modelRenderer,
+  viewportHeight,
 }: {
   /** Render cards without a capture from source (the run's project can run). */
   liveRun?: string;
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit logical viewport height for source-model cards. */
+  viewportHeight?: number;
   archive: Archive;
   width?: number;
   widths: number[];
@@ -275,6 +282,8 @@ export function MobileScreenDeck({
                     renderer={modelRenderer}
                     model={sourceModel}
                     screen={screen}
+                    width={width && width > 0 ? width : 375}
+                    height={viewportHeight ?? Math.round((width && width > 0 ? width : 375) * 1.6)}
                   />
                 )}
                 {screen.nativeSource && !cell && !src && !screen.component && (

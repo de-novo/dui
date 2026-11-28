@@ -129,6 +129,8 @@ export type ModelRenderResult = {
   html: string;
   /** Style and body markup, for mounting in a shadow root inside a map card. */
   markup: string;
+  /** Logical viewport used for the isolated card document. */
+  viewport: { width: number; height?: number };
   /** Model facts that could not be drawn, with their source text where the model records it. */
   unresolved: string[];
 };
@@ -430,6 +432,14 @@ function documentTypographyCss(
     "fontStyle",
     "lineHeight",
     "letterSpacing",
+    "color",
+    "background",
+    "width",
+    "minWidth",
+    "maxWidth",
+    "height",
+    "minHeight",
+    "maxHeight",
   ]);
   const output: string[] = [];
   for (const declaration of declarations ?? []) {
@@ -806,10 +816,14 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     } else {
       doc.body.append(root);
     }
-    const markup = `<style>${baseCss}${documentCss}</style>` + doc.body.innerHTML;
+    const links = externalStylesheets
+      .map((url) => `<link rel="stylesheet" href="${escapeHtml(url)}">`)
+      .join("");
+    const markup = `<style>${baseCss}${documentCss}</style>${links}` + doc.body.innerHTML;
     return {
       html: "<!doctype html>" + doc.documentElement.outerHTML,
       markup,
+      viewport: { width, ...(height === undefined ? {} : { height }) },
       unresolved: [...unresolved],
     };
   };
@@ -819,6 +833,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
   return {
     html: iframe.html,
     markup: card.markup,
+    viewport: card.viewport,
     unresolved: [...new Set([...iframe.unresolved, ...card.unresolved])],
   };
 }
