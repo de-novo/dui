@@ -998,7 +998,7 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   const styles = (n: { style: { property: string; value: { value: unknown } }[] }) =>
     Object.fromEntries(n.style.map((d) => [d.property, d.value.value]));
   const section = styles(grouped.children[0]);
-  assert.equal(section.color, undefined);
+  assert.equal(section.color, "#123456");
   assert.equal(styles(grouped.children[0].children[0]).letterSpacing, undefined);
   for (const [name, value] of Object.entries({
     position: "relative",

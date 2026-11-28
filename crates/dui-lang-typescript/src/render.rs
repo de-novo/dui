@@ -17,7 +17,9 @@ pub struct Context<'a> {
     pub modules: style::modules::Bindings<'a>,
     pub tailwind: bool,
     pub built: Option<&'a style::built::Sheet<'a>>,
+    pub sources: &'a [style::built::Sheet<'a>],
     pub items: Vec<(String, String)>,
+    pub constants: BTreeMap<String, serde_json::Value>,
     pub model: &'a mut m::SourceModel,
 }
 fn attr<'a>(f: &File, tag: Ast<'a>, key: &str) -> Option<Ast<'a>> {
@@ -29,6 +31,101 @@ fn attr<'a>(f: &File, tag: Ast<'a>, key: &str) -> Option<Ast<'a>> {
 }
 fn tag(n: Ast<'_>) -> Ast<'_> {
     field(n, "open_tag").unwrap_or(n)
+}
+
+fn object_key(file: &File, key: Ast<'_>) -> Option<String> {
+    let raw = file.text(key);
+    match key.kind() {
+        "property_identifier" | "private_property_identifier" | "number" => Some(raw.into()),
+        "string" => serde_json::from_str::<String>(raw).ok().or_else(|| {
+            raw.strip_prefix('\'')
+                .and_then(|v| v.strip_suffix('\''))
+                .map(str::to_owned)
+        }),
+        _ => None,
+    }
+}
+
+/// Parse a closed literal tree. Objects may spread other closed literal objects; duplicate keys
+/// follow JavaScript's last-write-wins object semantics. No calls, arithmetic or references run.
+pub(crate) fn static_literal(file: &File, node: Ast<'_>) -> Option<serde_json::Value> {
+    let n = unwrap_expr(node);
+    if let Some(value) = crate::literal(file, n) {
+        return Some(value);
+    }
+    match n.kind() {
+        "array" => {
+            let mut out = Vec::new();
+            for child in children(n) {
+                if child.kind() == "spread_element" {
+                    let value = static_literal(file, first(child)?)?;
+                    out.extend(value.as_array()?.iter().cloned());
+                } else {
+                    out.push(static_literal(file, child)?);
+                }
+            }
+            Some(out.into())
+        }
+        "object" => {
+            let mut out = serde_json::Map::new();
+            for child in children(n) {
+                match child.kind() {
+                    "pair" => {
+                        let key = field(child, "key").and_then(|key| object_key(file, key))?;
+                        let value = field(child, "value").and_then(|v| static_literal(file, v))?;
+                        out.insert(key, value);
+                    }
+                    "spread_element" => {
+                        let value = static_literal(file, first(child)?)?;
+                        for (key, value) in value.as_object()? {
+                            out.insert(key.clone(), value.clone());
+                        }
+                    }
+                    "shorthand_property_identifier" => return None,
+                    _ => return None,
+                }
+            }
+            Some(out.into())
+        }
+        "unary_expression" if file.name(n, "operator") == Some("-") => {
+            let value = static_literal(file, field(n, "argument")?)?;
+            value.as_f64().map(|v| (-v).into())
+        }
+        _ => None,
+    }
+}
+
+fn static_path(value: &serde_json::Value, path: &[String]) -> Option<serde_json::Value> {
+    let mut current = value;
+    for key in path {
+        current = current.get(key)?;
+    }
+    Some(current.clone())
+}
+
+fn truthy_json(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Null => false,
+        serde_json::Value::Bool(value) => *value,
+        serde_json::Value::Number(value) => value.as_f64().is_some_and(|v| v != 0.),
+        serde_json::Value::String(value) => !value.is_empty(),
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => true,
+    }
+}
+
+fn plus_json(left: serde_json::Value, right: serde_json::Value) -> Option<serde_json::Value> {
+    if left.is_string() || right.is_string() {
+        let text = |value: serde_json::Value| -> Option<String> {
+            match value {
+                serde_json::Value::String(value) => Some(value),
+                serde_json::Value::Number(value) => Some(value.to_string()),
+                serde_json::Value::Bool(value) => Some(value.to_string()),
+                _ => None,
+            }
+        };
+        return Some((text(left)? + &text(right)?).into());
+    }
+    Some((left.as_f64()? + right.as_f64()?).into())
 }
 impl Context<'_> {
     fn component(&self, name: &str) -> Option<String> {
@@ -77,6 +174,113 @@ impl Context<'_> {
                 })
         }
     }
+    /// Evaluate only syntax-proven immutable bindings and closed boolean/string/class-helper
+    /// expressions. Anything outside this bounded subset remains opaque rather than executed.
+    fn static_value(&self, node: Ast<'_>) -> Option<serde_json::Value> {
+        let n = unwrap_expr(node);
+        if let Some(value) = static_literal(self.file, n) {
+            return Some(value);
+        }
+        if n.kind() == "identifier" || n.kind() == "member_expression" {
+            let mut base = n;
+            let mut path = Vec::new();
+            while base.kind() == "member_expression" {
+                path.push(self.file.name(base, "property")?.to_owned());
+                base = field(base, "object")?;
+            }
+            if base.kind() == "identifier" {
+                path.reverse();
+                return self
+                    .constants
+                    .get(self.file.text(base))
+                    .and_then(|value| static_path(value, &path));
+            }
+        }
+        match n.kind() {
+            "ternary_expression" => {
+                let condition = self.static_value(field(n, "condition")?)?;
+                if truthy_json(&condition) {
+                    self.static_value(field(n, "consequence")?)
+                } else {
+                    self.static_value(field(n, "alternative")?)
+                }
+            }
+            "binary_expression" => {
+                let left = self.static_value(field(n, "left")?)?;
+                let operator = self.file.name(n, "operator")?;
+                match operator {
+                    "+" => plus_json(left, self.static_value(field(n, "right")?)?),
+                    "&&" => {
+                        if truthy_json(&left) {
+                            self.static_value(field(n, "right")?)
+                        } else {
+                            Some(left)
+                        }
+                    }
+                    "||" => {
+                        if truthy_json(&left) {
+                            Some(left)
+                        } else {
+                            self.static_value(field(n, "right")?)
+                        }
+                    }
+                    "===" => Some((self.static_value(field(n, "right")?) == Some(left)).into()),
+                    "!==" => Some((self.static_value(field(n, "right")?) != Some(left)).into()),
+                    _ => None,
+                }
+            }
+            "unary_expression" if self.file.name(n, "operator") == Some("!") => {
+                Some((!truthy_json(&self.static_value(field(n, "argument")?)?)).into())
+            }
+            "call_expression" => {
+                let function = field(n, "function")?;
+                let local = if function.kind() == "identifier" {
+                    self.file.text(function)
+                } else {
+                    return None;
+                };
+                let (_, export) = self.file.bindings.get(local)?;
+                if export != "default" || !matches!(local, "clsx" | "classnames" | "cn") {
+                    return None;
+                }
+                let mut out = String::new();
+                for argument in children(field(n, "arguments")?) {
+                    let Some(value) = self.static_value(argument) else {
+                        continue;
+                    };
+                    let mut push = |text: String| {
+                        if !text.is_empty() {
+                            if !out.is_empty() {
+                                out.push(' ');
+                            }
+                            out.push_str(&text);
+                        }
+                    };
+                    match value {
+                        serde_json::Value::String(text) => push(text),
+                        serde_json::Value::Array(values) => {
+                            for value in values {
+                                if let Some(text) = value.as_str() {
+                                    push(text.to_owned());
+                                }
+                            }
+                        }
+                        serde_json::Value::Object(values) => {
+                            for (key, enabled) in values {
+                                if truthy_json(&enabled) {
+                                    push(key);
+                                }
+                            }
+                        }
+                        serde_json::Value::Number(number) => push(number.to_string()),
+                        _ => {}
+                    }
+                }
+                Some(out.into())
+            }
+            _ => None,
+        }
+    }
     fn expr(&self, node: Ast<'_>) -> m::Expr {
         let n = unwrap_expr(node);
         if let Some(value) = literal(self.file, n) {
@@ -84,6 +288,9 @@ impl Context<'_> {
         }
         if let Some(read) = self.binding(n) {
             return read;
+        }
+        if let Some(value) = self.static_value(n) {
+            return m::Expr::Literal { value };
         }
         let mut reads = vec![];
         let mut pending = children(n);
@@ -350,6 +557,24 @@ impl Context<'_> {
         }
         for attribute in open.children_by_field_name("attribute", &mut open.walk()) {
             if attribute.kind() != "jsx_attribute" {
+                let spread = first(attribute).filter(|n| n.kind() == "spread_element");
+                let object = spread
+                    .and_then(first)
+                    .and_then(|value| self.static_value(value))
+                    .and_then(|value| value.as_object().cloned());
+                if let Some(object) = object {
+                    for (key, value) in object {
+                        if let Some(target) = &component
+                            && !self.signatures[target]
+                                .iter()
+                                .any(|s| s.kind == m::SlotKind::Prop && s.name == key)
+                        {
+                            return self.placeholder(n, id, "Unsupported component prop");
+                        }
+                        el.props.insert(key, m::Expr::Literal { value });
+                    }
+                    continue;
+                }
                 return self.placeholder(n, id, "Unsupported spread attributes");
             }
             let parts = children(attribute);
@@ -384,10 +609,21 @@ impl Context<'_> {
                 .unwrap_or(m::Expr::Literal { value: true.into() });
             el.props.insert(key.into(), expr);
         }
-        if let Some(sheet) = self.built
-            && name.starts_with(char::is_lowercase)
-        {
-            sheet.apply(self.file, open, &mut el);
+        let class_text = attr(self.file, open, "className").map_or_else(
+            || Some(String::new()),
+            |value| match self.expr(value) {
+                m::Expr::Literal { value } => value.as_str().map(str::to_owned),
+                _ => None,
+            },
+        );
+        if name.starts_with(char::is_lowercase) {
+            if let Some(sheet) = self.built {
+                sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+            } else {
+                for sheet in self.sources {
+                    sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+                }
+            }
         }
         // Inline declarations have higher precedence regardless of JSX attribute order.
         el.style
