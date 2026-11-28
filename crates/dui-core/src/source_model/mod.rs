@@ -339,6 +339,57 @@ pub struct DocumentStyle {
     /// Declarations effective on the document body element.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<DocumentElementStyle>,
+    /// External stylesheets declared by the document HTML. These are facts needed for
+    /// resources such as web fonts; the renderer must not execute the document.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external_stylesheets: Vec<String>,
+    /// Web font faces declared by stylesheets. Local sources are content-addressed archive
+    /// assets; external sources are facts only and are never fetched by the default renderer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub font_faces: Vec<FontFace>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FontFace {
+    pub id: String,
+    pub family: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stretch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
+    pub sources: Vec<FontSource>,
+    pub origin: Origin,
+    pub location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum FontSource {
+    /// A font file inside the measured project, copied into the archive under `asset`.
+    Asset {
+        /// Project-relative path with `/` separators.
+        path: String,
+        /// Content-addressed archive file `asset-<sha256>.<extension>`.
+        asset: String,
+        /// Lowercase hex SHA-256 of the font bytes.
+        sha256: String,
+        /// Font byte length. Extraction and archive writes bound this value.
+        bytes: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+    },
+    /// A remote font URL declared by the source. It is evidence only: archive rendering must
+    /// not fetch it or fall back to the network.
+    External {
+        url: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

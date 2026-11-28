@@ -4,6 +4,8 @@
 
 > 이 문서는 [영어 원문](../en/source-model.md)의 한국어 번역이다. 내용이 다르면 영어가 기준이다.
 
+> 참고: 이 문서에는 아직 영어판의 `documentStyle.externalStylesheets` 및 `documentStyle.fontFaces` 추가 내용이 반영되어 있지 않다.
+
 > 상태: 스키마 버전 1, 2026-11-27 결정 ([#353](https://github.com/de-novo/dui/issues/353)). [기본 파이프라인](roadmap.md#default-pipeline)의 1단계다. 관련 문서: [아키텍처](architecture.md) · [도메인 모델](domain-model.md) · [로드맵](roadmap.md).
 
 소스 모델은 소스 코드가 UI에 대해 선언한 내용이다. 언어 어댑터가 문법에서 모델을 쓰고, 공식 컴파일러가 이를 보강할 수 있다. 근사 렌더러, 핫 리로드, 슬롯·상태 토글, 이후의 내보내기는 이 모델만 읽는다. 그래서 새 언어에는 이 모델을 쓰는 어댑터 하나만 있으면 된다.

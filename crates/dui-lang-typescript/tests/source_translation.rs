@@ -272,3 +272,92 @@ export default function App() {
         root.style
     );
 }
+
+#[test]
+fn bundled_font_faces_are_extracted_with_bounded_local_assets() {
+    let dir = tempfile::tempdir().expect("temp project");
+    let assets = dir.path().join("dist/assets/fonts");
+    fs::create_dir_all(&assets).expect("font dir");
+    let font = [b"wOF2".as_slice(), &[7u8; 128]].concat();
+    fs::write(assets.join("demo.woff2"), &font).expect("font");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#"@font-face{font-family:'Demo Sans';src:url('./fonts/demo.woff2') format('woff2'),url('https://fonts.example.com/demo.woff2') format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+html{font-family:'Demo Sans',sans-serif}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let document = model.document_style.expect("document style");
+    assert_eq!(document.font_faces.len(), 1, "{:#?}", document.font_faces);
+    let face = &document.font_faces[0];
+    assert_eq!(face.family, "Demo Sans");
+    assert_eq!(face.weight.as_deref(), Some("400 900"));
+    assert_eq!(face.display.as_deref(), Some("swap"));
+    let mut kinds = face.sources.iter().map(|source| match source {
+        m::FontSource::Asset {
+            path,
+            asset,
+            sha256,
+            bytes,
+            format,
+        } => {
+            assert_eq!(path, "dist/assets/fonts/demo.woff2");
+            assert_eq!(*bytes, font.len() as u64);
+            assert_eq!(sha256.len(), 64);
+            assert_eq!(asset, &format!("asset-{sha256}.woff2"));
+            assert_eq!(format.as_deref(), Some("woff2"));
+            "asset"
+        }
+        m::FontSource::External { url, format } => {
+            assert_eq!(url, "https://fonts.example.com/demo.woff2");
+            assert_eq!(format.as_deref(), Some("woff2"));
+            "external"
+        }
+    });
+    assert_eq!(kinds.next(), Some("asset"));
+    assert_eq!(kinds.next(), Some("external"));
+    assert_eq!(kinds.next(), None);
+}
+
+#[test]
+fn invalid_local_fonts_stay_out_of_the_model_and_report_a_diagnostic() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/not-a-font.woff2"),
+        b"not a font",
+    )
+    .expect("font");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#"@font-face{font-family:'Broken';src:url('./not-a-font.woff2') format('woff2')}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    assert!(
+        model
+            .document_style
+            .as_ref()
+            .is_none_or(|document| document.font_faces.is_empty())
+    );
+    assert!(
+        model
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "unsupported-font-resource"),
+        "{:#?}",
+        model.diagnostics
+    );
+}

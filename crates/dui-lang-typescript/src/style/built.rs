@@ -586,24 +586,65 @@ fn width_condition(raw: &str) -> Option<m::Condition> {
         return None;
     }
     let feature = raw.strip_prefix('(')?.strip_suffix(')')?.trim();
-    let (name, value) = feature.split_once(':')?;
-    let super::V::Length { value, unit } = super::length(value.trim())? else {
-        return None;
-    };
-    if value < 0.
-        || !matches!(
-            unit,
-            m::LengthUnit::Px | m::LengthUnit::Rem | m::LengthUnit::Em
-        )
-    {
+    let mut min_width = None;
+    let mut max_width = None;
+    if let Some((name, value)) = feature.split_once(':') {
+        let super::V::Length { value, unit } = super::length(value.trim())? else {
+            return None;
+        };
+        if value < 0.
+            || !matches!(
+                unit,
+                m::LengthUnit::Px | m::LengthUnit::Rem | m::LengthUnit::Em
+            )
+        {
+            return None;
+        }
+        let width = Some(m::Length { value, unit });
+        (min_width, max_width) = match name.trim() {
+            "min-width" => (width, None),
+            "max-width" => (None, width),
+            _ => return None,
+        };
+    } else if let Some(range) = feature.strip_prefix("width") {
+        let range = range.trim_start();
+        let (op, raw_length) = [">=", "<=", ">", "<", "="]
+            .into_iter()
+            .find_map(|op| Some((op, range.strip_prefix(op)?)))?;
+        let super::V::Length { mut value, unit } = super::length(raw_length.trim())? else {
+            return None;
+        };
+        if value < 0.
+            || !matches!(
+                unit,
+                m::LengthUnit::Px | m::LengthUnit::Rem | m::LengthUnit::Em
+            )
+        {
+            return None;
+        }
+        // v1 has inclusive width bounds only. Move strict bounds by the least representable
+        // epsilon; this preserves integer CSS-pixel boundary behavior such as 767/768/769
+        // while keeping the uncertainty-first representation for unknown widths.
+        match op {
+            ">=" => min_width = Some(m::Length { value, unit }),
+            "<=" => max_width = Some(m::Length { value, unit }),
+            ">" => {
+                value += f64::EPSILON;
+                min_width = Some(m::Length { value, unit });
+            }
+            "<" => {
+                value -= f64::EPSILON;
+                max_width = Some(m::Length { value, unit });
+            }
+            "=" => {
+                min_width = Some(m::Length { value, unit });
+                max_width = Some(m::Length { value, unit });
+            }
+            _ => return None,
+        }
+    } else {
         return None;
     }
-    let width = Some(m::Length { value, unit });
-    let (min_width, max_width) = match name.trim() {
-        "min-width" => (width, None),
-        "max-width" => (None, width),
-        _ => return None,
-    };
     Some(m::Condition {
         min_width,
         max_width,
@@ -1030,7 +1071,12 @@ impl<'a> Sheet<'a> {
         if root.is_none() && body.is_none() {
             return None;
         }
-        Some(m::DocumentStyle { root, body })
+        Some(m::DocumentStyle {
+            root,
+            body,
+            external_stylesheets: vec![],
+            font_faces: vec![],
+        })
     }
 
     fn document_element_style(&self, target: DocumentTarget) -> Option<m::DocumentElementStyle> {
@@ -1101,7 +1147,9 @@ impl<'a> Sheet<'a> {
                 }
             }
         }
-        let uncertain = best.is_none() && unknown.is_some();
+        let uncertain = unknown.is_some_and(|(unknown_rank, _)| {
+            best.is_none_or(|(best_rank, _)| unknown_rank >= best_rank)
+        });
         let rule = if uncertain { unknown?.1 } else { best?.1 };
         let value = if uncertain {
             V::Unresolved {
@@ -1693,7 +1741,9 @@ impl<'a> Sheet<'a> {
             let mut rule_exact: Option<(usize, u32, usize)> = None;
             let mut rule_unknown = None;
             for selector in &self.selectors[rule.selectors] {
-                if selector.subject.excludes(classes, el, spread) {
+                let mutable_root_attribute = document_scope
+                    && (selector.text.starts_with("html[") || selector.text.starts_with(":root["));
+                if selector.subject.excludes(classes, el, spread) && !mutable_root_attribute {
                     continue;
                 }
                 match contextual_specificity(selector.text, classes, el, file, open) {
@@ -1731,15 +1781,22 @@ impl<'a> Sheet<'a> {
             let contextual = self.selectors[rule.selectors]
                 .iter()
                 .any(|selector| contextual_selector(selector.text));
-            let keep = rule.uncertain
-                || (contextual && (candidate.0 || Some(candidate.1) >= rank))
+            let keep = (rule.uncertain && (rank.is_none() || rule.when.is_some()))
+                || ((contextual || document_scope) && (candidate.0 || Some(candidate.1) >= rank))
                 || (classes.is_none() && (candidate.0 || rank.is_none()));
             if keep && unknown_rank.is_none_or(|current| candidate >= current) {
                 unknown_rank = Some(candidate);
                 unknown = Some(rule);
             }
         }
-        if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
+        // Recomputing a stylesheet cascade may replace an earlier stylesheet fact (for
+        // example when a caller-selected class is evaluated separately), but it must not
+        // displace an inline declaration, which has higher CSS precedence.
+        if !unknown.is_some_and(|r| r.important)
+            && el
+                .style
+                .iter()
+                .any(|d| d.property == property && d.from.syntax == m::StyleSyntax::Inline)
         {
             return;
         }
@@ -1769,11 +1826,26 @@ impl<'a> Sheet<'a> {
         {
             exact.sort_by_key(|(rank, _)| *rank);
             el.style.retain(|d| d.property != property);
+            // Without a viewport there is no negative width condition in v1 that can
+            // express the unconditional fallback exactly. Put the uncertainty first,
+            // then retain the positive media-dependent possibilities as conditions.
+            let (_, first) = exact.first().copied().expect("media candidates exist");
+            el.style.push(m::StyleDeclaration {
+                property,
+                value: V::Unresolved {
+                    text: first.source.text.clone(),
+                    reason: "Viewport width is unknown; media-dependent built CSS cannot be proven"
+                        .into(),
+                    refinement: None,
+                },
+                when: None,
+                from: first.source.clone(),
+            });
             let opaque_inline = el
                 .unresolved_style
                 .iter()
                 .any(|d| d.syntax == m::StyleSyntax::Inline);
-            for (_, rule) in exact {
+            for (_, rule) in exact.iter().filter(|(_, rule)| rule.when.is_some()) {
                 let value = (!opaque_inline)
                     .then(|| {
                         self.value(

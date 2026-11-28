@@ -23,6 +23,8 @@ Pass `--built-css FILE` to read a single bundled stylesheet inside the project. 
 
 The same stylesheet read can add optional top-level `documentStyle` context with `root` and `body` typography declarations. Only document-anchored selectors participate: `html`, `body`, `:root`, their supported compound selectors, and a direct child or descendant of `html`. Importance, layers, specificity, source order and the supplied root attribute decide the winner. When a selector, at-rule or cascade result cannot be proven, the declaration is explicit `unresolved` rather than a guess. Bare class or ID selectors that give no document anchor do not participate.
 
+`documentStyle.externalStylesheets` records external stylesheet URLs declared by the document HTML, such as font stylesheet links. `documentStyle.fontFaces` records `@font-face` facts. A local font source is bounded, content-hashed and named as an archive `asset-<sha256>.<extension>`; a remote source is evidence with its declared URL. Font extraction never executes the document and never guesses a missing file.
+
 Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
 
 For a direct child or descendant selector with two simple parts, the TSX adapter checks intrinsic JSX ancestors up to the component boundary. To inspect a model, run `dui serve`, choose **Open source model** in the workspace picker and select the exported JSON. The viewer draws the selected component from schema v1 and lists unresolved styles.

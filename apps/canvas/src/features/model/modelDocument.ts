@@ -96,6 +96,26 @@ export type Model = {
   documentStyle?: {
     root?: DocumentElementStyle;
     body?: DocumentElementStyle;
+    externalStylesheets?: string[];
+    fontFaces?: {
+      id: string;
+      family: string;
+      style?: string;
+      weight?: string;
+      stretch?: string;
+      display?: string;
+      sources: (
+        | {
+            kind: "asset";
+            path: string;
+            asset: string;
+            sha256: string;
+            bytes: number;
+            format?: string;
+          }
+        | { kind: "external"; url: string; format?: string }
+      )[];
+    }[];
   };
   files?: Record<string, unknown>[];
   itemSchemas?: Record<string, unknown>[];
@@ -123,6 +143,8 @@ export type ModelRenderContext = {
   /** Initial user-agent font size for media thresholds and root font percentages. */
   initialFontSize?: number;
   colorScheme?: "light" | "dark";
+  /** Resolve a content-addressed archive asset for same-run font bytes. */
+  assetUrl?: (asset: string) => string;
 };
 export type ModelRenderResult = {
   /** Full inert document, for the sandboxed model workbench iframe. */
@@ -456,6 +478,42 @@ function documentTypographyCss(
   return output.join(";");
 }
 
+function escapeCssString(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("\n", " ");
+}
+
+function fontDescriptor(
+  value: string | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  if (!value) return fallback;
+  return /^[a-zA-Z0-9][a-zA-Z0-9 .%_-]{0,63}$/.test(value) ? value : undefined;
+}
+
+function fontFacesCss(model: Model, context: ModelRenderContext): string {
+  const resolve = context.assetUrl ?? ((asset: string) => asset);
+  const rules: string[] = [];
+  for (const face of model.documentStyle?.fontFaces ?? []) {
+    const sources = face.sources.flatMap((source) => {
+      if (source.kind !== "asset") return [];
+      const format = fontDescriptor(source.format, "");
+      return [
+        `url("${escapeCssString(resolve(source.asset))}")${format ? ` format("${escapeCssString(format)}")` : ""}`,
+      ];
+    });
+    if (!sources.length || !face.family) continue;
+    const weight = fontDescriptor(face.weight, "normal");
+    const style = fontDescriptor(face.style, "normal");
+    const stretch = fontDescriptor(face.stretch, "normal");
+    const display = fontDescriptor(face.display, undefined);
+    if (!weight || !style || !stretch) continue;
+    rules.push(
+      `@font-face{font-family:"${escapeCssString(face.family)}";src:${sources.join(",")};font-style:${style};font-weight:${weight};font-stretch:${stretch}${display ? `;font-display:${display}` : ""}}`,
+    );
+  }
+  return rules.join("");
+}
+
 function renderDom(model: Model, componentId: string, context: ModelRenderContext = {}) {
   const width = context.width && context.width > 0 ? context.width : 375;
   const colorScheme = context.colorScheme ?? "light";
@@ -472,8 +530,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     const doc = document.implementation.createHTMLDocument("");
     const policy = doc.createElement("meta");
     policy.httpEquiv = "Content-Security-Policy";
-    policy.content =
-      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+    const fontCss = fontFacesCss(model, context);
+    policy.content = fontCss
+      ? "default-src 'none'; style-src 'unsafe-inline'; font-src data: http:; base-uri 'none'; form-action 'none'"
+      : "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
     doc.head.append(policy);
     const style = doc.createElement("style");
     style.textContent = baseCss;
@@ -506,7 +566,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     const documentCss = isolated
       ? `:host{${[rootBase, rootCss].filter(Boolean).join(";")}}.dui-document-body{${bodyCss}}`
       : `html{${[rootBase, rootCss].filter(Boolean).join(";")}}body{${bodyCss}}`;
-    style.textContent = baseCss + documentCss;
+    style.textContent = baseCss + fontCss + documentCss;
 
     function conditionStatus(when: Condition | undefined, scope: Scope): "yes" | "no" | "unknown" {
       if (!when) return "yes";
@@ -816,10 +876,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     } else {
       doc.body.append(root);
     }
-    const links = externalStylesheets
-      .map((url) => `<link rel="stylesheet" href="${escapeHtml(url)}">`)
-      .join("");
-    const markup = `<style>${baseCss}${documentCss}</style>${links}` + doc.body.innerHTML;
+    const markup = `<style>${baseCss}${fontCss}${documentCss}</style>` + doc.body.innerHTML;
     return {
       html: "<!doctype html>" + doc.documentElement.outerHTML,
       markup,

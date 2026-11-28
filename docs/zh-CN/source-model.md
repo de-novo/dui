@@ -4,6 +4,8 @@
 
 > 本文是[英文原文](../en/source-model.md)的简体中文翻译。如有出入，以英文为准。
 
+> 注意：本文档尚未同步英文版关于 `documentStyle.externalStylesheets` 和 `documentStyle.fontFaces` 的最新增补。
+
 > 状态：schema 版本 1，2026-11-27 决定（[#353](https://github.com/de-novo/dui/issues/353)）。[默认流水线](roadmap.md#default-pipeline)的第 1 阶段。相关：[架构](architecture.md) · [领域模型](domain-model.md) · [路线图](roadmap.md)。
 
 源码模型是源码对其 UI 的声明。语言适配器根据语法写出模型，官方编译器可以对其细化。近似渲染器、热重载、槽位与状态切换以及之后的导出只读取这个模型，因此新语言只需要一个写出该模型的适配器。

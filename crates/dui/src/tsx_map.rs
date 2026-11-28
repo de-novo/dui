@@ -102,6 +102,86 @@ pub(crate) fn project_model(model: &SourceModel) -> SourceProjection {
     }
 }
 
+fn font_magic_matches(extension: &str, bytes: &[u8]) -> bool {
+    match extension {
+        "woff2" => bytes.starts_with(b"wOF2"),
+        "woff" => bytes.starts_with(b"wOFF"),
+        "ttf" => bytes.starts_with(&[0, 1, 0, 0]) || bytes.starts_with(b"true"),
+        "otf" => bytes.starts_with(b"OTTO"),
+        _ => false,
+    }
+}
+
+/// Copy only the bounded local font assets named by the model. The archive write re-checks
+/// path, type, byte length and digest instead of trusting the model JSON in memory.
+fn copy_font_assets(project: &Path, out: &Path, model: &SourceModel) -> Result<(), String> {
+    use dui_core::source_model::FontSource;
+    use sha2::{Digest, Sha256};
+    let project = project.canonicalize().map_err(|e| e.to_string())?;
+    let mut total = 0u64;
+    let mut copied = BTreeMap::new();
+    for face in model
+        .document_style
+        .as_ref()
+        .map(|document| document.font_faces.as_slice())
+        .unwrap_or_default()
+    {
+        for source in &face.sources {
+            let FontSource::Asset {
+                path,
+                asset,
+                sha256,
+                bytes,
+                ..
+            } = source
+            else {
+                continue;
+            };
+            if copied.insert(asset.clone(), ()).is_some() {
+                continue;
+            }
+            if path.is_empty()
+                || path.starts_with('/')
+                || path.contains('\\')
+                || path
+                    .split('/')
+                    .any(|part| part.is_empty() || part == "." || part == "..")
+                || *bytes == 0
+                || *bytes > 4 * 1024 * 1024
+            {
+                return Err(format!("unsafe font asset path in source model: {path}"));
+            }
+            let full = project
+                .join(path)
+                .canonicalize()
+                .map_err(|e| format!("{path}: {e}"))?;
+            if !full.starts_with(&project) || !full.is_file() {
+                return Err(format!("font asset escapes the project: {path}"));
+            }
+            let data = fs::read(&full).map_err(|e| format!("{path}: {e}"))?;
+            let extension = path
+                .rsplit_once('.')
+                .map(|(_, ext)| ext)
+                .unwrap_or_default();
+            if data.len() as u64 != *bytes
+                || format!("{:x}", Sha256::digest(&data)) != *sha256
+                || format!("asset-{sha256}.{extension}") != *asset
+                || !font_magic_matches(extension, &data)
+            {
+                return Err(format!(
+                    "font asset does not match its source model metadata: {path}"
+                ));
+            }
+            total += bytes;
+            if total > 12 * 1024 * 1024 {
+                return Err("font assets exceed the bounded archive size".into());
+            }
+            fs::write(out.join(asset), &data).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
     let model = dui_lang_typescript::extract(project, entry).map_err(|e| failure(2, &e))?;
     let projection = project_model(&model);
@@ -114,6 +194,7 @@ pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
     archive::publish(archive::provenance(project)?, |out| {
         fs::create_dir_all(out).map_err(io)?;
         fs::write(out.join("source-model.json"), model.to_json().map_err(io)?).map_err(io)?;
+        copy_font_assets(project, out, &model).map_err(|e| failure(2, &e))?;
         analysis::store(&out.join("graph.json"), &graph)?;
         analysis::store(&out.join("report.json"), &report)?;
         Ok(report)

@@ -3,8 +3,8 @@
 //! aliases do not loop.
 
 use super::{
-    Component, Condition, Edge, EdgeTarget, Expr, Location, Match, Node, SCHEMA_VERSION, Slot,
-    SourceModel, StyleDeclaration, StyleProperty, StyleValue, TypeRef,
+    Component, Condition, Edge, EdgeTarget, Expr, FontSource, Location, Match, Node,
+    SCHEMA_VERSION, Slot, SourceModel, StyleDeclaration, StyleProperty, StyleValue, TypeRef,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -196,8 +196,15 @@ impl<'a> Check<'a> {
         }
 
         if let Some(document) = &model.document_style {
-            if document.root.is_none() && document.body.is_none() {
-                self.error("/documentStyle", "must describe the root or body");
+            if document.root.is_none()
+                && document.body.is_none()
+                && document.external_stylesheets.is_empty()
+                && document.font_faces.is_empty()
+            {
+                self.error(
+                    "/documentStyle",
+                    "must describe the root, body or document resources",
+                );
             }
             for (name, part) in [("root", &document.root), ("body", &document.body)] {
                 if let Some(part) = part {
@@ -206,6 +213,87 @@ impl<'a> Check<'a> {
                             &format!("/documentStyle/{name}/style/{index}"),
                             declaration,
                         );
+                    }
+                }
+            }
+            for (index, url) in document.external_stylesheets.iter().enumerate() {
+                if !(url.starts_with("https://")
+                    || url.starts_with("http://")
+                    || url.starts_with("//"))
+                {
+                    self.error(
+                        format!("/documentStyle/externalStylesheets/{index}"),
+                        "must be an external HTTP URL",
+                    );
+                }
+            }
+            self.sorted("/documentStyle/fontFaces", &document.font_faces, |face| {
+                &face.id
+            });
+            for (index, face) in document.font_faces.iter().enumerate() {
+                let pointer = format!("/documentStyle/fontFaces/{index}");
+                self.non_empty(format!("{pointer}/id"), &face.id);
+                self.non_empty(format!("{pointer}/family"), &face.family);
+                self.location(&format!("{pointer}/location"), &face.location);
+                if face.sources.is_empty() {
+                    self.error(format!("{pointer}/sources"), "must not be empty");
+                }
+                for (at, source) in face.sources.iter().enumerate() {
+                    let source_pointer = format!("{pointer}/sources/{at}");
+                    match source {
+                        FontSource::Asset {
+                            path,
+                            asset,
+                            sha256,
+                            bytes,
+                            format,
+                        } => {
+                            if !is_relative_path(path) {
+                                self.error(
+                                    format!("{source_pointer}/path"),
+                                    "must be a project-relative path",
+                                );
+                            }
+                            if !is_sha256(sha256) {
+                                self.error(
+                                    format!("{source_pointer}/sha256"),
+                                    "must be lowercase hex SHA-256",
+                                );
+                            }
+                            let extension = path.rsplit_once('.').map(|(_, ext)| ext);
+                            let expected = extension.map(|ext| format!("asset-{sha256}.{ext}"));
+                            if !matches!(extension, Some("woff2" | "woff" | "ttf" | "otf"))
+                                || expected.as_deref() != Some(asset.as_str())
+                            {
+                                self.error(
+                                    format!("{source_pointer}/asset"),
+                                    "must be asset-<sha256>.<woff2|woff|ttf|otf> for its source path",
+                                );
+                            }
+                            if *bytes == 0 || *bytes > 4 * 1024 * 1024 {
+                                self.error(
+                                    format!("{source_pointer}/bytes"),
+                                    "must be within the bounded local font size",
+                                );
+                            }
+                            if let Some(format) = format {
+                                self.non_empty(format!("{source_pointer}/format"), format);
+                            }
+                        }
+                        FontSource::External { url, format } => {
+                            if !(url.starts_with("https://")
+                                || url.starts_with("http://")
+                                || url.starts_with("//"))
+                            {
+                                self.error(
+                                    format!("{source_pointer}/url"),
+                                    "must be an external HTTP URL",
+                                );
+                            }
+                            if let Some(format) = format {
+                                self.non_empty(format!("{source_pointer}/format"), format);
+                            }
+                        }
                     }
                 }
             }

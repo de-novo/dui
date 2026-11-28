@@ -59,15 +59,24 @@ const MobileApproximateCard = memo(
     screen,
     width,
     height,
+    imageUrl,
   }: {
     renderer?: SourceModelRenderer;
     model?: Model;
     screen: Screen;
     width: number;
     height?: number;
+    imageUrl: (name: string) => string;
   }) {
     const { t } = useI18n();
-    const render = useApproximateModelRender(renderer, model, screen.component, width, height);
+    const render = useApproximateModelRender(
+      renderer,
+      model,
+      screen.component,
+      width,
+      height,
+      imageUrl,
+    );
     if (!render) return null;
     return (
       <>

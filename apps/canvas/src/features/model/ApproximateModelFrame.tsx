@@ -29,16 +29,17 @@ export function useApproximateModelRender(
   componentId: string | undefined,
   width: number,
   height?: number,
+  assetUrl?: (asset: string) => string,
 ): ModelRenderResult | undefined {
   const colorScheme = useViewerColorScheme();
   return useMemo(() => {
     if (!renderer || !model || !componentId) return undefined;
     try {
-      return renderer.render(model, componentId, { width, height, colorScheme });
+      return renderer.render(model, componentId, { width, height, colorScheme, assetUrl });
     } catch {
       return undefined;
     }
-  }, [renderer, model, componentId, width, height, colorScheme]);
+  }, [renderer, model, componentId, width, height, colorScheme, assetUrl]);
 }
 
 /** Mounts the renderer's inert markup in a shadow root. It cannot receive clicks or run code. */

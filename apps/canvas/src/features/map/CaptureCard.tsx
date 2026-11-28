@@ -96,6 +96,7 @@ export function CaptureCard({
     screen.component,
     cardWidth && cardWidth > 0 ? cardWidth : 375,
     modelHeight ?? frameHeight,
+    imageUrl,
   );
   const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
