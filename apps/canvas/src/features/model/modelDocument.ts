@@ -7,6 +7,8 @@ export type Expr =
   | { kind: "literal"; value: Json }
   | { kind: "slot"; slot: string; path?: string[] }
   | { kind: "item"; list: string; path?: string[] }
+  | { kind: "unary"; operator: string; value: Expr }
+  | { kind: "binary"; operator: string; left: Expr; right: Expr }
   | { kind: "opaque"; text: string; reads?: Expr[] };
 type TypeRef =
   | { kind: "boolean" | "string" | "number" | "node" | "function" }
@@ -373,11 +375,53 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
     if (!scope.items.has(e.list)) return { known: false };
     return lookupPath(scope.items.get(e.list), e.path);
   }
+  if (e.kind === "unary") {
+    if (e.operator !== "!") return { known: false };
+    const value = resolveExpr(e.value, scope);
+    return value.known ? { known: true, value: !truthy(value.value) } : value;
+  }
+  if (e.kind === "binary") {
+    const left = resolveExpr(e.left, scope);
+    if (e.operator === "&&") {
+      if (left.known && !truthy(left.value)) return left;
+      const right = resolveExpr(e.right, scope);
+      if (!left.known && right.known && !truthy(right.value)) return { known: true, value: false };
+      return left.known ? right : { known: false };
+    }
+    if (e.operator === "||") {
+      if (left.known && truthy(left.value)) return left;
+      const right = resolveExpr(e.right, scope);
+      if (!left.known && right.known && truthy(right.value)) return { known: true, value: true };
+      return left.known ? right : { known: false };
+    }
+    if (!left.known) return { known: false };
+    const right = resolveExpr(e.right, scope);
+    if (!right.known) return { known: false };
+    if (e.operator === "??") return left.value === null || left.value === undefined ? right : left;
+    if (e.operator === "===") return { known: true, value: sameJson(left.value, right.value) };
+    if (e.operator === "!==") return { known: true, value: !sameJson(left.value, right.value) };
+    if (e.operator === ">" || e.operator === ">=" || e.operator === "<" || e.operator === "<=") {
+      const a = typeof left.value === "number" ? left.value : undefined;
+      const b = typeof right.value === "number" ? right.value : undefined;
+      if (a === undefined || b === undefined) return { known: false };
+      const value =
+        e.operator === ">"
+          ? a > b
+          : e.operator === ">="
+            ? a >= b
+            : e.operator === "<"
+              ? a < b
+              : a <= b;
+      return { known: true, value };
+    }
+  }
   return { known: false };
 }
 function exprLabel(e: Expr): string {
   if (e.kind === "literal") return JSON.stringify(e.value);
   if (e.kind === "opaque") return e.text.length > 42 ? e.text.slice(0, 41) + "…" : e.text;
+  if (e.kind === "unary") return e.operator + exprLabel(e.value);
+  if (e.kind === "binary") return `${exprLabel(e.left)}${e.operator}${exprLabel(e.right)}`;
   const base = e.kind === "slot" ? e.slot : `${e.list} item`;
   const name = base.split("#").at(-1)?.split(".").at(-1) ?? base;
   return name + (e.path?.length ? "." + e.path.join(".") : "");

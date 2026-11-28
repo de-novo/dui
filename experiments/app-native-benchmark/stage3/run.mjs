@@ -65,6 +65,10 @@ function valuesFor(comp, byName) {
   const values = {};
   const missing = [];
   for (const [name, value] of Object.entries(byName ?? {})) {
+    if (name.includes("#")) {
+      values[name] = value;
+      continue;
+    }
     const slot = comp?.slots?.find((s) => s.name === name);
     if (slot) values[slot.id] = value;
     else missing.push(name);
@@ -162,7 +166,8 @@ for (const [target, config] of Object.entries(fixtures.targets)) {
       else if (assignment.missing.length) cause = "mock-state";
       else if (!mounted || render.unresolved.length || missingText.length) cause = "render";
       else cause = "none";
-      const reference = process.env[`${target.toUpperCase()}_REFERENCE_${viewport.name.toUpperCase()}`];
+      const envTarget = target.toUpperCase().replaceAll("-", "_");
+      const reference = process.env[`${envTarget}_REFERENCE_${state.toUpperCase()}_${viewport.name.toUpperCase()}`] ?? config.references?.[state]?.[viewport.name];
       const diff = reference ? comparePng(reference, png, path.join(out, `${target}-${state}-${viewport.name}-diff.png`)) : undefined;
       stateRecord.viewports[viewport.name] = { png: path.basename(png), mounted, textLength: render.text.length, elements: render.elements, missingText, unresolved: render.unresolved.slice(0, 20), cause, pixel: diff };
     }

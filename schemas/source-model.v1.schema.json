@@ -169,6 +169,28 @@
         { "$ref": "#/$defs/read" },
         {
           "additionalProperties": false,
+          "required": ["operator", "value"],
+          "properties": {
+            "kind": { "const": "unary" },
+            "operator": { "const": "!" },
+            "value": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["operator", "left", "right"],
+          "properties": {
+            "kind": { "const": "binary" },
+            "operator": {
+              "type": "string",
+              "enum": ["&&", "||", "??", "===", "!==", ">", ">=", "<", "<="]
+            },
+            "left": { "$ref": "#/$defs/expr" },
+            "right": { "$ref": "#/$defs/expr" }
+          }
+        },
+        {
+          "additionalProperties": false,
           "required": ["text"],
           "properties": {
             "kind": { "const": "opaque" },

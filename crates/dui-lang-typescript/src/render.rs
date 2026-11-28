@@ -401,8 +401,13 @@ impl Context<'_> {
 
     fn binding(&self, mut n: Ast<'_>) -> Option<m::Expr> {
         let mut path = Vec::new();
-        while n.kind() == "member_expression" {
-            path.push(self.file.name(n, "property")?.into());
+        while matches!(n.kind(), "member_expression" | "subscript_expression") {
+            if n.kind() == "member_expression" {
+                path.push(self.file.name(n, "property")?.into());
+            } else {
+                let index = field(n, "index").and_then(|index| literal(self.file, index))?;
+                path.push(index.as_u64()?.to_string());
+            }
             n = field(n, "object")?;
         }
         if self.class_render && n.kind() == "this" {
@@ -616,6 +621,42 @@ impl Context<'_> {
             _ => None,
         }
     }
+    fn structured_operand(&self, node: Ast<'_>) -> Option<m::Expr> {
+        let n = unwrap_expr(node);
+        if let Some(value) = literal(self.file, n) {
+            return Some(m::Expr::Literal { value });
+        }
+        if let Some(read) = self.binding(n) {
+            return Some(read);
+        }
+        if let Some(value) = self.static_value(n) {
+            return Some(m::Expr::Literal { value });
+        }
+        self.structured_expr(n)
+    }
+    fn structured_expr(&self, node: Ast<'_>) -> Option<m::Expr> {
+        let n = unwrap_expr(node);
+        if n.kind() == "unary_expression" && self.file.name(n, "operator") == Some("!") {
+            return Some(m::Expr::Unary {
+                operator: "!".into(),
+                value: Box::new(self.structured_operand(field(n, "argument")?)?),
+            });
+        }
+        if n.kind() == "binary_expression" {
+            let operator = self.file.name(n, "operator")?;
+            if matches!(
+                operator,
+                "&&" | "||" | "??" | "===" | "!==" | ">" | ">=" | "<" | "<="
+            ) {
+                return Some(m::Expr::Binary {
+                    operator: operator.into(),
+                    left: Box::new(self.structured_operand(field(n, "left")?)?),
+                    right: Box::new(self.structured_operand(field(n, "right")?)?),
+                });
+            }
+        }
+        None
+    }
     pub(crate) fn expr(&self, node: Ast<'_>) -> m::Expr {
         let n = unwrap_expr(node);
         if let Some(value) = literal(self.file, n) {
@@ -626,6 +667,9 @@ impl Context<'_> {
         }
         if let Some(value) = self.static_value(n) {
             return m::Expr::Literal { value };
+        }
+        if let Some(structured) = self.structured_expr(n) {
+            return structured;
         }
         let mut reads = vec![];
         let mut pending = children(n);

@@ -715,6 +715,26 @@ impl<'a> Check<'a> {
                 }
                 self.field_path(pointer, path);
             }
+            Expr::Unary { operator, value } => {
+                if operator != "!" {
+                    self.error(format!("{pointer}/operator"), "unsupported unary operator");
+                }
+                self.expr(&format!("{pointer}/value"), value, scope);
+            }
+            Expr::Binary {
+                operator,
+                left,
+                right,
+            } => {
+                if !matches!(
+                    operator.as_str(),
+                    "&&" | "||" | "??" | "===" | "!==" | ">" | ">=" | "<" | "<="
+                ) {
+                    self.error(format!("{pointer}/operator"), "unsupported binary operator");
+                }
+                self.expr(&format!("{pointer}/left"), left, scope);
+                self.expr(&format!("{pointer}/right"), right, scope);
+            }
             Expr::Opaque { text, reads } => {
                 self.non_empty(format!("{pointer}/text"), text);
                 for (index, read) in reads.iter().enumerate() {
@@ -723,7 +743,7 @@ impl<'a> Check<'a> {
                         Expr::Slot { .. } | Expr::Item { .. } => {
                             self.expr(&read_pointer, read, scope);
                         }
-                        Expr::Literal { .. } | Expr::Opaque { .. } => {
+                        Expr::Literal { .. } | Expr::Opaque { .. } | Expr::Unary { .. } | Expr::Binary { .. } => {
                             self.error(read_pointer, "must be a slot or item read");
                         }
                     }

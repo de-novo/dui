@@ -120,6 +120,8 @@ An **expression** says where a value comes from.
 | `literal` | A JSON `value` written in the source |
 | `slot` | A read of a slot of the same component, with an optional field `path` such as `["length"]` |
 | `item` | A read of the current item of an enclosing `list` node, with a field `path`. These are the field-to-UI bindings |
+| `unary` | A deterministic `!` operation over one expression |
+| `binary` | A deterministic `&&`, `||`, `??`, equality, or numeric comparison operation over two expressions |
 | `opaque` | Code the model does not evaluate: its `text` and the slot and item `reads` in it |
 
 ## 5. Nodes

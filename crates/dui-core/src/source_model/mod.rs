@@ -202,6 +202,17 @@ pub enum Expr {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         path: Vec<String>,
     },
+    /// A deterministic unary operation over a modeled value.
+    Unary {
+        operator: String,
+        value: Box<Expr>,
+    },
+    /// A deterministic binary operation over modeled values.
+    Binary {
+        operator: String,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     /// Code the model does not evaluate. `reads` lists the slot and item reads in it.
     Opaque {
         text: String,

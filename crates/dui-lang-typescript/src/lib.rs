@@ -130,6 +130,32 @@ fn returned(f: Ast<'_>) -> Option<Ast<'_>> {
         .and_then(first)
         .map(unwrap_expr)
 }
+fn object_type_fields(files: &Files, file: &File, node: Ast<'_>) -> Vec<m::Field> {
+    let n = unwrap_expr(node);
+    if matches!(n.kind(), "object_type" | "interface_body") {
+        return fields(files, file, n);
+    }
+    if n.kind() == "type_identifier"
+        && let Some((target, name)) = symbol(files, file, file.text(n))
+    {
+        for declaration in target.declarations() {
+            if declaration.kind() == "interface_declaration"
+                && target.name(declaration, "name") == Some(name)
+                && let Some(body) = field(declaration, "body")
+            {
+                return fields(files, target, body);
+            }
+            if declaration.kind() == "type_alias_declaration"
+                && target.name(declaration, "name") == Some(name)
+                && let Some(value) = field(declaration, "value")
+            {
+                return object_type_fields(files, target, value);
+            }
+        }
+    }
+    Vec::new()
+}
+
 fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
     if f.kind() == "method_definition" {
         return class_view::props(file, f, id);
@@ -214,6 +240,24 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             });
         }
     }
+    if let Some(param) = field(f, "parameters").and_then(first)
+        && let Some(pattern) = field(param, "pattern").filter(|p| p.kind() == "identifier")
+        && let Some(ty) = field(param, "type").map(unwrap_expr)
+    {
+        for prop in object_type_fields(files, file, ty) {
+            out.push(m::Slot {
+                id: format!("{id}.{}", prop.name),
+                name: prop.name.clone(),
+                kind: m::SlotKind::Prop,
+                ty: prop.ty,
+                optional: prop.optional,
+                initial: None,
+                source: None,
+                origin: m::Origin::Syntax,
+                location: file.loc(pattern),
+            });
+        }
+    }
     let Some(body) = field(f, "body") else {
         return out;
     };
@@ -222,12 +266,32 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
         .filter(|d| matches!(d.kind(), "lexical_declaration" | "variable_declaration"))
         .flat_map(children)
     {
-        let (Some(pat), Some(call)) = (
-            field(var, "name"),
-            field(var, "value").filter(|c| c.kind() == "call_expression"),
-        ) else {
+        let (Some(pat), Some(value)) = (field(var, "name"), field(var, "value")) else {
             continue;
         };
+        if value.kind() != "call_expression" {
+            if pat.kind() == "identifier"
+                && !matches!(
+                    value.kind(),
+                    "arrow_function" | "function_expression" | "object" | "array" | "template_string"
+                )
+            {
+                let name = file.text(pat);
+                out.push(m::Slot {
+                    id: format!("{id}.{name}"),
+                    name: name.into(),
+                    kind: m::SlotKind::External,
+                    ty: unknown(),
+                    optional: true,
+                    initial: None,
+                    source: Some(file.text(value).into()),
+                    origin: m::Origin::Syntax,
+                    location: file.loc(var),
+                });
+            }
+            continue;
+        }
+        let call = value;
         let Some(callee) = file.name(call, "function") else {
             continue;
         };
@@ -357,17 +421,10 @@ fn conditional_return(statement: Ast<'_>) -> Option<(Ast<'_>, Ast<'_>)> {
     }
     let condition = field(statement, "condition")?;
     let consequence = field(statement, "consequence")?;
-    if consequence.kind() == "return_statement" {
-        return return_expression(consequence).map(|content| (condition, content));
+    if consequence.kind() == "return_statement" || consequence.kind() == "statement_block" {
+        return Some((condition, consequence));
     }
-    if consequence.kind() != "statement_block" {
-        return None;
-    }
-    let statements = children(consequence);
-    if statements.len() != 1 {
-        return None;
-    }
-    return_expression(statements[0]).map(|content| (condition, content))
+    None
 }
 
 fn condition_shape<'a>(
@@ -413,18 +470,13 @@ fn condition_shape<'a>(
 fn conditional_node(
     cx: &mut render::Context<'_>,
     condition: Ast<'_>,
-    content: Ast<'_>,
+    yes: m::Node,
     otherwise: m::Node,
     id: String,
 ) -> m::Node {
     let location = cx.file.loc(condition);
     let (on, when, _left, _right, _operator) = condition_shape(cx.file, condition);
-    let yes = cx.node(content, format!("{id}.0.0"));
-    let (truthy, fallback) = if when == m::Match::Truthy(false) {
-        (otherwise.clone(), yes)
-    } else {
-        (yes, otherwise)
-    };
+    let (truthy, fallback) = (yes, otherwise);
     m::Node::Branch(m::Branch {
         id,
         on: cx.expr(on),
@@ -440,6 +492,60 @@ fn conditional_node(
         ],
         location,
     })
+}
+
+fn consequence_node(
+    cx: &mut render::Context<'_>,
+    consequence: Ast<'_>,
+    id: String,
+) -> Option<m::Node> {
+    if consequence.kind() == "return_statement" {
+        return return_expression(consequence).map(|content| cx.node(content, id));
+    }
+    if consequence.kind() == "statement_block" {
+        return statements_root(cx, children(consequence), id);
+    }
+    None
+}
+
+fn statements_root(cx: &mut render::Context<'_>, statements: Vec<Ast<'_>>, id: String) -> Option<m::Node> {
+    let mut conditional = Vec::new();
+    let mut final_return = None;
+    for statement in &statements {
+        match statement.kind() {
+            "lexical_declaration"
+            | "variable_declaration"
+            | "expression_statement"
+            | "function_declaration" => {}
+            "return_statement" => {
+                if final_return.is_some() {
+                    return None;
+                }
+                final_return = return_expression(*statement);
+            }
+            "if_statement" if final_return.is_none() => {
+                if let Some(early) = conditional_return(*statement) {
+                    conditional.push(early);
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+    }
+    let final_return = final_return?;
+    let final_id = if conditional.is_empty() {
+        id.clone()
+    } else {
+        format!("{id}.final")
+    };
+    let mut root = cx.node(final_return, final_id);
+    for (index, (condition, consequence)) in conditional.iter().rev().enumerate() {
+        let branch_id = format!("{id}.return{index}");
+        let yes = consequence_node(cx, *consequence, format!("{branch_id}.content"))?;
+        root = conditional_node(cx, *condition, yes, root, branch_id);
+    }
+    Some(root)
 }
 
 fn component_root(cx: &mut render::Context<'_>, f: Ast<'_>, id: String) -> m::Node {
@@ -464,39 +570,8 @@ fn component_root(cx: &mut render::Context<'_>, f: Ast<'_>, id: String) -> m::No
     if body.kind() != "statement_block" {
         return cx.node(unwrap_expr(body), id);
     }
-    let statements = children(body);
-    let mut conditional = Vec::new();
-    let mut final_return = None;
-    let mut supported = true;
-    for statement in &statements {
-        match statement.kind() {
-            "lexical_declaration"
-            | "variable_declaration"
-            | "expression_statement"
-            | "function_declaration" => {}
-            "return_statement" => {
-                if final_return.is_some() {
-                    supported = false;
-                    break;
-                }
-                final_return = return_expression(*statement);
-            }
-            "if_statement" if final_return.is_none() => {
-                if let Some(early) = conditional_return(*statement) {
-                    conditional.push(early);
-                } else {
-                    supported = false;
-                    break;
-                }
-            }
-            _ => {
-                supported = false;
-                break;
-            }
-        }
-    }
-    if !supported || final_return.is_none() {
-        return crate::returned(f)
+    statements_root(cx, children(body), id.clone()).unwrap_or_else(|| {
+        crate::returned(f)
             .map(|n| cx.node(n, id.clone()))
             .unwrap_or_else(|| {
                 m::Node::Placeholder(m::Placeholder {
@@ -504,24 +579,8 @@ fn component_root(cx: &mut render::Context<'_>, f: Ast<'_>, id: String) -> m::No
                     reason: "Unsupported component body".into(),
                     location: cx.file.loc(f),
                 })
-            });
-    }
-    let final_id = if conditional.is_empty() {
-        id.clone()
-    } else {
-        format!("{id}.final")
-    };
-    let mut root = cx.node(final_return.expect("checked final return"), final_id);
-    for (index, (condition, content)) in conditional.iter().rev().enumerate() {
-        root = conditional_node(
-            cx,
-            *condition,
-            *content,
-            root,
-            format!("{id}.return{index}"),
-        );
-    }
-    root
+            })
+    })
 }
 
 fn stylesheet_order(files: &Files, entry: &str) -> Vec<String> {

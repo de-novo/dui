@@ -63,15 +63,170 @@
           "user": {
             "id": 1,
             "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteScrollMain.activeEventTypeGroup": [
+            {
+              "id": 1,
+              "teamId": null,
+              "parentId": null,
+              "bookerUrl": "https://booker.example.test",
+              "metadata": {
+                "readOnly": false
+              },
+              "profile": {
+                "slug": "bench-user",
+                "name": "Bench User"
+              },
+              "eventTypes": [
+                {
+                  "id": 101,
+                  "title": "Benchmark Intro",
+                  "slug": "benchmark-intro",
+                  "length": 30,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic intro",
+                  "eventTypeColor": null
+                },
+                {
+                  "id": 102,
+                  "title": "Benchmark Deep Dive",
+                  "slug": "benchmark-deep-dive",
+                  "length": 60,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic deep dive",
+                  "eventTypeColor": null
+                }
+              ]
+            }
+          ],
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": {
+              "pages": [
+                {
+                  "eventTypes": [
+                    {
+                      "id": 101,
+                      "title": "Benchmark Intro",
+                      "slug": "benchmark-intro",
+                      "length": 30,
+                      "hidden": false,
+                      "schedulingType": null,
+                      "safeDescription": "Synthetic intro",
+                      "eventTypeColor": null
+                    },
+                    {
+                      "id": 102,
+                      "title": "Benchmark Deep Dive",
+                      "slug": "benchmark-deep-dive",
+                      "length": 60,
+                      "hidden": false,
+                      "schedulingType": null,
+                      "safeDescription": "Synthetic deep dive",
+                      "eventTypeColor": null
+                    }
+                  ],
+                  "nextCursor": null
+                }
+              ],
+              "pageParams": [
+                null
+              ]
+            },
+            "isPending": false,
+            "isError": false,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
           }
         },
         "loading": {
           "userEventGroupsData": {
-            "eventTypeGroups": []
+            "eventTypeGroups": [
+              {
+                "id": 1,
+                "teamId": null,
+                "parentId": null,
+                "bookerUrl": "https://booker.example.test",
+                "metadata": {
+                  "readOnly": false
+                },
+                "profile": {
+                  "slug": "bench-user",
+                  "name": "Bench User"
+                },
+                "eventTypes": [
+                  {
+                    "id": 101,
+                    "title": "Benchmark Intro",
+                    "slug": "benchmark-intro",
+                    "length": 30,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic intro",
+                    "eventTypeColor": null
+                  },
+                  {
+                    "id": 102,
+                    "title": "Benchmark Deep Dive",
+                    "slug": "benchmark-deep-dive",
+                    "length": 60,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic deep dive",
+                    "eventTypeColor": null
+                  }
+                ]
+              }
+            ]
           },
           "user": {
             "id": 1,
             "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteScrollMain.activeEventTypeGroup": [
+            {
+              "id": 1,
+              "teamId": null,
+              "parentId": null,
+              "bookerUrl": "https://booker.example.test",
+              "metadata": {
+                "readOnly": false
+              },
+              "profile": {
+                "slug": "bench-user",
+                "name": "Bench User"
+              },
+              "eventTypes": [
+                {
+                  "id": 101,
+                  "title": "Benchmark Intro",
+                  "slug": "benchmark-intro",
+                  "length": 30,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic intro",
+                  "eventTypeColor": null
+                },
+                {
+                  "id": 102,
+                  "title": "Benchmark Deep Dive",
+                  "slug": "benchmark-deep-dive",
+                  "length": 60,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic deep dive",
+                  "eventTypeColor": null
+                }
+              ]
+            }
+          ],
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": null,
+            "isPending": true,
+            "isError": false,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
           }
         },
         "empty": {
@@ -81,15 +236,112 @@
           "user": {
             "id": 1,
             "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": {
+              "pages": [
+                {
+                  "eventTypes": [],
+                  "nextCursor": null
+                }
+              ],
+              "pageParams": [
+                null
+              ]
+            },
+            "isPending": false,
+            "isError": false,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
           }
         },
         "error": {
           "userEventGroupsData": {
-            "eventTypeGroups": []
+            "eventTypeGroups": [
+              {
+                "id": 1,
+                "teamId": null,
+                "parentId": null,
+                "bookerUrl": "https://booker.example.test",
+                "metadata": {
+                  "readOnly": false
+                },
+                "profile": {
+                  "slug": "bench-user",
+                  "name": "Bench User"
+                },
+                "eventTypes": [
+                  {
+                    "id": 101,
+                    "title": "Benchmark Intro",
+                    "slug": "benchmark-intro",
+                    "length": 30,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic intro",
+                    "eventTypeColor": null
+                  },
+                  {
+                    "id": 102,
+                    "title": "Benchmark Deep Dive",
+                    "slug": "benchmark-deep-dive",
+                    "length": 60,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic deep dive",
+                    "eventTypeColor": null
+                  }
+                ]
+              }
+            ]
           },
           "user": {
             "id": 1,
             "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteScrollMain.activeEventTypeGroup": [
+            {
+              "id": 1,
+              "teamId": null,
+              "parentId": null,
+              "bookerUrl": "https://booker.example.test",
+              "metadata": {
+                "readOnly": false
+              },
+              "profile": {
+                "slug": "bench-user",
+                "name": "Bench User"
+              },
+              "eventTypes": [
+                {
+                  "id": 101,
+                  "title": "Benchmark Intro",
+                  "slug": "benchmark-intro",
+                  "length": 30,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic intro",
+                  "eventTypeColor": null
+                },
+                {
+                  "id": 102,
+                  "title": "Benchmark Deep Dive",
+                  "slug": "benchmark-deep-dive",
+                  "length": 60,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic deep dive",
+                  "eventTypeColor": null
+                }
+              ]
+            }
+          ],
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": null,
+            "isPending": false,
+            "isError": true,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
           }
         }
       }
