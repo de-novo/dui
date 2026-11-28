@@ -1101,7 +1101,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         }
         StyleValue::Color { .. } => color,
         StyleValue::Keyword { value } => {
-            keywords.is_none_or(|allowed| allowed.contains(&value.as_str()))
+            value == "inherit" || keywords.is_none_or(|allowed| allowed.contains(&value.as_str()))
         }
         StyleValue::Unresolved { .. } => true,
         StyleValue::Token { .. } => false,

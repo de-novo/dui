@@ -1828,6 +1828,9 @@ impl<'a> Sheet<'a> {
         } else {
             raw
         };
+        if raw == "inherit" {
+            return Some(V::Keyword { value: raw.into() });
+        }
         if rule.name == "position" {
             return matches!(raw, "static" | "relative" | "absolute" | "fixed" | "sticky")
                 .then(|| V::Keyword { value: raw.into() });
