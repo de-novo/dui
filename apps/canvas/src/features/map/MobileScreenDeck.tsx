@@ -100,7 +100,6 @@ const MobileApproximateCard = memo(
   },
   (before, after) =>
     before.renderer === after.renderer &&
-    before.model === after.model &&
     before.screen === after.screen &&
     before.width === after.width &&
     before.height === after.height &&

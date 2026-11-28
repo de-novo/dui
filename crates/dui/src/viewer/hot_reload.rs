@@ -481,13 +481,14 @@ impl HotSession {
         archive_edges: Vec<Value>,
         archive_discovery: Value,
     ) -> Self {
+        let archive_model = Arc::new(archive_model);
         let inner = Arc::new(Inner {
             state: Mutex::new(HotState {
                 revision: 0,
                 status_revision: 0,
                 watch_status: "starting",
                 reason: None,
-                model: Arc::new(archive_model.clone()),
+                model: Arc::clone(&archive_model),
                 nodes: archive_nodes,
                 edges: archive_edges,
                 discovery: archive_discovery,
@@ -586,13 +587,19 @@ fn publish_state(inner: &Inner, update: impl FnOnce(&mut HotState)) {
     }
 }
 
-fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model: SourceModel) {
+fn watch_loop(
+    inner: Arc<Inner>,
+    project: PathBuf,
+    entry: PathBuf,
+    archive_model: Arc<SourceModel>,
+) {
     let mut cache = ParseCache::default();
     let mut scan = scan_sources(&project);
     let mut previous = archive_model;
     loop {
         match extract_incremental_watched(&project, &entry, &mut cache, true) {
             Ok((model, stats)) => {
+                let model = Arc::new(model);
                 let changed_scan = Vec::new();
                 if model != previous {
                     let (patch, model_changed) =
@@ -619,7 +626,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.status_revision += 1;
                         state.watch_status = "ready";
                         state.reason = None;
-                        state.model = Arc::new(model.clone());
+                        state.model = Arc::clone(&model);
                         state.nodes = nodes;
                         state.edges = edges;
                         state.discovery = discovery;
@@ -642,8 +649,8 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.reason = None;
                         // The archive may predate the watcher. The first extraction still publishes
                         // the current source as a patch relative to that immutable baseline.
-                        if state.revision == 0 && state.model.as_ref() != &previous {
-                            state.model = Arc::new(previous.clone());
+                        if state.revision == 0 && state.model.as_ref() != previous.as_ref() {
+                            state.model = Arc::clone(&previous);
                         }
                     });
                 }
@@ -676,6 +683,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
             let extraction_start_wall = hot_wall_ms();
             match extract_incremental_watched(&project, &entry, &mut cache, structure_changed) {
                 Ok((model, stats)) => {
+                    let model = Arc::new(model);
                     let extraction_ms = extraction_started.elapsed().as_secs_f64() * 1000.0;
                     let extraction_end_wall = hot_wall_ms();
                     let diff_started = Instant::now();
@@ -703,7 +711,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.status_revision += 1;
                         state.watch_status = "ready";
                         state.reason = None;
-                        state.model = Arc::new(model.clone());
+                        state.model = Arc::clone(&model);
                         state.nodes = projection.nodes;
                         state.edges = projection.edges;
                         state.discovery = projection.discovery;

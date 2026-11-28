@@ -236,3 +236,43 @@ export default function App() {
     assert_eq!(incremental, fresh);
     assert_ne!(incremental, initial);
 }
+
+#[test]
+fn bare_project_imports_resolve_without_external_package_diagnostics() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path();
+    write(
+        root,
+        "src/main.tsx",
+        r#"import React from 'react';
+import { Child } from 'src/child';
+export default function App() {
+  return <main><Child /></main>;
+}
+"#,
+    );
+    write(
+        root,
+        "src/child.tsx",
+        r#"export function Child() {
+  return <p>root relative</p>;
+}
+"#,
+    );
+    let model = extract(root, &root.join("src/main.tsx")).expect("extract");
+    let main = model
+        .files
+        .iter()
+        .find(|file| file.path == "src/main.tsx")
+        .expect("main file");
+    assert!(main.imports.iter().any(|path| path == "src/child.tsx"));
+    assert!(
+        !model
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "unresolved-import"
+                && diagnostic.message == "react"),
+        "external package import became a project diagnostic: {:?}",
+        model.diagnostics
+    );
+}

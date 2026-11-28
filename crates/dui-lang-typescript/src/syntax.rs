@@ -564,20 +564,18 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
             continue;
         };
         let mut module = request.to_owned();
-        {
-            if let Some(resolved) = resolve(root, &file.path, request, aliases) {
-                module = resolved;
-                if module != file.path {
-                    imports.insert(module.clone());
-                    ordered_imports.push(module.clone());
-                }
-            } else {
-                diagnostics.push(Diagnostic {
-                    code: "unresolved-import".into(),
-                    message: request.into(),
-                    location: Some(file.loc(source)),
-                });
+        if let Some(resolved) = resolve(root, &file.path, request, aliases) {
+            module = resolved;
+            if module != file.path {
+                imports.insert(module.clone());
+                ordered_imports.push(module.clone());
             }
+        } else if request.starts_with('.') || uses_alias(request, aliases) {
+            diagnostics.push(Diagnostic {
+                code: "unresolved-import".into(),
+                message: request.into(),
+                location: Some(file.loc(source)),
+            });
         }
         let mut imported = Vec::new();
         for clause in children(stmt)
