@@ -894,9 +894,12 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
     assert.deepEqual(prop(root.style, "borderTopWidth"), { kind: "length", value: 2, unit: "px" });
     assert.deepEqual(prop(root.style, "paddingTop"), { kind: "length", value: 12, unit: "px" });
     assert.deepEqual(prop(root.style, "paddingBottom"), { kind: "length", value: 18, unit: "px" });
+    assert.deepEqual(prop(root.style, "fontFamily"), {
+      kind: "keyword",
+      value: "system-ui,sans-serif",
+    });
     for (const [property, text] of Object.entries({
       paddingStart: "4px min(10px,1vw)",
-      fontFamily: "system-ui,sans-serif",
       textDecorationLine: "none",
     })) {
       const output = prop(root.style, property) as { kind: string; text: string };

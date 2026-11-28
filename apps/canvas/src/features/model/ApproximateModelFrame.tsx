@@ -1,6 +1,29 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Model, ModelRenderResult, SourceModelRenderer } from "./modelDocument";
 
+const modelFontStyles = new Map<string, { style: HTMLStyleElement; count: number }>();
+
+function acquireModelFonts(css: string) {
+  if (!css) return () => {};
+  let entry = modelFontStyles.get(css);
+  if (!entry) {
+    const style = document.createElement("style");
+    style.dataset.duiModelFonts = "";
+    style.textContent = css;
+    document.head.append(style);
+    entry = { style, count: 0 };
+    modelFontStyles.set(css, entry);
+  }
+  entry.count += 1;
+  return () => {
+    entry.count -= 1;
+    if (entry.count === 0) {
+      entry.style.remove();
+      modelFontStyles.delete(css);
+    }
+  };
+}
+
 function useViewerColorScheme(): "light" | "dark" {
   const read = () =>
     document.documentElement.dataset.theme === "dark" ? ("dark" as const) : ("light" as const);
@@ -66,6 +89,7 @@ export function ApproximateModelFrame({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  useLayoutEffect(() => acquireModelFonts(render.fontCss), [render.fontCss]);
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;

@@ -655,11 +655,27 @@ fn width_condition(raw: &str) -> Option<m::Condition> {
     })
 }
 
-fn split_var_argument(raw: &str) -> Option<(&str, Option<&str>)> {
-    let inner = raw.strip_prefix("var(")?.strip_suffix(')')?;
+fn split_var_inner(inner: &str) -> Option<(&str, Option<&str>)> {
     let mut depth = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
     for (index, c) in inner.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+            continue;
+        }
+        if let Some(mark) = quote {
+            if c == mark {
+                quote = None;
+            }
+            continue;
+        }
         match c {
+            '"' | '\'' => quote = Some(c),
             '(' => depth += 1,
             ')' => depth = depth.saturating_sub(1),
             ',' if depth == 0 => {
@@ -668,7 +684,12 @@ fn split_var_argument(raw: &str) -> Option<(&str, Option<&str>)> {
             _ => {}
         }
     }
-    Some((inner.trim(), None))
+    (quote.is_none()).then_some((inner.trim(), None))
+}
+
+fn split_var_argument(raw: &str) -> Option<(&str, Option<&str>)> {
+    let inner = raw.strip_prefix("var(")?.strip_suffix(')')?;
+    split_var_inner(inner)
 }
 
 /// Resolve one whole var() reference, preferring the custom property and using its fallback
@@ -705,6 +726,150 @@ fn resolved_value_text<'a>(raw: &'a str, vars: &BTreeMap<&'a str, Option<&'a str
     } else {
         raw
     }
+}
+
+fn resolve_embedded_vars(
+    raw: &str,
+    vars: &BTreeMap<&str, Option<&str>>,
+    depth: usize,
+) -> Option<String> {
+    if depth >= 8 {
+        return None;
+    }
+    let mut out = String::new();
+    let mut pos = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    while pos < raw.len() {
+        let c = raw[pos..].chars().next()?;
+        if let Some(mark) = quote {
+            out.push(c);
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == mark {
+                quote = None;
+            }
+            pos += c.len_utf8();
+            continue;
+        }
+        if raw[pos..].starts_with("var(") {
+            let inner_start = pos + 4;
+            let mut cursor = inner_start;
+            let mut nesting = 1usize;
+            let mut inner_quote = None;
+            let mut inner_escaped = false;
+            let mut end = None;
+            while cursor < raw.len() {
+                let inner = raw[cursor..].chars().next()?;
+                if inner_escaped {
+                    inner_escaped = false;
+                } else if inner == '\\' {
+                    inner_escaped = true;
+                } else if let Some(mark) = inner_quote {
+                    if inner == mark {
+                        inner_quote = None;
+                    }
+                } else {
+                    match inner {
+                        '"' | '\'' => inner_quote = Some(inner),
+                        '(' => nesting += 1,
+                        ')' => {
+                            nesting = nesting.saturating_sub(1);
+                            if nesting == 0 {
+                                end = Some(cursor);
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                cursor += inner.len_utf8();
+            }
+            let end = end?;
+            let (name, fallback) = split_var_inner(&raw[inner_start..end])?;
+            let replacement = match vars.get(name).copied().flatten() {
+                Some(value) => value,
+                None => fallback?,
+            };
+            out.push_str(&resolve_embedded_vars(replacement, vars, depth + 1)?);
+            pos = end + 1;
+            continue;
+        }
+        if c == '"' || c == '\'' {
+            quote = Some(c);
+        }
+        out.push(c);
+        pos += c.len_utf8();
+    }
+    (quote.is_none()).then_some(out)
+}
+
+fn valid_font_family(part: &str) -> bool {
+    let part = part.trim();
+    if part.is_empty() {
+        return false;
+    }
+    let mut chars = part.char_indices();
+    let Some((_, mark @ ('"' | '\''))) = chars.next() else {
+        return !part.chars().any(|c| {
+            c.is_control() || matches!(c, ',' | ';' | '{' | '}' | '(' | ')' | '"' | '\'')
+        });
+    };
+    let mut escaped = false;
+    for (index, c) in chars {
+        if escaped {
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if c == mark {
+            return part[index + c.len_utf8()..].trim().is_empty();
+        }
+    }
+    false
+}
+
+fn valid_font_family_list(raw: &str) -> bool {
+    let mut parts = 0usize;
+    let mut start = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    let mut valid = true;
+    for (index, c) in raw.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+            continue;
+        }
+        if let Some(mark) = quote {
+            if c == mark {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            '"' | '\'' => quote = Some(c),
+            ',' => {
+                parts += 1;
+                valid = valid && valid_font_family(&raw[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    quote.is_none() && valid && valid_font_family(&raw[start..]) && parts + 1 > 0
+}
+
+fn font_family_value(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<V> {
+    let resolved = resolve_embedded_vars(raw, vars, 0)?;
+    let resolved = resolved.trim();
+    valid_font_family_list(resolved).then(|| V::Keyword {
+        value: resolved.into(),
+    })
 }
 
 fn length_operand<'a>(
@@ -1001,6 +1166,7 @@ impl<'a> Sheet<'a> {
                     }
                 }
                 "keyframes_statement" => {}
+                "at_rule" if parts.first().is_some_and(|p| f.text(*p) == "@font-face") => {}
                 "rule_set" => {
                     if let [selectors, body] = parts.as_slice() {
                         sheet
@@ -1202,6 +1368,9 @@ impl<'a> Sheet<'a> {
         rule: &Rule<'_>,
         vars: &BTreeMap<&str, Option<&str>>,
     ) -> Option<V> {
+        if property == P::FontFamily {
+            return font_family_value(rule.value, vars);
+        }
         let raw = rule.value;
         let raw = if raw.starts_with("var(") {
             resolved_var(raw, vars, 0)?
@@ -1555,9 +1724,6 @@ impl<'a> Sheet<'a> {
                 .into_iter()
                 .find(|(p, _)| *p == property)
                 .map(|(_, v)| v);
-        }
-        if property == P::FontFamily {
-            return (!raw.contains(',')).then(|| V::Keyword { value: raw.into() });
         }
         if matches!(
             property,

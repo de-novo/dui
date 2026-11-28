@@ -293,6 +293,7 @@ export function MobileScreenDeck({
                     screen={screen}
                     width={width && width > 0 ? width : 375}
                     height={viewportHeight ?? Math.round((width && width > 0 ? width : 375) * 1.6)}
+                    imageUrl={imageUrl}
                   />
                 )}
                 {screen.nativeSource && !cell && !src && !screen.component && (

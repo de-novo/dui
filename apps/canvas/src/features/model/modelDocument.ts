@@ -153,6 +153,7 @@ export type ModelRenderResult = {
   markup: string;
   /** Logical viewport used for the isolated card document. */
   viewport: { width: number; height?: number };
+  fontCss: string;
   /** Model facts that could not be drawn, with their source text where the model records it. */
   unresolved: string[];
 };
@@ -881,6 +882,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       html: "<!doctype html>" + doc.documentElement.outerHTML,
       markup,
       viewport: { width, ...(height === undefined ? {} : { height }) },
+      fontCss,
       unresolved: [...unresolved],
     };
   };
@@ -891,6 +893,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     html: iframe.html,
     markup: card.markup,
     viewport: card.viewport,
+    fontCss: card.fontCss,
     unresolved: [...new Set([...iframe.unresolved, ...card.unresolved])],
   };
 }

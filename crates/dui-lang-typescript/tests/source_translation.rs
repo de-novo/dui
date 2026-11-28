@@ -283,7 +283,8 @@ fn bundled_font_faces_are_extracted_with_bounded_local_assets() {
     fs::write(
         dir.path().join("dist/assets/index.css"),
         r#"@font-face{font-family:'Demo Sans';src:url('./fonts/demo.woff2') format('woff2'),url('https://fonts.example.com/demo.woff2') format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
-html{font-family:'Demo Sans',sans-serif}"#,
+:root{--demo-font:'Demo Sans',ui-sans-serif,system-ui,sans-serif}
+html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
     )
     .expect("built css");
     fs::write(
@@ -299,6 +300,42 @@ html{font-family:'Demo Sans',sans-serif}"#,
     assert_eq!(face.family, "Demo Sans");
     assert_eq!(face.weight.as_deref(), Some("400 900"));
     assert_eq!(face.display.as_deref(), Some("swap"));
+    let root_family = document
+        .root
+        .as_ref()
+        .and_then(|root| {
+            root.style
+                .iter()
+                .find(|declaration| declaration.property == m::StyleProperty::FontFamily)
+        })
+        .expect("document root font family");
+    assert_eq!(
+        root_family.value,
+        m::StyleValue::Keyword {
+            value: "'Demo Sans',ui-sans-serif,system-ui,sans-serif".into(),
+        },
+        "@font-face descriptors must not obscure the document fallback list"
+    );
+    assert!(
+        document.body.is_none(),
+        "@font-face descriptors are not body element declarations: {:#?}",
+        document.body
+    );
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let m::Node::Element(main) = &app.root else {
+        panic!("App root must remain an element")
+    };
+    assert!(
+        main.style
+            .iter()
+            .all(|declaration| declaration.property != m::StyleProperty::FontFamily),
+        "the document font is inherited context, not a main element declaration: {:#?}",
+        main.style
+    );
     let mut kinds = face.sources.iter().map(|source| match source {
         m::FontSource::Asset {
             path,

@@ -25,6 +25,8 @@ The same stylesheet read can add optional top-level `documentStyle` context with
 
 `documentStyle.externalStylesheets` records external stylesheet URLs declared by the document HTML, such as font stylesheet links. `documentStyle.fontFaces` records `@font-face` facts. A local font source is bounded, content-hashed and named as an archive `asset-<sha256>.<extension>`; a remote source is evidence with its declared URL. Font extraction never executes the document and never guesses a missing file.
 
+Remote font evidence is not font bytes. The default renderer never follows a remote stylesheet or font URL, so a family available only remotely cannot be pixel-matched on the default path; the resolved family cascade falls back to the first locally available face. Runtime effects that later add a font class or stylesheet are application behavior, not source-proven document typography. Exact offline use of a remote-only family would require explicitly supplied local bytes matched to that source URL, with provenance and license recorded; no such product contract exists in schema v1.
+
 Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
 
 For a direct child or descendant selector with two simple parts, the TSX adapter checks intrinsic JSX ancestors up to the component boundary. To inspect a model, run `dui serve`, choose **Open source model** in the workspace picker and select the exported JSON. The viewer draws the selected component from schema v1 and lists unresolved styles.
@@ -35,7 +37,7 @@ The built CSS reader maps display mode, horizontal overflow and auto-fit grids w
 
 The bundled CSS reader resolves independent row and column gaps and common flex shorthands into growth, shrinkage and basis.
 
-The reader expands block spacing in horizontal layouts. Built font-family lists, text-decoration lines, viewport minimums in spacing and ID selectors remain unresolved.
+The reader expands block spacing in horizontal layouts and preserves font-family fallback lists, including resolvable var() references. Built text-decoration lines, viewport minimums in spacing and ID selectors remain unresolved.
 
 Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
 
