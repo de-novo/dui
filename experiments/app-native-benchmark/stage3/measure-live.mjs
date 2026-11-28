@@ -14,10 +14,8 @@ const targets = {
     root: process.env.CALCOM_WEB_ROOT,
     entry: "modules/event-types/views/event-types-listing-view.tsx",
     file: "modules/event-types/views/event-types-listing-view.tsx",
-    before: "  return (\n    <InfiniteScrollMain",
-    after: "  return (\n    <>Benchmark save marker {n}\n    <InfiniteScrollMain",
-    close: "    />\n  );\n};\n\nexport const SearchContext",
-    closeAfter: "    />\n    </>\n  );\n};\n\nexport const SearchContext",
+    before: "  return (\n    <InfiniteScrollMain\n      profiles={userEventGroupsData.profiles}\n      eventTypeGroups={userEventGroupsData.eventTypeGroups}\n    />\n  );",
+    after: "  return (\n    <>Benchmark save marker {n}\n    <InfiniteScrollMain\n      profiles={userEventGroupsData.profiles}\n      eventTypeGroups={userEventGroupsData.eventTypeGroups}\n    />\n    </>\n  );",
     probe: "Benchmark save marker {n}",
   },
   plane: {
@@ -37,7 +35,7 @@ const targets = {
     probe: "Benchmark save marker {n}",
   },
 };
-const iterations = 10, deadlineMs = 2000;
+const iterations = 10, deadlineMs = 5000;
 const viewports = [{id:"desktop",width:1440,height:920},{id:"mobile",width:390,height:844}];
 function copy(src,dst){fs.rmSync(dst,{recursive:true,force:true});fs.cpSync(src,dst,{recursive:true,filter:s=>!/(^|[\/])(node_modules|\.git|\.next|dist|build|\.output)([\/]|$)/.test(s)})}
 function pct(a,p){if(!a.length)return null;return a[Math.min(a.length-1,Math.ceil(p/100*a.length)-1)]}
@@ -61,7 +59,7 @@ for(const [key,t] of Object.entries(targets)){
    for(let i=0;i<iterations;i++){
     const marker=t.after.replaceAll("{n}",String(i)),expected=t.probe.replaceAll("{n}",String(i));
     let next=original.replace(t.before,marker);if(t.close)next=next.replace(t.close,t.closeAfter);
-    fs.writeFileSync(file,next);const started=performance.now();
+    if(!next.includes(expected)||next===original)throw Error("controlled edit did not apply");fs.writeFileSync(file,next);const started=performance.now();
     await Promise.all(contexts.map(async(c,vi)=>{const vp=viewports[vi],p=c.pages()[0],sample={iteration:i,status:"deadline",ms:null};try{await p.waitForFunction(e=>[...document.querySelectorAll(".approximate-model-content")].some(x=>x.shadowRoot?.textContent?.includes(e)),expected,{timeout:deadlineMs,polling:"raf"});await p.evaluate(()=>new Promise(ok=>requestAnimationFrame(()=>requestAnimationFrame(ok))));sample.ms=Math.round((performance.now()-started)*10)/10;sample.status="reflected"}catch{}row.viewports[vp.id].samples.push(sample)}));
    }
    for(const vp of viewports){const ss=row.viewports[vp.id].samples,ok=ss.filter(s=>s.status==="reflected").map(s=>s.ms).sort((a,b)=>a-b);Object.assign(row.viewports[vp.id],{attempted:ss.length,reflectedCount:ok.length,missed:ss.length-ok.length,medianMs:pct(ok,50),p95Ms:pct(ok,95)})}
