@@ -260,6 +260,68 @@ pub(crate) fn run(project: &Path, manifest: &Path, out: &Path) -> Reply {
     )
     .map_err(|e| failure(3, &e.to_string()))?;
 
+    if spec["capture"] == false {
+        let mut cells = Vec::new();
+        for (index, state_def) in states.iter().enumerate() {
+            let name = state_def["name"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| format!("state-{index}"));
+            let input = &state_def["input"];
+            let state_id = state_hash(&path, &name, input);
+            for &width in &widths {
+                cells.push(json!({
+                    "scenario": name,
+                    "path": path,
+                    "width": width,
+                    "input": input,
+                    "state": state_id,
+                    "planIndex": index,
+                    "status": "unverified",
+                    "reason": "not-rendered",
+                    "elementTreeAvailable": false,
+                }));
+            }
+        }
+        let mut coverage = crate::coverage::base(&cells);
+        coverage["branchOutcomes"] = json!(0);
+        coverage["observedBranchOutcomes"] = json!(0);
+        let report = json!({
+            "runtime": "gpui-kit",
+            "os": env::consts::OS,
+            "arch": env::consts::ARCH,
+            "versions": lockfile_versions(project),
+            "renderPath": "not-rendered",
+            "elementTreeAvailable": false,
+            "browser": null,
+            "path": path,
+            "widths": widths,
+            "coverage": coverage,
+            "cells": cells,
+        });
+        let base_graph = json!({
+            "nodes": [{
+                "id": format!("route:{path}"),
+                "kind": "screen",
+                "path": path,
+                "label": path,
+            }],
+            "edges": [],
+        });
+        let graph = crate::graph_view::with_cells(base_graph, &report)?;
+        fs::write(
+            out.join("report.json"),
+            serde_json::to_vec_pretty(&report).map_err(|e| failure(3, &e.to_string()))?,
+        )
+        .map_err(|e| failure(3, &e.to_string()))?;
+        fs::write(
+            out.join("graph.json"),
+            serde_json::to_vec_pretty(&graph).map_err(|e| failure(3, &e.to_string()))?,
+        )
+        .map_err(|e| failure(3, &e.to_string()))?;
+        return Ok(report);
+    }
+
     let toolchain = select_toolchain();
     let binary = build_fixture(project, toolchain.as_deref())?;
     let versions = lockfile_versions(project);

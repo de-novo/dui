@@ -509,8 +509,13 @@ fn execute_with_locales(
         let mut scenario_overlays: BTreeSet<String> = BTreeSet::new();
         let scenario_path = spec["path"].as_str().unwrap_or_default().to_owned();
         let concurrency = crate::host::resolve_capture_concurrency(&spec);
+        let plan_renderer_safe = !plan_only
+            || renderer
+                .as_deref()
+                .is_some_and(|r| r.plans_without_heavy_runtime());
         if target.is_none()
             && concurrency > 1
+            && plan_renderer_safe
             && !prefetched_scenarios.contains(&(scenario.clone(), scenario_path.clone()))
             && let Some(browser) = renderer.as_deref_mut()
         {
@@ -713,7 +718,11 @@ fn execute_with_locales(
                 }
                 for width in widths {
                     let Some(browser) = renderer.as_deref_mut() else {
-                        let mut cell = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state_id,"planIndex":index,"status":"unrenderable","reason":"no-render-env"});
+                        let mut cell = if plan_only {
+                            json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state_id,"planIndex":index,"status":"unverified","reason":"not-rendered"})
+                        } else {
+                            json!({"scenario":scenario,"path":spec["path"],"width":width,"input":row,"state":state_id,"planIndex":index,"status":"unrenderable","reason":"no-render-env"})
+                        };
                         if let Some(loc) = locale {
                             cell["locale"] = json!(loc);
                         }
@@ -845,7 +854,11 @@ fn execute_with_locales(
                         continue;
                     }
 
-                    if plan_only && (index != 0 || *width != discovery_width) {
+                    if plan_only
+                        && (!browser.plans_without_heavy_runtime()
+                            || index != 0
+                            || *width != discovery_width)
+                    {
                         let mut cell = json!({"scenario":scenario,"path":spec["path"],"width":width,"input":input,"state":state_id,"planIndex":index,"status":"unverified","reason":"not-rendered"});
                         if let Some(loc) = locale {
                             cell["locale"] = json!(loc);
@@ -1720,6 +1733,10 @@ mod tests {
     /// Counts the widths it is asked to render.
     struct CountingPage(Vec<u32>);
     impl Renderer for CountingPage {
+        fn plans_without_heavy_runtime(&self) -> bool {
+            true
+        }
+
         fn capture(
             &mut self,
             spec: &Value,
@@ -1764,6 +1781,43 @@ mod tests {
                 .unwrap()
                 .filter_map(Result::ok)
                 .all(|e| !e.file_name().to_string_lossy().ends_with(".png"))
+        );
+    }
+
+    #[test]
+    fn a_map_without_capture_never_calls_a_rendering_renderer() {
+        struct HeavyRenderer;
+        impl Renderer for HeavyRenderer {
+            fn capture(
+                &mut self,
+                _: &Value,
+                _: &Value,
+                _: u32,
+                _: &Path,
+            ) -> Result<Value, Box<dyn std::error::Error>> {
+                panic!("a heavy renderer must not launch without capture")
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let mut heavy = HeavyRenderer;
+        let report = execute_with(
+            Some(&mut heavy),
+            &json!({"facts": [], "diagnostics": []}),
+            &json!({"path": "/", "capture": false, "routeSelector": "a[href]"}),
+            dir.path(),
+            &BTreeSet::from([375, 1280]),
+            None,
+        )
+        .expect("a map without capture still plans its cells");
+        assert_eq!(report["browser"], Value::Null);
+        assert_eq!(report["coverage"]["captured"], 0);
+        assert!(
+            report["cells"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["status"] == "unverified" && c["reason"] == "not-rendered")
         );
     }
 

@@ -46,6 +46,13 @@ pub struct RenderBackJob<'a> {
 }
 
 pub trait Renderer {
+    /// Whether `capture` is a lightweight planning visit that starts no browser, dev server,
+    /// emulator, simulator, or other heavy renderer. Only such a renderer may be called when
+    /// the manifest has `"capture": false` (AGENTS.md#never).
+    fn plans_without_heavy_runtime(&self) -> bool {
+        false
+    }
+
     fn capture(
         &mut self,
         spec: &Value,
@@ -112,11 +119,6 @@ pub trait SurfaceAdapter {
     fn check_env(&self) -> Result<(), UnrenderableReason> {
         Ok(())
     }
-    /// Whether this surface maps without capture (`"capture": false`) with nothing that
-    /// `check_env` looks for, such as a browser (AGENTS.md#never).
-    fn maps_without_renderer(&self) -> bool {
-        false
-    }
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply;
 }
 
@@ -179,9 +181,9 @@ impl SurfaceRegistry {
             );
             return Err((5, unrenderable_reply(surface_id, &reason)));
         };
-        // Nothing can be captured, so the run must not pass: exit 5 with the same JSON. A map
-        // without capture needs no renderer on surfaces that can plan without one.
-        let plan_only = manifest["capture"] == false && adapter.maps_without_renderer();
+        // A map without capture needs no renderer environment at all: the analysis pipeline
+        // plans cells as not-rendered instead of falling back to a browser, dev server or device.
+        let plan_only = manifest["capture"] == false;
         if !plan_only && let Err(reason) = adapter.check_env() {
             return Err((5, unrenderable_reply(surface_id, &reason)));
         }

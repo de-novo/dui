@@ -604,16 +604,19 @@ impl SurfaceAdapter for UniversalWebSurface {
         }
     }
 
-    fn maps_without_renderer(&self) -> bool {
-        true
-    }
-
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
         // Without capture no browser starts (AGENTS.md#never): links are read from the HTML the
         // app's server sends.
         if crate::html_map::HtmlLinks::wanted(spec) {
-            let mut links = crate::html_map::HtmlLinks::new(Box::new(|| {
+            let host_is_command = fs::read(spec)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                .is_some_and(|manifest| manifest["host"] == "command");
+            let mut links = crate::html_map::HtmlLinks::new(Box::new(move || {
+                if host_is_command {
+                    return Ok(None);
+                }
                 let session = UniversalWebHost
                     .start(project, spec, &Value::Null)
                     .map_err(|(_, v)| v.to_string())?;
