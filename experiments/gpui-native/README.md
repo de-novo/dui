@@ -48,3 +48,20 @@ The optional host-text control (pass `host` to run.py) displayed a blank content
 The pixel score uses the union of reference and preview ink (any RGB channel below 235), counting a mismatch where any channel differs by more than 20. The 32-pixel outer window margin is excluded only from ink counts and ink bounds. Strict equality compares the entire frame. The acceptance cutoff is at most 1% mismatched ink.
 
 The initial Android single-label run passed 0.5 logical pixels directly to cosmic-text’s em-based letter-spacing API. The corrected run divides by the 16-pixel font size. The four affected cases were rerun with the same sources and reference images. The initial observations are included in evidence/initial-tracking.json.
+
+## Minimum layout dependency set
+
+For a native shell already using gpui-pre 0.3.14, reuse its Taffy 0.15.1. Exposing that version directly adds **zero new package versions** to that shell. For the fixture layout adapter alone, the verified Cargo declaration is:
+
+```toml
+taffy = { version = "=0.15.1", default-features = false, features = ["taffy_tree", "flexbox"] }
+```
+
+| Isolated layout adapter | Direct | Transitive normal | Transitive build-only | Total external packages |
+|---|---|---|---|---|
+| Taffy 0.15.1 (MIT) | 1 | slotmap 1.1.1 (Zlib) | version_check 0.9.5 (MIT or Apache-2.0) | 3 |
+| Taffy 0.16.0 (MIT), same features | 1 | slotmap 1.1.1 (Zlib), rustc-hash 2.1.3 (Apache-2.0 or MIT) | version_check 0.9.5 (MIT or Apache-2.0) | 4 |
+
+Verified on Apple Silicon in isolated Cargo binaries with an offline build and run. Both versions passed position assertions for a centered 204-wide column, a two-label row with a 12-point gap and a fixed-size paragraph at 390×844 and 1440×920. This tests layout with supplied text dimensions. Font measurement, drawing and GPUI shell dependencies are outside these isolated counts. Cargo unifies features for a shared version, so GPUI can enable additional features on the same Taffy in the combined shell.
+
+The original research target returned 312 unique normal/build package entries including its own executable (311 external), counted by package name and version using Cargo tree for aarch64-apple-darwin. The minimum above applies to the native layout adapter only.
