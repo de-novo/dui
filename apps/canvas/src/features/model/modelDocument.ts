@@ -46,6 +46,7 @@ type Condition = {
   interaction?: "hover" | "focus" | "pressed" | "disabled";
   colorScheme?: "light" | "dark";
   expr?: Expr;
+  equals?: Json;
 };
 type Declaration = {
   property: string;
@@ -95,6 +96,39 @@ export type Model = {
   documentStyle?: {
     root?: DocumentElementStyle;
     body?: DocumentElementStyle;
+    externalStylesheets?: string[];
+    fontFaces?: {
+      id: string;
+      family: string;
+      style?: string;
+      weight?: string;
+      stretch?: string;
+      display?: string;
+      unicodeRange?: string;
+      stylesheet?: string;
+      stylesheetSha256?: string;
+      sources: (
+        | {
+            kind: "asset";
+            path: string;
+            asset: string;
+            sha256: string;
+            bytes: number;
+            format?: string;
+            license?: string;
+          }
+        | {
+            kind: "external";
+            url: string;
+            format?: string;
+            asset?: string;
+            sha256?: string;
+            bytes?: number;
+            retrievedUrl?: string;
+            license?: string;
+          }
+      )[];
+    }[];
   };
   files?: Record<string, unknown>[];
   itemSchemas?: Record<string, unknown>[];
@@ -122,12 +156,17 @@ export type ModelRenderContext = {
   /** Initial user-agent font size for media thresholds and root font percentages. */
   initialFontSize?: number;
   colorScheme?: "light" | "dark";
+  /** Resolve a content-addressed archive asset for same-run font bytes. */
+  assetUrl?: (asset: string) => string;
 };
 export type ModelRenderResult = {
   /** Full inert document, for the sandboxed model workbench iframe. */
   html: string;
   /** Style and body markup, for mounting in a shadow root inside a map card. */
   markup: string;
+  /** Logical viewport used for the isolated card document. */
+  viewport: { width: number; height?: number };
+  fontCss: string;
   /** Model facts that could not be drawn, with their source text where the model records it. */
   unresolved: string[];
 };
@@ -211,6 +250,7 @@ const directCss: Record<string, string> = {
   borderLeftStyle: "border-left-style",
   borderRadius: "border-radius",
   borderWidth: "border-width",
+  boxShadow: "box-shadow",
 };
 const compositeProperties = new Set([
   "dotRadius",
@@ -225,7 +265,7 @@ const compositeProperties = new Set([
 ]);
 
 const baseCss = `
-*{box-sizing:border-box}:host{display:block;color:#111;background:#fff;}body{margin:0;color:#111;background:#fff}h1,h2,h3,h4,h5,h6,p,pre,ul,ol,dl,dd{margin:0}a{text-decoration:underline}button,input,textarea,select{font:inherit}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
+:host{display:block}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
 `;
 
 type LengthEnvironment = {
@@ -416,10 +456,29 @@ function modeledRootFontSize(
   return initialFontSize;
 }
 
+function documentConditionStatus(
+  when: Condition | undefined,
+  env: LengthEnvironment,
+  colorScheme: "light" | "dark",
+): "yes" | "no" | "unknown" {
+  if (!when) return "yes";
+  const min = lengthPx(when.minWidth, env.initialFontSize);
+  const max = lengthPx(when.maxWidth, env.initialFontSize);
+  if ((when.minWidth && min === undefined) || (when.maxWidth && max === undefined))
+    return "unknown";
+  if (min !== undefined && env.width < min) return "no";
+  if (max !== undefined && env.width > max) return "no";
+  if (when.interaction) return "no";
+  if (when.colorScheme && when.colorScheme !== colorScheme) return "no";
+  if (when.expr) return "unknown";
+  return "yes";
+}
+
 function documentTypographyCss(
   declarations: Declaration[] | undefined,
   env: LengthEnvironment,
   note: (text: string) => void,
+  colorScheme: "light" | "dark",
   skipFontSize = false,
 ): string {
   const typography = new Set([
@@ -429,6 +488,14 @@ function documentTypographyCss(
     "fontStyle",
     "lineHeight",
     "letterSpacing",
+    "color",
+    "background",
+    "width",
+    "minWidth",
+    "maxWidth",
+    "height",
+    "minHeight",
+    "maxHeight",
   ]);
   const output: string[] = [];
   for (const declaration of declarations ?? []) {
@@ -437,12 +504,63 @@ function documentTypographyCss(
       (skipFontSize && declaration.property === "fontSize")
     )
       continue;
+    const applies = documentConditionStatus(declaration.when, env, colorScheme);
+    if (applies === "no") continue;
+    if (applies === "unknown") {
+      note(declaration.from.text);
+      continue;
+    }
     const key = directCss[declaration.property];
-    const value = !declaration.when && cssValue(declaration.value, env);
+    const value = cssValue(declaration.value, env);
     if (key && value && CSS.supports(key, value)) output.push(`${key}:${value}`);
     else note(declaration.from.text);
   }
   return output.join(";");
+}
+
+function escapeCssString(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("\n", " ");
+}
+
+function fontDescriptor(
+  value: string | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  if (!value) return fallback;
+  return /^[a-zA-Z0-9][a-zA-Z0-9 .%_-]{0,63}$/.test(value) ? value : undefined;
+}
+
+function fontUnicodeRange(value: string | undefined): string | undefined {
+  return value && value.length <= 256 && /^[Uu+0-9A-Fa-f?,\-\s]+$/.test(value) ? value : undefined;
+}
+
+function fontFacesCss(model: Model, context: ModelRenderContext): string {
+  const resolve = context.assetUrl ?? ((asset: string) => asset);
+  const rules: string[] = [];
+  for (const face of model.documentStyle?.fontFaces ?? []) {
+    const sources = face.sources.flatMap((source) => {
+      const asset =
+        source.kind === "asset" || (source.kind === "external" && source.asset && source.sha256)
+          ? source.asset
+          : undefined;
+      if (!asset) return [];
+      const format = fontDescriptor(source.format, "");
+      return [
+        `url("${escapeCssString(resolve(asset))}")${format ? ` format("${escapeCssString(format)}")` : ""}`,
+      ];
+    });
+    if (!sources.length || !face.family) continue;
+    const weight = fontDescriptor(face.weight, "normal");
+    const style = fontDescriptor(face.style, "normal");
+    const stretch = fontDescriptor(face.stretch, "normal");
+    const display = fontDescriptor(face.display, undefined);
+    const unicodeRange = fontUnicodeRange(face.unicodeRange);
+    if (!weight || !style || !stretch) continue;
+    rules.push(
+      `@font-face{font-family:"${escapeCssString(face.family)}";src:${sources.join(",")};font-style:${style};font-weight:${weight};font-stretch:${stretch}${display ? `;font-display:${display}` : ""}${unicodeRange ? `;unicode-range:${unicodeRange}` : ""}}`,
+    );
+  }
+  return rules.join("");
 }
 
 function renderDom(model: Model, componentId: string, context: ModelRenderContext = {}) {
@@ -461,8 +579,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     const doc = document.implementation.createHTMLDocument("");
     const policy = doc.createElement("meta");
     policy.httpEquiv = "Content-Security-Policy";
-    policy.content =
-      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+    const fontCss = fontFacesCss(model, context);
+    policy.content = fontCss
+      ? "default-src 'none'; style-src 'unsafe-inline'; font-src data: http:; base-uri 'none'; form-action 'none'"
+      : "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
     doc.head.append(policy);
     const style = doc.createElement("style");
     style.textContent = baseCss;
@@ -488,14 +608,20 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       model.documentStyle?.root?.style,
       env,
       documentNote,
+      colorScheme,
       true,
     );
-    const bodyCss = documentTypographyCss(model.documentStyle?.body?.style, env, documentNote);
+    const bodyCss = documentTypographyCss(
+      model.documentStyle?.body?.style,
+      env,
+      documentNote,
+      colorScheme,
+    );
     const rootBase = `font-family:system-ui,sans-serif;font-size:${rootFontSize}px`;
     const documentCss = isolated
       ? `:host{${[rootBase, rootCss].filter(Boolean).join(";")}}.dui-document-body{${bodyCss}}`
       : `html{${[rootBase, rootCss].filter(Boolean).join(";")}}body{${bodyCss}}`;
-    style.textContent = baseCss + documentCss;
+    style.textContent = baseCss + fontCss + documentCss;
 
     function conditionStatus(when: Condition | undefined, scope: Scope): "yes" | "no" | "unknown" {
       if (!when) return "yes";
@@ -511,7 +637,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (when.expr) {
         const value = resolveExpr(when.expr, scope);
         if (!value.known) unknown = true;
-        else if (!truthy(value.value)) return "no";
+        else if (
+          when.equals !== undefined ? !sameJson(value.value, when.equals) : !truthy(value.value)
+        )
+          return "no";
       }
       return unknown ? "unknown" : "yes";
     }
@@ -606,6 +735,22 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       for (const u of n.unresolvedStyle ?? []) note(n, u.text);
     }
 
+    function resolvedPropEntries(n: Node, scope: Scope): [string, unknown][] {
+      const entries: [string, unknown][] = [];
+      for (const [name, expr] of Object.entries(n.props ?? {})) {
+        const value = resolveExpr(expr, scope);
+        if (!value.known || value.value === undefined || value.value === null) continue;
+        if (
+          name.startsWith("...") &&
+          typeof value.value === "object" &&
+          !Array.isArray(value.value)
+        ) {
+          for (const [key, spread] of Object.entries(value.value)) entries.push([key, spread]);
+        } else entries.push([name, value.value]);
+      }
+      return entries;
+    }
+
     function applyProps(el: HTMLElement, n: Node, scope: Scope) {
       const visualAttributes = new Set([
         "type",
@@ -626,15 +771,13 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         "rowspan",
         "for",
       ]);
-      for (const [name, expr] of Object.entries(n.props ?? {})) {
+      for (const [name, raw] of resolvedPropEntries(n, scope)) {
         if (!visualAttributes.has(name)) continue;
-        const value = resolveExpr(expr, scope);
-        if (!value.known || value.value === undefined || value.value === null) continue;
         const attr = name === "for" ? "for" : name;
-        if (typeof value.value === "boolean") {
-          if (value.value) el.setAttribute(attr, "");
-        } else if (typeof value.value === "string" || typeof value.value === "number") {
-          el.setAttribute(attr, String(value.value));
+        if (typeof raw === "boolean") {
+          if (raw) el.setAttribute(attr, "");
+        } else if (typeof raw === "string" || typeof raw === "number") {
+          el.setAttribute(attr, String(raw));
         }
       }
       if (el instanceof HTMLInputElement || el instanceof HTMLButtonElement) el.tabIndex = -1;
@@ -655,12 +798,20 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return placeholder("Unresolved component");
       const slots = new Map<string, unknown>();
       const scope: Scope = { slots, items: new Map() };
+      const ordinary = new Set(
+        (c.slots ?? []).filter((s) => !s.name.startsWith("...")).map((s) => s.name),
+      );
+      const rest = new Map<string, unknown>();
+      for (const [key, value] of props)
+        if (!ordinary.has(key) && value !== undefined) rest.set(key, value);
       for (const s of c.slots ?? []) {
-        const initial = props.has(s.name)
-          ? { known: true, value: props.get(s.name) }
-          : s.initial
-            ? resolveExpr(s.initial, scope)
-            : { known: false };
+        const initial = s.name.startsWith("...")
+          ? { known: true, value: Object.fromEntries(rest) }
+          : props.has(s.name)
+            ? { known: true, value: props.get(s.name) }
+            : s.initial
+              ? resolveExpr(s.initial, scope)
+              : { known: false };
         if (initial.known) slots.set(s.id, initial.value);
       }
       return draw(c.root, scope, [...stack, id]);
@@ -687,9 +838,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
             nodes: n.children,
             scope: copyScope(scope),
           };
-          for (const slot of target.slots ?? [])
-            if (slot.type.kind === "node" && slot.name === "children" && !props.has(slot.name))
-              props.set(slot.name, content);
+          const acceptsChildren = (target.slots ?? []).some(
+            (slot) => slot.name === "children" || slot.name.startsWith("..."),
+          );
+          if (acceptsChildren && !props.has("children")) props.set("children", content);
         }
         return component(n.component!, props, stack);
       }
@@ -757,7 +909,16 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       el.dataset.modelNode = n.id;
       applyStyles(el, n, scope);
       applyProps(el, n, scope);
-      drawChildren(n.children, scope, stack, el);
+      const childrenProp = resolvedPropEntries(n, scope)
+        .reverse()
+        .find(([name]) => name === "children")?.[1];
+      if (isNodeContent(childrenProp)) {
+        drawChildren(childrenProp.nodes, childrenProp.scope, stack, el);
+      } else if (typeof childrenProp === "string" || typeof childrenProp === "number") {
+        el.append(String(childrenProp));
+      } else {
+        drawChildren(n.children, scope, stack, el);
+      }
       return el;
     }
 
@@ -770,10 +931,12 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     } else {
       doc.body.append(root);
     }
-    const markup = `<style>${baseCss}${documentCss}</style>` + doc.body.innerHTML;
+    const markup = `<style>${baseCss}${fontCss}${documentCss}</style>` + doc.body.innerHTML;
     return {
       html: "<!doctype html>" + doc.documentElement.outerHTML,
       markup,
+      viewport: { width, ...(height === undefined ? {} : { height }) },
+      fontCss,
       unresolved: [...unresolved],
     };
   };
@@ -783,6 +946,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
   return {
     html: iframe.html,
     markup: card.markup,
+    viewport: card.viewport,
+    fontCss: card.fontCss,
     unresolved: [...new Set([...iframe.unresolved, ...card.unresolved])],
   };
 }

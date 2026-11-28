@@ -219,6 +219,13 @@ async function openArchive(root: string) {
   if (hasSourceModel) {
     graph.sourceModel = "source-model.json";
     images.add("source-model.json");
+    const sourceModel = JSON.parse(await readFile(join(root, "source-model.json"), "utf8"));
+    for (const face of sourceModel.documentStyle?.fontFaces ?? []) {
+      for (const source of face.sources ?? []) {
+        if (typeof source.asset === "string" && assetName.test(source.asset))
+          images.add(source.asset);
+      }
+    }
   }
   for (const { image } of [...cells, ...graph.overview]) {
     if (typeof image === "string" && basename(image) === image && image.endsWith(".png"))

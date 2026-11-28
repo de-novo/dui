@@ -73,6 +73,7 @@ type CardNode = Node<
     liveRun?: string;
     sourceModel?: Model;
     modelRenderer?: SourceModelRenderer;
+    modelHeight?: number;
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -310,6 +311,8 @@ function Card({
         dimmed={data.dimmed}
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
+        modelWidth={data.width}
+        modelHeight={data.modelHeight}
         openComments={data.openComments}
         screenDiff={data.screenDiff}
         diffVisualMode={data.diffVisualMode}
@@ -526,6 +529,7 @@ export function ScreenMap({
   liveRun,
   sourceModel,
   modelRenderer,
+  modelHeight,
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -552,6 +556,8 @@ export function ScreenMap({
   liveRun?: string;
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit logical viewport height for source-model cards. */
+  modelHeight?: number;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -582,9 +588,10 @@ export function ScreenMap({
       return updated ?? previous;
     });
   }, []);
+  const expandModelContent = Boolean(sourceModel && modelRenderer);
   const layout = useMemo(
-    () => layoutMap(archive, width, mode, heights),
-    [archive, width, mode, heights],
+    () => layoutMap(archive, width, mode, heights, expandModelContent),
+    [archive, width, mode, heights, expandModelContent],
   );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { cardWidth, frameHeight, column, row } = layout.metrics;
@@ -660,6 +667,7 @@ export function ScreenMap({
             liveRun,
             sourceModel,
             modelRenderer,
+            modelHeight,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -683,6 +691,7 @@ export function ScreenMap({
       liveRun,
       sourceModel,
       modelRenderer,
+      modelHeight,
       diffsByPath,
       diffActive,
       mode,

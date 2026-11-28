@@ -221,6 +221,7 @@ fn media(f: &File, query: Ast<'_>) -> Option<m::Condition> {
         interaction: None,
         color_scheme: None,
         expr: None,
+        equals: None,
     })
 }
 pub(super) fn declaration(name: &str, raw: &str) -> Option<(Vec<P>, V)> {

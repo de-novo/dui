@@ -303,7 +303,7 @@ fn resolve_component(
 ) -> Option<String> {
     let dynamic = dynamic_bindings(file);
     let (target, export) = if let Some((module, export)) = dynamic.get(name) {
-        (files.get(module)?, export.as_str())
+        (files.get(module)?.as_ref(), export.as_str())
     } else {
         symbol(files, file, name)?
     };

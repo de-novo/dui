@@ -3,10 +3,10 @@
 //! aliases do not loop.
 
 use super::{
-    Component, Condition, Edge, EdgeTarget, Expr, Location, Match, Node, SCHEMA_VERSION, Slot,
-    SourceModel, StyleDeclaration, StyleProperty, StyleValue, TypeRef,
+    Component, Condition, Edge, EdgeTarget, Expr, FontSource, Location, Match, Node,
+    SCHEMA_VERSION, Slot, SourceModel, StyleDeclaration, StyleProperty, StyleValue, TypeRef,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -44,6 +44,14 @@ struct Scope<'a> {
     lists: Vec<&'a str>,
 }
 
+/// Node ancestry retained for edge validation. The component's slot map can be rebuilt from
+/// the component on demand, so storing it once per node would repeat the largest part of the
+/// scope for every element in the model.
+struct NodeScope<'a> {
+    component: &'a Component,
+    lists: Vec<&'a str>,
+}
+
 struct Check<'a> {
     model: &'a SourceModel,
     errors: Vec<ModelError>,
@@ -53,7 +61,7 @@ struct Check<'a> {
     schemas: BTreeSet<&'a str>,
     tokens: BTreeMap<&'a str, &'a StyleValue>,
     slot_ids: BTreeSet<&'a str>,
-    nodes: BTreeMap<&'a str, Scope<'a>>,
+    nodes: HashMap<&'a str, NodeScope<'a>>,
 }
 
 impl<'a> Check<'a> {
@@ -83,7 +91,7 @@ impl<'a> Check<'a> {
                 .map(|token| (token.id.as_str(), &token.value))
                 .collect(),
             slot_ids: BTreeSet::new(),
-            nodes: BTreeMap::new(),
+            nodes: HashMap::new(),
         }
     }
 
@@ -196,8 +204,15 @@ impl<'a> Check<'a> {
         }
 
         if let Some(document) = &model.document_style {
-            if document.root.is_none() && document.body.is_none() {
-                self.error("/documentStyle", "must describe the root or body");
+            if document.root.is_none()
+                && document.body.is_none()
+                && document.external_stylesheets.is_empty()
+                && document.font_faces.is_empty()
+            {
+                self.error(
+                    "/documentStyle",
+                    "must describe the root, body or document resources",
+                );
             }
             for (name, part) in [("root", &document.root), ("body", &document.body)] {
                 if let Some(part) = part {
@@ -206,6 +221,170 @@ impl<'a> Check<'a> {
                             &format!("/documentStyle/{name}/style/{index}"),
                             declaration,
                         );
+                    }
+                }
+            }
+            for (index, url) in document.external_stylesheets.iter().enumerate() {
+                if !(url.starts_with("https://")
+                    || url.starts_with("http://")
+                    || url.starts_with("//"))
+                {
+                    self.error(
+                        format!("/documentStyle/externalStylesheets/{index}"),
+                        "must be an external HTTP URL",
+                    );
+                }
+            }
+            self.sorted("/documentStyle/fontFaces", &document.font_faces, |face| {
+                &face.id
+            });
+            for (index, face) in document.font_faces.iter().enumerate() {
+                let pointer = format!("/documentStyle/fontFaces/{index}");
+                self.non_empty(format!("{pointer}/id"), &face.id);
+                self.non_empty(format!("{pointer}/family"), &face.family);
+                self.location(&format!("{pointer}/location"), &face.location);
+                if let Some(unicode_range) = &face.unicode_range {
+                    self.non_empty(format!("{pointer}/unicodeRange"), unicode_range);
+                }
+                if let Some(stylesheet) = &face.stylesheet {
+                    self.non_empty(format!("{pointer}/stylesheet"), stylesheet);
+                }
+                if let Some(sha256) = &face.stylesheet_sha256
+                    && !is_sha256(sha256)
+                {
+                    self.error(
+                        format!("{pointer}/stylesheetSha256"),
+                        "must be lowercase hex SHA-256",
+                    );
+                }
+                if face.stylesheet.as_ref().is_some_and(|sheet| {
+                    sheet.starts_with("https://")
+                        || sheet.starts_with("http://")
+                        || sheet.starts_with("//")
+                }) && face.stylesheet_sha256.is_none()
+                {
+                    self.error(
+                        format!("{pointer}/stylesheetSha256"),
+                        "remote stylesheet provenance must include its content hash",
+                    );
+                }
+                if face.sources.is_empty() {
+                    self.error(format!("{pointer}/sources"), "must not be empty");
+                }
+                for (at, source) in face.sources.iter().enumerate() {
+                    let source_pointer = format!("{pointer}/sources/{at}");
+                    match source {
+                        FontSource::Asset {
+                            path,
+                            asset,
+                            sha256,
+                            bytes,
+                            format,
+                            license,
+                        } => {
+                            if !is_relative_path(path) {
+                                self.error(
+                                    format!("{source_pointer}/path"),
+                                    "must be a project-relative path",
+                                );
+                            }
+                            if !is_sha256(sha256) {
+                                self.error(
+                                    format!("{source_pointer}/sha256"),
+                                    "must be lowercase hex SHA-256",
+                                );
+                            }
+                            let extension = path.rsplit_once('.').map(|(_, ext)| ext);
+                            let expected = extension.map(|ext| format!("asset-{sha256}.{ext}"));
+                            if !matches!(extension, Some("woff2" | "woff" | "ttf" | "otf"))
+                                || expected.as_deref() != Some(asset.as_str())
+                            {
+                                self.error(
+                                    format!("{source_pointer}/asset"),
+                                    "must be asset-<sha256>.<woff2|woff|ttf|otf> for its source path",
+                                );
+                            }
+                            if *bytes == 0 || *bytes > 4 * 1024 * 1024 {
+                                self.error(
+                                    format!("{source_pointer}/bytes"),
+                                    "must be within the bounded local font size",
+                                );
+                            }
+                            if let Some(format) = format {
+                                self.non_empty(format!("{source_pointer}/format"), format);
+                            }
+                            if let Some(license) = license {
+                                self.non_empty(format!("{source_pointer}/license"), license);
+                            }
+                        }
+                        FontSource::External {
+                            url,
+                            format,
+                            asset,
+                            sha256,
+                            bytes,
+                            retrieved_url,
+                            license,
+                        } => {
+                            if !(url.starts_with("https://")
+                                || url.starts_with("http://")
+                                || url.starts_with("//"))
+                            {
+                                self.error(
+                                    format!("{source_pointer}/url"),
+                                    "must be an external HTTP URL",
+                                );
+                            }
+                            if let Some(format) = format {
+                                self.non_empty(format!("{source_pointer}/format"), format);
+                            }
+                            if let Some(license) = license {
+                                self.non_empty(format!("{source_pointer}/license"), license);
+                            }
+                            let materialized = asset.is_some()
+                                || sha256.is_some()
+                                || bytes.is_some()
+                                || retrieved_url.is_some();
+                            if materialized {
+                                let (Some(asset), Some(sha256), Some(bytes), Some(retrieved_url)) =
+                                    (asset, sha256, bytes, retrieved_url)
+                                else {
+                                    self.error(
+                                        source_pointer.clone(),
+                                        "materialized remote font fields must be complete",
+                                    );
+                                    continue;
+                                };
+                                if !is_sha256(sha256) {
+                                    self.error(
+                                        format!("{source_pointer}/sha256"),
+                                        "must be lowercase hex SHA-256",
+                                    );
+                                }
+                                let extension = asset.rsplit_once('.').map(|(_, ext)| ext);
+                                if !matches!(extension, Some("woff2" | "woff" | "ttf" | "otf"))
+                                    || *asset
+                                        != format!("asset-{sha256}.{}", extension.unwrap_or(""))
+                                {
+                                    self.error(
+                                        format!("{source_pointer}/asset"),
+                                        "must be asset-<sha256>.<woff2|woff|ttf|otf>",
+                                    );
+                                }
+                                if *bytes == 0 || *bytes > 4 * 1024 * 1024 {
+                                    self.error(
+                                        format!("{source_pointer}/bytes"),
+                                        "must be within the bounded font size",
+                                    );
+                                }
+                                if !retrieved_url.starts_with("https://") {
+                                    self.error(
+                                        format!("{source_pointer}/retrievedUrl"),
+                                        "must be the final public HTTPS URL",
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -408,7 +587,11 @@ impl<'a> Check<'a> {
     fn node(&mut self, pointer: &str, node: &'a Node, scope: &Scope<'a>) {
         let id = node.id();
         self.non_empty(format!("{pointer}/id"), id);
-        if self.nodes.insert(id, scope.clone()).is_some() {
+        let retained = NodeScope {
+            component: scope.component,
+            lists: scope.lists.clone(),
+        };
+        if self.nodes.insert(id, retained).is_some() {
             self.error(
                 format!("{pointer}/id"),
                 format!("duplicate identifier {id:?}"),
@@ -441,8 +624,11 @@ impl<'a> Check<'a> {
                             .filter(|slot| slot.kind == super::SlotKind::Prop)
                             .map(|slot| slot.name.as_str())
                             .collect();
+                        let accepts_rest = target.slots.iter().any(|slot| {
+                            slot.kind == super::SlotKind::Prop && slot.name.starts_with("...")
+                        });
                         for name in instance.props.keys() {
-                            if !props.contains(name.as_str()) {
+                            if !props.contains(name.as_str()) && !accepts_rest {
                                 self.error(
                                     format!("{pointer}/props/{name}"),
                                     format!("{:?} has no prop {name:?}", instance.component),
@@ -703,6 +889,12 @@ impl<'a> Check<'a> {
                 self.error(format!("{pointer}/{name}/value"), "must be a finite number");
             }
         }
+        if condition.equals.is_some() && condition.expr.is_none() {
+            self.error(
+                format!("{pointer}/equals"),
+                "requires expr so the compared value is explicit",
+            );
+        }
         if let Some(expr) = &condition.expr {
             self.expr(&format!("{pointer}/expr"), expr, scope);
         }
@@ -711,7 +903,16 @@ impl<'a> Check<'a> {
     fn edge(&mut self, pointer: &str, edge: &Edge) {
         self.non_empty(format!("{pointer}/id"), &edge.id);
         self.location(&format!("{pointer}/location"), &edge.location);
-        let scope = self.nodes.get(edge.from.as_str()).cloned();
+        let scope = self.nodes.get(edge.from.as_str()).map(|node| Scope {
+            component: node.component,
+            slots: node
+                .component
+                .slots
+                .iter()
+                .map(|slot| (slot.id.as_str(), slot))
+                .collect(),
+            lists: node.lists.clone(),
+        });
         if scope.is_none() {
             self.error(
                 format!("{pointer}/from"),
@@ -776,6 +977,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         P::Top | P::Right | P::Bottom | P::Left => (true, false, false, Some(&["auto"])),
         P::ZIndex => (false, true, false, Some(&["auto"])),
         P::DotColor | P::ShadowColor => (false, false, true, Some(&[])),
+        P::BoxShadow => (false, false, false, None),
         P::DotRadius
         | P::TileWidth
         | P::TileHeight
@@ -920,7 +1122,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         }
         StyleValue::Color { .. } => color,
         StyleValue::Keyword { value } => {
-            keywords.is_none_or(|allowed| allowed.contains(&value.as_str()))
+            value == "inherit" || keywords.is_none_or(|allowed| allowed.contains(&value.as_str()))
         }
         StyleValue::Unresolved { .. } => true,
         StyleValue::Token { .. } => false,

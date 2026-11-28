@@ -76,6 +76,7 @@ pub enum Language {
     Kotlin,
     Dart,
     Css,
+    Html,
 }
 
 /// Where a fact came from. `inferred` marks a gap filled by AI or a heuristic.
@@ -339,6 +340,85 @@ pub struct DocumentStyle {
     /// Declarations effective on the document body element.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<DocumentElementStyle>,
+    /// External stylesheets declared by the document HTML. These are facts needed for
+    /// resources such as web fonts; the renderer must not execute the document.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external_stylesheets: Vec<String>,
+    /// Web font faces declared by stylesheets. Local and materialized remote sources are
+    /// content-addressed archive assets; the renderer never fetches a remote font itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub font_faces: Vec<FontFace>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FontFace {
+    pub id: String,
+    pub family: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stretch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unicode_range: Option<String>,
+    /// Project-relative stylesheet path or remote stylesheet URL containing this face.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stylesheet: Option<String>,
+    /// Lowercase hex SHA-256 of the stylesheet bytes used for a remote face.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stylesheet_sha256: Option<String>,
+    pub sources: Vec<FontSource>,
+    pub origin: Origin,
+    pub location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum FontSource {
+    /// A font file inside the measured project, copied into the archive under `asset`.
+    Asset {
+        /// Project-relative path with `/` separators.
+        path: String,
+        /// Content-addressed archive file `asset-<sha256>.<extension>`.
+        asset: String,
+        /// Lowercase hex SHA-256 of the font bytes.
+        sha256: String,
+        /// Font byte length. Extraction and archive writes bound this value.
+        bytes: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        /// License fact read from the font bytes when present; omission means unknown.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        license: Option<String>,
+    },
+    /// A remote font URL declared by the source. When the bounded build-stage intake could
+    /// materialize public bytes, the content-addressed archive fields are present; otherwise
+    /// this remains evidence only and archive rendering must not fetch it.
+    External {
+        url: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        asset: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        bytes: Option<u64>,
+        /// Final public HTTPS URL after redirects when bytes were materialized.
+        #[serde(
+            rename = "retrievedUrl",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        retrieved_url: Option<String>,
+        /// License fact read from the font bytes when present; omission means unknown.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        license: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -459,6 +539,8 @@ pub enum StyleProperty {
     ShadowBlur,
     ShadowSpread,
     ShadowColor,
+    /// Canonical serialized CSS shadow list. `none` or comma-separated shadow layers.
+    BoxShadow,
     BorderTopLeftRadius,
     BorderTopRightRadius,
     BorderBottomRightRadius,
@@ -567,6 +649,9 @@ pub struct Condition {
     pub color_scheme: Option<ColorScheme>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expr: Option<Expr>,
+    /// When present, `expr` must resolve to exactly this JSON value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equals: Option<Value>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

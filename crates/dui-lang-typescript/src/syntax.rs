@@ -1,10 +1,11 @@
 //! Source ranges, declarations and local module imports. No project code is executed.
-use dui_core::source_model::{Diagnostic, Location};
+use dui_core::source_model::{Component, Diagnostic, Edge, ItemSchema, Location, Slot, Token};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tree_sitter::{Node as Ast, Parser, Tree};
 
@@ -14,9 +15,13 @@ pub struct File {
     pub src: String,
     pub tree: Tree,
     pub imports: BTreeSet<String>,
+    /// Resolved static imports in source order. The schema stores the sorted set in `imports`;
+    /// stylesheet discovery uses this evaluation-order trace without executing the modules.
+    pub ordered_imports: Vec<String>,
     // Local alias -> (module or relative file, exported name).
     pub bindings: BTreeMap<String, (String, String)>,
     pub dynamic_imports: BTreeMap<String, String>,
+    pub sha256: String,
 }
 pub fn children(n: Ast<'_>) -> Vec<Ast<'_>> {
     n.named_children(&mut n.walk())
@@ -267,7 +272,10 @@ fn uses_alias(request: &str, aliases: &[Alias]) -> bool {
 
 fn module_candidates(path: PathBuf) -> Vec<PathBuf> {
     let mut paths = vec![path.clone()];
-    if path.extension().is_none() {
+    if !matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("ts" | "tsx" | "css")
+    ) {
         for ext in ["ts", "tsx"] {
             paths.push(PathBuf::from(format!("{}.{ext}", path.display())));
         }
@@ -313,13 +321,62 @@ fn resolve(root: &Path, from: &str, request: &str, aliases: &[Alias]) -> Option<
 /// refreshes added and removed imports without re-parsing the file's source.
 struct ImportScan {
     imports: BTreeSet<String>,
+    ordered_imports: Vec<String>,
     bindings: BTreeMap<String, (String, String)>,
     diagnostics: Vec<Diagnostic>,
     dynamic_imports: BTreeMap<String, String>,
 }
 
+fn may_contain_dynamic_import(src: &str) -> bool {
+    let bytes = src.as_bytes();
+    let mut at = 0;
+    while let Some(found) = src[at..].find("import").map(|index| at + index) {
+        let before = found
+            .checked_sub(1)
+            .and_then(|index| bytes.get(index))
+            .copied();
+        let after = bytes.get(found + 6).copied();
+        if before.is_some_and(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'$')
+            || after.is_some_and(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'$')
+        {
+            at = found + 6;
+            continue;
+        }
+        let mut cursor = found + 6;
+        loop {
+            while bytes.get(cursor).is_some_and(|c| c.is_ascii_whitespace()) {
+                cursor += 1;
+            }
+            if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+                cursor += 2;
+                while bytes.get(cursor).is_some_and(|c| *c != b'\n') {
+                    cursor += 1;
+                }
+                continue;
+            }
+            if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+                cursor += 2;
+                while cursor + 1 < bytes.len()
+                    && !(bytes[cursor] == b'*' && bytes[cursor + 1] == b'/')
+                {
+                    cursor += 1;
+                }
+                cursor = (cursor + 2).min(bytes.len());
+                continue;
+            }
+            break;
+        }
+        if bytes.get(cursor) == Some(&b'(') {
+            return true;
+        }
+        at = found + 6;
+    }
+    false
+}
+
 fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
     let mut imports = BTreeSet::new();
+    let mut ordered_imports = Vec::new();
     let mut bindings = BTreeMap::new();
     let mut diagnostics = Vec::new();
     let mut dynamic_imports = BTreeMap::new();
@@ -327,7 +384,11 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
         .into_iter()
         .filter(|n| n.kind() == "import_statement")
     {
-        let Some(source) = field(stmt, "source") else {
+        let Some(source) = field(stmt, "source").or_else(|| {
+            children(stmt)
+                .into_iter()
+                .find(|node| matches!(node.kind(), "string" | "string_value"))
+        }) else {
             continue;
         };
         let raw = file.text(source);
@@ -340,6 +401,7 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
                 module = resolved;
                 if module != file.path {
                     imports.insert(module.clone());
+                    ordered_imports.push(module.clone());
                 }
             } else {
                 diagnostics.push(Diagnostic {
@@ -379,7 +441,11 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
             bindings.insert(alias, (module.clone(), name));
         }
     }
-    let mut pending_nodes = vec![file.tree.root_node()];
+    let mut pending_nodes = if may_contain_dynamic_import(&file.src) {
+        vec![file.tree.root_node()]
+    } else {
+        Vec::new()
+    };
     while let Some(node) = pending_nodes.pop() {
         if node.kind() == "call_expression"
             && field(node, "function").is_some_and(|f| f.kind() == "import")
@@ -406,6 +472,7 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
     }
     ImportScan {
         imports,
+        ordered_imports,
         bindings,
         diagnostics,
         dynamic_imports,
@@ -431,20 +498,65 @@ fn parse_file(path: &str, src: String, parser: &mut Parser) -> Result<File, Stri
         src,
         tree,
         imports: BTreeSet::new(),
+        ordered_imports: Vec::new(),
         bindings: BTreeMap::new(),
         dynamic_imports: BTreeMap::new(),
+        sha256: String::new(),
     })
 }
 
 pub struct Sources {
     pub entry: String,
     pub artifact: Option<String>,
-    pub files: BTreeMap<String, File>,
+    pub files: BTreeMap<String, Arc<File>>,
+}
+
+pub(crate) struct RenderedFile {
+    pub fingerprint: String,
+    pub cacheable: bool,
+    pub components: Vec<Component>,
+    pub edges: Vec<Edge>,
+}
+
+struct CachedFile {
+    sha256: String,
+    len: u64,
+    modified: Option<std::time::SystemTime>,
+    file: Arc<File>,
+}
+
+#[ouroboros::self_referencing(pub_extras)]
+pub(crate) struct CachedSheet {
+    #[allow(dead_code)]
+    file: Arc<File>,
+    #[borrows(file)]
+    #[covariant]
+    pub(crate) sheet: crate::style::built::Sheet<'this>,
+}
+
+pub(crate) struct CachedBuiltSheet {
+    pub key: String,
+    pub sheet: Arc<CachedSheet>,
+}
+
+pub(crate) struct CachedFontIntake {
+    pub key: String,
+    pub intake: crate::fonts::FontIntake,
+}
+
+pub(crate) struct FileFacts {
+    pub tokens: Vec<Token>,
+    pub item_schemas: Vec<ItemSchema>,
+    pub signatures: Vec<(String, Vec<Slot>)>,
 }
 
 #[derive(Default)]
 pub struct ParseCache {
-    files: BTreeMap<String, (String, File)>,
+    files: BTreeMap<String, CachedFile>,
+    pub(crate) rendered: BTreeMap<String, RenderedFile>,
+    pub(crate) fonts: Option<CachedFontIntake>,
+    pub(crate) built_sheet: Option<CachedBuiltSheet>,
+    pub(crate) facts: BTreeMap<String, (String, Arc<FileFacts>)>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -459,8 +571,16 @@ pub fn load_cached(
     built_css: Option<&Path>,
     diagnostics: &mut Vec<Diagnostic>,
     cache: &mut ParseCache,
+    refresh_imports: bool,
 ) -> Result<(Sources, LoadStats), String> {
-    load_inner(root, entry, built_css, diagnostics, Some(cache))
+    load_inner(
+        root,
+        entry,
+        built_css,
+        diagnostics,
+        Some(cache),
+        refresh_imports,
+    )
 }
 
 fn load_inner(
@@ -469,6 +589,7 @@ fn load_inner(
     built_css: Option<&Path>,
     diagnostics: &mut Vec<Diagnostic>,
     mut cache: Option<&mut ParseCache>,
+    refresh_imports: bool,
 ) -> Result<(Sources, LoadStats), String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let aliases = path_aliases(&root);
@@ -491,28 +612,62 @@ fn load_inner(
         if files.contains_key(&path) {
             continue;
         }
-        let src = fs::read_to_string(root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
-        if src.len() >= u32::MAX as usize {
-            return Err(format!("{path}: source exceeds model location range"));
-        }
-        let sha256 = format!("{:x}", Sha256::digest(src.as_bytes()));
-        let cached = cache
+        let metadata = fs::metadata(root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
+        let len = metadata.len();
+        let modified = metadata.modified().ok();
+        let metadata_hit = cache
             .as_ref()
             .and_then(|cache| cache.files.get(&path))
-            .filter(|(cached_sha, _)| cached_sha == &sha256)
-            .map(|(_, file)| file.clone());
-        let mut file = if let Some(file) = cached {
+            .filter(|cached| cached.len == len && cached.modified == modified)
+            .map(|cached| cached.file.clone());
+        let mut reused_parse = false;
+        let mut file = if let Some(file) = metadata_hit {
             stats.reused.push(path.clone());
+            reused_parse = true;
             file
         } else {
-            stats.parsed.push(path.clone());
-            let parsed = parse_file(&path, src, &mut parser)?;
-            if let Some(cache) = cache.as_mut() {
-                cache
-                    .files
-                    .insert(path.clone(), (sha256.clone(), parsed.clone()));
+            let src = fs::read_to_string(root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
+            if src.len() >= u32::MAX as usize {
+                return Err(format!("{path}: source exceeds model location range"));
             }
-            parsed
+            let sha256 = format!("{:x}", Sha256::digest(src.as_bytes()));
+            let content_hit = cache
+                .as_ref()
+                .and_then(|cache| cache.files.get(&path))
+                .filter(|cached| cached.sha256 == sha256)
+                .map(|cached| cached.file.clone());
+            if let Some(file) = content_hit {
+                stats.reused.push(path.clone());
+                reused_parse = true;
+                if let Some(cache) = cache.as_mut() {
+                    cache.files.insert(
+                        path.clone(),
+                        CachedFile {
+                            sha256,
+                            len,
+                            modified,
+                            file: file.clone(),
+                        },
+                    );
+                }
+                file
+            } else {
+                stats.parsed.push(path.clone());
+                let mut parsed = parse_file(&path, src, &mut parser)?;
+                parsed.sha256 = sha256.clone();
+                if let Some(cache) = cache.as_mut() {
+                    cache.files.insert(
+                        path.clone(),
+                        CachedFile {
+                            sha256,
+                            len,
+                            modified,
+                            file: Arc::new(parsed.clone()),
+                        },
+                    );
+                }
+                Arc::new(parsed)
+            }
         };
         if file.tree.root_node().has_error() {
             diagnostics.push(Diagnostic {
@@ -521,13 +676,35 @@ fn load_inner(
                 location: Some(file.loc(file.tree.root_node())),
             });
         }
-        let mut scan = scan_imports(&root, &file, &aliases);
-        file.imports = scan.imports;
-        file.bindings = scan.bindings;
-        file.dynamic_imports = scan.dynamic_imports;
-        diagnostics.append(&mut scan.diagnostics);
+        if refresh_imports || !reused_parse {
+            let mut scan = scan_imports(&root, &file, &aliases);
+            if file.imports != scan.imports
+                || file.ordered_imports != scan.ordered_imports
+                || file.bindings != scan.bindings
+                || file.dynamic_imports != scan.dynamic_imports
+            {
+                let mut updated = (*file).clone();
+                updated.imports = scan.imports;
+                updated.ordered_imports = scan.ordered_imports;
+                updated.bindings = scan.bindings;
+                updated.dynamic_imports = scan.dynamic_imports;
+                file = Arc::new(updated);
+            }
+            diagnostics.append(&mut scan.diagnostics);
+        }
+        if let Some(cache) = cache.as_mut() {
+            cache.files.insert(
+                path.clone(),
+                CachedFile {
+                    sha256: file.sha256.clone(),
+                    len,
+                    modified,
+                    file: file.clone(),
+                },
+            );
+        }
         for module in &file.imports {
-            if !files.contains_key(module) {
+            if !files.contains_key(module.as_str()) {
                 pending.push(module.clone());
             }
         }

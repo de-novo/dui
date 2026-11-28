@@ -2,19 +2,30 @@
 //! never writes to the immutable run archive and never starts an app host, browser or emulator.
 use crate::tsx_map;
 use dui_core::source_model::{Node, SourceModel};
-use dui_lang_typescript::{ParseCache, extract_incremental};
+use dui_lang_typescript::{ParseCache, extract_incremental_watched};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        Arc, Condvar, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
-const POLL_INTERVAL: Duration = Duration::from_millis(50);
+const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const CLIENT_ACTIVITY_GRACE: Duration = Duration::from_secs(2);
 const LONG_POLL: Duration = Duration::from_secs(8);
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_millis() as u64)
+}
 
 #[derive(Clone)]
 pub(crate) struct HotSession {
@@ -24,6 +35,7 @@ pub(crate) struct HotSession {
 struct Inner {
     state: Mutex<HotState>,
     changed: Condvar,
+    client_active_until_ms: AtomicU64,
 }
 
 struct HotState {
@@ -31,7 +43,7 @@ struct HotState {
     status_revision: u64,
     watch_status: &'static str,
     reason: Option<String>,
-    model: SourceModel,
+    model: Arc<SourceModel>,
     nodes: Vec<Value>,
     edges: Vec<Value>,
     discovery: Value,
@@ -69,13 +81,16 @@ fn diff_keyed(old: &[Value], new: &[Value], field: &str) -> Value {
 }
 
 fn edge_key(value: &Value) -> String {
-    value["modelEdge"].as_str().map(str::to_owned).unwrap_or_else(|| {
-        format!(
-            "{}->{}",
-            value["source"].as_str().unwrap_or_default(),
-            value["target"].as_str().unwrap_or_default()
-        )
-    })
+    value["modelEdge"]
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            format!(
+                "{}->{}",
+                value["source"].as_str().unwrap_or_default(),
+                value["target"].as_str().unwrap_or_default()
+            )
+        })
 }
 
 fn diff_graph(
@@ -116,11 +131,67 @@ fn diff_graph(
     patch
 }
 
-fn entity_values<T: serde::Serialize>(items: &[T]) -> Vec<Value> {
-    items
+fn diff_entities<T: serde::Serialize + PartialEq>(
+    old: &[T],
+    new: &[T],
+    key: impl Fn(&T) -> &str,
+) -> Value {
+    let old: BTreeMap<String, &T> = old
         .iter()
-        .filter_map(|item| serde_json::to_value(item).ok())
-        .collect()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let new: BTreeMap<String, &T> = new
+        .iter()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let mut upsert = Vec::new();
+    let mut remove = Vec::new();
+    for (id, value) in &new {
+        if old.get(id).copied() != Some(*value)
+            && let Ok(value) = serde_json::to_value(*value)
+        {
+            upsert.push(value);
+        }
+    }
+    for id in old.keys() {
+        if !new.contains_key(id) {
+            remove.push(id.clone());
+        }
+    }
+    json!({"upsert":upsert,"remove":remove})
+}
+
+fn diff_entities_except<T: serde::Serialize + PartialEq>(
+    old: &[T],
+    new: &[T],
+    key: impl Fn(&T) -> &str,
+    assume_unchanged: &BTreeSet<String>,
+) -> Value {
+    let old: BTreeMap<String, &T> = old
+        .iter()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let new: BTreeMap<String, &T> = new
+        .iter()
+        .map(|item| (key(item).to_owned(), item))
+        .collect();
+    let mut upsert = Vec::new();
+    let mut remove = Vec::new();
+    for (id, value) in &new {
+        let unchanged = assume_unchanged.contains(id) && old.contains_key(id);
+        if !unchanged
+            && old.get(id).copied() != Some(*value)
+            && let Ok(value) = serde_json::to_value(*value)
+        {
+            upsert.push(value);
+        }
+    }
+    for id in old.keys() {
+        if !new.contains_key(id) {
+            remove.push(id.clone());
+        }
+    }
+    json!({"upsert":upsert,"remove":remove})
 }
 
 fn dependency_graph(model: &SourceModel) -> BTreeMap<String, Vec<String>> {
@@ -196,13 +267,11 @@ fn affected_metadata(
             changed.insert((*path).clone());
         }
     }
-    let style_global = changed
-        .iter()
-        .any(|path| path.ends_with(".css") && !path.ends_with(".module.css"));
+    let style_global = changed.iter().any(|path| path.ends_with(".css"));
     let mut affected_files = reverse_closure(&old_graph, &new_graph, &changed);
     if style_global {
-        // Theme and ordinary stylesheet cascade is global in schema v1. Module CSS stays scoped
-        // to its importers; other CSS invalidates every card rather than hiding a stale style.
+        // Theme extraction and the ordinary stylesheet cascade are global in schema v1.
+        // Any CSS edit therefore invalidates every card rather than hiding a stale style.
         affected_files.extend(new.files.iter().map(|file| file.path.clone()));
     }
     let mut affected_components: BTreeSet<String> = new
@@ -237,34 +306,25 @@ fn diff_model(
     scan_changed: &[String],
     parsed_files: &[String],
 ) -> (Value, bool) {
-    let files = diff_keyed(&entity_values(&old.files), &entity_values(&new.files), "path");
-    let screens = diff_keyed(
-        &entity_values(&old.screens),
-        &entity_values(&new.screens),
-        "id",
-    );
-    let components = diff_keyed(
-        &entity_values(&old.components),
-        &entity_values(&new.components),
-        "id",
-    );
-    let item_schemas = diff_keyed(
-        &entity_values(&old.item_schemas),
-        &entity_values(&new.item_schemas),
-        "id",
-    );
-    let tokens = diff_keyed(
-        &entity_values(&old.tokens),
-        &entity_values(&new.tokens),
-        "id",
-    );
-    let edges = diff_keyed(
-        &entity_values(&old.edges),
-        &entity_values(&new.edges),
-        "id",
-    );
     let (changed_files, affected_files, affected_components, affected_screens) =
         affected_metadata(old, new, scan_changed);
+    let files = diff_entities(&old.files, &new.files, |file| &file.path);
+    let screens = diff_entities(&old.screens, &new.screens, |screen| &screen.id);
+    let unchanged_components = new
+        .components
+        .iter()
+        .filter(|component| !affected_components.contains(&component.id))
+        .map(|component| component.id.clone())
+        .collect();
+    let components = diff_entities_except(
+        &old.components,
+        &new.components,
+        |component| &component.id,
+        &unchanged_components,
+    );
+    let item_schemas = diff_entities(&old.item_schemas, &new.item_schemas, |schema| &schema.id);
+    let tokens = diff_entities(&old.tokens, &new.tokens, |token| &token.id);
+    let edges = diff_entities(&old.edges, &new.edges, |edge| &edge.id);
     let mut patch = json!({
         "baseRevision":base_revision,
         "files":files,
@@ -299,10 +359,18 @@ fn diff_model(
 }
 
 fn patch_has_changes(patch: &Value) -> bool {
-    patch["screens"]["upsert"].as_array().is_some_and(|v| !v.is_empty())
-        || patch["screens"]["remove"].as_array().is_some_and(|v| !v.is_empty())
-        || patch["links"]["upsert"].as_array().is_some_and(|v| !v.is_empty())
-        || patch["links"]["remove"].as_array().is_some_and(|v| !v.is_empty())
+    patch["screens"]["upsert"]
+        .as_array()
+        .is_some_and(|v| !v.is_empty())
+        || patch["screens"]["remove"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
+        || patch["links"]["upsert"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
+        || patch["links"]["remove"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
         || patch.get("screenDiscovery").is_some()
 }
 
@@ -319,7 +387,7 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
             let name = name.to_string_lossy();
             if matches!(
                 name.as_ref(),
-                ".git" | "node_modules" | "target" | "dist" | "build" | ".next" | ".dui"
+                ".git" | "node_modules" | "target" | ".next" | ".dui"
             ) {
                 continue;
             }
@@ -330,12 +398,16 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
                 pending.push(path);
                 continue;
             }
-            if !kind.is_file()
-                || !matches!(
-                    path.extension().and_then(|ext| ext.to_str()),
-                    Some("ts" | "tsx" | "css")
-                )
-            {
+            let watched_extension = matches!(
+                path.extension().and_then(|ext| ext.to_str()),
+                Some("ts" | "tsx" | "css" | "html" | "woff" | "woff2" | "ttf" | "otf")
+            );
+            let root_resolution_config = path
+                .strip_prefix(root)
+                .ok()
+                .and_then(|relative| relative.to_str())
+                .is_some_and(|relative| matches!(relative, "tsconfig.json" | "jsconfig.json"));
+            if !kind.is_file() || !(watched_extension || root_resolution_config) {
                 continue;
             }
             let Ok(meta) = entry.metadata() else {
@@ -359,6 +431,17 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
     out
 }
 
+fn dependency_structure_changed(
+    before: &BTreeMap<String, (u64, u128)>,
+    after: &BTreeMap<String, (u64, u128)>,
+    changed: &[String],
+) -> bool {
+    changed.iter().any(|path| {
+        before.contains_key(path) != after.contains_key(path)
+            || matches!(path.as_str(), "tsconfig.json" | "jsconfig.json")
+    })
+}
+
 fn scan_changed(
     before: &BTreeMap<String, (u64, u128)>,
     after: &BTreeMap<String, (u64, u128)>,
@@ -368,7 +451,25 @@ fn scan_changed(
         .chain(after.keys())
         .filter(|path| before.get(*path) != after.get(*path))
         .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect()
+}
+
+fn hot_timing_enabled() -> bool {
+    std::env::var_os("DUI_HOT_TIMING").is_some()
+}
+
+fn hot_wall_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_millis())
+}
+
+fn log_hot_timing(value: Value) {
+    if hot_timing_enabled() {
+        eprintln!("{value}");
+    }
 }
 
 impl HotSession {
@@ -386,7 +487,7 @@ impl HotSession {
                 status_revision: 0,
                 watch_status: "starting",
                 reason: None,
-                model: archive_model.clone(),
+                model: Arc::new(archive_model.clone()),
                 nodes: archive_nodes,
                 edges: archive_edges,
                 discovery: archive_discovery,
@@ -394,15 +495,11 @@ impl HotSession {
                 graph_patch: None,
             }),
             changed: Condvar::new(),
+            client_active_until_ms: AtomicU64::new(0),
         });
         let thread_inner = Arc::clone(&inner);
         thread::spawn(move || {
-            watch_loop(
-                thread_inner,
-                project,
-                entry,
-                archive_model,
-            );
+            watch_loop(thread_inner, project, entry, archive_model);
         });
         Self { inner }
     }
@@ -416,20 +513,23 @@ impl HotSession {
         let Ok(mut guard) = self.inner.state.lock() else {
             return json!({"status":"error","reason":"watch-state-poisoned"});
         };
+        self.inner.client_active_until_ms.store(
+            now_millis() + CLIENT_ACTIVITY_GRACE.as_millis() as u64,
+            Ordering::Relaxed,
+        );
         if wait {
             let deadline = Instant::now() + LONG_POLL;
             loop {
                 let unchanged_revision = since.is_some_and(|revision| guard.revision == revision);
-                let unchanged_status = status_since
-                    .is_none_or(|revision| guard.status_revision == revision);
+                let unchanged_status =
+                    status_since.is_none_or(|revision| guard.status_revision == revision);
                 if !unchanged_revision || !unchanged_status {
                     break;
                 }
                 let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
                     break;
                 };
-                let Ok((next, timeout)) = self.inner.changed.wait_timeout(guard, remaining)
-                else {
+                let Ok((next, timeout)) = self.inner.changed.wait_timeout(guard, remaining) else {
                     return json!({"status":"error","reason":"watch-state-poisoned"});
                 };
                 guard = next;
@@ -456,7 +556,7 @@ impl HotSession {
         });
         if since.is_none() || stale_client {
             body["kind"] = json!("snapshot");
-            if let Ok(model) = serde_json::to_value(&guard.model) {
+            if let Ok(model) = serde_json::to_value(guard.model.as_ref()) {
                 body["model"] = model;
             }
             body["graph"] = json!({
@@ -491,7 +591,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
     let mut scan = scan_sources(&project);
     let mut previous = archive_model;
     loop {
-        match extract_incremental(&project, &entry, &mut cache) {
+        match extract_incremental_watched(&project, &entry, &mut cache, true) {
             Ok((model, stats)) => {
                 let changed_scan = Vec::new();
                 if model != previous {
@@ -519,7 +619,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.status_revision += 1;
                         state.watch_status = "ready";
                         state.reason = None;
-                        state.model = model.clone();
+                        state.model = Arc::new(model.clone());
                         state.nodes = nodes;
                         state.edges = edges;
                         state.discovery = discovery;
@@ -542,8 +642,8 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.reason = None;
                         // The archive may predate the watcher. The first extraction still publishes
                         // the current source as a patch relative to that immutable baseline.
-                        if state.revision == 0 && state.model != previous {
-                            state.model = previous.clone();
+                        if state.revision == 0 && state.model.as_ref() != &previous {
+                            state.model = Arc::new(previous.clone());
                         }
                     });
                 }
@@ -555,18 +655,37 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
             }),
         }
         loop {
-            thread::sleep(POLL_INTERVAL);
+            let active = inner.client_active_until_ms.load(Ordering::Relaxed) >= now_millis();
+            thread::sleep(if active {
+                ACTIVE_POLL_INTERVAL
+            } else {
+                IDLE_POLL_INTERVAL
+            });
+            let scan_started = Instant::now();
+            let scan_start_wall = hot_wall_ms();
             let next = scan_sources(&project);
+            let scan_ms = scan_started.elapsed().as_secs_f64() * 1000.0;
+            let scan_end_wall = hot_wall_ms();
             if next == scan {
                 continue;
             }
             let changed = scan_changed(&scan, &next);
+            let structure_changed = dependency_structure_changed(&scan, &next, &changed);
             scan = next;
-            match extract_incremental(&project, &entry, &mut cache) {
+            let extraction_started = Instant::now();
+            let extraction_start_wall = hot_wall_ms();
+            match extract_incremental_watched(&project, &entry, &mut cache, structure_changed) {
                 Ok((model, stats)) => {
-                    if model == previous {
+                    let extraction_ms = extraction_started.elapsed().as_secs_f64() * 1000.0;
+                    let extraction_end_wall = hot_wall_ms();
+                    let diff_started = Instant::now();
+                    let (patch, model_changed) =
+                        diff_model(&previous, &model, 0, &changed, &stats.parsed);
+                    let diff_ms = diff_started.elapsed().as_secs_f64() * 1000.0;
+                    if !model_changed {
                         continue;
                     }
+                    let projection_started = Instant::now();
                     let current_projection = tsx_map::project_model(&previous);
                     let projection = tsx_map::project_model(&model);
                     let graph_patch = diff_graph(
@@ -577,19 +696,14 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         &projection.edges,
                         &projection.discovery,
                     );
-                    let (patch, model_changed) = diff_model(
-                        &previous,
-                        &model,
-                        0,
-                        &changed,
-                        &stats.parsed,
-                    );
+                    let projection_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
+                    let publish_started = Instant::now();
                     publish_state(&inner, |state| {
                         state.revision += 1;
                         state.status_revision += 1;
                         state.watch_status = "ready";
                         state.reason = None;
-                        state.model = model.clone();
+                        state.model = Arc::new(model.clone());
                         state.nodes = projection.nodes;
                         state.edges = projection.edges;
                         state.discovery = projection.discovery;
@@ -600,6 +714,23 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         }
                         state.graph_patch = patch_has_changes(&graph_patch).then_some(graph_patch);
                     });
+                    let publish_ms = publish_started.elapsed().as_secs_f64() * 1000.0;
+                    log_hot_timing(json!({
+                        "kind":"hot-edit",
+                        "scanStartWallMs":scan_start_wall,
+                        "scanEndWallMs":scan_end_wall,
+                        "scanMs":scan_ms,
+                        "extractionStartWallMs":extraction_start_wall,
+                        "extractionEndWallMs":extraction_end_wall,
+                        "extractionMs":extraction_ms,
+                        "diffMs":diff_ms,
+                        "projectionMs":projection_ms,
+                        "publishMs":publish_ms,
+                        "publishWallMs":hot_wall_ms(),
+                        "changedFiles":changed,
+                        "parsedFiles":stats.parsed,
+                        "reusedFiles":stats.reused.len(),
+                    }));
                     previous = model;
                 }
                 Err(reason) => publish_state(&inner, |state| {
@@ -609,5 +740,164 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                 }),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dui_core::source_model::{
+        Component, Extractor, Language, Location, Placeholder, SourceFile,
+    };
+
+    fn location(file: &str) -> Location {
+        Location {
+            file: file.into(),
+            line: 1,
+            column: 1,
+            start: 0,
+            end: 1,
+        }
+    }
+
+    fn source_file(path: &str, sha256: &str, imports: &[&str]) -> SourceFile {
+        SourceFile {
+            path: path.into(),
+            language: if path.ends_with(".css") {
+                Language::Css
+            } else {
+                Language::Typescript
+            },
+            sha256: sha256.into(),
+            imports: imports.iter().map(|import| (*import).to_owned()).collect(),
+        }
+    }
+
+    fn component(id: &str, file: &str, text: &str) -> Component {
+        Component {
+            id: id.into(),
+            name: id.rsplit('#').next().unwrap_or(id).into(),
+            location: location(file),
+            slots: vec![],
+            root: Node::Placeholder(Placeholder {
+                id: format!("{id}@0"),
+                reason: text.into(),
+                location: location(file),
+            }),
+        }
+    }
+
+    fn model(files: Vec<SourceFile>, components: Vec<Component>) -> SourceModel {
+        SourceModel {
+            schema_version: dui_core::source_model::SCHEMA_VERSION,
+            extractor: Extractor {
+                name: "test".into(),
+                version: "0".into(),
+            },
+            files,
+            screens: vec![],
+            components,
+            document_style: None,
+            item_schemas: vec![],
+            tokens: vec![],
+            edges: vec![],
+            diagnostics: vec![],
+        }
+    }
+
+    fn upsert_ids(patch: &Value, entity: &str) -> BTreeSet<String> {
+        patch[entity]["upsert"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|value| value["id"].as_str().map(str::to_owned))
+            .collect()
+    }
+
+    #[test]
+    fn scan_changed_reports_each_changed_path_once() {
+        let before = BTreeMap::from([("src/a.tsx".to_owned(), (10, 20))]);
+        let after = BTreeMap::from([("src/a.tsx".to_owned(), (10, 21))]);
+        assert_eq!(scan_changed(&before, &after), vec!["src/a.tsx"]);
+    }
+
+    #[test]
+    fn identical_models_produce_an_empty_patch() {
+        let model = model(
+            vec![source_file("src/a.tsx", "same", &[])],
+            vec![component("src/a.tsx#A", "src/a.tsx", "same")],
+        );
+        let (patch, changed) = diff_model(&model, &model, 0, &[], &[]);
+        assert!(!changed);
+        for entity in [
+            "files",
+            "screens",
+            "components",
+            "itemSchemas",
+            "tokens",
+            "edges",
+        ] {
+            assert_eq!(patch[entity]["upsert"], json!([]), "{entity} upsert");
+            assert_eq!(patch[entity]["remove"], json!([]), "{entity} remove");
+        }
+    }
+
+    #[test]
+    fn scan_sources_includes_document_and_font_assets() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path();
+        std::fs::create_dir_all(root.join("src/assets")).expect("mkdir");
+        std::fs::write(root.join("src/app.tsx"), "export default function App() {}").expect("tsx");
+        std::fs::write(root.join("src/assets/font.woff2"), b"wOF2test").expect("font");
+        std::fs::write(root.join("index.html"), "<html></html>").expect("html");
+        let scan = scan_sources(root);
+        assert!(scan.contains_key("src/app.tsx"));
+        assert!(scan.contains_key("src/assets/font.woff2"));
+        assert!(scan.contains_key("index.html"));
+    }
+
+    #[test]
+    fn dependency_edits_mark_dependents_without_marking_unrelated_files() {
+        let old = model(
+            vec![
+                source_file("src/app.tsx", "app", &["src/child.tsx"]),
+                source_file("src/child.tsx", "child-before", &[]),
+                source_file("src/other.tsx", "other", &[]),
+            ],
+            vec![
+                component("src/app.tsx#App", "src/app.tsx", "before app"),
+                component("src/child.tsx#Child", "src/child.tsx", "before child"),
+                component("src/other.tsx#Other", "src/other.tsx", "same other"),
+            ],
+        );
+        let mut new = old.clone();
+        new.files[1].sha256 = "child-after".into();
+        new.components[0].root = Node::Placeholder(Placeholder {
+            id: "src/app.tsx#App@0".into(),
+            reason: "after app".into(),
+            location: location("src/app.tsx"),
+        });
+        new.components[1].root = Node::Placeholder(Placeholder {
+            id: "src/child.tsx#Child@0".into(),
+            reason: "after child".into(),
+            location: location("src/child.tsx"),
+        });
+        let (patch, changed) = diff_model(&old, &new, 0, &["src/child.tsx".into()], &[]);
+        assert!(changed);
+        assert_eq!(
+            patch["affectedFiles"],
+            json!(["src/app.tsx", "src/child.tsx"])
+        );
+        assert_eq!(
+            patch["affectedComponents"],
+            json!(["src/app.tsx#App", "src/child.tsx#Child"])
+        );
+        assert_eq!(
+            upsert_ids(&patch, "components"),
+            BTreeSet::from([
+                "src/app.tsx#App".to_owned(),
+                "src/child.tsx#Child".to_owned()
+            ])
+        );
     }
 }

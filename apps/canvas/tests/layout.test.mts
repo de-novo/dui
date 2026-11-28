@@ -84,10 +84,27 @@ test("nodeMetrics sizes map cards 1:1 with capture width and spaces columns with
 
   const plan = layoutMap(archive, 1280, "overview");
   assert.equal(plan.metrics.cardWidth, 1280);
+  assert.equal(plan.metrics.contentWidth, 1280);
   const xs = [...new Set(plan.nodes.map((n) => n.position.x))].sort((a, b) => a - b);
   for (let i = 1; i < xs.length; i += 1) {
     assert.ok(xs[i]! - xs[i - 1]! >= desktop.cardWidth, "columns must not overlap at 1:1 width");
   }
+});
+
+test("expanded source-model metrics reserve card chrome outside the logical viewport", () => {
+  const mobile = nodeMetrics(390, true);
+  assert.equal(mobile.contentWidth, 390);
+  assert.equal(mobile.cardWidth, 400);
+  assert.equal(mobile.frameHeight, 624);
+
+  const desktop = nodeMetrics(1440, true);
+  assert.equal(desktop.contentWidth, 1440);
+  assert.equal(desktop.cardWidth, 1466);
+  assert.equal(desktop.frameHeight, 900);
+
+  const boundary = nodeMetrics(790, true);
+  assert.equal(boundary.cardWidth, 800);
+  assert.equal(boundary.contentWidth, 790);
 });
 
 test("layoutMap sizes tall full-page captures to their real aspect ratio without vertical overlap", () => {

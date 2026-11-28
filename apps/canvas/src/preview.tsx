@@ -139,6 +139,7 @@ function MapView({
     screen: selectedId,
     state,
     width,
+    height,
     widths,
     locale,
     locales,
@@ -377,6 +378,7 @@ function MapView({
             liveRun={run.responsiveAvailable ? run.key : undefined}
             sourceModel={sourceModel}
             modelRenderer={modelRenderer}
+            viewportHeight={height ?? undefined}
           />
         ) : (
           <div ref={overviewLayer} className="overview-layer">
@@ -418,6 +420,7 @@ function MapView({
                     liveRun={run.responsiveAvailable ? run.key : undefined}
                     sourceModel={sourceModel}
                     modelRenderer={modelRenderer}
+                    modelHeight={height ?? undefined}
                     selectedId={selectedId}
                     focusActive={showDetails}
                     openCommentsByPath={commentsByPath}
