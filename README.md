@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md) | [한국어](README.ko.md)
 
 dui captures a running web or GPUI app across UI states and viewport widths. It reads the app’s official compiler types, generates mock responses, and checks what was actually rendered. Browse the screen map, live sessions, and diffs in the embedded web viewer (`dui open`) or consume the same results as JSON through the CLI or MCP.
 
-**Goal.** dui aims to let product planners, designers and QA reviewers see the screen a user will see and see it update as soon as the code changes. Reviewing the shipping code directly shortens the handoff from design through implementation to QA and gives teams faster feedback on AI-generated changes.
+**Goal.** dui aims to let product planners, designers and QA reviewers see the screen a user will see and see it update as soon as the code changes. Reviewing the shipping code directly shortens the handoff from design through implementation to QA and gives teams faster feedback on AI-generated changes. The engine targets accurate primitive rendering. The fixed web inventory diagnoses changes to the shared engine.
 
 [Product roadmap](docs/en/roadmap.md) · [Changelog](CHANGELOG.md) · [Analysis and rendering support](docs/en/supported-frameworks.md)
 
