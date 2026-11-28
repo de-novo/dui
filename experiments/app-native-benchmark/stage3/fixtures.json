@@ -1,0 +1,586 @@
+{
+  "version": 1,
+  "states": [
+    "populated",
+    "loading",
+    "empty",
+    "error"
+  ],
+  "targets": {
+    "calcom": {
+      "entry": "modules/event-types/views/event-types-listing-view.tsx",
+      "component": "EventTypesPage",
+      "assertions": {
+        "populated": [
+          "Benchmark Intro",
+          "Benchmark Deep Dive"
+        ],
+        "empty": [],
+        "loading": [],
+        "error": []
+      },
+      "slots": {
+        "populated": {
+          "userEventGroupsData": {
+            "eventTypeGroups": [
+              {
+                "id": 1,
+                "teamId": null,
+                "parentId": null,
+                "bookerUrl": "https://booker.example.test",
+                "metadata": {
+                  "readOnly": false
+                },
+                "profile": {
+                  "slug": "bench-user",
+                  "name": "Bench User"
+                },
+                "eventTypes": [
+                  {
+                    "id": 101,
+                    "title": "Benchmark Intro",
+                    "slug": "benchmark-intro",
+                    "length": 30,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic intro",
+                    "eventTypeColor": null
+                  },
+                  {
+                    "id": 102,
+                    "title": "Benchmark Deep Dive",
+                    "slug": "benchmark-deep-dive",
+                    "length": 60,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic deep dive",
+                    "eventTypeColor": null
+                  }
+                ]
+              }
+            ]
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteScrollMain.activeEventTypeGroup": [
+            {
+              "id": 1,
+              "teamId": null,
+              "parentId": null,
+              "bookerUrl": "https://booker.example.test",
+              "metadata": {
+                "readOnly": false
+              },
+              "profile": {
+                "slug": "bench-user",
+                "name": "Bench User"
+              },
+              "eventTypes": [
+                {
+                  "id": 101,
+                  "title": "Benchmark Intro",
+                  "slug": "benchmark-intro",
+                  "length": 30,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic intro",
+                  "eventTypeColor": null
+                },
+                {
+                  "id": 102,
+                  "title": "Benchmark Deep Dive",
+                  "slug": "benchmark-deep-dive",
+                  "length": 60,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic deep dive",
+                  "eventTypeColor": null
+                }
+              ]
+            }
+          ],
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": {
+              "pages": [
+                {
+                  "eventTypes": [
+                    {
+                      "id": 101,
+                      "title": "Benchmark Intro",
+                      "slug": "benchmark-intro",
+                      "length": 30,
+                      "hidden": false,
+                      "schedulingType": null,
+                      "safeDescription": "Synthetic intro",
+                      "eventTypeColor": null
+                    },
+                    {
+                      "id": 102,
+                      "title": "Benchmark Deep Dive",
+                      "slug": "benchmark-deep-dive",
+                      "length": 60,
+                      "hidden": false,
+                      "schedulingType": null,
+                      "safeDescription": "Synthetic deep dive",
+                      "eventTypeColor": null
+                    }
+                  ],
+                  "nextCursor": null
+                }
+              ],
+              "pageParams": [
+                null
+              ]
+            },
+            "isPending": false,
+            "isError": false,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
+          }
+        },
+        "loading": {
+          "userEventGroupsData": {
+            "eventTypeGroups": [
+              {
+                "id": 1,
+                "teamId": null,
+                "parentId": null,
+                "bookerUrl": "https://booker.example.test",
+                "metadata": {
+                  "readOnly": false
+                },
+                "profile": {
+                  "slug": "bench-user",
+                  "name": "Bench User"
+                },
+                "eventTypes": [
+                  {
+                    "id": 101,
+                    "title": "Benchmark Intro",
+                    "slug": "benchmark-intro",
+                    "length": 30,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic intro",
+                    "eventTypeColor": null
+                  },
+                  {
+                    "id": 102,
+                    "title": "Benchmark Deep Dive",
+                    "slug": "benchmark-deep-dive",
+                    "length": 60,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic deep dive",
+                    "eventTypeColor": null
+                  }
+                ]
+              }
+            ]
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteScrollMain.activeEventTypeGroup": [
+            {
+              "id": 1,
+              "teamId": null,
+              "parentId": null,
+              "bookerUrl": "https://booker.example.test",
+              "metadata": {
+                "readOnly": false
+              },
+              "profile": {
+                "slug": "bench-user",
+                "name": "Bench User"
+              },
+              "eventTypes": [
+                {
+                  "id": 101,
+                  "title": "Benchmark Intro",
+                  "slug": "benchmark-intro",
+                  "length": 30,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic intro",
+                  "eventTypeColor": null
+                },
+                {
+                  "id": 102,
+                  "title": "Benchmark Deep Dive",
+                  "slug": "benchmark-deep-dive",
+                  "length": 60,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic deep dive",
+                  "eventTypeColor": null
+                }
+              ]
+            }
+          ],
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": null,
+            "isPending": true,
+            "isError": false,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
+          }
+        },
+        "empty": {
+          "userEventGroupsData": {
+            "eventTypeGroups": []
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": {
+              "pages": [
+                {
+                  "eventTypes": [],
+                  "nextCursor": null
+                }
+              ],
+              "pageParams": [
+                null
+              ]
+            },
+            "isPending": false,
+            "isError": false,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
+          }
+        },
+        "error": {
+          "userEventGroupsData": {
+            "eventTypeGroups": [
+              {
+                "id": 1,
+                "teamId": null,
+                "parentId": null,
+                "bookerUrl": "https://booker.example.test",
+                "metadata": {
+                  "readOnly": false
+                },
+                "profile": {
+                  "slug": "bench-user",
+                  "name": "Bench User"
+                },
+                "eventTypes": [
+                  {
+                    "id": 101,
+                    "title": "Benchmark Intro",
+                    "slug": "benchmark-intro",
+                    "length": 30,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic intro",
+                    "eventTypeColor": null
+                  },
+                  {
+                    "id": 102,
+                    "title": "Benchmark Deep Dive",
+                    "slug": "benchmark-deep-dive",
+                    "length": 60,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic deep dive",
+                    "eventTypeColor": null
+                  }
+                ]
+              }
+            ]
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          },
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteScrollMain.activeEventTypeGroup": [
+            {
+              "id": 1,
+              "teamId": null,
+              "parentId": null,
+              "bookerUrl": "https://booker.example.test",
+              "metadata": {
+                "readOnly": false
+              },
+              "profile": {
+                "slug": "bench-user",
+                "name": "Bench User"
+              },
+              "eventTypes": [
+                {
+                  "id": 101,
+                  "title": "Benchmark Intro",
+                  "slug": "benchmark-intro",
+                  "length": 30,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic intro",
+                  "eventTypeColor": null
+                },
+                {
+                  "id": 102,
+                  "title": "Benchmark Deep Dive",
+                  "slug": "benchmark-deep-dive",
+                  "length": 60,
+                  "hidden": false,
+                  "schedulingType": null,
+                  "safeDescription": "Synthetic deep dive",
+                  "eventTypeColor": null
+                }
+              ]
+            }
+          ],
+          "modules/event-types/views/event-types-listing-view.tsx#InfiniteTeamsTab.query": {
+            "data": null,
+            "isPending": false,
+            "isError": true,
+            "hasNextPage": false,
+            "isFetchingNextPage": false
+          }
+        }
+      },
+      "pixelEvidence": {
+        "error": "negative-only: HTTP 500 and absence of list/empty sentinel; no positive error sentinel in source"
+      }
+    },
+    "plane": {
+      "entry": "app/(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/issues/(list)/page.tsx",
+      "component": "ProjectIssuesPage",
+      "builtCss": "build/client/assets/root-CzK3JmXp.css",
+      "assertions": {
+        "populated": [
+          "Benchmark issue one",
+          "Benchmark issue two"
+        ],
+        "empty": [],
+        "loading": [],
+        "error": []
+      },
+      "slots": {
+        "populated": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": {
+            "displayFilters": {
+              "layout": "list"
+            },
+            "richFilters": {}
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.issueMap": {
+            "issue-benchmark-1": {
+              "id": "issue-benchmark-1",
+              "name": "Benchmark issue one",
+              "project_id": "project-benchmark",
+              "sequence_id": 1,
+              "created_at": "2026-01-01T00:00:00.000Z",
+              "updated_at": "2026-01-01T00:00:00.000Z",
+              "sub_issues_count": 0,
+              "is_draft": false,
+              "archived_at": null
+            },
+            "issue-benchmark-2": {
+              "id": "issue-benchmark-2",
+              "name": "Benchmark issue two",
+              "project_id": "project-benchmark",
+              "sequence_id": 2,
+              "created_at": "2026-01-01T00:00:00.000Z",
+              "updated_at": "2026-01-01T00:00:00.000Z",
+              "sub_issues_count": 0,
+              "is_draft": false,
+              "archived_at": null
+            }
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.groupedIssueIds": {
+            "All Issues": [
+              "issue-benchmark-1",
+              "issue-benchmark-2"
+            ]
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.displayFilters": {
+            "layout": "list"
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.displayProperties": {
+            "key": true,
+            "issue_type": false
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.group_by": null,
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.orderBy": "sort_order",
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.showEmptyGroup": true,
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.collapsedGroups": [],
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.isEditingAllowed": true,
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.canEditProperties": true,
+          "components/issues/issue-layouts/list/default.tsx#List.groups": [
+            {
+              "id": "All Issues",
+              "name": "All work items",
+              "payload": {}
+            }
+          ],
+          "components/issues/issue-layouts/list/default.tsx#List.groupIds": [
+            "All Issues"
+          ],
+          "components/issues/issue-layouts/list/default.tsx#List.is_list": true,
+          "components/issues/issue-layouts/list/list-group.tsx#ListGroup.isExpanded": true,
+          "components/issues/issue-layouts/list/list-group.tsx#ListGroup.shouldExpand": true,
+          "components/issues/issue-layouts/list/list-group.tsx#ListGroup.groupIssueCount": 2,
+          "components/core/render-if-visible-HOC.tsx#RenderIfVisible.isVisible": true,
+          "components/work-item-filters/filters-hoc/base.tsx#WorkItemFilterRoot.workItemLayoutFilter": {
+            "layout": "list",
+            "filters": {}
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/list/roots/project-root.tsx#ListLayout.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.projectId": "project-benchmark",
+          "components/rich-filters/transition-components.tsx#CssTransition.phase": "entered",
+          "components/issues/bulk-operations/root.tsx#IssueBulkOperationsRoot.isSelectionActive": false,
+          "components/issues/bulk-operations/root.tsx#IssueBulkOperationsRoot.selectionHelpers": {
+            "isSelectionDisabled": false
+          }
+        },
+        "loading": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": null,
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": []
+        },
+        "empty": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": {
+            "displayFilters": {
+              "layout": "list"
+            },
+            "richFilters": {}
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": []
+        },
+        "error": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": {
+            "displayFilters": {
+              "layout": "list"
+            },
+            "richFilters": {}
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": []
+        }
+      },
+      "expressions": {
+        "populated": {
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "issue?.tempId !== undefined": false,
+          "issues?.getIssueLoader() === \"init-loader\" || issueCount === undefined": false,
+          "issues.getGroupIssueCount(undefined, undefined, false) === 0 && layout !== EIssueLayoutTypes.CALENDAR": false,
+          "validateEmptyIssueGroups(groupIssueCount)": true,
+          "issues?.getIssueLoader()": false,
+          "this.state.hasError": false
+        },
+        "loading": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": false,
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
+        },
+        "empty": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": true,
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
+        },
+        "error": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": true,
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
+        }
+      },
+      "sourceTraces": [
+        {
+          "id": "plane-grouped-entities-before-list-return",
+          "file": "components/issues/issue-layouts/list/default.tsx",
+          "inOrder": [
+            "const groupIds = groups.map",
+            "let entities: Record<string, string[]> = {}",
+            "if (is_list)",
+            "entities = Object.assign(orderedGroups, { [groupIds[0]]: groupedIssueIds[ALL_ISSUES] ?? [] })",
+            "return (",
+            "entities={entities}",
+            "groups.map((group: IGroupByColumn)"
+          ]
+        },
+        {
+          "id": "plane-issue-ids-to-row-title",
+          "file": "components/issues/issue-layouts/list/blocks-list.tsx",
+          "inOrder": [
+            "issueIds.map((issueId: string, index: number)",
+            "issueId={issueId}",
+            "issuesMap={issuesMap}"
+          ]
+        },
+        {
+          "id": "plane-row-issue-name",
+          "file": "components/issues/issue-layouts/list/block.tsx",
+          "inOrder": [
+            "const issue = issuesMap[issueId]",
+            "{issue.name}"
+          ]
+        }
+      ]
+    }
+  }
+}

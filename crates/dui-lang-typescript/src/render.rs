@@ -12,6 +12,7 @@ pub struct Context<'a> {
     pub file: &'a File,
     pub files: &'a Files,
     pub slots: &'a [m::Slot],
+    pub props_object: Option<&'a str>,
     pub class_render: bool,
     pub signatures: &'a BTreeMap<String, Vec<m::Slot>>,
     pub modules: style::modules::Bindings<'a>,
@@ -19,6 +20,7 @@ pub struct Context<'a> {
     pub built: Option<&'a style::built::Sheet<'a>>,
     pub sources: &'a [style::built::Sheet<'a>],
     pub items: Vec<(String, String)>,
+    pub bindings: Vec<std::collections::BTreeSet<String>>,
     pub constants: BTreeMap<String, serde_json::Value>,
     pub model: &'a mut m::SourceModel,
 }
@@ -33,7 +35,7 @@ fn tag(n: Ast<'_>) -> Ast<'_> {
     field(n, "open_tag").unwrap_or(n)
 }
 
-fn object_key(file: &File, key: Ast<'_>) -> Option<String> {
+pub(crate) fn object_key(file: &File, key: Ast<'_>) -> Option<String> {
     let raw = file.text(key);
     match key.kind() {
         "property_identifier" | "private_property_identifier" | "number" => Some(raw.into()),
@@ -127,52 +129,423 @@ fn plus_json(left: serde_json::Value, right: serde_json::Value) -> Option<serde_
     }
     Some((left.as_f64()? + right.as_f64()?).into())
 }
+fn object_pair<'a>(file: &File, object: Ast<'a>, key: &str) -> Option<Ast<'a>> {
+    pair_entries(file, object)
+        .into_iter()
+        .find_map(|(name, value)| (name == key).then_some(value))
+}
+
+fn pair_entries<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
+    children(object)
+        .into_iter()
+        .filter(|node| node.kind() == "pair")
+        .filter_map(|node| {
+            Some((
+                object_key(file, field(node, "key")?)?,
+                field(node, "value")?,
+            ))
+        })
+        .collect()
+}
+
+fn object_entries<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
+    children(object)
+        .into_iter()
+        .filter_map(|node| {
+            if node.kind() == "pair" {
+                Some((
+                    object_key(file, field(node, "key")?)?,
+                    field(node, "value")?,
+                ))
+            } else if node.kind() == "shorthand_property_identifier" {
+                Some((file.text(node).to_owned(), node))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn find_declarator<'a>(file: &File, root: Ast<'a>, name: &str) -> Option<Ast<'a>> {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        if node.kind() == "variable_declarator"
+            && field(node, "name").is_some_and(|n| file.text(n) == name)
+        {
+            return Some(node);
+        }
+        pending.extend(children(node));
+    }
+    None
+}
+
+type VariantConfig = (
+    String,
+    Vec<(String, Vec<(String, String)>)>,
+    BTreeMap<String, String>,
+);
+
+fn cva_config(file: &File, local: &str) -> Option<VariantConfig> {
+    if file.bindings.get(local).is_some() {
+        return None;
+    }
+    let factory = find_declarator(file, file.tree.root_node(), local)
+        .and_then(|node| field(node, "value"))
+        .map(unwrap_expr)
+        .filter(|value| value.kind() == "call_expression")?;
+    let arguments = field(factory, "arguments")?;
+    let base = first(arguments)
+        .and_then(|v| literal(file, v))
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default();
+    let config = children(arguments)
+        .get(1)
+        .copied()
+        .filter(|v| v.kind() == "object")?;
+    let variants_node = object_pair(file, config, "variants").filter(|v| v.kind() == "object")?;
+    let mut variants = Vec::new();
+    for (group, choices_node) in pair_entries(file, variants_node) {
+        if choices_node.kind() != "object" {
+            continue;
+        }
+        let mut choices = Vec::new();
+        for (choice, value) in pair_entries(file, choices_node) {
+            if let Some(classes) = literal(file, value).and_then(|v| v.as_str().map(str::to_owned))
+            {
+                choices.push((choice, classes));
+            }
+        }
+        variants.push((group, choices));
+    }
+    let mut defaults = BTreeMap::new();
+    if let Some(node) =
+        object_pair(file, config, "defaultVariants").filter(|v| v.kind() == "object")
+    {
+        for (group, value) in pair_entries(file, node) {
+            if let Some(choice) = literal(file, value).and_then(|v| v.as_str().map(str::to_owned)) {
+                defaults.insert(group, choice);
+            }
+        }
+    }
+    Some((base, variants, defaults))
+}
+
+fn join_classes(parts: impl IntoIterator<Item = String>) -> String {
+    parts
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Add a variant equality to a stylesheet condition. Width, color-scheme and interaction
+/// constraints survive; a second expression cannot be represented as a conjunction in schema v1.
+fn variant_condition(
+    base: Option<&m::Condition>,
+    on: &m::Expr,
+    choice: &str,
+) -> Option<m::Condition> {
+    let mut condition = base.cloned().unwrap_or(m::Condition {
+        min_width: None,
+        max_width: None,
+        interaction: None,
+        color_scheme: None,
+        expr: None,
+        equals: None,
+    });
+    if condition.expr.is_some() || condition.equals.is_some() {
+        return None;
+    }
+    condition.expr = Some(on.clone());
+    condition.equals = Some(choice.into());
+    Some(condition)
+}
+
+/// cva's defaultVariants are runtime defaults of the props read by the call. Preserve
+/// them as prop defaults so an omitted caller prop and an explicit default value draw alike.
+pub(crate) fn apply_variant_defaults(file: &File, root: Ast<'_>, slots: &mut [m::Slot]) {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        pending.extend(children(node));
+        if node.kind() != "call_expression" {
+            continue;
+        }
+        let Some(function) = field(node, "function").filter(|f| f.kind() == "identifier") else {
+            continue;
+        };
+        let local = file.text(function);
+        let Some((_, _, defaults)) = cva_config(file, local) else {
+            continue;
+        };
+        let Some(options) = field(node, "arguments")
+            .and_then(first)
+            .filter(|v| v.kind() == "object")
+        else {
+            continue;
+        };
+        for (group, value) in object_entries(file, options) {
+            let Some(choice) = defaults.get(&group) else {
+                continue;
+            };
+            let value = unwrap_expr(value);
+            if !matches!(value.kind(), "identifier" | "shorthand_property_identifier") {
+                continue;
+            }
+            let name = file.text(value);
+            if let Some(slot) = slots
+                .iter_mut()
+                .find(|slot| slot.name == name && slot.initial.is_none())
+            {
+                slot.initial = Some(m::Expr::Literal {
+                    value: choice.clone().into(),
+                });
+            }
+        }
+    }
+}
+
+struct VariantClasses {
+    base: String,
+    on: m::Expr,
+    cases: Vec<(String, String)>,
+}
+
+fn push_direct_reads(expr: &m::Expr, reads: &mut Vec<m::Expr>) {
+    match expr {
+        m::Expr::Slot { .. } | m::Expr::Item { .. } | m::Expr::Binding { .. } => {
+            if !reads.contains(expr) {
+                reads.push(expr.clone());
+            }
+        }
+        m::Expr::Index { object, key } => {
+            push_direct_reads(object, reads);
+            push_direct_reads(key, reads);
+        }
+        m::Expr::Object { properties } => {
+            for value in properties.values() {
+                push_direct_reads(value, reads);
+            }
+        }
+        m::Expr::Unary { value, .. } => push_direct_reads(value, reads),
+        m::Expr::Binary { left, right, .. } => {
+            push_direct_reads(left, reads);
+            push_direct_reads(right, reads);
+        }
+        m::Expr::Literal { .. } | m::Expr::Opaque { .. } => {}
+    }
+}
+
 impl Context<'_> {
     fn component(&self, name: &str) -> Option<String> {
         let (file, export) = symbol(self.files, self.file, name)?;
         let id = format!("{}#{export}", file.path);
         self.signatures.contains_key(&id).then_some(id)
     }
-    fn binding(&self, mut n: Ast<'_>) -> Option<m::Expr> {
-        let mut path = Vec::new();
-        while n.kind() == "member_expression" {
-            path.push(self.file.name(n, "property")?.into());
+    fn variant_classes(&self, node: Ast<'_>) -> Option<VariantClasses> {
+        let mut pending = vec![unwrap_expr(node)];
+        let mut invocation = None;
+        while let Some(current) = pending.pop() {
+            if current.kind() == "call_expression"
+                && field(current, "function").is_some_and(|f| {
+                    f.kind() == "identifier" && cva_config(self.file, self.file.text(f)).is_some()
+                })
+            {
+                invocation = Some(current);
+                break;
+            }
+            pending.extend(children(current));
+        }
+        let invocation = invocation?;
+        let local = field(invocation, "function").map(|f| self.file.text(f))?;
+        let (base, variants, defaults) = cva_config(self.file, local)?;
+        let options = field(invocation, "arguments")
+            .and_then(first)
+            .filter(|v| v.kind() == "object");
+        let mut selected: BTreeMap<String, String> = BTreeMap::new();
+        let mut dynamic: Vec<(String, m::Expr)> = Vec::new();
+        for (group, _) in &variants {
+            let supplied = options.and_then(|object| {
+                object_entries(self.file, object)
+                    .into_iter()
+                    .find(|(key, _)| key == group)
+                    .map(|(_, value)| value)
+            });
+            let supplied_expr = supplied.and_then(|value| {
+                let value = unwrap_expr(value);
+                self.binding(value).and_then(|expr| match &expr {
+                    m::Expr::Slot { path, .. } if path.is_empty() => Some(expr),
+                    _ => None,
+                })
+            });
+            if let Some(expr) = supplied_expr {
+                dynamic.push((group.clone(), expr));
+                continue;
+            }
+            let choice = supplied
+                .and_then(|value| literal(self.file, unwrap_expr(value)))
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .or_else(|| defaults.get(group).cloned());
+            if let Some(choice) = choice {
+                selected.insert(group.clone(), choice.clone());
+            }
+        }
+        let (dynamic_group, on) = dynamic.first()?;
+        for (group, _) in dynamic.iter().skip(1) {
+            if let Some(choice) = defaults.get(group) {
+                selected.insert(group.clone(), choice.clone());
+            }
+        }
+        let dynamic_group = dynamic_group.clone();
+        let choices = variants
+            .iter()
+            .find(|(group, _)| group == &dynamic_group)?
+            .1
+            .clone();
+        let mut cases = Vec::new();
+        for (choice, classes) in choices {
+            let mut parts = vec![base.clone()];
+            for (group, group_choices) in &variants {
+                if group == &dynamic_group {
+                    parts.push(classes.clone());
+                } else if let Some(wanted) = selected.get(group) {
+                    parts.push(
+                        group_choices
+                            .iter()
+                            .find(|(choice, _)| choice == wanted)
+                            .map(|(_, classes)| classes.clone())
+                            .unwrap_or_default(),
+                    );
+                }
+            }
+            cases.push((choice, join_classes(parts)));
+        }
+        Some(VariantClasses {
+            base,
+            on: on.clone(),
+            cases,
+        })
+    }
+
+    fn append_static_key(expr: m::Expr, key: String) -> m::Expr {
+        match expr {
+            m::Expr::Slot { slot, mut path } => {
+                path.push(key);
+                m::Expr::Slot { slot, path }
+            }
+            m::Expr::Item { list, mut path } => {
+                path.push(key);
+                m::Expr::Item { list, path }
+            }
+            m::Expr::Binding { name, mut path } => {
+                path.push(key);
+                m::Expr::Binding { name, path }
+            }
+            object => m::Expr::Index {
+                object: Box::new(object),
+                key: Box::new(m::Expr::Literal { value: key.into() }),
+            },
+        }
+    }
+
+    fn binding(&self, n: Ast<'_>) -> Option<m::Expr> {
+        self.binding_at(n, 0)
+    }
+
+    /// Lower a bounded member/subscript chain. Static properties remain field paths on direct
+    /// reads; computed keys become explicit indexed expressions. Unsupported or deeply nested
+    /// chains return `None` so the caller records opaque source instead of guessing a value.
+    fn binding_at(&self, mut n: Ast<'_>, depth: usize) -> Option<m::Expr> {
+        const EXPRESSION_DEPTH_LIMIT: usize = 24;
+        if depth >= EXPRESSION_DEPTH_LIMIT {
+            return None;
+        }
+        enum Segment<'a> {
+            Static(String),
+            Key(Ast<'a>),
+        }
+        let mut segments = Vec::new();
+        while matches!(n.kind(), "member_expression" | "subscript_expression") {
+            if segments.len() >= EXPRESSION_DEPTH_LIMIT {
+                return None;
+            }
+            if n.kind() == "member_expression" {
+                segments.push(Segment::Static(self.file.name(n, "property")?.into()));
+            } else {
+                let index = field(n, "index")?;
+                let static_key = literal(self.file, index).and_then(|value| match value {
+                    serde_json::Value::String(value) => Some(value),
+                    serde_json::Value::Number(value) => Some(value.to_string()),
+                    _ => None,
+                });
+                if let Some(key) = static_key {
+                    segments.push(Segment::Static(key));
+                } else {
+                    segments.push(Segment::Key(index));
+                }
+            }
             n = field(n, "object")?;
         }
-        if self.class_render && n.kind() == "this" {
-            path.reverse();
-            if let [props, name, rest @ ..] = path.as_slice()
-                && props == "props"
-                && let Some(slot) = self.slots.iter().find(|s| &s.name == name)
-            {
-                return Some(m::Expr::Slot {
-                    slot: slot.id.clone(),
-                    path: rest.to_vec(),
-                });
+        segments.reverse();
+        let mut expr = if self.class_render && n.kind() == "this" {
+            if !matches!(segments.first(), Some(Segment::Static(props)) if props == "props") {
+                return None;
             }
-            return None;
-        }
-        if n.kind() != "identifier" {
-            return None;
-        }
-        path.reverse();
-        let name = self.file.text(n);
-        if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
-            Some(m::Expr::Item {
-                list: list.clone(),
-                path,
-            })
-        } else if self.class_render {
-            None
+            let Some(Segment::Static(name)) = segments.get(1) else {
+                return None;
+            };
+            let slot = self.slots.iter().find(|s| &s.name == name)?;
+            segments.drain(..2);
+            m::Expr::Slot {
+                slot: slot.id.clone(),
+                path: vec![],
+            }
+        } else if matches!(n.kind(), "identifier" | "shorthand_property_identifier") {
+            let name = self.file.text(n);
+            if Some(name) == self.props_object {
+                let Some(Segment::Static(first)) = segments.first() else {
+                    return None;
+                };
+                let slot = self.slots.iter().find(|s| &s.name == first)?;
+                segments.drain(..1);
+                m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: vec![],
+                }
+            } else if self.bindings.iter().rev().any(|scope| scope.contains(name)) {
+                m::Expr::Binding {
+                    name: name.into(),
+                    path: vec![],
+                }
+            } else if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
+                m::Expr::Item {
+                    list: list.clone(),
+                    path: vec![],
+                }
+            } else if self.class_render {
+                return None;
+            } else {
+                let slot = self.slots.iter().find(|s| s.name == name)?;
+                m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: vec![],
+                }
+            }
         } else {
-            self.slots
-                .iter()
-                .find(|s| s.name == name)
-                .map(|s| m::Expr::Slot {
-                    slot: s.id.clone(),
-                    path,
-                })
+            return None;
+        };
+        for segment in segments {
+            match segment {
+                Segment::Static(key) => expr = Self::append_static_key(expr, key),
+                Segment::Key(key_node) => {
+                    let key = self.structured_operand_at(key_node, depth + 1)?;
+                    expr = m::Expr::Index {
+                        object: Box::new(expr),
+                        key: Box::new(key),
+                    };
+                }
+            }
         }
+        Some(expr)
     }
     /// Evaluate only syntax-proven immutable bindings and closed boolean/string/class-helper
     /// expressions. Anything outside this bounded subset remains opaque rather than executed.
@@ -239,8 +612,77 @@ impl Context<'_> {
                 } else {
                     return None;
                 };
+                if self.file.bindings.get(local).is_none()
+                    && let Some(factory) =
+                        find_declarator(self.file, self.file.tree.root_node(), local)
+                            .and_then(|node| field(node, "value"))
+                            .map(unwrap_expr)
+                            .filter(|value| value.kind() == "call_expression")
+                    && let Some(arguments) = field(factory, "arguments")
+                {
+                    let base = first(arguments)
+                        .and_then(|v| literal(self.file, v))
+                        .and_then(|v| v.as_str().map(str::to_owned))
+                        .unwrap_or_default();
+                    let config = children(arguments)
+                        .get(1)
+                        .copied()
+                        .filter(|v| v.kind() == "object")?;
+                    let variants = object_pair(self.file, config, "variants")
+                        .filter(|v| v.kind() == "object")?;
+                    let defaults = object_pair(self.file, config, "defaultVariants")
+                        .filter(|v| v.kind() == "object");
+                    let options = field(n, "arguments")
+                        .and_then(first)
+                        .filter(|v| v.kind() == "object");
+                    let mut supplied = BTreeMap::new();
+                    if let Some(options) = options {
+                        for (key, value) in pair_entries(self.file, options) {
+                            let value = if value.kind() == "identifier" {
+                                self.slots
+                                    .iter()
+                                    .find(|slot| slot.name == self.file.text(value))
+                                    .and_then(|slot| slot.initial.as_ref())
+                                    .and_then(|expr| match expr {
+                                        m::Expr::Literal { value } => Some(value.clone()),
+                                        _ => None,
+                                    })
+                            } else {
+                                self.static_value(value)
+                            };
+                            if let Some(value) = value {
+                                supplied.insert(key, value);
+                            }
+                        }
+                    }
+                    let mut out = base;
+                    for (group, choices) in pair_entries(self.file, variants) {
+                        let selected = supplied
+                            .get(&group)
+                            .and_then(|v| v.as_str().map(str::to_owned))
+                            .or_else(|| {
+                                defaults
+                                    .and_then(|d| object_pair(self.file, d, &group))
+                                    .and_then(|v| literal(self.file, v))
+                                    .and_then(|v| v.as_str().map(str::to_owned))
+                            });
+                        if let Some(selected) = selected
+                            && let Some(classes) = object_pair(self.file, choices, &selected)
+                                .and_then(|v| literal(self.file, v))
+                                .and_then(|v| v.as_str().map(str::to_owned))
+                            && !classes.is_empty()
+                        {
+                            out.push(' ');
+                            out.push_str(&classes);
+                        }
+                    }
+                    return Some(out.into());
+                }
                 let (_, export) = self.file.bindings.get(local)?;
-                if export != "default" || !matches!(local, "clsx" | "classnames" | "cn") {
+                if !matches!(
+                    (export.as_str(), local),
+                    ("default", "clsx" | "classnames" | "cn") | ("cn", "cn")
+                ) {
                     return None;
                 }
                 let mut out = String::new();
@@ -281,7 +723,72 @@ impl Context<'_> {
             _ => None,
         }
     }
-    fn expr(&self, node: Ast<'_>) -> m::Expr {
+    fn structured_operand_at(&self, node: Ast<'_>, depth: usize) -> Option<m::Expr> {
+        if depth >= 24 {
+            return None;
+        }
+        let n = unwrap_expr(node);
+        if let Some(value) = literal(self.file, n) {
+            return Some(m::Expr::Literal { value });
+        }
+        if let Some(read) = self.binding_at(n, depth) {
+            return Some(read);
+        }
+        if let Some(value) = self.static_value(n) {
+            return Some(m::Expr::Literal { value });
+        }
+        self.structured_expr_at(n, depth)
+    }
+    fn structured_expr(&self, node: Ast<'_>) -> Option<m::Expr> {
+        self.structured_expr_at(node, 0)
+    }
+    fn structured_expr_at(&self, node: Ast<'_>, depth: usize) -> Option<m::Expr> {
+        if depth >= 24 {
+            return None;
+        }
+        let n = unwrap_expr(node);
+        if n.kind() == "object" {
+            let mut properties = BTreeMap::new();
+            for child in children(n) {
+                match child.kind() {
+                    "pair" => {
+                        let key = field(child, "key").and_then(|key| object_key(self.file, key))?;
+                        let value =
+                            self.structured_operand_at(field(child, "value")?, depth + 1)?;
+                        properties.insert(key, value);
+                    }
+                    "shorthand_property_identifier" => {
+                        let key = self.file.text(child).to_owned();
+                        let value = self.binding_at(child, depth + 1)?;
+                        properties.insert(key, value);
+                    }
+                    _ => return None,
+                }
+            }
+            return Some(m::Expr::Object { properties });
+        }
+        if n.kind() == "unary_expression" && self.file.name(n, "operator") == Some("!") {
+            return Some(m::Expr::Unary {
+                operator: "!".into(),
+                value: Box::new(self.structured_operand_at(field(n, "argument")?, depth + 1)?),
+            });
+        }
+        if n.kind() == "binary_expression" {
+            let operator = self.file.name(n, "operator")?;
+            if matches!(
+                operator,
+                "&&" | "||" | "??" | "===" | "!==" | ">" | ">=" | "<" | "<="
+            ) {
+                return Some(m::Expr::Binary {
+                    operator: operator.into(),
+                    left: Box::new(self.structured_operand_at(field(n, "left")?, depth + 1)?),
+                    right: Box::new(self.structured_operand_at(field(n, "right")?, depth + 1)?),
+                });
+            }
+        }
+        None
+    }
+    pub(crate) fn expr(&self, node: Ast<'_>) -> m::Expr {
         let n = unwrap_expr(node);
         if let Some(value) = literal(self.file, n) {
             return m::Expr::Literal { value };
@@ -292,14 +799,15 @@ impl Context<'_> {
         if let Some(value) = self.static_value(n) {
             return m::Expr::Literal { value };
         }
+        if let Some(structured) = self.structured_expr(n) {
+            return structured;
+        }
         let mut reads = vec![];
         let mut pending = children(n);
         pending.reverse();
         while let Some(c) = pending.pop() {
             if let Some(read) = self.binding(c) {
-                if !reads.contains(&read) {
-                    reads.push(read)
-                }
+                push_direct_reads(&read, &mut reads);
             } else if !matches!(c.kind(), "arrow_function" | "function_expression") {
                 pending.extend(children(c).into_iter().rev())
             }
@@ -345,6 +853,56 @@ impl Context<'_> {
                 id,
                 location: loc,
             });
+        }
+        if let m::Expr::Slot { slot, path } = self.expr(n)
+            && path.is_empty()
+            && let Some(slot) = self
+                .slots
+                .iter()
+                .find(|candidate| candidate.id == slot && candidate.ty == m::TypeRef::Node)
+        {
+            return m::Node::Outlet(m::Outlet {
+                id,
+                slot: slot.id.clone(),
+                location: loc,
+            });
+        }
+        if n.kind() == "call_expression" && self.is_react_create_element(n) {
+            return self.create_element(n, id);
+        }
+        if n.kind() == "call_expression"
+            && field(n, "function").is_some_and(|function| {
+                function.kind() == "identifier"
+                    && self
+                        .slots
+                        .iter()
+                        .any(|slot| slot.name == self.file.text(function))
+            })
+        {
+            let function = field(n, "function").unwrap();
+            let slot = self
+                .slots
+                .iter()
+                .find(|slot| slot.name == self.file.text(function))
+                .unwrap();
+            let arguments = field(n, "arguments")
+                .map(children)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|argument| self.expr(argument))
+                .collect();
+            return m::Node::Invoke(m::Invoke {
+                id,
+                callee: m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: vec![],
+                },
+                arguments,
+                location: loc,
+            });
+        }
+        if matches!(n.kind(), "arrow_function" | "function_expression") {
+            return self.render_function(n, id);
         }
         match n.kind() {
             "jsx_element" | "jsx_self_closing_element" => self.element(n, id),
@@ -450,6 +1008,161 @@ impl Context<'_> {
             location: self.file.loc(n),
         })
     }
+    fn parameter_nodes<'a>(&self, f: Ast<'a>) -> Vec<Ast<'a>> {
+        if let Some(parameter) = field(f, "parameter") {
+            return vec![parameter];
+        }
+        field(f, "parameters")
+            .map(children)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|parameter| {
+                matches!(
+                    parameter.kind(),
+                    "required_parameter" | "optional_parameter" | "identifier" | "object_pattern"
+                )
+            })
+            .collect()
+    }
+    fn pattern_node<'a>(&self, parameter: Ast<'a>) -> Ast<'a> {
+        field(parameter, "pattern")
+            .or_else(|| field(parameter, "name"))
+            .unwrap_or(parameter)
+    }
+    fn binding_pattern(&self, parameter: Ast<'_>) -> Option<m::BindingPattern> {
+        let pattern = self.pattern_node(parameter);
+        if pattern.kind() == "identifier" {
+            return Some(m::BindingPattern::Identifier {
+                name: self.file.text(pattern).into(),
+            });
+        }
+        if pattern.kind() != "object_pattern" {
+            return None;
+        }
+        let mut properties = BTreeMap::new();
+        for binding in children(pattern) {
+            match binding.kind() {
+                "shorthand_property_identifier_pattern" => {
+                    let name = self.file.text(binding);
+                    properties.insert(name.into(), name.into());
+                }
+                "pair_pattern" | "object_assignment_pattern" => {
+                    let key = field(binding, "key")
+                        .and_then(|key| object_key(self.file, key))
+                        .or_else(|| first(binding).map(|key| self.file.text(key).to_owned()))?;
+                    let value = field(binding, "value").or_else(|| field(binding, "right"))?;
+                    let value = if value.kind() == "assignment_pattern" {
+                        field(value, "left")?
+                    } else {
+                        value
+                    };
+                    if !matches!(
+                        value.kind(),
+                        "identifier" | "shorthand_property_identifier_pattern"
+                    ) {
+                        return None;
+                    }
+                    properties.insert(key, self.file.text(value).into());
+                }
+                _ => return None,
+            }
+        }
+        (!properties.is_empty()).then_some(m::BindingPattern::Object { properties })
+    }
+    fn render_function(&mut self, n: Ast<'_>, id: String) -> m::Node {
+        let parameters = self.parameter_nodes(n);
+        let mut patterns = Vec::new();
+        for parameter in parameters {
+            let Some(pattern) = self.binding_pattern(parameter) else {
+                return self.placeholder(n, id, "Unsupported render function parameters");
+            };
+            patterns.push(pattern);
+        }
+        let names = patterns
+            .iter()
+            .flat_map(|pattern| match pattern {
+                m::BindingPattern::Identifier { name } => vec![name.clone()],
+                m::BindingPattern::Object { properties } => properties.values().cloned().collect(),
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        let Some(body) = crate::returned(n) else {
+            return self.placeholder(n, id, "Unsupported render function body");
+        };
+        self.bindings.push(names);
+        let child = self.node(body, format!("{id}.0"));
+        self.bindings.pop();
+        m::Node::RenderFunction(m::RenderFunction {
+            id,
+            parameters: patterns,
+            children: vec![child],
+            location: self.file.loc(n),
+        })
+    }
+    fn is_react_create_element(&self, n: Ast<'_>) -> bool {
+        field(n, "function").is_some_and(|function| {
+            function.kind() == "member_expression"
+                && self.file.name(function, "property") == Some("createElement")
+                && field(function, "object").is_some_and(|object| self.file.text(object) == "React")
+        })
+    }
+    fn unique_declarator<'a>(file: &'a File, name: &str) -> Option<Ast<'a>> {
+        let mut pending = vec![file.tree.root_node()];
+        let mut found = None;
+        while let Some(node) = pending.pop() {
+            if node.kind() == "variable_declarator"
+                && field(node, "name").is_some_and(|n| file.text(n) == name)
+            {
+                if found.is_some() {
+                    return None;
+                }
+                found = Some(node);
+            }
+            pending.extend(children(node));
+        }
+        found
+    }
+    fn expression_child(&mut self, node: Ast<'_>, id: String, depth: usize) -> m::Node {
+        let n = unwrap_expr(node);
+        if depth < 8 && n.kind() == "identifier" {
+            let name = self.file.text(n);
+            if let Some(initial) = Self::unique_declarator(self.file, name)
+                .and_then(|declarator| field(declarator, "value"))
+                .filter(|value| value.id() != n.id())
+            {
+                return self.expression_child(initial, id, depth + 1);
+            }
+        }
+        self.node(n, id)
+    }
+    fn create_element(&mut self, n: Ast<'_>, id: String) -> m::Node {
+        let arguments = field(n, "arguments").map(children).unwrap_or_default();
+        let Some(tag) = arguments.first() else {
+            return self.placeholder(n, id, "Incomplete createElement");
+        };
+        let mut props = BTreeMap::new();
+        if let Some(object) = arguments.get(1).map(|v| unwrap_expr(*v)) {
+            if object.kind() == "object" {
+                for (key, value) in object_entries(self.file, object) {
+                    props.insert(key, self.expr(value));
+                }
+            } else if !matches!(object.kind(), "null") {
+                return self.placeholder(n, id, "Unsupported createElement props");
+            }
+        }
+        let children = arguments
+            .iter()
+            .skip(2)
+            .enumerate()
+            .map(|(index, child)| self.expression_child(*child, format!("{id}.{index}"), 0))
+            .collect();
+        m::Node::CreateElement(m::CreateElement {
+            id,
+            tag: self.expr(*tag),
+            props,
+            children,
+            location: self.file.loc(n),
+        })
+    }
     fn child_nodes(&mut self, n: Ast<'_>, id: &str) -> Vec<m::Node> {
         let mut nodes = Vec::new();
         for c in children(n).into_iter().filter(|c| {
@@ -472,6 +1185,16 @@ impl Context<'_> {
                 location: self.file.loc(n),
             });
         };
+        let resolved_name =
+            if name.starts_with(char::is_uppercase) && self.component(name).is_none() {
+                self.constants
+                    .get(name)
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(name)
+            } else {
+                name
+            };
+        let name = resolved_name;
         let component = self.component(name);
         let binding = self.file.bindings.get(name);
         let router = binding
@@ -540,6 +1263,13 @@ impl Context<'_> {
                 });
             }
         }
+        if name.ends_with(".Provider") {
+            return m::Node::Fragment(m::Fragment {
+                children: self.child_nodes(n, &id),
+                id,
+                location,
+            });
+        }
         let mut el = m::Element {
             id: id.clone(),
             tag: name.into(),
@@ -565,9 +1295,10 @@ impl Context<'_> {
                 if let Some(object) = object {
                     for (key, value) in object {
                         if let Some(target) = &component
-                            && !self.signatures[target]
-                                .iter()
-                                .any(|s| s.kind == m::SlotKind::Prop && s.name == key)
+                            && !self.signatures[target].iter().any(|s| {
+                                s.kind == m::SlotKind::Prop
+                                    && (s.name == key || s.name.starts_with("..."))
+                            })
                         {
                             return self.placeholder(n, id, "Unsupported component prop");
                         }
@@ -575,11 +1306,62 @@ impl Context<'_> {
                     }
                     continue;
                 }
+                if spread
+                    .and_then(first)
+                    .filter(|value| value.kind() == "identifier")
+                    .is_some_and(|value| {
+                        if self.file.text(value) == "props" {
+                            for slot in self
+                                .slots
+                                .iter()
+                                .filter(|slot| slot.kind == m::SlotKind::Prop)
+                            {
+                                let accepted = component.as_ref().is_none_or(|target| {
+                                    self.signatures[target].iter().any(|target_slot| {
+                                        target_slot.kind == m::SlotKind::Prop
+                                            && (*target_slot.name == *slot.name
+                                                || target_slot.name.starts_with("..."))
+                                    })
+                                });
+                                if accepted {
+                                    el.props.insert(
+                                        slot.name.clone().into(),
+                                        m::Expr::Slot {
+                                            slot: slot.id.clone(),
+                                            path: vec![],
+                                        },
+                                    );
+                                }
+                            }
+                            return true;
+                        }
+                        let wanted = format!("...{}", self.file.text(value));
+                        self.slots
+                            .iter()
+                            .find(|slot| slot.name == wanted)
+                            .is_some_and(|slot| {
+                                el.props.insert(
+                                    wanted.clone(),
+                                    m::Expr::Slot {
+                                        slot: slot.id.clone(),
+                                        path: vec![],
+                                    },
+                                );
+                                true
+                            })
+                    })
+                {
+                    continue;
+                }
                 return self.placeholder(n, id, "Unsupported spread attributes");
             }
             let parts = children(attribute);
             let Some(k) = parts.first() else { continue };
             let key = self.file.text(*k);
+            // React keys identify list instances; they are metadata rather than component inputs.
+            if key == "key" {
+                continue;
+            }
             if component.is_none() && matches!(key, "className" | "style") {
                 if key == "className"
                     && let Some(value) = parts.get(1)
@@ -597,9 +1379,9 @@ impl Context<'_> {
                 continue;
             }
             if let Some(target) = &component
-                && !self.signatures[target]
-                    .iter()
-                    .any(|s| s.kind == m::SlotKind::Prop && s.name == key)
+                && !self.signatures[target].iter().any(|s| {
+                    s.kind == m::SlotKind::Prop && (s.name == key || s.name.starts_with("..."))
+                })
             {
                 return self.placeholder(n, id, "Unsupported component prop");
             }
@@ -609,20 +1391,59 @@ impl Context<'_> {
                 .unwrap_or(m::Expr::Literal { value: true.into() });
             el.props.insert(key.into(), expr);
         }
-        let class_text = attr(self.file, open, "className").map_or_else(
-            || Some(String::new()),
-            |value| match self.expr(value) {
-                m::Expr::Literal { value } => value.as_str().map(str::to_owned),
-                _ => None,
-            },
-        );
+        let variant_classes =
+            attr(self.file, open, "className").and_then(|v| self.variant_classes(v));
+        let class_text = if let Some(variant) = &variant_classes {
+            Some(variant.base.clone())
+        } else {
+            attr(self.file, open, "className").map_or_else(
+                || Some(String::new()),
+                |value| match self.expr(value) {
+                    m::Expr::Literal { value } => value.as_str().map(str::to_owned),
+                    _ => None,
+                },
+            )
+        };
         if name.starts_with(char::is_lowercase) {
-            if let Some(sheet) = self.built {
-                sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+            let sheets: Vec<&style::built::Sheet<'_>> = if let Some(sheet) = self.built {
+                vec![sheet]
             } else {
-                for sheet in self.sources {
-                    sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+                self.sources.iter().collect()
+            };
+            for sheet in &sheets {
+                sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
+            }
+            if let Some(variant) = variant_classes {
+                for (choice, classes) in variant.cases {
+                    let mut conditional = el.clone();
+                    conditional
+                        .unresolved_style
+                        .retain(|item| item.syntax == m::StyleSyntax::Inline);
+                    for sheet in &sheets {
+                        sheet.apply_classes(self.file, open, &mut conditional, Some(&classes));
+                    }
+                    for mut declaration in conditional.style {
+                        if el.style.iter().any(|existing| *existing == declaration) {
+                            continue;
+                        }
+                        let Some(when) =
+                            variant_condition(declaration.when.as_ref(), &variant.on, &choice)
+                        else {
+                            continue;
+                        };
+                        declaration.when = Some(when);
+                        el.style.push(declaration);
+                    }
                 }
+            }
+            if class_text.is_some()
+                && let Some(attribute) = attr(self.file, open, "className")
+                && !attribute.is_error()
+            {
+                let source = self.file.loc(attribute.parent().unwrap_or(attribute));
+                el.unresolved_style.retain(|item| {
+                    !(item.syntax == m::StyleSyntax::Class && item.location == source)
+                });
             }
         }
         // Inline declarations have higher precedence regardless of JSX attribute order.

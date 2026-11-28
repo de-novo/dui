@@ -1,5 +1,5 @@
 use dui_core::source_model as m;
-use dui_lang_typescript::extract;
+use dui_lang_typescript::{extract, extract_in_context};
 use std::fs;
 use std::path::Path;
 
@@ -162,5 +162,830 @@ fn scoped_custom_properties_resolve_through_the_cascade() {
         }),
         "inner scoped variable must override the inherited value: {:#?}",
         em.style
+    );
+}
+
+#[test]
+fn cva_variant_props_become_source_proven_conditional_styles() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("style.css"),
+        r#".base { display: inline-flex; padding: 4px; }
+.variant-default { background-color: #000000; color: #ffffff; }
+.variant-outline { background-color: #ffffff; color: #000000; border-width: 1px; }
+.size-default { height: 36px; }
+"#,
+    )
+    .expect("stylesheet");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import "./style.css";
+const buttonVariants = cva("base", {
+  variants: {
+    variant: { default: "variant-default", outline: "variant-outline" },
+    size: { default: "size-default" },
+  },
+  defaultVariants: { variant: "default", size: "default" },
+});
+function Button({ variant, size, className, ...props }: any) {
+  return <button {...props} className={cn(buttonVariants({ variant, size, className }))} />;
+}
+export default function App() {
+  return <><Button variant="outline">Go Back</Button><Button>Back Home</Button></>;
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let button = model
+        .components
+        .iter()
+        .find(|component| component.name == "Button")
+        .expect("Button");
+    for (name, choice) in [("variant", "default"), ("size", "default")] {
+        let slot = button
+            .slots
+            .iter()
+            .find(|slot| slot.name == name)
+            .expect("variant slot");
+        assert_eq!(
+            slot.initial,
+            Some(m::Expr::Literal {
+                value: serde_json::json!(choice)
+            }),
+            "cva defaultVariants become prop defaults"
+        );
+    }
+    let m::Node::Element(root) = &button.root else {
+        panic!("Button root must remain an intrinsic button")
+    };
+    let conditional: Vec<_> = root
+        .style
+        .iter()
+        .filter(|declaration| {
+            declaration
+                .when
+                .as_ref()
+                .and_then(|when| when.expr.as_ref())
+                .is_some_and(
+                    |expr| matches!(expr, m::Expr::Slot { slot, .. } if slot.ends_with(".variant")),
+                )
+        })
+        .collect();
+    assert!(
+        conditional.iter().any(|declaration| {
+            declaration.property == m::StyleProperty::Background
+                && declaration.value
+                    == m::StyleValue::Color {
+                        value: "#ffffff".into(),
+                    }
+                && declaration
+                    .when
+                    .as_ref()
+                    .and_then(|when| when.equals.as_ref())
+                    == Some(&serde_json::json!("outline"))
+        }),
+        "outline variant must carry its source-proven surface conditionally: {:#?}",
+        root.style
+    );
+    assert!(
+        conditional.iter().any(|declaration| {
+            declaration.property == m::StyleProperty::Background
+                && declaration.value
+                    == m::StyleValue::Color {
+                        value: "#000000".into(),
+                    }
+                && declaration
+                    .when
+                    .as_ref()
+                    .and_then(|when| when.equals.as_ref())
+                    == Some(&serde_json::json!("default"))
+        }),
+        "default variant must carry its source-proven surface conditionally: {:#?}",
+        root.style
+    );
+    assert!(
+        root.style.iter().all(|declaration| {
+            declaration.property != m::StyleProperty::Background || declaration.when.is_some()
+        }),
+        "variant surfaces must not be guessed unconditionally: {:#?}",
+        root.style
+    );
+}
+
+#[test]
+fn bundled_font_faces_are_extracted_with_bounded_local_assets() {
+    let dir = tempfile::tempdir().expect("temp project");
+    let assets = dir.path().join("dist/assets/fonts");
+    fs::create_dir_all(&assets).expect("font dir");
+    let font = [b"wOF2".as_slice(), &[7u8; 128]].concat();
+    fs::write(assets.join("demo.woff2"), &font).expect("font");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#"@font-face{font-family:'Demo Sans';src:url('./fonts/demo.woff2') format('woff2'),url('https://fonts.example.com/demo.woff2') format('woff2');font-weight:400 900;font-style:normal;font-display:swap}
+:root{--demo-font:'Demo Sans',ui-sans-serif,system-ui,sans-serif}
+html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let document = model.document_style.expect("document style");
+    assert_eq!(document.font_faces.len(), 1, "{:#?}", document.font_faces);
+    let face = &document.font_faces[0];
+    assert_eq!(face.family, "Demo Sans");
+    assert_eq!(face.weight.as_deref(), Some("400 900"));
+    assert_eq!(face.display.as_deref(), Some("swap"));
+    let root_family = document
+        .root
+        .as_ref()
+        .and_then(|root| {
+            root.style
+                .iter()
+                .find(|declaration| declaration.property == m::StyleProperty::FontFamily)
+        })
+        .expect("document root font family");
+    assert_eq!(
+        root_family.value,
+        m::StyleValue::Keyword {
+            value: "'Demo Sans',ui-sans-serif,system-ui,sans-serif".into(),
+        },
+        "@font-face descriptors must not obscure the document fallback list"
+    );
+    assert!(
+        document.body.is_none(),
+        "@font-face descriptors are not body element declarations: {:#?}",
+        document.body
+    );
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let m::Node::Element(main) = &app.root else {
+        panic!("App root must remain an element")
+    };
+    assert!(
+        main.style
+            .iter()
+            .all(|declaration| declaration.property != m::StyleProperty::FontFamily),
+        "the document font is inherited context, not a main element declaration: {:#?}",
+        main.style
+    );
+    let mut kinds = face.sources.iter().map(|source| match source {
+        m::FontSource::Asset {
+            path,
+            asset,
+            sha256,
+            bytes,
+            format,
+            ..
+        } => {
+            assert_eq!(path, "dist/assets/fonts/demo.woff2");
+            assert_eq!(*bytes, font.len() as u64);
+            assert_eq!(sha256.len(), 64);
+            assert_eq!(asset, &format!("asset-{sha256}.woff2"));
+            assert_eq!(format.as_deref(), Some("woff2"));
+            "asset"
+        }
+        m::FontSource::External { url, format, .. } => {
+            assert_eq!(url, "https://fonts.example.com/demo.woff2");
+            assert_eq!(format.as_deref(), Some("woff2"));
+            "external"
+        }
+    });
+    assert_eq!(kinds.next(), Some("asset"));
+    assert_eq!(kinds.next(), Some("external"));
+    assert_eq!(kinds.next(), None);
+}
+
+#[test]
+fn cached_public_remote_fonts_are_materialized_without_network() {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().expect("temp project");
+    let cache = tempfile::tempdir().expect("font cache");
+    // SAFETY: this test process never restores or mutates the variable concurrently; the
+    // extraction tests either have no remote font or tolerate a cache miss.
+    unsafe { std::env::set_var("DUI_FONT_CACHE", cache.path()) };
+    let url = "https://fonts.example.test/demo.woff2";
+    let font = [b"wOF2".as_slice(), &[9u8; 256]].concat();
+    let sha256 = format!("{:x}", Sha256::digest(&font));
+    fs::create_dir_all(cache.path().join("blobs")).expect("blob dir");
+    fs::create_dir_all(cache.path().join("index")).expect("index dir");
+    fs::write(cache.path().join("blobs").join(&sha256), &font).expect("blob");
+    let key = format!(
+        "{:x}",
+        Sha256::digest(format!("font-fetch-v1\n{url}").as_bytes())
+    );
+    fs::write(
+        cache.path().join("index").join(format!("{key}.json")),
+        format!(
+            r#"{{"version":1,"url":"{url}","finalUrl":"{url}","sha256":"{sha256}","bytes":{}}}"#,
+            font.len()
+        ),
+    )
+    .expect("cache metadata");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        format!(r#"@font-face{{font-family:'Remote Demo';src:url('{url}') format('woff2');font-display:swap}}"#),
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let face = &model.document_style.expect("document").font_faces[0];
+    let m::FontSource::External {
+        asset: Some(asset),
+        sha256: Some(model_sha),
+        bytes: Some(bytes),
+        retrieved_url: Some(retrieved),
+        ..
+    } = &face.sources[0]
+    else {
+        panic!(
+            "cached remote font must become a complete materialized source: {:#?}",
+            face.sources
+        )
+    };
+    assert_eq!(asset, &format!("asset-{sha256}.woff2"));
+    assert_eq!(model_sha, &sha256);
+    assert_eq!(*bytes, font.len() as u64);
+    assert_eq!(retrieved, url);
+}
+
+#[test]
+fn default_document_font_provider_class_is_source_proven() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#".font-inter{font-family:Inter,"sans-serif"}.font-manrope{font-family:Manrope,"sans-serif"}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("fonts.ts"),
+        "export const fonts = ['inter', 'manrope'] as const
+",
+    )
+    .expect("fonts");
+    fs::write(
+        dir.path().join("font-provider.tsx"),
+        r#"import { useEffect, useState } from 'react'
+import { fonts } from './fonts'
+export function FontProvider() {
+  const [font, setFont] = useState(() => fonts[0])
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.add(`font-${font}`)
+  }, [font])
+  return null
+}
+"#,
+    )
+    .expect("provider");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import './font-provider'
+export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let root = model
+        .document_style
+        .and_then(|document| document.root)
+        .expect("document root");
+    let family = root
+        .style
+        .iter()
+        .find(|declaration| declaration.property == m::StyleProperty::FontFamily)
+        .expect("font family");
+    assert_eq!(
+        family.value,
+        m::StyleValue::Keyword {
+            value: "Inter,\"sans-serif\"".into()
+        },
+        "{:#?}",
+        root.style
+    );
+}
+
+#[test]
+fn invalid_local_fonts_stay_out_of_the_model_and_report_a_diagnostic() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/not-a-font.woff2"),
+        b"not a font",
+    )
+    .expect("font");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#"@font-face{font-family:'Broken';src:url('./not-a-font.woff2') format('woff2')}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    assert!(
+        model
+            .document_style
+            .as_ref()
+            .is_none_or(|document| document.font_faces.is_empty())
+    );
+    assert!(
+        model
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "unsupported-font-resource"),
+        "{:#?}",
+        model.diagnostics
+    );
+}
+
+#[test]
+fn theme_states_and_logical_viewport_lengths_are_source_proven() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#":root{--surface:#ffffff;--ink:#111111}
+.dark{--surface:#020618;--ink:#f8fafc;--input:oklch(100% 0 0/.15)}
+:root[data-theme=dark]{--muted:#90a1b9}
+body{min-height:100svh;background-color:var(--surface);color:var(--ink)}
+.h-svh{height:100svh}.h-full{height:100%}
+.dark\:bg-input:is(.dark *){background-color:color-mix(in oklab,var(--input) 30%,transparent)}
+.dark\:hover\:bg-input:is(.dark *):hover{background-color:#999999}
+.themed{color:var(--muted)}
+@media (prefers-color-scheme: dark){.themed{border-color:#445566}}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <div className="h-svh dark:bg-input themed"><div className="h-full">Hello</div></div>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract_in_context(
+        dir.path(),
+        Path::new("App.tsx"),
+        Some(Path::new("dist/assets/index.css")),
+        Some(1440),
+        None,
+    )
+    .expect("extract");
+    let document = model.document_style.expect("document style");
+    let body = document.body.expect("body");
+    let dark_background = body
+        .style
+        .iter()
+        .find(|declaration| {
+            declaration.property == m::StyleProperty::Background
+                && declaration.when.as_ref().and_then(|when| when.color_scheme)
+                    == Some(m::ColorScheme::Dark)
+        })
+        .expect("dark document background");
+    let effective_document = match &dark_background.value {
+        m::StyleValue::Unresolved {
+            refinement: Some(refinement),
+            ..
+        } => refinement.as_ref(),
+        value => value,
+    };
+    assert_eq!(
+        effective_document,
+        &m::StyleValue::Color {
+            value: "#020618".into()
+        },
+        "scheme-scoped root variables must resolve the selectable dark document state"
+    );
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let m::Node::Element(root) = &app.root else {
+        panic!("App root must be an element")
+    };
+    let declarations = |property| {
+        root.style
+            .iter()
+            .filter(move |declaration| declaration.property == property)
+            .collect::<Vec<_>>()
+    };
+    let height = declarations(m::StyleProperty::Height)
+        .into_iter()
+        .next()
+        .expect("height");
+    let m::StyleValue::Unresolved {
+        refinement: Some(refinement),
+        ..
+    } = &height.value
+    else {
+        panic!(
+            "100svh must remain unresolved with a typed refinement: {:#?}",
+            height
+        )
+    };
+    assert_eq!(
+        refinement.as_ref(),
+        &m::StyleValue::Length {
+            value: 100.,
+            unit: m::LengthUnit::Svh,
+        }
+    );
+    for (property, expected) in [
+        (m::StyleProperty::Background, "#ffffff0b"),
+        (m::StyleProperty::Color, "#90a1b9"),
+        (m::StyleProperty::BorderColor, "#445566"),
+    ] {
+        assert!(
+            declarations(property).iter().any(|declaration| {
+                declaration.when.as_ref().and_then(|when| when.color_scheme)
+                    == Some(m::ColorScheme::Dark)
+                    && declaration.value
+                        == m::StyleValue::Color {
+                            value: expected.into(),
+                        }
+            }),
+            "missing selectable dark {property:?} state {expected}: {:#?}",
+            declarations(property)
+        );
+    }
+}
+
+#[test]
+fn built_css_wide_inherit_is_preserved_for_form_controls() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#"button,input{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;background-color:#0000}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main><button>Go Back</button></main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    fn find_button(node: &m::Node) -> Option<&m::Element> {
+        match node {
+            m::Node::Element(element) if element.tag == "button" => Some(element),
+            m::Node::Element(element) => element.children.iter().find_map(find_button),
+            _ => None,
+        }
+    }
+    let button = find_button(&app.root).expect("button");
+    for property in [
+        m::StyleProperty::FontFamily,
+        m::StyleProperty::FontSize,
+        m::StyleProperty::LineHeight,
+        m::StyleProperty::FontWeight,
+        m::StyleProperty::LetterSpacing,
+        m::StyleProperty::Color,
+    ] {
+        assert!(
+            button.style.iter().any(|declaration| {
+                declaration.property == property
+                    && declaration.value
+                        == m::StyleValue::Keyword {
+                            value: "inherit".into(),
+                        }
+            }),
+            "missing inherited {property:?}: {:#?}",
+            button.style
+        );
+    }
+}
+
+#[test]
+fn destructured_query_reads_are_slots() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { useQuery } from '@tanstack/react-query'
+export default function App() {
+  const { data, isPending: pending, isError = false } = useQuery({ queryKey: ['items'] })
+  if (pending) return <p>Loading</p>
+  if (isError) return <p>Error</p>
+  return <ul>{data.map((item) => <li key={item}>{item}</li>)}</ul>
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    for name in ["data", "pending", "isError"] {
+        let slot = app
+            .slots
+            .iter()
+            .find(|slot| slot.name == name)
+            .unwrap_or_else(|| panic!("missing {name} slot: {:#?}", app.slots));
+        assert_eq!(slot.kind, m::SlotKind::Query);
+        assert!(
+            slot.source
+                .as_deref()
+                .is_some_and(|source| source.contains("useQuery"))
+        );
+    }
+}
+
+#[test]
+fn conditional_early_returns_become_state_branches() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { useQuery } from '@tanstack/react-query'
+export default function App() {
+  const org = useQuery({ queryKey: ['org'] })
+  if (org.isError) return <p>Error</p>
+  if (org.isPending) return <p>Loading</p>
+  return <ul>{org.data.map((item) => <li key={item}>{item}</li>)}</ul>
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|c| c.name == "App")
+        .expect("App");
+    assert!(
+        matches!(&app.root, m::Node::Branch(branch) if matches!(&branch.arms[1].children[0], m::Node::Branch(_))),
+        "early returns must become nested branches: {:#?}",
+        app.root
+    );
+}
+
+#[test]
+fn transparent_component_wrappers_preserve_component_functions() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { memo, forwardRef } from 'react'
+import { observer } from 'mobx-react'
+function Item({ label }: { label: string }) { return <strong>{label}</strong> }
+const MemoizedItem = memo(Item)
+const Forwarded = forwardRef((props: { label: string }, ref: any) => <p>{props.label}</p>)
+const Observed = observer(function Observed() { return <MemoizedItem label="wrapped" /> })
+export default function App() { return <section><Observed /><Forwarded label="forwarded" /></section> }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    for name in ["MemoizedItem", "Forwarded", "Observed"] {
+        let component = model
+            .components
+            .iter()
+            .find(|component| component.name == name)
+            .unwrap_or_else(|| panic!("missing {name}"));
+        assert!(
+            !matches!(component.root, m::Node::Placeholder(_)),
+            "{name} must unwrap to a renderable component: {:#?}",
+            component.root
+        );
+    }
+}
+
+#[test]
+fn react_route_composition_preserves_keys_props_objects_and_exported_entries() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("organization.tsx"),
+        r#"type Shared = { entityType: string } & ({ isTemporary: true; entityId?: string } | { isTemporary?: false; entityId: string });
+function Boundary(props: Shared & { children?: any }) {
+  if (!props.entityType) return null;
+  return <>{props.children}</>;
+}
+function Row(props: { id: string; rows: Record<string, string> }) {
+  if (!props.id || !props.rows[props.id]) return null;
+  return <p>{props.rows[props.id]}</p>;
+}
+function Rows({ ids, rows }: { ids: string[]; rows: Record<string, string> }) {
+  let entities: Record<string, string[]> = {};
+  if (ids.length) {
+    entities = { all: ids };
+  }
+  return <div>{ids.map((id, index) => <Row key={id} id={id} rows={rows} />)}</div>;
+}
+export function OrganizationScreen() {
+  return <Boundary entityType="project" entityId="project-benchmark"><Rows ids={["a"]} rows={{ a: "Benchmark issue" }} /></Boundary>;
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("organization.tsx")).expect("extract");
+    let boundary = model
+        .components
+        .iter()
+        .find(|component| component.name == "Boundary")
+        .expect("Boundary");
+    assert!(
+        boundary.slots.iter().any(|slot| slot.name == "entityId"),
+        "union-intersection prop types must expose entityId: {:#?}",
+        boundary.slots
+    );
+    assert!(
+        matches!(&boundary.root, m::Node::Branch(branch) if matches!(&branch.arms[1].children[0], m::Node::Fragment(_))),
+        "object-form props children must remain in the composition: {:#?}",
+        boundary.root
+    );
+    let rows = model
+        .components
+        .iter()
+        .find(|component| component.name == "Rows")
+        .expect("Rows");
+    assert!(
+        !matches!(rows.root, m::Node::Placeholder(_)),
+        "imperative non-return statements must not erase the render tree: {:#?}",
+        rows.root
+    );
+    fn contains_placeholder(node: &m::Node) -> bool {
+        match node {
+            m::Node::Placeholder(_) => true,
+            _ => node.children().into_iter().any(contains_placeholder),
+        }
+    }
+    assert!(
+        !contains_placeholder(&rows.root),
+        "React keys are list metadata, not unsupported component props: {:#?}",
+        rows.root
+    );
+    assert!(
+        model
+            .screens
+            .iter()
+            .any(|screen| screen.name == "OrganizationScreen"),
+        "a single exported entry component becomes the explicit-entry screen: {:#?}",
+        model.screens
+    );
+}
+
+#[test]
+fn render_prop_invocations_and_create_element_have_explicit_nodes() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import React from 'react'
+function Frame({ children }: { children: any }) {
+  return <>{typeof children === 'function' ? children({ filter: true }) : children}</>
+}
+function Dynamic({ as = 'div', children }: { as?: string; children?: any }) {
+  const child = children
+  return React.createElement(as, { className: 'box' }, child)
+}
+export default function App() {
+  return <Frame>{({ filter }: { filter: boolean }) => <main>{filter && <Dynamic>Row</Dynamic>}</main>}</Frame>
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let kinds = |component: &str| -> Vec<&'static str> {
+        let component = model
+            .components
+            .iter()
+            .find(|candidate| candidate.name == component)
+            .unwrap_or_else(|| panic!("missing {component}"));
+        let mut out = Vec::new();
+        let mut stack = vec![&component.root];
+        while let Some(node) = stack.pop() {
+            out.push(match node {
+                m::Node::RenderFunction(_) => "renderFunction",
+                m::Node::Invoke(_) => "invoke",
+                m::Node::CreateElement(_) => "createElement",
+                m::Node::Fragment(_) => "fragment",
+                m::Node::Element(_) => "element",
+                m::Node::Instance(_) => "instance",
+                m::Node::Text(_) => "text",
+                m::Node::Branch(_) => "branch",
+                m::Node::List(_) => "list",
+                m::Node::Outlet(_) => "outlet",
+                m::Node::Placeholder(_) => "placeholder",
+            });
+            stack.extend(node.children());
+        }
+        out
+    };
+    assert!(
+        kinds("Frame").contains(&"invoke"),
+        "Frame: {:?}",
+        kinds("Frame")
+    );
+    assert!(
+        kinds("App").contains(&"renderFunction"),
+        "App: {:?}",
+        kinds("App")
+    );
+    assert!(
+        kinds("Dynamic").contains(&"createElement"),
+        "Dynamic: {:?}",
+        kinds("Dynamic")
+    );
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let mut stack = vec![&app.root];
+    let mut found = false;
+    while let Some(node) = stack.pop() {
+        if let m::Node::RenderFunction(function) = node {
+            found = function.parameters.iter().any(|parameter| {
+                matches!(
+                    parameter,
+                    m::BindingPattern::Object { properties } if properties.get("filter").is_some()
+                )
+            });
+        }
+        stack.extend(node.children());
+    }
+    assert!(
+        found,
+        "object render-prop parameter missing: {:#?}",
+        app.root
+    );
+}
+
+#[test]
+fn dynamic_keyed_lookup_is_modeled_across_props_derived_locals_and_loop_items() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"type RowProps = { id?: string; rows?: Record<string, string> };
+function Row(props: RowProps) {
+  const { id = "fallback", rows: rowsById = {} } = props;
+  const row = rowsById[id];
+  return <p>{row}</p>;
+}
+export default function Rows({ ids, rows }: { ids: string[]; rows: Record<string, string> }) {
+  return <>{ids.map((id) => <Row key={id} id={id} rows={rows} />)}</>;
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let row = model
+        .components
+        .iter()
+        .find(|component| component.name == "Row")
+        .expect("Row");
+    let slot = |name: &str| {
+        row.slots
+            .iter()
+            .find(|slot| slot.name == name)
+            .unwrap_or_else(|| panic!("missing Row slot {name}: {:#?}", row.slots))
+    };
+    assert!(
+        matches!(slot("id").initial.as_ref(), Some(m::Expr::Literal { value }) if value == "fallback"),
+        "props-object destructuring must preserve the source default: {:#?}",
+        slot("id")
+    );
+    assert!(
+        matches!(slot("rows").initial.as_ref(), Some(m::Expr::Literal { value }) if value.as_object().is_some_and(|object| object.is_empty())),
+        "object source defaults must stay literal JSON rather than opaque text: {:#?}",
+        slot("rows")
+    );
+    assert!(
+        matches!(slot("rowsById").initial.as_ref(), Some(m::Expr::Slot { slot, path }) if slot.ends_with("#Row.rows") && path.is_empty()),
+        "destructured aliases must read their source prop: {:#?}",
+        slot("rowsById")
+    );
+    let initial = slot("row").initial.as_ref().expect("derived row initial");
+    let m::Expr::Index { object, key } = initial else {
+        panic!("rows[id] must become a keyed lookup: {initial:#?}")
+    };
+    assert!(
+        matches!(object.as_ref(), m::Expr::Slot { slot, path } if slot.ends_with("#Row.rowsById") && path.is_empty()),
+        "lookup object must be the destructured rows alias: {object:#?}"
+    );
+    assert!(
+        matches!(key.as_ref(), m::Expr::Slot { slot, path } if slot.ends_with("#Row.id") && path.is_empty()),
+        "lookup key must be the id prop value, not a literal path segment: {key:#?}"
     );
 }

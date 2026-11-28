@@ -11,6 +11,7 @@ import {
 import { captureBadgeCounts, routeName } from "./CaptureCard";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
+import type { SourceInputRenderContext } from "../model/sourceInputs";
 import { liveCell, useLiveFrame } from "./liveFrames";
 import { memo, useState } from "react";
 
@@ -57,22 +58,37 @@ const MobileApproximateCard = memo(
     renderer,
     model,
     screen,
+    width,
+    height,
+    imageUrl,
+    input,
   }: {
     renderer?: SourceModelRenderer;
     model?: Model;
     screen: Screen;
+    width: number;
+    height?: number;
+    imageUrl: (name: string) => string;
+    input?: SourceInputRenderContext;
   }) {
     const { t } = useI18n();
-    const render = useApproximateModelRender(renderer, model, screen.component, 375);
+    const render = useApproximateModelRender(
+      renderer,
+      model,
+      screen.component,
+      width,
+      height,
+      imageUrl,
+      input,
+    );
     if (!render) return null;
     return (
       <>
+        <div className="mobile-deck-status-row">
+          <span>{t.approximateModel}</span>
+        </div>
         <div className="mobile-deck-frame mobile-deck-frame-model" data-showing="model">
-          <ApproximateModelFrame
-            render={render}
-            label={t.approximateModel}
-            showUnresolved={false}
-          />
+          <ApproximateModelFrame render={render} showUnresolved={false} />
         </div>
         {render.unresolved.length > 0 && (
           <div className="mobile-model-unresolved" title={render.unresolved.join("\n")}>
@@ -82,7 +98,13 @@ const MobileApproximateCard = memo(
       </>
     );
   },
-  (before, after) => before.renderer === after.renderer && before.screen === after.screen,
+  (before, after) =>
+    before.renderer === after.renderer &&
+    before.screen === after.screen &&
+    before.width === after.width &&
+    before.height === after.height &&
+    before.imageUrl === after.imageUrl &&
+    before.input === after.input,
 );
 
 export type MobileViewMode = "deck" | "map";
@@ -114,11 +136,17 @@ export function MobileScreenDeck({
   liveRun,
   sourceModel,
   modelRenderer,
+  modelInput,
+  viewportHeight,
 }: {
   /** Render cards without a capture from source (the run's project can run). */
   liveRun?: string;
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit archived fixture values for the selected source-input state. */
+  modelInput?: SourceInputRenderContext;
+  /** Explicit logical viewport height for source-model cards. */
+  viewportHeight?: number;
   archive: Archive;
   width?: number;
   widths: number[];
@@ -275,6 +303,10 @@ export function MobileScreenDeck({
                     renderer={modelRenderer}
                     model={sourceModel}
                     screen={screen}
+                    width={width && width > 0 ? width : 375}
+                    height={viewportHeight ?? Math.round((width && width > 0 ? width : 375) * 1.6)}
+                    imageUrl={imageUrl}
+                    input={modelInput}
                   />
                 )}
                 {screen.nativeSource && !cell && !src && !screen.component && (

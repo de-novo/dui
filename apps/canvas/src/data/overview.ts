@@ -204,6 +204,8 @@ export type ScreenMap = {
   screenDiscovery?: { kind: string; limitations: string[] };
   /** Archive file containing the frozen schema-v1 source model. */
   sourceModel?: string;
+  /** Archive file containing explicit reviewer-supplied source input states. */
+  sourceInputs?: string;
   screens: Screen[];
   links: ScreenLink[];
 };
@@ -505,6 +507,7 @@ export function decodeOverview(raw: unknown): ScreenMap {
   }
   const discovery = raw.screenDiscovery;
   const sourceModel = typeof raw.sourceModel === "string" ? raw.sourceModel : undefined;
+  const sourceInputs = typeof raw.sourceInputs === "string" ? raw.sourceInputs : undefined;
   if (record(discovery) && typeof discovery.kind === "string") {
     if (
       !Array.isArray(discovery.limitations) ||
@@ -515,8 +518,9 @@ export function decodeOverview(raw: unknown): ScreenMap {
       screens,
       links,
       sourceModel,
+      sourceInputs,
       screenDiscovery: { kind: discovery.kind, limitations: discovery.limitations },
     };
   }
-  return { screens, links, sourceModel };
+  return { screens, links, sourceModel, sourceInputs };
 }

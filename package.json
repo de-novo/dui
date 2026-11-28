@@ -39,6 +39,7 @@
     "check:settle": "tsc --project scripts && cargo build --locked && node scripts/check-settle.mts",
     "check:tsx-model": "tsc --project scripts && cargo build --locked -p dui && node scripts/check-tsx-model.mts",
     "check:source-model": "tsc --project scripts && node scripts/check-source-model.mts",
+    "check:source-inputs": "tsc --project scripts && cargo build --locked && node scripts/check-source-inputs.mts",
     "check:source-model-additive": "tsc --project scripts && node scripts/check-source-model-additive.mts",
     "check:browserless-map": "tsc --project scripts && cargo build --locked && node scripts/check-browserless-map.mts",
     "check:map-thumbnails": "tsc --project scripts && cargo build --locked && node scripts/check-map-thumbnails.mts",

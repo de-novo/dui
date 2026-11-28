@@ -23,21 +23,27 @@ Pass `--built-css FILE` to read a single bundled stylesheet inside the project. 
 
 The same stylesheet read can add optional top-level `documentStyle` context with `root` and `body` typography declarations. Only document-anchored selectors participate: `html`, `body`, `:root`, their supported compound selectors, and a direct child or descendant of `html`. Importance, layers, specificity, source order and the supplied root attribute decide the winner. When a selector, at-rule or cascade result cannot be proven, the declaration is explicit `unresolved` rather than a guess. Bare class or ID selectors that give no document anchor do not participate.
 
+`documentStyle.externalStylesheets` records external stylesheet URLs declared by the document HTML, such as font stylesheet links. `documentStyle.fontFaces` records `@font-face` facts from built, linked and imported sheets. A local font source is bounded, content-hashed and named as an archive `asset-<sha256>.<extension>`. A public HTTPS remote font or font stylesheet may be materialized only during extraction: the adapter uses one fixed request policy, follows at most three redirects, rejects credentials, localhost and private or reserved addresses, bounds each font, stylesheet, total face bytes and the cache, and stores bytes content-addressed under `$DUI_FONT_CACHE` or `~/.dui/font-cache`. The model records the declared URL, final retrieved URL, stylesheet hash, font hash and byte count. A license or license URL is recorded when present in the font name table; omission means unknown rather than a guess. Font extraction never executes the document and never guesses a missing file.
+
+Materialized remote bytes are copied into the run archive under the same `asset-<sha256>.<extension>` contract as local bytes. Archive rendering remains offline: the renderer reads only archived assets and never follows a remote stylesheet or font URL. If bounded extraction cannot materialize a public remote source, that source stays explicit evidence without asset fields and the family can fall back exactly as the source cascade allows. Runtime effects that later add a font class or stylesheet are application behavior unless the adapter can prove their default from source. For the narrow provider pattern of one template class whose default is the first string in a statically enumerable array, the document cascade may use that default root class; more dynamic state stays unknown.
+
 Add `--viewport-width PX` to evaluate a single pixel-based width media condition at the specified viewport. Supported forms include `min-width`, `max-width`, and comparisons such as `(width < 768px)`. Other media conditions stay unresolved.
 
 For a direct child or descendant selector with two simple parts, the TSX adapter checks intrinsic JSX ancestors up to the component boundary. To inspect a model, run `dui serve`, choose **Open source model** in the workspace picker and select the exported JSON. The viewer draws the selected component from schema v1 and lists unresolved styles.
 
 When the project selects its theme with a root data attribute, supply the same value during extraction, for example `--root-attribute data-theme=dark`. The adapter resolves simple matching root variable declarations from the bundle. Without that context, conflicting definitions stay unresolved.
 
+Root-scoped `.dark` and `.light` rules, simple `[data-theme=light|dark]` selectors, and exact `(prefers-color-scheme: light|dark)` media rules are compiled as selectable `colorScheme` states when their class, attribute, or media syntax is explicit. Theme-dependent custom properties are overlaid on the unconditional `:root` values for that state. Selectors or cascade results that remain uncertain retain their source text and the best proven typed refinement rather than being guessed. The canvas applies the state matching its explicit color scheme; without that explicit context it does not infer a theme.
+
 The built CSS reader maps display mode, horizontal overflow and auto-fit grids with a minimum column width into model properties. A single flexible track is also supported. A literal body root preserves document colors. Scoped theme overrides stay uncertain when the ancestor chain cannot be established.
 
 The bundled CSS reader resolves independent row and column gaps and common flex shorthands into growth, shrinkage and basis.
 
-The reader expands block spacing in horizontal layouts. Built font-family lists, text-decoration lines, viewport minimums in spacing and ID selectors remain unresolved.
+The reader expands block spacing in horizontal layouts and preserves font-family fallback lists, including resolvable var() references. Built text-decoration lines, viewport minimums in spacing and ID selectors remain unresolved.
 
-Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
+Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB, oklab, or oklch mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
 
-Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
+Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops and two explicit tile dimensions are represented as model colors and lengths. A complete CSS `box-shadow` list is represented as `boxShadow`, a canonical serialized list after custom-property resolution; unsupported grammar or an unknown winning value remains unresolved rather than dropping layers.
 
 ## 1. Principles
 
@@ -114,7 +120,42 @@ An **expression** says where a value comes from.
 | `literal` | A JSON `value` written in the source |
 | `slot` | A read of a slot of the same component, with an optional field `path` such as `["length"]` |
 | `item` | A read of the current item of an enclosing `list` node, with a field `path`. These are the field-to-UI bindings |
+| `object` | A bounded object literal with statically visible keys |
+| `index` | A bounded keyed lookup. A missing key or unknown input stays unresolved rather than falling back to another entry |
+| `unary` | A deterministic `!` operation over one expression |
+| `binary` | A deterministic `&&`, `||`, `??`, equality, or numeric comparison operation over two expressions |
 | `opaque` | Code the model does not evaluate: its `text` and the slot and item `reads` in it |
+
+### Explicit runtime input states
+
+A source model remains a record of source facts. Runtime fixture values are supplied separately in trusted local project configuration. Set `sourceInputs` in `dui.json` either to this object or to a project-relative JSON file containing it:
+
+```json
+{
+  "defaultState": "populated",
+  "states": {
+    "populated": {
+      "slots": {
+        "src/Orders.tsx#Orders.orders": [
+          { "id": "o1", "title": "Fixture order", "status": "open" }
+        ]
+      },
+      "expressions": {
+        "formatCurrency(order.total)": "$42.00"
+      }
+    },
+    "empty": {
+      "slots": {
+        "src/Orders.tsx#Orders.orders": []
+      }
+    }
+  }
+}
+```
+
+Slot keys are the exact stable slot ids in the extracted model; expression keys are the exact `text` of opaque expressions. `dui map PROJECT --entry ENTRY.tsx` validates every supplied key against the extraction and fails rather than guessing or ignoring an unknown key. Valid values are copied verbatim into the immutable run archive as `source-inputs.json`, and the viewer graph references it as `sourceInputs`. The archive values are explicit review evidence, not secrets.
+
+In the viewer, an explicit `state` URL parameter selects that state exactly. When no state is selected, `defaultState` applies. An unknown explicit state selects no values. The renderer receives only the selected state's slot and expression maps; unsupplied slots keep their source-modeled initials or placeholders. Hot reload patches source facts only and reapplies the same immutable input state after every patch. No application code, browser route interception or network payload injection is part of this path.
 
 ## 5. Nodes
 

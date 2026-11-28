@@ -6,6 +6,7 @@ import { isNotCaptured, type Cell, type Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
+import type { SourceInputRenderContext } from "../model/sourceInputs";
 import {
   resolveCardDiffImageUrl,
   type CanvasDiffVisualMode,
@@ -43,6 +44,7 @@ export function CaptureCard({
   dimmed = false,
   cardWidth,
   frameHeight,
+  modelWidth,
   openComments = 0,
   screenDiff,
   diffVisualMode = "after",
@@ -54,6 +56,8 @@ export function CaptureCard({
   live,
   sourceModel,
   modelRenderer,
+  modelHeight,
+  modelInput,
 }: {
   screen: Screen;
   cell?: Cell;
@@ -77,6 +81,8 @@ export function CaptureCard({
   dimmed?: boolean;
   cardWidth?: number;
   frameHeight?: number;
+  /** Logical capture/viewport width for source-model rendering, before card chrome. */
+  modelWidth?: number;
   openComments?: number;
   screenDiff?: ScreenCanvasDiff;
   diffVisualMode?: CanvasDiffVisualMode;
@@ -85,19 +91,26 @@ export function CaptureCard({
   /** Frozen source model and its replaceable renderer for source-model archives. */
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit logical viewport height for the source model, when one is selected. */
+  modelHeight?: number;
+  /** Explicit archived fixture values for the selected source-input state. */
+  modelInput?: SourceInputRenderContext;
 }) {
   const { t } = useI18n();
   const modelRender = useApproximateModelRender(
     modelRenderer,
     sourceModel,
     screen.component,
-    cardWidth && cardWidth > 0 ? cardWidth : 375,
-    frameHeight,
+    modelWidth && modelWidth > 0 ? modelWidth : cardWidth && cardWidth > 0 ? cardWidth : 375,
+    modelHeight ?? frameHeight,
+    imageUrl,
+    modelInput,
   );
   const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);
   const { notCaptured, unverifiedAfterCapture, unavailable } = captureBadgeCounts(screen.cells);
-  const large = Boolean(cardWidth && cardWidth >= 800);
+  const logicalCardWidth = modelWidth ?? cardWidth;
+  const large = Boolean(logicalCardWidth && logicalCardWidth >= 800);
   const thumbnail = small && !screenDiff ? cell?.thumbnail : undefined;
   const fallbackSrc = thumbnail
     ? imageUrl(thumbnail)
@@ -216,7 +229,6 @@ export function CaptureCard({
         ) : modelCard ? (
           <ApproximateModelFrame
             render={modelCard}
-            label={t.approximateModel}
             unresolvedLabel={
               modelCard.unresolved.length > 0
                 ? t.unresolvedModelParts(modelCard.unresolved.length)
@@ -331,6 +343,7 @@ export function CaptureCard({
             {screen.sourceLocation.line === undefined ? "" : ":" + screen.sourceLocation.line}
           </small>
         )}
+        {modelCard && <small>{t.approximateModel}</small>}
         {modelCard && modelCard.unresolved.length > 0 && (
           <small title={modelCard.unresolved.join("\n")}>
             {t.unresolvedModelParts(modelCard.unresolved.length)}

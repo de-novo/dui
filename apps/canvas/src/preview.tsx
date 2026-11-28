@@ -38,6 +38,11 @@ import {
 } from "./model/runLabels";
 import { parseSelection, resolveCell, withSearchChanges } from "./model/selection";
 import { createDomModelRenderer, decodeModel, type Model } from "./features/model/modelDocument";
+import {
+  decodeSourceInputs,
+  sourceInputContext,
+  type SourceInputs,
+} from "./features/model/sourceInputs";
 import { useSourceModelHotReload } from "./features/model/useSourceModelHotReload";
 
 const modelRenderer = createDomModelRenderer();
@@ -109,12 +114,14 @@ function imageUrlFor(run: Run) {
 function MapView({
   archive: initialArchive,
   sourceModel: initialSourceModel,
+  sourceInputs,
   run,
   runs,
   onOpenDiff,
 }: {
   archive: Archive;
   sourceModel?: Model;
+  sourceInputs?: SourceInputs;
   run: Run;
   runs: Run[];
   onOpenDiff: () => void;
@@ -139,6 +146,7 @@ function MapView({
     screen: selectedId,
     state,
     width,
+    height,
     widths,
     locale,
     locales,
@@ -148,6 +156,7 @@ function MapView({
   } = selection;
   const screen = archive.screens.find((s) => s.id === selectedId);
   const { cells, cell } = resolveCell(screen, width, state, locale);
+  const modelInput = sourceInputContext(sourceInputs, state);
 
   const [mapGuides, setMapGuides] = useState({ frames: false, guides: false });
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -368,7 +377,7 @@ function MapView({
             diffVisualMode={diffVisualMode}
             beforeRunKey={compareBeforeKey || undefined}
             afterRunKey={run.key}
-            imageUrl={(name) => archiveUrl(name, run)}
+            imageUrl={imageUrl}
             mobileView={mobileView}
             openSearch={openSearch}
             onSelectMobileView={setMobileView}
@@ -377,6 +386,8 @@ function MapView({
             liveRun={run.responsiveAvailable ? run.key : undefined}
             sourceModel={sourceModel}
             modelRenderer={modelRenderer}
+            modelInput={modelInput}
+            viewportHeight={height ?? undefined}
           />
         ) : (
           <div ref={overviewLayer} className="overview-layer">
@@ -418,6 +429,8 @@ function MapView({
                     liveRun={run.responsiveAvailable ? run.key : undefined}
                     sourceModel={sourceModel}
                     modelRenderer={modelRenderer}
+                    modelHeight={height ?? undefined}
+                    modelInput={modelInput}
                     selectedId={selectedId}
                     focusActive={showDetails}
                     openCommentsByPath={commentsByPath}
@@ -785,12 +798,14 @@ function Viewer({
   run,
   archive,
   sourceModel,
+  sourceInputs,
   error,
 }: {
   initialRuns: Run[];
   run?: Run;
   archive?: Archive;
   sourceModel?: Model;
+  sourceInputs?: SourceInputs;
   error?: string;
 }) {
   const { t } = useI18n();
@@ -857,6 +872,7 @@ function Viewer({
         <MapView
           archive={archive}
           sourceModel={sourceModel}
+          sourceInputs={sourceInputs}
           run={run}
           runs={runs}
           onOpenDiff={() => openDiff()}
@@ -903,9 +919,19 @@ if (new URLSearchParams(location.search).get("view") === "model") {
       run && archive?.sourceModel
         ? decodeModel(await json(archiveUrl(archive.sourceModel, run)))
         : undefined;
+    const sourceInputs =
+      run && archive?.sourceInputs
+        ? decodeSourceInputs(await json(archiveUrl(archive.sourceInputs, run)))
+        : undefined;
     root.render(
       <LocaleProvider>
-        <Viewer initialRuns={runs} run={run} archive={archive} sourceModel={sourceModel} />
+        <Viewer
+          initialRuns={runs}
+          run={run}
+          archive={archive}
+          sourceModel={sourceModel}
+          sourceInputs={sourceInputs}
+        />
       </LocaleProvider>,
     );
   } catch (error) {

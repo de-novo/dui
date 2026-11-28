@@ -76,6 +76,7 @@ pub enum Language {
     Kotlin,
     Dart,
     Css,
+    Html,
 }
 
 /// Where a fact came from. `inferred` marks a gap filled by AI or a heuristic.
@@ -201,6 +202,33 @@ pub enum Expr {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         path: Vec<String>,
     },
+    /// A read of a render-function parameter bound by an enclosing `invoke` node.
+    Binding {
+        name: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        path: Vec<String>,
+    },
+    /// A bounded object literal with statically visible keys.
+    Object {
+        properties: BTreeMap<String, Expr>,
+    },
+    /// A bounded keyed lookup. Both object and key are model expressions; a missing key or
+    /// unknown input stays unresolved rather than falling back to another entry.
+    Index {
+        object: Box<Expr>,
+        key: Box<Expr>,
+    },
+    /// A deterministic unary operation over a modeled value.
+    Unary {
+        operator: String,
+        value: Box<Expr>,
+    },
+    /// A deterministic binary operation over modeled values.
+    Binary {
+        operator: String,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     /// Code the model does not evaluate. `reads` lists the slot and item reads in it.
     Opaque {
         text: String,
@@ -219,6 +247,13 @@ pub enum Node {
     Branch(Branch),
     List(List),
     Outlet(Outlet),
+    /// A function passed as renderable UI input. The node is a value template; it is
+    /// drawn only through an `invoke` node, never executed as code.
+    RenderFunction(RenderFunction),
+    /// A bounded render-prop invocation: one callee expression and positional arguments.
+    Invoke(Invoke),
+    /// A bounded `React.createElement` call with statically visible props and children.
+    CreateElement(CreateElement),
     Placeholder(Placeholder),
 }
 
@@ -321,6 +356,56 @@ pub struct Outlet {
     pub location: Location,
 }
 
+/// A positional render-function parameter. Object patterns are bounded to one level of
+/// `key: localName` destructuring; anything else stays a placeholder in the adapter.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum BindingPattern {
+    Identifier {
+        name: String,
+    },
+    Object {
+        properties: BTreeMap<String, String>,
+    },
+}
+
+/// A render-function value template. `children` is the function body's UI template.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RenderFunction {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parameters: Vec<BindingPattern>,
+    pub children: Vec<Node>,
+    pub location: Location,
+}
+
+/// A render-prop invocation. Arguments are positional and evaluated only as model
+/// expressions; no application code runs.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Invoke {
+    pub id: String,
+    pub callee: Expr,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<Expr>,
+    pub location: Location,
+}
+
+/// A bounded `React.createElement` call. `tag` may be a literal intrinsic name or a
+/// model expression; the renderer resolves only modeled values and otherwise uses a placeholder.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateElement {
+    pub id: String,
+    pub tag: Expr,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub props: BTreeMap<String, Expr>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<Node>,
+    pub location: Location,
+}
+
 /// Source the adapter could not map. Drawn as a labeled placeholder.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -339,6 +424,85 @@ pub struct DocumentStyle {
     /// Declarations effective on the document body element.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<DocumentElementStyle>,
+    /// External stylesheets declared by the document HTML. These are facts needed for
+    /// resources such as web fonts; the renderer must not execute the document.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external_stylesheets: Vec<String>,
+    /// Web font faces declared by stylesheets. Local and materialized remote sources are
+    /// content-addressed archive assets; the renderer never fetches a remote font itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub font_faces: Vec<FontFace>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FontFace {
+    pub id: String,
+    pub family: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stretch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unicode_range: Option<String>,
+    /// Project-relative stylesheet path or remote stylesheet URL containing this face.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stylesheet: Option<String>,
+    /// Lowercase hex SHA-256 of the stylesheet bytes used for a remote face.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stylesheet_sha256: Option<String>,
+    pub sources: Vec<FontSource>,
+    pub origin: Origin,
+    pub location: Location,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum FontSource {
+    /// A font file inside the measured project, copied into the archive under `asset`.
+    Asset {
+        /// Project-relative path with `/` separators.
+        path: String,
+        /// Content-addressed archive file `asset-<sha256>.<extension>`.
+        asset: String,
+        /// Lowercase hex SHA-256 of the font bytes.
+        sha256: String,
+        /// Font byte length. Extraction and archive writes bound this value.
+        bytes: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        /// License fact read from the font bytes when present; omission means unknown.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        license: Option<String>,
+    },
+    /// A remote font URL declared by the source. When the bounded build-stage intake could
+    /// materialize public bytes, the content-addressed archive fields are present; otherwise
+    /// this remains evidence only and archive rendering must not fetch it.
+    External {
+        url: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        asset: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        bytes: Option<u64>,
+        /// Final public HTTPS URL after redirects when bytes were materialized.
+        #[serde(
+            rename = "retrievedUrl",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        retrieved_url: Option<String>,
+        /// License fact read from the font bytes when present; omission means unknown.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        license: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -459,6 +623,8 @@ pub enum StyleProperty {
     ShadowBlur,
     ShadowSpread,
     ShadowColor,
+    /// Canonical serialized CSS shadow list. `none` or comma-separated shadow layers.
+    BoxShadow,
     BorderTopLeftRadius,
     BorderTopRightRadius,
     BorderBottomRightRadius,
@@ -567,6 +733,9 @@ pub struct Condition {
     pub color_scheme: Option<ColorScheme>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expr: Option<Expr>,
+    /// When present, `expr` must resolve to exactly this JSON value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equals: Option<Value>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -783,6 +952,9 @@ impl Node {
             Self::Branch(node) => &node.id,
             Self::List(node) => &node.id,
             Self::Outlet(node) => &node.id,
+            Self::RenderFunction(node) => &node.id,
+            Self::Invoke(node) => &node.id,
+            Self::CreateElement(node) => &node.id,
             Self::Placeholder(node) => &node.id,
         }
     }
@@ -796,6 +968,9 @@ impl Node {
             Self::Branch(node) => &node.location,
             Self::List(node) => &node.location,
             Self::Outlet(node) => &node.location,
+            Self::RenderFunction(node) => &node.location,
+            Self::Invoke(node) => &node.location,
+            Self::CreateElement(node) => &node.location,
             Self::Placeholder(node) => &node.location,
         }
     }
@@ -808,7 +983,9 @@ impl Node {
             Self::Instance(node) => node.children.iter().collect(),
             Self::List(node) => node.children.iter().collect(),
             Self::Branch(node) => node.arms.iter().flat_map(|arm| &arm.children).collect(),
-            Self::Text(_) | Self::Outlet(_) | Self::Placeholder(_) => Vec::new(),
+            Self::RenderFunction(node) => node.children.iter().collect(),
+            Self::CreateElement(node) => node.children.iter().collect(),
+            Self::Text(_) | Self::Outlet(_) | Self::Invoke(_) | Self::Placeholder(_) => Vec::new(),
         }
     }
 }

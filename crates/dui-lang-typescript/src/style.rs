@@ -7,18 +7,75 @@ use std::collections::{BTreeMap, BTreeSet};
 use tree_sitter::Node as Ast;
 
 fn color(s: &str) -> Option<V> {
-    let h = s.strip_prefix('#')?;
-    if !h.bytes().all(|b| b.is_ascii_hexdigit()) {
+    let s = s.trim();
+    if let Some(h) = s.strip_prefix('#') {
+        if !h.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        let hex = match h.len() {
+            3 | 4 => h.chars().flat_map(|c| [c, c]).collect(),
+            6 | 8 => h.to_owned(),
+            _ => return None,
+        };
+        return Some(V::Color {
+            value: format!("#{}", hex.to_ascii_lowercase()),
+        });
+    }
+    oklch_color(s)
+}
+
+fn oklch_color(s: &str) -> Option<V> {
+    let inner = s.strip_prefix("oklch(")?.strip_suffix(')')?;
+    let mut alpha_parts = inner.split('/');
+    let color_part = alpha_parts.next()?;
+    let alpha = match alpha_parts.next().map(str::trim) {
+        None => 1.,
+        Some(raw) if raw.ends_with('%') => raw.strip_suffix('%')?.parse::<f64>().ok()? / 100.,
+        Some(raw) => raw.parse::<f64>().ok()?,
+    };
+    if alpha_parts.next().is_some() || !(0.0..=1.0).contains(&alpha) {
         return None;
     }
-    let hex = match h.len() {
-        3 | 4 => h.chars().flat_map(|c| [c, c]).collect(),
-        6 | 8 => h.to_owned(),
-        _ => return None,
+    let mut parts = color_part.split_ascii_whitespace();
+    let raw_l = parts.next()?;
+    let lightness = if let Some(percent) = raw_l.strip_suffix('%') {
+        percent.parse::<f64>().ok()? / 100.
+    } else {
+        raw_l.parse::<f64>().ok()?
     };
-    Some(V::Color {
-        value: format!("#{}", hex.to_ascii_lowercase()),
-    })
+    let chroma = parts.next()?.parse::<f64>().ok()?;
+    let hue = parts
+        .next()?
+        .trim_end_matches("deg")
+        .parse::<f64>()
+        .ok()?
+        .to_radians();
+    let a = chroma * hue.cos();
+    let b = chroma * hue.sin();
+    let l = (lightness + 0.3963377774 * a + 0.2158037573 * b).powi(3);
+    let m = (lightness - 0.1055613458 * a - 0.0638541729 * b).powi(3);
+    let ss = (lightness - 0.0894841775 * a - 1.2914855480 * b).powi(3);
+    let linear = [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * ss,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * ss,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * ss,
+    ];
+    let mut hex = String::from("#");
+    for channel in linear {
+        let gamma = if channel <= 0.0031308 {
+            12.92 * channel
+        } else {
+            1.055 * channel.powf(1. / 2.4) - 0.055
+        };
+        hex.push_str(&format!(
+            "{:02x}",
+            (gamma.clamp(0., 1.) * 255.).round() as u8
+        ));
+    }
+    if alpha < 1. {
+        hex.push_str(&format!("{:02x}", (alpha * 255.).round() as u8));
+    }
+    Some(V::Color { value: hex })
 }
 fn numeric_length(s: &str) -> Option<m::Length> {
     let s = s.trim();
@@ -120,7 +177,7 @@ pub(crate) fn export_value(value: V, text: &str) -> V {
     }
 }
 
-fn nonnegative_length(value: &V) -> bool {
+pub(crate) fn nonnegative_length(value: &V) -> bool {
     match value {
         V::Length { value, .. } => *value >= 0.,
         V::Clamp {
@@ -224,69 +281,65 @@ fn uniform_gap(raw: &str) -> Option<V> {
 
 pub fn theme(f: &File) -> Vec<m::Token> {
     let mut tokens = BTreeMap::new();
-    for rule in children(f.tree.root_node()) {
-        let parts = children(rule);
-        if parts.first().is_none_or(|n| f.text(*n) != "@theme") {
-            continue;
-        }
-        let Some(block) = parts.iter().find(|n| n.kind() == "block") else {
+    let mut pending = vec![f.tree.root_node()];
+    let mut nodes = Vec::new();
+    while let Some(node) = pending.pop() {
+        nodes.push(node);
+        pending.extend(children(node));
+    }
+    for decl in nodes.into_iter().filter(|n| n.kind() == "declaration") {
+        let parts = children(decl);
+        let [name, value, rest @ ..] = parts.as_slice() else {
             continue;
         };
-        for decl in children(*block)
-            .into_iter()
-            .filter(|n| n.kind() == "declaration")
-        {
-            let parts = children(decl);
-            let [name, value, rest @ ..] = parts.as_slice() else {
-                continue;
-            };
-            let name = f.text(*name);
-            let val = &f.src[value.start_byte()..rest.last().unwrap_or(value).end_byte()];
-            let group = if name.starts_with("--color-") {
-                m::TokenGroup::Color
-            } else if name == "--spacing" || name.starts_with("--spacing-") {
-                m::TokenGroup::Spacing
-            } else if name.starts_with("--radius-") {
-                m::TokenGroup::Radius
-            } else {
-                continue;
-            };
-            let parsed = if group == m::TokenGroup::Color {
-                color(val)
-            } else if group == m::TokenGroup::Spacing && val.parse::<f64>().ok() == Some(0.) {
-                Some(V::Length {
-                    value: 0.,
-                    unit: m::LengthUnit::Px,
-                })
-            } else {
-                length(val)
-            };
-            let value = parsed
-                .map(|value| export_value(value, val))
-                .unwrap_or_else(|| V::Unresolved {
-                    text: val.into(),
-                    reason: "Unsupported theme value".into(),
-                    refinement: None,
-                });
-            tokens.insert(
-                name.to_owned(),
-                m::Token {
-                    id: format!("{}#{name}", f.path),
-                    name: name.into(),
-                    group,
-                    value,
-                    modes: Default::default(),
-                    syntax: m::StyleSyntax::Theme,
-                    location: Some(f.loc(decl)),
-                    package: None,
-                },
-            );
+        let name = f.text(*name);
+        if !name.starts_with("--") {
+            continue;
         }
+        let val = &f.src[value.start_byte()..rest.last().unwrap_or(value).end_byte()];
+        let group = if name.starts_with("--color-") || color(val).is_some() {
+            m::TokenGroup::Color
+        } else if name == "--spacing" || name.starts_with("--spacing-") {
+            m::TokenGroup::Spacing
+        } else if name.starts_with("--radius") {
+            m::TokenGroup::Radius
+        } else {
+            continue;
+        };
+        let parsed = if group == m::TokenGroup::Color {
+            color(val)
+        } else if group == m::TokenGroup::Spacing && val.parse::<f64>().ok() == Some(0.) {
+            Some(V::Length {
+                value: 0.,
+                unit: m::LengthUnit::Px,
+            })
+        } else {
+            length(val)
+        };
+        let value = parsed
+            .map(|value| export_value(value, val))
+            .unwrap_or_else(|| V::Unresolved {
+                text: val.into(),
+                reason: "Unsupported theme value".into(),
+                refinement: None,
+            });
+        tokens.insert(
+            name.to_owned(),
+            m::Token {
+                id: format!("{}#{name}", f.path),
+                name: name.into(),
+                group,
+                value,
+                modes: Default::default(),
+                syntax: m::StyleSyntax::Theme,
+                location: Some(f.loc(decl)),
+                package: None,
+            },
+        );
     }
     resolve_aliases(&mut tokens);
     tokens.into_values().collect()
 }
-
 // Resolve only single-argument var() references inside one parsed @theme stylesheet.
 // Cache the terminal value, but keep the immediate target ID for consumers editing tokens.
 fn resolve_aliases(tokens: &mut BTreeMap<String, m::Token>) {
@@ -357,12 +410,14 @@ fn spacing(name: &str) -> Option<&'static [P]> {
     Some(match name {
         "padding" => PADDING,
         "padding-inline" => &[P::PaddingStart, P::PaddingEnd],
+        "padding-block" => &[P::PaddingTop, P::PaddingBottom],
         "padding-top" => &[P::PaddingTop],
         "padding-bottom" => &[P::PaddingBottom],
         "padding-inline-start" => &[P::PaddingStart],
         "padding-inline-end" => &[P::PaddingEnd],
         "margin" => &[P::MarginTop, P::MarginEnd, P::MarginBottom, P::MarginStart],
         "margin-inline" => &[P::MarginStart, P::MarginEnd],
+        "margin-block" => &[P::MarginTop, P::MarginBottom],
         "margin-top" => &[P::MarginTop],
         "margin-bottom" => &[P::MarginBottom],
         "margin-inline-start" => &[P::MarginStart],
@@ -393,7 +448,25 @@ fn spacing_value(name: &str, raw: &str) -> Option<V> {
 
 // Physical left/right only have a direction-independent logical mapping when equal.
 fn shorthand(name: &str, raw: &str) -> Option<Vec<(P, V)>> {
-    if matches!(name, "padding-inline" | "margin-inline") {
+    if matches!(
+        name,
+        "padding-inline" | "margin-inline" | "padding-block" | "margin-block"
+    ) && raw.trim().starts_with("calc(")
+        && raw.trim().ends_with(')')
+    {
+        let value = spacing_value(name, raw.trim())?;
+        return Some(
+            spacing(name)?
+                .iter()
+                .copied()
+                .map(|p| (p, value.clone()))
+                .collect(),
+        );
+    }
+    if matches!(
+        name,
+        "padding-inline" | "margin-inline" | "padding-block" | "margin-block"
+    ) {
         let mut words = raw.split_ascii_whitespace();
         let start = spacing_value(name, words.next()?)?;
         let end = match words.next() {
@@ -456,59 +529,224 @@ fn scaled_spacing(class: &str, step: u16, tokens: &[m::Token]) -> V {
     }
 }
 
+fn token_value(token: &m::Token) -> V {
+    V::Token {
+        token: token.id.clone(),
+        resolved: match &token.value {
+            V::Token { resolved, .. } => resolved.clone(),
+            V::Unresolved { .. } => None,
+            value @ (V::Length { .. }
+            | V::Clamp { .. }
+            | V::Color { .. }
+            | V::Number { .. }
+            | V::Keyword { .. }) => Some(Box::new(value.clone())),
+        },
+    }
+}
+
+fn unique_token<'a>(tokens: &'a [m::Token], name: &str) -> Option<&'a m::Token> {
+    let mut matches = tokens.iter().filter(|t| t.name == name);
+    let token = matches.next()?;
+    matches.next().is_none().then_some(token)
+}
+
+fn utility_length(key: &str, tokens: &[m::Token]) -> Option<V> {
+    match key {
+        "full" => {
+            return Some(V::Length {
+                value: 100.,
+                unit: m::LengthUnit::Percent,
+            });
+        }
+        "svh" => {
+            return Some(V::Length {
+                value: 100.,
+                unit: m::LengthUnit::Svh,
+            });
+        }
+        "vh" => {
+            return Some(V::Length {
+                value: 100.,
+                unit: m::LengthUnit::Vh,
+            });
+        }
+        "auto" => {
+            return Some(V::Keyword {
+                value: "auto".into(),
+            });
+        }
+        _ => {}
+    }
+    if let Some(raw) = key.strip_prefix('[').and_then(|v| v.strip_suffix(']')) {
+        return length(&raw.replace('_', " "));
+    }
+    let step = key
+        .parse::<f64>()
+        .ok()
+        .filter(|n| n.is_finite() && *n >= 0.)?;
+    Some(scaled_spacing(key, step as u16, tokens))
+}
+
 fn classes(s: &str, tokens: &[m::Token]) -> Option<(Vec<P>, V)> {
-    let (prop, keyword) = match s {
-        "flex" | "flex-row" => (P::Direction, "row"),
-        "flex-col" => (P::Direction, "column"),
-        "items-center" => (P::AlignItems, "center"),
-        "justify-between" => (P::JustifyContent, "spaceBetween"),
-        _ => {
-            let (prefix, key) = s.split_once('-')?;
-            let (props, group): (&[P], &str) = match prefix {
-                "gap" => (&[P::Gap], "spacing"),
-                "p" => (PADDING, "spacing"),
-                "px" => (&[P::PaddingStart, P::PaddingEnd], "spacing"),
-                "py" => (&[P::PaddingTop, P::PaddingBottom], "spacing"),
-                "text" => (&[P::Color], "color"),
-                "bg" => (&[P::Background], "color"),
-                "rounded" => (&[P::BorderRadius], "radius"),
-                _ => return None,
-            };
-            let name = format!("--{group}-{key}");
-            let mut matches = tokens.iter().filter(|t| t.name == name);
-            let Some(token) = matches.next() else {
-                if group != "spacing" {
-                    return None;
-                }
-                let step = key.parse::<u16>().ok()?;
-                return Some((props.into(), scaled_spacing(s, step, tokens)));
-            };
-            if matches.next().is_some() {
-                return None;
-            }
+    match s {
+        "flex" | "flex-row" => {
             return Some((
-                props.into(),
-                V::Token {
-                    token: token.id.clone(),
-                    resolved: match &token.value {
-                        V::Token { resolved, .. } => resolved.clone(),
-                        V::Unresolved { .. } => None,
-                        value @ (V::Length { .. }
-                        | V::Clamp { .. }
-                        | V::Color { .. }
-                        | V::Number { .. }
-                        | V::Keyword { .. }) => Some(Box::new(value.clone())),
-                    },
+                vec![P::Direction],
+                V::Keyword {
+                    value: "row".into(),
                 },
             ));
         }
+        "inline-flex" => {
+            return Some((
+                vec![P::Display],
+                V::Keyword {
+                    value: "inline-flex".into(),
+                },
+            ));
+        }
+        "flex-col" => {
+            return Some((
+                vec![P::Direction],
+                V::Keyword {
+                    value: "column".into(),
+                },
+            ));
+        }
+        "items-center" => {
+            return Some((
+                vec![P::AlignItems],
+                V::Keyword {
+                    value: "center".into(),
+                },
+            ));
+        }
+        "justify-center" => {
+            return Some((
+                vec![P::JustifyContent],
+                V::Keyword {
+                    value: "center".into(),
+                },
+            ));
+        }
+        "justify-between" => {
+            return Some((
+                vec![P::JustifyContent],
+                V::Keyword {
+                    value: "spaceBetween".into(),
+                },
+            ));
+        }
+        "text-center" => {
+            return Some((
+                vec![P::TextAlign],
+                V::Keyword {
+                    value: "center".into(),
+                },
+            ));
+        }
+        "whitespace-nowrap" => {
+            return Some((
+                vec![P::WhiteSpace],
+                V::Keyword {
+                    value: "nowrap".into(),
+                },
+            ));
+        }
+        "border" => {
+            return Some((
+                vec![P::BorderWidth],
+                V::Length {
+                    value: 1.,
+                    unit: m::LengthUnit::Px,
+                },
+            ));
+        }
+        "font-bold" => return Some((vec![P::FontWeight], V::Number { value: 700. })),
+        "font-medium" => return Some((vec![P::FontWeight], V::Number { value: 500. })),
+        "font-normal" => return Some((vec![P::FontWeight], V::Number { value: 400. })),
+        "leading-tight" => return Some((vec![P::LineHeight], V::Number { value: 1.25 })),
+        "leading-none" => return Some((vec![P::LineHeight], V::Number { value: 1. })),
+        "m-auto" => {
+            return Some((
+                vec![P::MarginTop, P::MarginEnd, P::MarginBottom, P::MarginStart],
+                V::Keyword {
+                    value: "auto".into(),
+                },
+            ));
+        }
+        "mx-auto" => {
+            return Some((
+                vec![P::MarginStart, P::MarginEnd],
+                V::Keyword {
+                    value: "auto".into(),
+                },
+            ));
+        }
+        _ => {}
+    }
+    let (prefix, key) = s.split_once('-')?;
+    if let Some(props) = match prefix {
+        "h" => Some(vec![P::Height]),
+        "min-h" if s.starts_with("min-h-") => Some(vec![P::MinHeight]),
+        "w" => Some(vec![P::Width]),
+        "mt" => Some(vec![P::MarginTop]),
+        "mb" => Some(vec![P::MarginBottom]),
+        "ms" => Some(vec![P::MarginStart]),
+        "me" => Some(vec![P::MarginEnd]),
+        _ => None,
+    } {
+        return utility_length(key, tokens).map(|value| (props, value));
+    }
+    if prefix == "text" {
+        if let Some(raw) = key.strip_prefix('[').and_then(|v| v.strip_suffix(']')) {
+            return length(&raw.replace('_', " ")).map(|value| (vec![P::FontSize], value));
+        }
+        if key == "sm" {
+            return Some((
+                vec![P::FontSize],
+                V::Length {
+                    value: 0.875,
+                    unit: m::LengthUnit::Rem,
+                },
+            ));
+        }
+    }
+    let (props, group): (&[P], &str) = match prefix {
+        "gap" => (&[P::Gap], "spacing"),
+        "p" => (PADDING, "spacing"),
+        "px" => (&[P::PaddingStart, P::PaddingEnd], "spacing"),
+        "py" => (&[P::PaddingTop, P::PaddingBottom], "spacing"),
+        "text" => (&[P::Color], "color"),
+        "bg" => (&[P::Background], "color"),
+        "rounded" => (&[P::BorderRadius], "radius"),
+        _ => return None,
     };
-    Some((
-        vec![prop],
-        V::Keyword {
-            value: keyword.into(),
-        },
-    ))
+    let name = format!("--{group}-{key}");
+    if let Some(token) = unique_token(tokens, &name) {
+        return Some((props.into(), token_value(token)));
+    }
+    if group == "spacing" {
+        let step = key.parse::<u16>().ok()?;
+        return Some((props.into(), scaled_spacing(s, step, tokens)));
+    }
+    if group == "radius" {
+        if key == "md" {
+            if let Some(base) = unique_token(tokens, "--radius") {
+                return Some((props.into(), token_value(base)));
+            }
+        }
+        if key == "none" {
+            return Some((
+                props.into(),
+                V::Length {
+                    value: 0.,
+                    unit: m::LengthUnit::Px,
+                },
+            ));
+        }
+    }
+    None
 }
 fn flex_keyword(name: &str, literal: Option<&str>, source: &str) -> Option<(Vec<P>, V)> {
     let property = match name {

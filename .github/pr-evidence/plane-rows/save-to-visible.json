@@ -1,0 +1,114 @@
+{
+  "desktop": {
+    "samples": [
+      {
+        "iteration": 0,
+        "status": "reflected",
+        "ms": 3880.7
+      },
+      {
+        "iteration": 1,
+        "status": "reflected",
+        "ms": 449.7
+      },
+      {
+        "iteration": 2,
+        "status": "reflected",
+        "ms": 449.8
+      },
+      {
+        "iteration": 3,
+        "status": "reflected",
+        "ms": 449.7
+      },
+      {
+        "iteration": 4,
+        "status": "reflected",
+        "ms": 449.6
+      },
+      {
+        "iteration": 5,
+        "status": "reflected",
+        "ms": 449.6
+      },
+      {
+        "iteration": 6,
+        "status": "reflected",
+        "ms": 449.5
+      },
+      {
+        "iteration": 7,
+        "status": "reflected",
+        "ms": 449.6
+      },
+      {
+        "iteration": 8,
+        "status": "reflected",
+        "ms": 449.5
+      },
+      {
+        "iteration": 9,
+        "status": "reflected",
+        "ms": 449.7
+      }
+    ],
+    "medianMs": 449.6,
+    "p95Ms": 3880.7
+  },
+  "mobile": {
+    "samples": [
+      {
+        "iteration": 0,
+        "status": "reflected",
+        "ms": 3875.7
+      },
+      {
+        "iteration": 1,
+        "status": "reflected",
+        "ms": 445
+      },
+      {
+        "iteration": 2,
+        "status": "reflected",
+        "ms": 444.8
+      },
+      {
+        "iteration": 3,
+        "status": "reflected",
+        "ms": 444.6
+      },
+      {
+        "iteration": 4,
+        "status": "reflected",
+        "ms": 444.6
+      },
+      {
+        "iteration": 5,
+        "status": "reflected",
+        "ms": 444.7
+      },
+      {
+        "iteration": 6,
+        "status": "reflected",
+        "ms": 444.5
+      },
+      {
+        "iteration": 7,
+        "status": "reflected",
+        "ms": 444.7
+      },
+      {
+        "iteration": 8,
+        "status": "reflected",
+        "ms": 444.6
+      },
+      {
+        "iteration": 9,
+        "status": "reflected",
+        "ms": 444.9
+      }
+    ],
+    "medianMs": 444.7,
+    "p95Ms": 3875.7
+  }
+}

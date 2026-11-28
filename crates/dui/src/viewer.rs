@@ -399,6 +399,31 @@ fn open_archive(root: &Path) -> Result<(ArchiveGraph, BTreeSet<String>), String>
         if root.join("source-model.json").is_file() {
             obj.insert("sourceModel".into(), json!("source-model.json"));
             images.insert("source-model.json".into());
+            if root.join(crate::source_inputs::ARCHIVE_FILE).is_file() {
+                obj.insert(
+                    "sourceInputs".into(),
+                    json!(crate::source_inputs::ARCHIVE_FILE),
+                );
+                images.insert(crate::source_inputs::ARCHIVE_FILE.into());
+            }
+            if let Ok(text) = fs::read_to_string(root.join("source-model.json"))
+                && let Ok(model) = serde_json::from_str::<Value>(&text)
+            {
+                for face in model["documentStyle"]["fontFaces"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                {
+                    for source in face["sources"].as_array().into_iter().flatten() {
+                        if let Some(asset) = source["asset"].as_str()
+                            && crate::snapshot_assets::is_asset_name(asset)
+                            && root.join(asset).is_file()
+                        {
+                            images.insert(asset.to_owned());
+                        }
+                    }
+                }
+            }
         }
     }
     let body = if graph["nodes"].as_array().is_some_and(|nodes| {
@@ -761,9 +786,12 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             if let [file] = files.iter().copied().collect::<Vec<_>>().as_slice() {
                 Some(PathBuf::from(file))
             } else {
-                crate::tsx_map::entry(&project).ok().flatten().and_then(|entry| {
-                    crate::tsx_map::project_relative_entry(&project, &entry).map(PathBuf::from)
-                })
+                crate::tsx_map::entry(&project)
+                    .ok()
+                    .flatten()
+                    .and_then(|entry| {
+                        crate::tsx_map::project_relative_entry(&project, &entry).map(PathBuf::from)
+                    })
             }
         });
         let Some(entry) = inferred_entry else {
@@ -793,9 +821,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                     edges,
                     discovery,
                 );
-                guard
-                    .hot_sessions
-                    .insert(run_key.clone(), session.clone());
+                guard.hot_sessions.insert(run_key.clone(), session.clone());
                 session
             }
         };
@@ -951,7 +977,8 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             );
             return;
         }
-        if archive_name == "source-model.json"
+        if (archive_name == "source-model.json"
+            || archive_name == crate::source_inputs::ARCHIVE_FILE)
             && images.contains(archive_name)
             && let Ok(bytes) = fs::read(root.join(archive_name))
         {

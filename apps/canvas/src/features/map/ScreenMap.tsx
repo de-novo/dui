@@ -54,6 +54,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
+import type { SourceInputRenderContext } from "../model/sourceInputs";
 import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
 
 /** Where an outgoing link edge starts on a card: the first anchor to its target, and the others. */
@@ -73,6 +74,8 @@ type CardNode = Node<
     liveRun?: string;
     sourceModel?: Model;
     modelRenderer?: SourceModelRenderer;
+    modelHeight?: number;
+    modelInput?: SourceInputRenderContext;
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -310,6 +313,9 @@ function Card({
         dimmed={data.dimmed}
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
+        modelWidth={data.width}
+        modelHeight={data.modelHeight}
+        modelInput={data.modelInput}
         openComments={data.openComments}
         screenDiff={data.screenDiff}
         diffVisualMode={data.diffVisualMode}
@@ -526,6 +532,8 @@ export function ScreenMap({
   liveRun,
   sourceModel,
   modelRenderer,
+  modelHeight,
+  modelInput,
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -552,6 +560,10 @@ export function ScreenMap({
   liveRun?: string;
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit logical viewport height for source-model cards. */
+  modelHeight?: number;
+  /** Explicit archived fixture values for the selected source-input state. */
+  modelInput?: SourceInputRenderContext;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -582,9 +594,10 @@ export function ScreenMap({
       return updated ?? previous;
     });
   }, []);
+  const expandModelContent = Boolean(sourceModel && modelRenderer);
   const layout = useMemo(
-    () => layoutMap(archive, width, mode, heights),
-    [archive, width, mode, heights],
+    () => layoutMap(archive, width, mode, heights, expandModelContent),
+    [archive, width, mode, heights, expandModelContent],
   );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { cardWidth, frameHeight, column, row } = layout.metrics;
@@ -660,6 +673,8 @@ export function ScreenMap({
             liveRun,
             sourceModel,
             modelRenderer,
+            modelHeight,
+            modelInput,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -683,6 +698,8 @@ export function ScreenMap({
       liveRun,
       sourceModel,
       modelRenderer,
+      modelHeight,
+      modelInput,
       diffsByPath,
       diffActive,
       mode,

@@ -1,12 +1,17 @@
 // Draw the versioned model in an inert document. Source tags, attributes and CSS never pass through.
 import { Ajv2020 } from "ajv/dist/2020.js";
-import schema from "../../../../../schemas/source-model.v1.schema.json";
+import schema from "../../../../../schemas/source-model.v1.schema.json" with { type: "json" };
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 export type Expr =
   | { kind: "literal"; value: Json }
   | { kind: "slot"; slot: string; path?: string[] }
   | { kind: "item"; list: string; path?: string[] }
+  | { kind: "binding"; name: string; path?: string[] }
+  | { kind: "object"; properties: Record<string, Expr> }
+  | { kind: "index"; object: Expr; key: Expr }
+  | { kind: "unary"; operator: string; value: Expr }
+  | { kind: "binary"; operator: string; left: Expr; right: Expr }
   | { kind: "opaque"; text: string; reads?: Expr[] };
 type TypeRef =
   | { kind: "boolean" | "string" | "number" | "node" | "function" }
@@ -46,6 +51,7 @@ type Condition = {
   interaction?: "hover" | "focus" | "pressed" | "disabled";
   colorScheme?: "light" | "dark";
   expr?: Expr;
+  equals?: Json;
 };
 type Declaration = {
   property: string;
@@ -56,7 +62,18 @@ type Declaration = {
 type Arm = { when: "otherwise" | { equals: Json } | { truthy: boolean }; children?: Node[] };
 export type ModelNode = {
   id: string;
-  kind: "fragment" | "element" | "instance" | "text" | "branch" | "list" | "outlet" | "placeholder";
+  kind:
+    | "fragment"
+    | "element"
+    | "instance"
+    | "text"
+    | "branch"
+    | "list"
+    | "outlet"
+    | "renderFunction"
+    | "invoke"
+    | "createElement"
+    | "placeholder";
   tag?: string;
   module?: string;
   component?: string;
@@ -71,6 +88,12 @@ export type ModelNode = {
   item?: string;
   itemType?: TypeRef;
   key?: Expr;
+  parameters?: (
+    | { kind: "identifier"; name: string }
+    | { kind: "object"; properties: Record<string, string> }
+  )[];
+  callee?: Expr;
+  arguments?: Expr[];
   style?: Declaration[];
   unresolvedStyle?: { text: string; reason?: string }[];
 };
@@ -95,6 +118,39 @@ export type Model = {
   documentStyle?: {
     root?: DocumentElementStyle;
     body?: DocumentElementStyle;
+    externalStylesheets?: string[];
+    fontFaces?: {
+      id: string;
+      family: string;
+      style?: string;
+      weight?: string;
+      stretch?: string;
+      display?: string;
+      unicodeRange?: string;
+      stylesheet?: string;
+      stylesheetSha256?: string;
+      sources: (
+        | {
+            kind: "asset";
+            path: string;
+            asset: string;
+            sha256: string;
+            bytes: number;
+            format?: string;
+            license?: string;
+          }
+        | {
+            kind: "external";
+            url: string;
+            format?: string;
+            asset?: string;
+            sha256?: string;
+            bytes?: number;
+            retrievedUrl?: string;
+            license?: string;
+          }
+      )[];
+    }[];
   };
   files?: Record<string, unknown>[];
   itemSchemas?: Record<string, unknown>[];
@@ -122,12 +178,19 @@ export type ModelRenderContext = {
   /** Initial user-agent font size for media thresholds and root font percentages. */
   initialFontSize?: number;
   colorScheme?: "light" | "dark";
+  slotValues?: Record<string, Json>;
+  expressionValues?: Record<string, Json>;
+  /** Resolve a content-addressed archive asset for same-run font bytes. */
+  assetUrl?: (asset: string) => string;
 };
 export type ModelRenderResult = {
   /** Full inert document, for the sandboxed model workbench iframe. */
   html: string;
   /** Style and body markup, for mounting in a shadow root inside a map card. */
   markup: string;
+  /** Logical viewport used for the isolated card document. */
+  viewport: { width: number; height?: number };
+  fontCss: string;
   /** Model facts that could not be drawn, with their source text where the model records it. */
   unresolved: string[];
 };
@@ -211,6 +274,7 @@ const directCss: Record<string, string> = {
   borderLeftStyle: "border-left-style",
   borderRadius: "border-radius",
   borderWidth: "border-width",
+  boxShadow: "box-shadow",
 };
 const compositeProperties = new Set([
   "dotRadius",
@@ -225,7 +289,7 @@ const compositeProperties = new Set([
 ]);
 
 const baseCss = `
-*{box-sizing:border-box}:host{display:block;color:#111;background:#fff;}body{margin:0;color:#111;background:#fff}h1,h2,h3,h4,h5,h6,p,pre,ul,ol,dl,dd{margin:0}a{text-decoration:underline}button,input,textarea,select{font:inherit}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
+:host{display:block}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
 `;
 
 type LengthEnvironment = {
@@ -303,11 +367,27 @@ function cssValue(v: Value, env: LengthEnvironment): string | undefined {
   }
 }
 
-type Resolved = { known: boolean; value?: unknown };
-type Scope = { slots: Map<string, unknown>; items: Map<string, unknown> };
+export type ResolvedExpression = { known: boolean; value?: unknown };
+type Resolved = ResolvedExpression;
+type Scope = {
+  slots: Map<string, unknown>;
+  items: Map<string, unknown>;
+  bindings: Map<string, unknown>;
+  expressions: Map<string, unknown>;
+};
 type NodeContent = { nodeContent: true; nodes: Node[]; scope: Scope };
+type FunctionContent = {
+  functionContent: true;
+  parameters: NonNullable<Node["parameters"]>;
+  nodes: Node[];
+  scope: Scope;
+};
 const isNodeContent = (value: unknown): value is NodeContent =>
   typeof value === "object" && value !== null && (value as NodeContent).nodeContent === true;
+const isFunctionContent = (value: unknown): value is FunctionContent =>
+  typeof value === "object" &&
+  value !== null &&
+  (value as FunctionContent).functionContent === true;
 
 function lookupPath(value: unknown, path: string[] | undefined): Resolved {
   let current = value;
@@ -332,12 +412,112 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
     if (!scope.items.has(e.list)) return { known: false };
     return lookupPath(scope.items.get(e.list), e.path);
   }
+  if (e.kind === "binding") {
+    if (!scope.bindings.has(e.name)) return { known: false };
+    return lookupPath(scope.bindings.get(e.name), e.path);
+  }
+  if (e.kind === "opaque" && scope.expressions.has(e.text)) {
+    return { known: true, value: scope.expressions.get(e.text) };
+  }
+  if (e.kind === "index") {
+    const object = resolveExpr(e.object, scope);
+    if (!object.known) return { known: false };
+    const keyValue = resolveExpr(e.key, scope);
+    if (!keyValue.known) return { known: false };
+    const key =
+      typeof keyValue.value === "string"
+        ? keyValue.value
+        : typeof keyValue.value === "number" && Number.isFinite(keyValue.value)
+          ? String(keyValue.value)
+          : undefined;
+    if (
+      key === undefined ||
+      (typeof object.value !== "object" && typeof object.value !== "function") ||
+      object.value === null ||
+      !Object.hasOwn(object.value, key)
+    )
+      return { known: false };
+    return { known: true, value: (object.value as Record<string, unknown>)[key] };
+  }
+  if (e.kind === "object") {
+    const value: Record<string, unknown> = {};
+    for (const [key, property] of Object.entries(e.properties)) {
+      const resolved = resolveExpr(property, scope);
+      if (!resolved.known) return { known: false };
+      value[key] = resolved.value;
+    }
+    return { known: true, value };
+  }
+  if (e.kind === "unary") {
+    if (e.operator !== "!") return { known: false };
+    const value = resolveExpr(e.value, scope);
+    return value.known ? { known: true, value: !truthy(value.value) } : value;
+  }
+  if (e.kind === "binary") {
+    const left = resolveExpr(e.left, scope);
+    if (e.operator === "&&") {
+      if (left.known && !truthy(left.value)) return left;
+      const right = resolveExpr(e.right, scope);
+      if (!left.known && right.known && !truthy(right.value)) return { known: true, value: false };
+      return left.known ? right : { known: false };
+    }
+    if (e.operator === "||") {
+      if (left.known && truthy(left.value)) return left;
+      const right = resolveExpr(e.right, scope);
+      if (!left.known && right.known && truthy(right.value)) return { known: true, value: true };
+      return left.known ? right : { known: false };
+    }
+    if (!left.known) return { known: false };
+    const right = resolveExpr(e.right, scope);
+    if (!right.known) return { known: false };
+    if (e.operator === "??") return left.value === null || left.value === undefined ? right : left;
+    if (e.operator === "===") return { known: true, value: sameJson(left.value, right.value) };
+    if (e.operator === "!==") return { known: true, value: !sameJson(left.value, right.value) };
+    if (e.operator === ">" || e.operator === ">=" || e.operator === "<" || e.operator === "<=") {
+      const a = typeof left.value === "number" ? left.value : undefined;
+      const b = typeof right.value === "number" ? right.value : undefined;
+      if (a === undefined || b === undefined) return { known: false };
+      const value =
+        e.operator === ">"
+          ? a > b
+          : e.operator === ">="
+            ? a >= b
+            : e.operator === "<"
+              ? a < b
+              : a <= b;
+      return { known: true, value };
+    }
+  }
   return { known: false };
+}
+
+export function resolveModelExpression(
+  e: Expr,
+  values: {
+    slots?: Record<string, unknown>;
+    items?: Record<string, unknown>;
+    bindings?: Record<string, unknown>;
+    expressions?: Record<string, unknown>;
+  } = {},
+): ResolvedExpression {
+  return resolveExpr(e, {
+    slots: new Map(Object.entries(values.slots ?? {})),
+    items: new Map(Object.entries(values.items ?? {})),
+    bindings: new Map(Object.entries(values.bindings ?? {})),
+    expressions: new Map(Object.entries(values.expressions ?? {})),
+  });
 }
 function exprLabel(e: Expr): string {
   if (e.kind === "literal") return JSON.stringify(e.value);
   if (e.kind === "opaque") return e.text.length > 42 ? e.text.slice(0, 41) + "…" : e.text;
-  const base = e.kind === "slot" ? e.slot : `${e.list} item`;
+  if (e.kind === "unary") return e.operator + exprLabel(e.value);
+  if (e.kind === "binary") return `${exprLabel(e.left)}${e.operator}${exprLabel(e.right)}`;
+  if (e.kind === "index") return `${exprLabel(e.object)}[${exprLabel(e.key)}]`;
+  if (e.kind === "object")
+    return `{${Object.entries(e.properties)
+      .map(([key, value]) => `${key}:${exprLabel(value)}`)
+      .join(",")}}`;
+  const base = e.kind === "slot" ? e.slot : e.kind === "binding" ? e.name : `${e.list} item`;
   const name = base.split("#").at(-1)?.split(".").at(-1) ?? base;
   return name + (e.path?.length ? "." + e.path.join(".") : "");
 }
@@ -353,7 +533,12 @@ function truthy(value: unknown): boolean {
   return Boolean(value);
 }
 function copyScope(scope: Scope): Scope {
-  return { slots: new Map(scope.slots), items: new Map(scope.items) };
+  return {
+    slots: new Map(scope.slots),
+    items: new Map(scope.items),
+    bindings: new Map(scope.bindings),
+    expressions: scope.expressions,
+  };
 }
 function lengthPx(
   length: { value: number; unit: string } | undefined,
@@ -416,10 +601,29 @@ function modeledRootFontSize(
   return initialFontSize;
 }
 
+function documentConditionStatus(
+  when: Condition | undefined,
+  env: LengthEnvironment,
+  colorScheme: "light" | "dark",
+): "yes" | "no" | "unknown" {
+  if (!when) return "yes";
+  const min = lengthPx(when.minWidth, env.initialFontSize);
+  const max = lengthPx(when.maxWidth, env.initialFontSize);
+  if ((when.minWidth && min === undefined) || (when.maxWidth && max === undefined))
+    return "unknown";
+  if (min !== undefined && env.width < min) return "no";
+  if (max !== undefined && env.width > max) return "no";
+  if (when.interaction) return "no";
+  if (when.colorScheme && when.colorScheme !== colorScheme) return "no";
+  if (when.expr) return "unknown";
+  return "yes";
+}
+
 function documentTypographyCss(
   declarations: Declaration[] | undefined,
   env: LengthEnvironment,
   note: (text: string) => void,
+  colorScheme: "light" | "dark",
   skipFontSize = false,
 ): string {
   const typography = new Set([
@@ -429,6 +633,14 @@ function documentTypographyCss(
     "fontStyle",
     "lineHeight",
     "letterSpacing",
+    "color",
+    "background",
+    "width",
+    "minWidth",
+    "maxWidth",
+    "height",
+    "minHeight",
+    "maxHeight",
   ]);
   const output: string[] = [];
   for (const declaration of declarations ?? []) {
@@ -437,12 +649,63 @@ function documentTypographyCss(
       (skipFontSize && declaration.property === "fontSize")
     )
       continue;
+    const applies = documentConditionStatus(declaration.when, env, colorScheme);
+    if (applies === "no") continue;
+    if (applies === "unknown") {
+      note(declaration.from.text);
+      continue;
+    }
     const key = directCss[declaration.property];
-    const value = !declaration.when && cssValue(declaration.value, env);
+    const value = cssValue(declaration.value, env);
     if (key && value && CSS.supports(key, value)) output.push(`${key}:${value}`);
     else note(declaration.from.text);
   }
   return output.join(";");
+}
+
+function escapeCssString(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("\n", " ");
+}
+
+function fontDescriptor(
+  value: string | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  if (!value) return fallback;
+  return /^[a-zA-Z0-9][a-zA-Z0-9 .%_-]{0,63}$/.test(value) ? value : undefined;
+}
+
+function fontUnicodeRange(value: string | undefined): string | undefined {
+  return value && value.length <= 256 && /^[Uu+0-9A-Fa-f?,\-\s]+$/.test(value) ? value : undefined;
+}
+
+function fontFacesCss(model: Model, context: ModelRenderContext): string {
+  const resolve = context.assetUrl ?? ((asset: string) => asset);
+  const rules: string[] = [];
+  for (const face of model.documentStyle?.fontFaces ?? []) {
+    const sources = face.sources.flatMap((source) => {
+      const asset =
+        source.kind === "asset" || (source.kind === "external" && source.asset && source.sha256)
+          ? source.asset
+          : undefined;
+      if (!asset) return [];
+      const format = fontDescriptor(source.format, "");
+      return [
+        `url("${escapeCssString(resolve(asset))}")${format ? ` format("${escapeCssString(format)}")` : ""}`,
+      ];
+    });
+    if (!sources.length || !face.family) continue;
+    const weight = fontDescriptor(face.weight, "normal");
+    const style = fontDescriptor(face.style, "normal");
+    const stretch = fontDescriptor(face.stretch, "normal");
+    const display = fontDescriptor(face.display, undefined);
+    const unicodeRange = fontUnicodeRange(face.unicodeRange);
+    if (!weight || !style || !stretch) continue;
+    rules.push(
+      `@font-face{font-family:"${escapeCssString(face.family)}";src:${sources.join(",")};font-style:${style};font-weight:${weight};font-stretch:${stretch}${display ? `;font-display:${display}` : ""}${unicodeRange ? `;unicode-range:${unicodeRange}` : ""}}`,
+    );
+  }
+  return rules.join("");
 }
 
 function renderDom(model: Model, componentId: string, context: ModelRenderContext = {}) {
@@ -461,8 +724,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     const doc = document.implementation.createHTMLDocument("");
     const policy = doc.createElement("meta");
     policy.httpEquiv = "Content-Security-Policy";
-    policy.content =
-      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+    const fontCss = fontFacesCss(model, context);
+    policy.content = fontCss
+      ? "default-src 'none'; style-src 'unsafe-inline'; font-src data: http:; base-uri 'none'; form-action 'none'"
+      : "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
     doc.head.append(policy);
     const style = doc.createElement("style");
     style.textContent = baseCss;
@@ -488,14 +753,20 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       model.documentStyle?.root?.style,
       env,
       documentNote,
+      colorScheme,
       true,
     );
-    const bodyCss = documentTypographyCss(model.documentStyle?.body?.style, env, documentNote);
+    const bodyCss = documentTypographyCss(
+      model.documentStyle?.body?.style,
+      env,
+      documentNote,
+      colorScheme,
+    );
     const rootBase = `font-family:system-ui,sans-serif;font-size:${rootFontSize}px`;
     const documentCss = isolated
       ? `:host{${[rootBase, rootCss].filter(Boolean).join(";")}}.dui-document-body{${bodyCss}}`
       : `html{${[rootBase, rootCss].filter(Boolean).join(";")}}body{${bodyCss}}`;
-    style.textContent = baseCss + documentCss;
+    style.textContent = baseCss + fontCss + documentCss;
 
     function conditionStatus(when: Condition | undefined, scope: Scope): "yes" | "no" | "unknown" {
       if (!when) return "yes";
@@ -511,7 +782,10 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (when.expr) {
         const value = resolveExpr(when.expr, scope);
         if (!value.known) unknown = true;
-        else if (!truthy(value.value)) return "no";
+        else if (
+          when.equals !== undefined ? !sameJson(value.value, when.equals) : !truthy(value.value)
+        )
+          return "no";
       }
       return unknown ? "unknown" : "yes";
     }
@@ -606,6 +880,22 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       for (const u of n.unresolvedStyle ?? []) note(n, u.text);
     }
 
+    function resolvedPropEntries(n: Node, scope: Scope): [string, unknown][] {
+      const entries: [string, unknown][] = [];
+      for (const [name, expr] of Object.entries(n.props ?? {})) {
+        const value = resolveExpr(expr, scope);
+        if (!value.known || value.value === undefined || value.value === null) continue;
+        if (
+          name.startsWith("...") &&
+          typeof value.value === "object" &&
+          !Array.isArray(value.value)
+        ) {
+          for (const [key, spread] of Object.entries(value.value)) entries.push([key, spread]);
+        } else entries.push([name, value.value]);
+      }
+      return entries;
+    }
+
     function applyProps(el: HTMLElement, n: Node, scope: Scope) {
       const visualAttributes = new Set([
         "type",
@@ -626,15 +916,13 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         "rowspan",
         "for",
       ]);
-      for (const [name, expr] of Object.entries(n.props ?? {})) {
+      for (const [name, raw] of resolvedPropEntries(n, scope)) {
         if (!visualAttributes.has(name)) continue;
-        const value = resolveExpr(expr, scope);
-        if (!value.known || value.value === undefined || value.value === null) continue;
         const attr = name === "for" ? "for" : name;
-        if (typeof value.value === "boolean") {
-          if (value.value) el.setAttribute(attr, "");
-        } else if (typeof value.value === "string" || typeof value.value === "number") {
-          el.setAttribute(attr, String(value.value));
+        if (typeof raw === "boolean") {
+          if (raw) el.setAttribute(attr, "");
+        } else if (typeof raw === "string" || typeof raw === "number") {
+          el.setAttribute(attr, String(raw));
         }
       }
       if (el instanceof HTMLInputElement || el instanceof HTMLButtonElement) el.tabIndex = -1;
@@ -654,13 +942,29 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (!c || stack.includes(id) || stack.length >= 64)
         return placeholder("Unresolved component");
       const slots = new Map<string, unknown>();
-      const scope: Scope = { slots, items: new Map() };
+      const scope: Scope = {
+        slots,
+        items: new Map(),
+        bindings: new Map(),
+        expressions: new Map(Object.entries(context.expressionValues ?? {})),
+      };
+      const ordinary = new Set(
+        (c.slots ?? []).filter((s) => !s.name.startsWith("...")).map((s) => s.name),
+      );
+      const rest = new Map<string, unknown>();
+      for (const [key, value] of props)
+        if (!ordinary.has(key) && value !== undefined) rest.set(key, value);
       for (const s of c.slots ?? []) {
-        const initial = props.has(s.name)
-          ? { known: true, value: props.get(s.name) }
-          : s.initial
-            ? resolveExpr(s.initial, scope)
-            : { known: false };
+        const explicit = Object.hasOwn(context.slotValues ?? {}, s.id);
+        const initial = s.name.startsWith("...")
+          ? { known: true, value: Object.fromEntries(rest) }
+          : props.has(s.name)
+            ? { known: true, value: props.get(s.name) }
+            : explicit
+              ? { known: true, value: context.slotValues?.[s.id] }
+              : s.initial
+                ? resolveExpr(s.initial, scope)
+                : { known: false };
         if (initial.known) slots.set(s.id, initial.value);
       }
       return draw(c.root, scope, [...stack, id]);
@@ -682,14 +986,26 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
           }),
         );
         if (target && n.children?.length) {
-          const content: NodeContent = {
-            nodeContent: true,
-            nodes: n.children,
-            scope: copyScope(scope),
-          };
-          for (const slot of target.slots ?? [])
-            if (slot.type.kind === "node" && slot.name === "children" && !props.has(slot.name))
-              props.set(slot.name, content);
+          const functionChild =
+            n.children.length === 1 && n.children[0].kind === "renderFunction"
+              ? n.children[0]
+              : undefined;
+          const content: NodeContent | FunctionContent = functionChild
+            ? {
+                functionContent: true,
+                parameters: functionChild.parameters ?? [],
+                nodes: functionChild.children ?? [],
+                scope: copyScope(scope),
+              }
+            : {
+                nodeContent: true,
+                nodes: n.children,
+                scope: copyScope(scope),
+              };
+          const acceptsChildren = (target.slots ?? []).some(
+            (slot) => slot.name === "children" || slot.name.startsWith("..."),
+          );
+          if (acceptsChildren && !props.has("children")) props.set("children", content);
         }
         return component(n.component!, props, stack);
       }
@@ -699,6 +1015,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
           const value = resolveExpr(expr, scope);
           if (value.known && (typeof value.value === "string" || typeof value.value === "number"))
             text.append(String(value.value));
+          else if (value.known && isNodeContent(value.value))
+            drawChildren(value.value.nodes, value.value.scope, stack, text);
           else if (
             !value.known ||
             (typeof value.value === "object" && value.value !== null && value.value !== undefined)
@@ -738,6 +1056,42 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         drawChildren(value.nodes, value.scope, stack, group);
         return group;
       }
+      if (n.kind === "renderFunction") return placeholder("render function value");
+      if (n.kind === "invoke") {
+        const value = n.callee ? resolveExpr(n.callee, scope) : { known: false };
+        if (!value.known || !isFunctionContent(value.value))
+          return placeholder(exprLabel(n.callee!));
+        const args = (n.arguments ?? []).map((argument) => resolveExpr(argument, scope));
+        const nested = copyScope(value.value.scope);
+        (value.value.parameters ?? []).forEach((parameter, index) => {
+          const argument = args[index];
+          if (parameter.kind === "identifier") {
+            if (argument?.known) nested.bindings.set(parameter.name, argument.value);
+            return;
+          }
+          for (const [key, name] of Object.entries(parameter.properties)) {
+            if (!argument?.known) continue;
+            const property = lookupPath(argument.value, [key]);
+            if (property.known) nested.bindings.set(name, property.value);
+          }
+        });
+        const group = doc.createDocumentFragment();
+        drawChildren(value.value.nodes, nested, stack, group);
+        return group;
+      }
+      if (n.kind === "createElement") {
+        const tagExpr = n.tag as unknown as Expr | undefined;
+        const resolved = tagExpr ? resolveExpr(tagExpr, scope) : { known: false };
+        const tag =
+          resolved.known && typeof resolved.value === "string" ? resolved.value : undefined;
+        if (!tag || !tags.has(tag))
+          return placeholder(tagExpr ? exprLabel(tagExpr) : "createElement");
+        const el = doc.createElement(tag);
+        el.dataset.modelNode = n.id;
+        applyProps(el, n, scope);
+        drawChildren(n.children, scope, stack, el);
+        return el;
+      }
       if (n.kind !== "element") return placeholder(n.reason ?? n.kind);
       if (n.module) {
         const el = doc.createElement("span");
@@ -757,7 +1111,16 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       el.dataset.modelNode = n.id;
       applyStyles(el, n, scope);
       applyProps(el, n, scope);
-      drawChildren(n.children, scope, stack, el);
+      const childrenProp = resolvedPropEntries(n, scope)
+        .reverse()
+        .find(([name]) => name === "children")?.[1];
+      if (isNodeContent(childrenProp)) {
+        drawChildren(childrenProp.nodes, childrenProp.scope, stack, el);
+      } else if (typeof childrenProp === "string" || typeof childrenProp === "number") {
+        el.append(String(childrenProp));
+      } else {
+        drawChildren(n.children, scope, stack, el);
+      }
       return el;
     }
 
@@ -770,10 +1133,12 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
     } else {
       doc.body.append(root);
     }
-    const markup = `<style>${baseCss}${documentCss}</style>` + doc.body.innerHTML;
+    const markup = `<style>${baseCss}${fontCss}${documentCss}</style>` + doc.body.innerHTML;
     return {
       html: "<!doctype html>" + doc.documentElement.outerHTML,
       markup,
+      viewport: { width, ...(height === undefined ? {} : { height }) },
+      fontCss,
       unresolved: [...unresolved],
     };
   };
@@ -783,6 +1148,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
   return {
     html: iframe.html,
     markup: card.markup,
+    viewport: card.viewport,
+    fontCss: card.fontCss,
     unresolved: [...new Set([...iframe.unresolved, ...card.unresolved])],
   };
 }
