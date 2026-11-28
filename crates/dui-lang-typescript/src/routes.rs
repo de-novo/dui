@@ -1030,10 +1030,207 @@ fn discover_navigate_edges(files: &Files, model: &mut m::SourceModel) {
     model.edges.extend(additions);
 }
 
+struct TanstackRoute {
+    local: String,
+    module: String,
+    path: String,
+    parent: String,
+    location: m::Location,
+}
+
+fn tanstack_updates(files: &Files) -> Vec<TanstackRoute> {
+    let mut routes = Vec::new();
+    for file in files.values().filter(|file| !file.path.ends_with(".css")) {
+        for declaration in file.declarations() {
+            if declaration.kind() != "variable_declarator" {
+                continue;
+            }
+            let Some(local) = file
+                .name(declaration, "name")
+                .filter(|name| {
+                    !name.is_empty()
+                        && name
+                            .bytes()
+                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+                })
+                .map(str::to_owned)
+            else {
+                continue;
+            };
+            let Some(call) = field(declaration, "value").map(unwrap_static) else {
+                continue;
+            };
+            if call.kind() != "call_expression" {
+                continue;
+            }
+            let Some(function) = field(call, "function").map(unwrap_static) else {
+                continue;
+            };
+            if function.kind() != "member_expression"
+                || file.name(function, "property") != Some("update")
+            {
+                continue;
+            }
+            let Some(receiver) = field(function, "object").map(unwrap_static) else {
+                continue;
+            };
+            if receiver.kind() != "identifier" {
+                continue;
+            }
+            let Some((module, exported)) = file.bindings.get(file.text(receiver)) else {
+                continue;
+            };
+            if exported != "Route" {
+                continue;
+            }
+            let Some(options) = field(call, "arguments")
+                .and_then(first)
+                .map(unwrap_static)
+                .filter(|node| node.kind() == "object")
+            else {
+                continue;
+            };
+            let (Some(path), Some(parent_node)) = (
+                object_value(file, options, "path")
+                    .and_then(|node| static_string(files, file, node)),
+                object_value(file, options, "getParentRoute"),
+            ) else {
+                continue;
+            };
+            let parent = descendants(parent_node)
+                .into_iter()
+                .find(|node| node.kind() == "identifier" && file.text(*node) != "getParentRoute")
+                .map(|node| file.text(node).to_owned())
+                .unwrap_or_default();
+            routes.push(TanstackRoute {
+                local,
+                module: module.clone(),
+                path,
+                parent,
+                location: file.loc(options),
+            });
+        }
+    }
+    routes
+}
+
+fn tanstack_component(files: &Files, scan: &RouteScan<'_>, path: &str) -> Option<String> {
+    let file = files.get(path)?;
+    for node in descendants(file.tree.root_node()) {
+        if node.kind() != "object" {
+            continue;
+        }
+        let Some(component) = object_value(file, node, "component").map(unwrap_static) else {
+            continue;
+        };
+        if component.kind() == "identifier"
+            && let Some(id) = scan.component_id(file, file.text(component))
+        {
+            return Some(id);
+        }
+    }
+    None
+}
+
+fn tanstack_full_path(
+    local: &str,
+    by_local: &BTreeMap<String, TanstackRoute>,
+    memo: &mut BTreeMap<String, Option<String>>,
+    active: &mut BTreeSet<String>,
+) -> Option<String> {
+    if let Some(path) = memo.get(local) {
+        return path.clone();
+    }
+    if !active.insert(local.to_owned()) {
+        return None;
+    }
+    let route = by_local.get(local)?;
+    let parent = if route.parent.to_ascii_lowercase().contains("rootroute") {
+        Some(String::new())
+    } else if by_local.contains_key(&route.parent) {
+        tanstack_full_path(&route.parent, by_local, memo, active)
+    } else {
+        Some(String::new())
+    }?;
+    let child = route.path.trim_matches('/');
+    let full = if child.is_empty() {
+        if parent.is_empty() {
+            "/".into()
+        } else {
+            parent
+        }
+    } else if parent.is_empty() {
+        normalize_route(&route.path)
+    } else {
+        normalize_route(&format!("{}/{child}", parent.trim_end_matches('/')))
+    };
+    active.remove(local);
+    memo.insert(local.to_owned(), Some(full.clone()));
+    Some(full)
+}
+
+fn discover_tanstack_routes(files: &Files, model: &mut m::SourceModel) {
+    let updates = tanstack_updates(files);
+    if updates.is_empty() {
+        return;
+    }
+    let components: BTreeSet<String> = model
+        .components
+        .iter()
+        .map(|component| component.id.clone())
+        .collect();
+    let scan = RouteScan {
+        files,
+        components: &components,
+        candidates: Vec::new(),
+        diagnostics: Vec::new(),
+    };
+    let by_local: BTreeMap<_, _> = updates
+        .into_iter()
+        .map(|route| (route.local.clone(), route))
+        .collect();
+    let mut memo = BTreeMap::new();
+    for local in by_local.keys().cloned().collect::<Vec<_>>() {
+        let mut active = BTreeSet::new();
+        tanstack_full_path(&local, &by_local, &mut memo, &mut active);
+    }
+    for (local, route) in &by_local {
+        let Some(full) = memo.get(local).cloned().flatten() else {
+            continue;
+        };
+        if full.contains('$') || full.contains('*') {
+            continue;
+        }
+        let Some(component) = tanstack_component(files, &scan, &route.module) else {
+            continue;
+        };
+        if model
+            .screens
+            .iter()
+            .any(|screen| screen.route.as_deref() == Some(full.as_str()))
+        {
+            continue;
+        }
+        let name = component
+            .rsplit_once('#')
+            .map(|(_, name)| name)
+            .unwrap_or(component.as_str());
+        model.screens.push(m::Screen {
+            id: format!("route:{full}"),
+            name: name.into(),
+            route: Some(full),
+            component,
+            origin: m::Origin::Syntax,
+            location: route.location.clone(),
+        });
+    }
+}
+
 /// Adds React Router object-route screens and imperative navigation edges, then improves
 /// declarative link targets that use the same constant-expression subset.
 pub(crate) fn discover(files: &Files, model: &mut m::SourceModel) {
     discover_object_routes(files, model);
+    discover_tanstack_routes(files, model);
     resolve_link_targets(files, model);
     discover_navigate_edges(files, model);
 }

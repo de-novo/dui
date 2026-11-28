@@ -140,6 +140,27 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             .map(|n| fields(files, file, n))
             .unwrap_or_default();
         for bind in children(pat) {
+            if bind.kind() == "rest_pattern"
+                && let Some(rest) = children(bind)
+                    .into_iter()
+                    .find(|n| n.kind() == "identifier")
+            {
+                let rest_name = file.text(rest);
+                out.push(m::Slot {
+                    id: format!("{id}...{rest_name}"),
+                    name: format!("...{rest_name}"),
+                    kind: m::SlotKind::Prop,
+                    ty: m::TypeRef::Unknown {
+                        text: Some("rest props".into()),
+                    },
+                    optional: true,
+                    initial: None,
+                    source: None,
+                    origin: m::Origin::Syntax,
+                    location: file.loc(rest),
+                });
+                continue;
+            }
             let (name_node, default) = match bind.kind() {
                 "shorthand_property_identifier_pattern" => (Some(bind), None),
                 "object_assignment_pattern" => (field(bind, "left"), field(bind, "right")),
@@ -288,13 +309,10 @@ fn stylesheet_order(files: &Files, entry: &str) -> Vec<String> {
             && let Some(file) = files.get(path)
         {
             for import in &file.ordered_imports {
-                if import.ends_with(".css") {
-                    if !out.contains(import) {
-                        out.push(import.clone());
-                    }
-                } else {
-                    visit(files, import, active, seen, out);
-                }
+                visit(files, import, active, seen, out);
+            }
+            if path.ends_with(".css") && !out.iter().any(|item| item == path) {
+                out.push(path.to_owned());
             }
         }
         active.remove(path);
@@ -310,27 +328,43 @@ fn stylesheet_order(files: &Files, entry: &str) -> Vec<String> {
     out
 }
 
-fn const_declaration(file: &File, declarator: Ast<'_>) -> Option<(String, Value)> {
-    if declarator.kind() != "variable_declarator" {
-        return None;
-    }
-    let parent = declarator.parent()?;
-    if !matches!(
-        parent.kind(),
-        "lexical_declaration" | "variable_declaration"
-    ) || !file.text(parent).trim_start().starts_with("const")
-    {
-        return None;
-    }
-    let name = field(declarator, "name").filter(|n| n.kind() == "identifier")?;
-    let value = field(declarator, "value").and_then(|v| render::static_literal(file, v))?;
-    Some((file.text(name).into(), value))
-}
-
 /// Immutable literal bindings visible to a straightforward component body. This is deliberately
 /// narrower than JavaScript scope: only module constants and constants directly preceding the
 /// component return participate, so nested shadowing cannot make an unrelated value look proven.
-fn constant_env(file: &File, function: Ast<'_>) -> BTreeMap<String, Value> {
+fn env_literal(file: &File, node: Ast<'_>, slots: &[m::Slot]) -> Option<Value> {
+    let node = crate::syntax::unwrap_expr(node);
+    if let Some(value) = render::static_literal(file, node) {
+        return Some(value);
+    }
+    if node.kind() == "identifier" {
+        return slots
+            .iter()
+            .find(|slot| slot.name == file.text(node))
+            .and_then(|slot| slot.initial.as_ref())
+            .and_then(|expr| match expr {
+                m::Expr::Literal { value } => Some(value.clone()),
+                _ => None,
+            });
+    }
+    if node.kind() == "ternary_expression" {
+        let condition = env_literal(file, crate::syntax::field(node, "condition")?, slots)?;
+        let truthy = match condition {
+            Value::Null => false,
+            Value::Bool(value) => value,
+            Value::Number(value) => value.as_f64().is_some_and(|v| v != 0.),
+            Value::String(value) => !value.is_empty(),
+            Value::Array(_) | Value::Object(_) => true,
+        };
+        return env_literal(
+            file,
+            crate::syntax::field(node, if truthy { "consequence" } else { "alternative" })?,
+            slots,
+        );
+    }
+    None
+}
+
+fn constant_env(file: &File, function: Ast<'_>, slots: &[m::Slot]) -> BTreeMap<String, Value> {
     let mut out = BTreeMap::new();
     for node in children(file.tree.root_node()) {
         let declarators: Vec<_> = if node.kind() == "export_statement" {
@@ -344,8 +378,13 @@ fn constant_env(file: &File, function: Ast<'_>) -> BTreeMap<String, Value> {
                 "lexical_declaration" | "variable_declaration"
             ) {
                 for declarator in children(declaration) {
-                    if let Some((name, value)) = const_declaration(file, declarator) {
-                        out.insert(name, value);
+                    if file.text(declaration).trim_start().starts_with("const")
+                        && let Some(name_node) =
+                            field(declarator, "name").filter(|n| n.kind() == "identifier")
+                        && let Some(value) = field(declarator, "value")
+                            .and_then(|value| env_literal(file, value, slots))
+                    {
+                        out.insert(file.text(name_node).into(), value);
                     }
                 }
             }
@@ -361,8 +400,13 @@ fn constant_env(file: &File, function: Ast<'_>) -> BTreeMap<String, Value> {
                 "lexical_declaration" | "variable_declaration"
             ) {
                 for declarator in children(statement) {
-                    if let Some((name, value)) = const_declaration(file, declarator) {
-                        out.insert(name, value);
+                    if file.text(statement).trim_start().starts_with("const")
+                        && let Some(name_node) =
+                            field(declarator, "name").filter(|n| n.kind() == "identifier")
+                        && let Some(value) = field(declarator, "value")
+                            .and_then(|value| env_literal(file, value, slots))
+                    {
+                        out.insert(file.text(name_node).into(), value);
                     }
                 }
             }
@@ -371,8 +415,38 @@ fn constant_env(file: &File, function: Ast<'_>) -> BTreeMap<String, Value> {
     out
 }
 
+fn discover_built_css(project: &Path) -> Option<std::path::PathBuf> {
+    for directory in ["dist", "build"] {
+        let root = project.join(directory);
+        if !root.is_dir() {
+            continue;
+        }
+        let mut pending = vec![root];
+        let mut found = Vec::new();
+        while let Some(dir) = pending.pop() {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    pending.push(path);
+                } else if path.extension().is_some_and(|ext| ext == "css") {
+                    found.push(path);
+                }
+            }
+        }
+        found.sort();
+        if let [path] = found.as_slice() {
+            return path.strip_prefix(project).ok().map(|p| p.to_path_buf());
+        }
+    }
+    None
+}
+
 pub fn extract(project: &Path, entry: &Path) -> Result<m::SourceModel, String> {
-    extract_with_css(project, entry, None)
+    let built = discover_built_css(project);
+    extract_with_css(project, entry, built.as_deref())
 }
 
 pub fn extract_with_css(
@@ -412,7 +486,8 @@ pub fn extract_incremental(
     entry: &Path,
     cache: &mut ParseCache,
 ) -> Result<(m::SourceModel, LoadStats), String> {
-    extract_in_context_impl(project, entry, None, None, None, cache)
+    let built = discover_built_css(project);
+    extract_in_context_impl(project, entry, built.as_deref(), None, None, cache)
 }
 
 fn extract_in_context_impl(
@@ -557,7 +632,7 @@ fn extract_in_context_impl(
                 modules: modules.bindings(file, f),
                 signatures: &signatures,
                 items: vec![],
-                constants: constant_env(file, f),
+                constants: constant_env(file, f, slot),
                 model: &mut model,
             };
             let root = match returned(f) {

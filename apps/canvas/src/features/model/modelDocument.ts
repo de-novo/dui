@@ -225,7 +225,8 @@ const compositeProperties = new Set([
 ]);
 
 const baseCss = `
-*{box-sizing:border-box}:host{display:block;color:#111;background:#fff;}body{margin:0;color:#111;background:#fff}h1,h2,h3,h4,h5,h6,p,pre,ul,ol,dl,dd{margin:0}a{text-decoration:underline}button,input,textarea,select{font:inherit}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
+html{line-height:1.15}body{margin:0;color:#111;background:#fff}h1{font-size:2em;font-weight:700;margin:.67em 0}h2{font-size:1.5em;font-weight:700;margin:.83em 0}p{margin:1em 0}ul,ol,dl{margin:1em 0;padding-inline-start:40px}button{font:inherit;color:inherit;background:buttonface;border:1px solid buttonborder;border-radius:0;padding:1px 6px}*,*::before,*::after{box-sizing:border-box}
+*{box-sizing:border-box}:host{display:block;color:#111;background:#fff}a{text-decoration:underline}button,input,textarea,select{font:inherit}.dui-placeholder{display:inline-block;max-width:100%;padding:1px 4px;border:1px dashed #999;border-radius:3px;color:#555;background:#f4f4f4;font:11px/1.4 ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;vertical-align:baseline}.dui-overlay{display:grid}.dui-overlay>*{grid-area:1/1}[data-model-module]{outline:1px dashed color-mix(in srgb,currentColor 24%,transparent);outline-offset:-1px}
 `;
 
 type LengthEnvironment = {
@@ -626,15 +627,21 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         "rowspan",
         "for",
       ]);
+      const entries: [string, unknown][] = [];
       for (const [name, expr] of Object.entries(n.props ?? {})) {
-        if (!visualAttributes.has(name)) continue;
         const value = resolveExpr(expr, scope);
         if (!value.known || value.value === undefined || value.value === null) continue;
+        if (name.startsWith("...") && typeof value.value === "object" && !Array.isArray(value.value)) {
+          for (const [key, spread] of Object.entries(value.value)) entries.push([key, spread]);
+        } else entries.push([name, value.value]);
+      }
+      for (const [name, raw] of entries) {
+        if (!visualAttributes.has(name)) continue;
         const attr = name === "for" ? "for" : name;
-        if (typeof value.value === "boolean") {
-          if (value.value) el.setAttribute(attr, "");
-        } else if (typeof value.value === "string" || typeof value.value === "number") {
-          el.setAttribute(attr, String(value.value));
+        if (typeof raw === "boolean") {
+          if (raw) el.setAttribute(attr, "");
+        } else if (typeof raw === "string" || typeof raw === "number") {
+          el.setAttribute(attr, String(raw));
         }
       }
       if (el instanceof HTMLInputElement || el instanceof HTMLButtonElement) el.tabIndex = -1;
@@ -655,12 +662,17 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return placeholder("Unresolved component");
       const slots = new Map<string, unknown>();
       const scope: Scope = { slots, items: new Map() };
+      const ordinary = new Set((c.slots ?? []).filter((s) => !s.name.startsWith("...")).map((s) => s.name));
+      const rest = new Map<string, unknown>();
+      for (const [key, value] of props) if (!ordinary.has(key) && value !== undefined) rest.set(key, value);
       for (const s of c.slots ?? []) {
-        const initial = props.has(s.name)
-          ? { known: true, value: props.get(s.name) }
-          : s.initial
-            ? resolveExpr(s.initial, scope)
-            : { known: false };
+        const initial = s.name.startsWith("...")
+          ? { known: true, value: Object.fromEntries(rest) }
+          : props.has(s.name)
+            ? { known: true, value: props.get(s.name) }
+            : s.initial
+              ? resolveExpr(s.initial, scope)
+              : { known: false };
         if (initial.known) slots.set(s.id, initial.value);
       }
       return draw(c.root, scope, [...stack, id]);

@@ -443,20 +443,35 @@ fn ident(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
 }
 
-// The CSS grammar may mark a media range or an empty var() fallback as an error.
-// Both remain inside an intact rule; conditions stay unknown and values are parsed from source.
+// The CSS grammar may mark a media range, container query or an empty var() fallback as an
+// error. These remain inside an intact rule; conditions stay unknown and values are parsed
+// from source. A genuinely broken rule or declaration still rejects the sheet.
 fn structural_error(f: &File, root: Ast<'_>) -> bool {
+    fn recoverable(f: &File, n: Ast<'_>) -> bool {
+        if !n.is_error() {
+            return false;
+        }
+        let text = f.text(n);
+        match n.parent().map(|p| p.kind()) {
+            Some("parenthesized_query") => {
+                !text.contains(['{', '}', ';'])
+                    && (text.starts_with("<=")
+                        || text.starts_with(">=")
+                        || text.starts_with('<')
+                        || text.starts_with('>'))
+            }
+            Some("arguments") => text == ",",
+            Some("at_rule") => text.starts_with("content ") && !text.contains(['{', '}', ';']),
+            _ => false,
+        }
+    }
     let mut pending = vec![root];
     while let Some(n) = pending.pop() {
         if !n.has_error() {
             continue;
         }
         if n.is_error() || n.is_missing() {
-            let parent = n.parent().map(|p| p.kind());
-            if n.is_error()
-                && (parent == Some("parenthesized_query") && !f.text(n).contains(['{', '}', ';'])
-                    || parent == Some("arguments") && f.text(n) == ",")
-            {
+            if recoverable(f, n) {
                 continue;
             }
             return true;
@@ -489,12 +504,20 @@ fn width_query(raw: &str, width: u32) -> Option<bool> {
             .find_map(|op| Some((op, range.strip_prefix(op)?)))?
     };
     let length = length.trim();
+    let scale = if length.ends_with("rem") || length.ends_with("em") {
+        16.
+    } else {
+        1.
+    };
     let threshold = length
         .strip_suffix("px")
+        .or_else(|| length.strip_suffix("rem"))
+        .or_else(|| length.strip_suffix("em"))
         .or_else(|| (length == "0").then_some(length))?
         .parse::<f64>()
         .ok()
-        .filter(|v| v.is_finite() && *v >= 0.)?;
+        .filter(|v| v.is_finite() && *v >= 0.)?
+        * scale;
     let width = f64::from(width);
     let matched = match op {
         ">=" => width >= threshold,
@@ -562,6 +585,152 @@ fn width_condition(raw: &str) -> Option<m::Condition> {
         color_scheme: None,
         expr: None,
     })
+}
+
+fn split_var_argument(raw: &str) -> Option<(&str, Option<&str>)> {
+    let inner = raw.strip_prefix("var(")?.strip_suffix(')')?;
+    let mut depth = 0usize;
+    for (index, c) in inner.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                return Some((inner[..index].trim(), Some(inner[index + 1..].trim())));
+            }
+            _ => {}
+        }
+    }
+    Some((inner.trim(), None))
+}
+
+/// Resolve one whole var() reference, preferring the custom property and using its fallback
+/// only when the property is absent or uncertain. Nested fallbacks remain source text, never guesses.
+fn resolved_var<'a>(
+    raw: &'a str,
+    vars: &BTreeMap<&'a str, Option<&'a str>>,
+    depth: usize,
+) -> Option<&'a str> {
+    if depth >= 8 {
+        return None;
+    }
+    let (name, fallback) = split_var_argument(raw)?;
+    if let Some(value) = vars.get(name).copied().flatten() {
+        return Some(value);
+    }
+    let fallback = fallback?;
+    if fallback.starts_with("var(") {
+        resolved_var(fallback, vars, depth + 1)
+    } else {
+        Some(fallback)
+    }
+}
+
+fn resolved_value_text<'a>(raw: &'a str, vars: &BTreeMap<&'a str, Option<&'a str>>) -> &'a str {
+    if raw.starts_with("var(") {
+        resolved_var(raw, vars, 0).unwrap_or(raw)
+    } else {
+        raw
+    }
+}
+
+fn length_operand<'a>(
+    raw: &'a str,
+    vars: &BTreeMap<&'a str, Option<&'a str>>,
+) -> Option<m::Length> {
+    let raw = resolved_value_text(raw.trim(), vars);
+    if raw.starts_with("calc(") {
+        return calc_length(raw, vars);
+    }
+    super::numeric_length(raw)
+}
+
+fn calc_length<'a>(raw: &'a str, vars: &BTreeMap<&'a str, Option<&'a str>>) -> Option<m::Length> {
+    let inner = raw.trim().strip_prefix("calc(")?.strip_suffix(')')?.trim();
+    let mut depth = 0usize;
+    let mut operator = None;
+    for (index, c) in inner.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            '+' | '-' | '*' if depth == 0 && index > 0 => operator = Some((index, c)),
+            _ => {}
+        }
+    }
+    let (index, op) = operator?;
+    let left = inner[..index].trim();
+    let right = inner[index + 1..].trim();
+    if op == '*' {
+        let number = left
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite())
+            .map(|n| (n, right))
+            .or_else(|| {
+                right
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|n| n.is_finite())
+                    .map(|n| (n, left))
+            })?;
+        let mut length = length_operand(number.1, vars)?;
+        length.value *= number.0;
+        return (length.value.is_finite()).then_some(length);
+    }
+    let mut left = length_operand(left, vars)?;
+    let mut right = length_operand(right, vars)?;
+    if left.unit != right.unit {
+        use m::LengthUnit as U;
+        match (left.unit, right.unit) {
+            (U::Rem, U::Px) => right.value /= 16.,
+            (U::Px, U::Rem) => right.value *= 16.,
+            _ => return None,
+        }
+        right.unit = left.unit;
+    }
+    match op {
+        '+' => left.value += right.value,
+        '-' => left.value -= right.value,
+        _ => return None,
+    }
+    (left.value.is_finite()).then_some(left)
+}
+
+fn numeric_calc(raw: &str) -> Option<f64> {
+    let inner = raw.trim().strip_prefix("calc(")?.strip_suffix(')')?.trim();
+    let (left, right) = inner.split_once('/')?;
+    let left = left.trim().parse::<f64>().ok()?;
+    let right = right.trim().parse::<f64>().ok()?;
+    (right != 0.)
+        .then_some(left / right)
+        .filter(|v| v.is_finite())
+}
+
+fn model_length<'a>(
+    property: P,
+    raw: &'a str,
+    vars: &BTreeMap<&'a str, Option<&'a str>>,
+) -> Option<V> {
+    let raw = resolved_value_text(raw.trim(), vars);
+    if raw.starts_with("calc(") {
+        if property == P::LineHeight
+            && let Some(value) = numeric_calc(raw).filter(|v| *v >= 0.)
+        {
+            return Some(V::Number { value });
+        }
+        let length = calc_length(raw, vars)?;
+        return Some(V::Length {
+            value: length.value,
+            unit: length.unit,
+        });
+    }
+    if property == P::LineHeight
+        && let Ok(value) = raw.parse::<f64>()
+        && value.is_finite()
+        && value >= 0.
+    {
+        return Some(V::Number { value });
+    }
+    super::length(raw)
 }
 
 impl<'a> Sheet<'a> {
@@ -654,8 +823,12 @@ impl<'a> Sheet<'a> {
                     let Some((_, raw)) = f.text(node).split_once(':') else {
                         continue;
                     };
-                    let value = raw.trim_end_matches(';').trim();
                     let important = parts.iter().any(|p| p.kind() == "important");
+                    let value = raw.trim_end_matches(';').trim();
+                    let value = value
+                        .strip_suffix("!important")
+                        .map(str::trim_end)
+                        .unwrap_or(value);
                     if matches!(prop, "writing-mode" | "-webkit-writing-mode" | "all") {
                         sheet.horizontal_block = false;
                     }
@@ -723,13 +896,10 @@ impl<'a> Sheet<'a> {
                             }
                         } else if root_attribute.is_some() {
                             ambiguous_variables.insert(prop);
+                        } else if root && !uncertain && !important {
+                            sheet.vars.insert(prop, Some(value));
                         } else {
-                            let definition = (root && !uncertain && !important).then_some(value);
-                            sheet
-                                .vars
-                                .entry(prop)
-                                .and_modify(|v| *v = None)
-                                .or_insert(definition);
+                            sheet.vars.entry(prop).or_insert(None);
                         }
                     } else {
                         for property in affected(prop) {
@@ -764,13 +934,7 @@ impl<'a> Sheet<'a> {
                                     })
                                     .collect()
                             });
-                        stack.push((
-                            *body,
-                            f.text(*selectors),
-                            layer,
-                            uncertain || !selector.is_empty(),
-                            when.clone(),
-                        ));
+                        stack.push((*body, f.text(*selectors), layer, uncertain, when.clone()));
                     }
                 }
                 "at_rule" if parts.first().is_some_and(|p| f.text(*p) == "@layer") => {
@@ -925,8 +1089,8 @@ impl<'a> Sheet<'a> {
         vars: &BTreeMap<&str, Option<&str>>,
     ) -> Option<V> {
         let raw = rule.value;
-        let raw = if let Some(name) = raw.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
-            vars.get(name.trim()).copied().flatten()?
+        let raw = if raw.starts_with("var(") {
+            resolved_var(raw, vars, 0)?
         } else {
             raw
         };
@@ -1268,6 +1432,37 @@ impl<'a> Sheet<'a> {
                 .find(|(p, _)| *p == property)
                 .map(|(_, v)| v);
         }
+        if property == P::FontFamily {
+            return Some(V::Keyword { value: raw.into() });
+        }
+        if matches!(
+            property,
+            P::Gap
+                | P::RowGap
+                | P::ColumnGap
+                | P::PaddingTop
+                | P::PaddingBottom
+                | P::PaddingStart
+                | P::PaddingEnd
+                | P::MarginTop
+                | P::MarginBottom
+                | P::MarginStart
+                | P::MarginEnd
+                | P::Width
+                | P::Height
+                | P::MinWidth
+                | P::MaxWidth
+                | P::MinHeight
+                | P::MaxHeight
+                | P::BorderWidth
+                | P::BorderRadius
+                | P::FontSize
+                | P::LineHeight
+                | P::LetterSpacing
+        ) && let Some(value) = model_length(property, raw, vars)
+        {
+            return Some(value);
+        }
         if name != "gap" || !raw.starts_with("calc(") {
             let (props, value) = modules::declaration(name, raw)?;
             return props.contains(&property).then_some(value);
@@ -1442,17 +1637,17 @@ impl<'a> Sheet<'a> {
         let spread = children(open).iter().any(|n| n.kind() == "jsx_expression");
         let mut unknown_rank = None;
         for (order, rule) in rules.iter().enumerate() {
+            let mut rule_exact: Option<(usize, u32, usize)> = None;
+            let mut rule_unknown = None;
             for selector in &self.selectors[rule.selectors] {
                 if selector.subject.excludes(classes, el, spread) {
                     continue;
                 }
                 match contextual_specificity(selector.text, classes, el, file, open) {
                     Some(None) => {}
-                    Some(Some(s)) if !rule.uncertain && !rule.important => {
+                    Some(Some(s)) if !rule.uncertain => {
                         let candidate = (rule.layer, s, order);
-                        if !exact.iter().any(|(_, old)| std::ptr::eq(*old, rule)) {
-                            exact.push((candidate, rule));
-                        }
+                        rule_exact = Some(rule_exact.map_or(candidate, |old| old.max(candidate)));
                     }
                     outcome => {
                         let weight = outcome
@@ -1460,18 +1655,29 @@ impl<'a> Sheet<'a> {
                             .or_else(|| simple_selector_weight(selector.text))
                             .unwrap_or(u32::MAX);
                         let candidate = (rule.important, (rule.layer, weight, order));
-                        if unknown_rank.is_none_or(|r| candidate >= r) {
-                            unknown_rank = Some(candidate);
-                            unknown = Some(rule);
+                        if rule_unknown.is_none_or(|r| candidate >= r) {
+                            rule_unknown = Some(candidate);
                         }
                     }
+                }
+            }
+            if let Some(candidate) = rule_exact {
+                exact.push((candidate, rule));
+            } else if let Some(candidate) = rule_unknown {
+                if unknown_rank.is_none_or(|r| candidate >= r) {
+                    unknown_rank = Some(candidate);
+                    unknown = Some(rule);
                 }
             }
         }
         let rank = exact.iter().map(|(rank, _)| *rank).max();
         // Unknown selectors can only displace a normal winner in the same or a higher layer.
+        // With a proven class list, selectors whose outcome cannot be proven are almost always
+        // pseudo, responsive or content-dependent variants that do not apply to the resting card.
+        // Keep uncertainty only for dynamic class strings, where the base rule itself may exist.
         let unknown = unknown.filter(|_| {
-            unknown_rank.is_some_and(|(important, candidate)| important || Some(candidate) >= rank)
+            classes.is_none()
+                && (unknown_rank.is_some_and(|(important, _)| important) || rank.is_none())
         });
         if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
         {
@@ -2109,6 +2315,20 @@ fn css_ident(raw: &str) -> Option<String> {
 
 /// Match one compound selector (no combinators). This covers the common stylesheet form
 /// `.a.b`, `tag.a`, `#id.a` and data attributes without treating their conjunction as unknown.
+fn unescaped_end(text: &str) -> usize {
+    let mut escaped = false;
+    for (index, c) in text.char_indices() {
+        if escaped {
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if matches!(c, '.' | '#' | '[') {
+            return index;
+        }
+    }
+    text.len()
+}
+
 fn compound_specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Option<Option<u32>> {
     if sel.is_empty() || sel.contains([' ', '>', '+', '~', ':']) {
         return None;
@@ -2141,7 +2361,7 @@ fn compound_specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Op
     }
     while !rest.is_empty() {
         if let Some(class) = rest.strip_prefix('.') {
-            let end = class.find(['.', '#', '[']).unwrap_or(class.len());
+            let end = unescaped_end(class);
             let raw = &class[..end];
             if raw.is_empty() {
                 return None;
@@ -2150,7 +2370,7 @@ fn compound_specificity(sel: &str, classes: Option<&str>, el: &m::Element) -> Op
             weight += 1024;
             rest = &class[end..];
         } else if let Some(id) = rest.strip_prefix('#') {
-            let end = id.find(['.', '#', '[']).unwrap_or(id.len());
+            let end = unescaped_end(id);
             let raw = &id[..end];
             if !ident(raw) {
                 return None;

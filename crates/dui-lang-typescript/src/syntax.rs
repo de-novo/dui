@@ -270,7 +270,10 @@ fn uses_alias(request: &str, aliases: &[Alias]) -> bool {
 
 fn module_candidates(path: PathBuf) -> Vec<PathBuf> {
     let mut paths = vec![path.clone()];
-    if path.extension().is_none() {
+    if !matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("ts" | "tsx" | "css")
+    ) {
         for ext in ["ts", "tsx"] {
             paths.push(PathBuf::from(format!("{}.{ext}", path.display())));
         }
@@ -332,7 +335,11 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
         .into_iter()
         .filter(|n| n.kind() == "import_statement")
     {
-        let Some(source) = field(stmt, "source") else {
+        let Some(source) = field(stmt, "source").or_else(|| {
+            children(stmt)
+                .into_iter()
+                .find(|node| matches!(node.kind(), "string" | "string_value"))
+        }) else {
             continue;
         };
         let raw = file.text(source);

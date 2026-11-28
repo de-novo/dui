@@ -761,9 +761,12 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             if let [file] = files.iter().copied().collect::<Vec<_>>().as_slice() {
                 Some(PathBuf::from(file))
             } else {
-                crate::tsx_map::entry(&project).ok().flatten().and_then(|entry| {
-                    crate::tsx_map::project_relative_entry(&project, &entry).map(PathBuf::from)
-                })
+                crate::tsx_map::entry(&project)
+                    .ok()
+                    .flatten()
+                    .and_then(|entry| {
+                        crate::tsx_map::project_relative_entry(&project, &entry).map(PathBuf::from)
+                    })
             }
         });
         let Some(entry) = inferred_entry else {
@@ -793,9 +796,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                     edges,
                     discovery,
                 );
-                guard
-                    .hot_sessions
-                    .insert(run_key.clone(), session.clone());
+                guard.hot_sessions.insert(run_key.clone(), session.clone());
                 session
             }
         };

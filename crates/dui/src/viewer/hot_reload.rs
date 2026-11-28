@@ -69,13 +69,16 @@ fn diff_keyed(old: &[Value], new: &[Value], field: &str) -> Value {
 }
 
 fn edge_key(value: &Value) -> String {
-    value["modelEdge"].as_str().map(str::to_owned).unwrap_or_else(|| {
-        format!(
-            "{}->{}",
-            value["source"].as_str().unwrap_or_default(),
-            value["target"].as_str().unwrap_or_default()
-        )
-    })
+    value["modelEdge"]
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            format!(
+                "{}->{}",
+                value["source"].as_str().unwrap_or_default(),
+                value["target"].as_str().unwrap_or_default()
+            )
+        })
 }
 
 fn diff_graph(
@@ -237,7 +240,11 @@ fn diff_model(
     scan_changed: &[String],
     parsed_files: &[String],
 ) -> (Value, bool) {
-    let files = diff_keyed(&entity_values(&old.files), &entity_values(&new.files), "path");
+    let files = diff_keyed(
+        &entity_values(&old.files),
+        &entity_values(&new.files),
+        "path",
+    );
     let screens = diff_keyed(
         &entity_values(&old.screens),
         &entity_values(&new.screens),
@@ -258,11 +265,7 @@ fn diff_model(
         &entity_values(&new.tokens),
         "id",
     );
-    let edges = diff_keyed(
-        &entity_values(&old.edges),
-        &entity_values(&new.edges),
-        "id",
-    );
+    let edges = diff_keyed(&entity_values(&old.edges), &entity_values(&new.edges), "id");
     let (changed_files, affected_files, affected_components, affected_screens) =
         affected_metadata(old, new, scan_changed);
     let mut patch = json!({
@@ -299,10 +302,18 @@ fn diff_model(
 }
 
 fn patch_has_changes(patch: &Value) -> bool {
-    patch["screens"]["upsert"].as_array().is_some_and(|v| !v.is_empty())
-        || patch["screens"]["remove"].as_array().is_some_and(|v| !v.is_empty())
-        || patch["links"]["upsert"].as_array().is_some_and(|v| !v.is_empty())
-        || patch["links"]["remove"].as_array().is_some_and(|v| !v.is_empty())
+    patch["screens"]["upsert"]
+        .as_array()
+        .is_some_and(|v| !v.is_empty())
+        || patch["screens"]["remove"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
+        || patch["links"]["upsert"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
+        || patch["links"]["remove"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
         || patch.get("screenDiscovery").is_some()
 }
 
@@ -397,12 +408,7 @@ impl HotSession {
         });
         let thread_inner = Arc::clone(&inner);
         thread::spawn(move || {
-            watch_loop(
-                thread_inner,
-                project,
-                entry,
-                archive_model,
-            );
+            watch_loop(thread_inner, project, entry, archive_model);
         });
         Self { inner }
     }
@@ -420,16 +426,15 @@ impl HotSession {
             let deadline = Instant::now() + LONG_POLL;
             loop {
                 let unchanged_revision = since.is_some_and(|revision| guard.revision == revision);
-                let unchanged_status = status_since
-                    .is_none_or(|revision| guard.status_revision == revision);
+                let unchanged_status =
+                    status_since.is_none_or(|revision| guard.status_revision == revision);
                 if !unchanged_revision || !unchanged_status {
                     break;
                 }
                 let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
                     break;
                 };
-                let Ok((next, timeout)) = self.inner.changed.wait_timeout(guard, remaining)
-                else {
+                let Ok((next, timeout)) = self.inner.changed.wait_timeout(guard, remaining) else {
                     return json!({"status":"error","reason":"watch-state-poisoned"});
                 };
                 guard = next;
@@ -577,13 +582,8 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         &projection.edges,
                         &projection.discovery,
                     );
-                    let (patch, model_changed) = diff_model(
-                        &previous,
-                        &model,
-                        0,
-                        &changed,
-                        &stats.parsed,
-                    );
+                    let (patch, model_changed) =
+                        diff_model(&previous, &model, 0, &changed, &stats.parsed);
                     publish_state(&inner, |state| {
                         state.revision += 1;
                         state.status_revision += 1;

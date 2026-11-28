@@ -441,8 +441,11 @@ impl<'a> Check<'a> {
                             .filter(|slot| slot.kind == super::SlotKind::Prop)
                             .map(|slot| slot.name.as_str())
                             .collect();
+                        let accepts_rest = target.slots.iter().any(|slot| {
+                            slot.kind == super::SlotKind::Prop && slot.name.starts_with("...")
+                        });
                         for name in instance.props.keys() {
-                            if !props.contains(name.as_str()) {
+                            if !props.contains(name.as_str()) && !accepts_rest {
                                 self.error(
                                     format!("{pointer}/props/{name}"),
                                     format!("{:?} has no prop {name:?}", instance.component),

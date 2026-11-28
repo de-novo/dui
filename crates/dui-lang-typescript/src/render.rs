@@ -127,6 +127,38 @@ fn plus_json(left: serde_json::Value, right: serde_json::Value) -> Option<serde_
     }
     Some((left.as_f64()? + right.as_f64()?).into())
 }
+fn object_pair<'a>(file: &File, object: Ast<'a>, key: &str) -> Option<Ast<'a>> {
+    pair_entries(file, object)
+        .into_iter()
+        .find_map(|(name, value)| (name == key).then_some(value))
+}
+
+fn pair_entries<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
+    children(object)
+        .into_iter()
+        .filter(|node| node.kind() == "pair")
+        .filter_map(|node| {
+            Some((
+                object_key(file, field(node, "key")?)?,
+                field(node, "value")?,
+            ))
+        })
+        .collect()
+}
+
+fn find_declarator<'a>(file: &File, root: Ast<'a>, name: &str) -> Option<Ast<'a>> {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        if node.kind() == "variable_declarator"
+            && field(node, "name").is_some_and(|n| file.text(n) == name)
+        {
+            return Some(node);
+        }
+        pending.extend(children(node));
+    }
+    None
+}
+
 impl Context<'_> {
     fn component(&self, name: &str) -> Option<String> {
         let (file, export) = symbol(self.files, self.file, name)?;
@@ -239,8 +271,77 @@ impl Context<'_> {
                 } else {
                     return None;
                 };
+                if self.file.bindings.get(local).is_none()
+                    && let Some(factory) =
+                        find_declarator(self.file, self.file.tree.root_node(), local)
+                            .and_then(|node| field(node, "value"))
+                            .map(unwrap_expr)
+                            .filter(|value| value.kind() == "call_expression")
+                    && let Some(arguments) = field(factory, "arguments")
+                {
+                    let base = first(arguments)
+                        .and_then(|v| literal(self.file, v))
+                        .and_then(|v| v.as_str().map(str::to_owned))
+                        .unwrap_or_default();
+                    let config = children(arguments)
+                        .get(1)
+                        .copied()
+                        .filter(|v| v.kind() == "object")?;
+                    let variants = object_pair(self.file, config, "variants")
+                        .filter(|v| v.kind() == "object")?;
+                    let defaults = object_pair(self.file, config, "defaultVariants")
+                        .filter(|v| v.kind() == "object");
+                    let options = field(n, "arguments")
+                        .and_then(first)
+                        .filter(|v| v.kind() == "object");
+                    let mut supplied = BTreeMap::new();
+                    if let Some(options) = options {
+                        for (key, value) in pair_entries(self.file, options) {
+                            let value = if value.kind() == "identifier" {
+                                self.slots
+                                    .iter()
+                                    .find(|slot| slot.name == self.file.text(value))
+                                    .and_then(|slot| slot.initial.as_ref())
+                                    .and_then(|expr| match expr {
+                                        m::Expr::Literal { value } => Some(value.clone()),
+                                        _ => None,
+                                    })
+                            } else {
+                                self.static_value(value)
+                            };
+                            if let Some(value) = value {
+                                supplied.insert(key, value);
+                            }
+                        }
+                    }
+                    let mut out = base;
+                    for (group, choices) in pair_entries(self.file, variants) {
+                        let selected = supplied
+                            .get(&group)
+                            .and_then(|v| v.as_str().map(str::to_owned))
+                            .or_else(|| {
+                                defaults
+                                    .and_then(|d| object_pair(self.file, d, &group))
+                                    .and_then(|v| literal(self.file, v))
+                                    .and_then(|v| v.as_str().map(str::to_owned))
+                            });
+                        if let Some(selected) = selected
+                            && let Some(classes) = object_pair(self.file, choices, &selected)
+                                .and_then(|v| literal(self.file, v))
+                                .and_then(|v| v.as_str().map(str::to_owned))
+                            && !classes.is_empty()
+                        {
+                            out.push(' ');
+                            out.push_str(&classes);
+                        }
+                    }
+                    return Some(out.into());
+                }
                 let (_, export) = self.file.bindings.get(local)?;
-                if export != "default" || !matches!(local, "clsx" | "classnames" | "cn") {
+                if !matches!(
+                    (export.as_str(), local),
+                    ("default", "clsx" | "classnames" | "cn") | ("cn", "cn")
+                ) {
                     return None;
                 }
                 let mut out = String::new();
@@ -472,6 +573,16 @@ impl Context<'_> {
                 location: self.file.loc(n),
             });
         };
+        let resolved_name =
+            if name.starts_with(char::is_uppercase) && self.component(name).is_none() {
+                self.constants
+                    .get(name)
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(name)
+            } else {
+                name
+            };
+        let name = resolved_name;
         let component = self.component(name);
         let binding = self.file.bindings.get(name);
         let router = binding
@@ -565,14 +676,41 @@ impl Context<'_> {
                 if let Some(object) = object {
                     for (key, value) in object {
                         if let Some(target) = &component
-                            && !self.signatures[target]
-                                .iter()
-                                .any(|s| s.kind == m::SlotKind::Prop && s.name == key)
+                            && !self.signatures[target].iter().any(|s| {
+                                s.kind == m::SlotKind::Prop
+                                    && (s.name == key || s.name.starts_with("..."))
+                            })
                         {
                             return self.placeholder(n, id, "Unsupported component prop");
                         }
                         el.props.insert(key, m::Expr::Literal { value });
                     }
+                    continue;
+                }
+                if spread
+                    .and_then(first)
+                    .filter(|value| value.kind() == "identifier")
+                    .and_then(|value| {
+                        let wanted = format!("...{}", self.file.text(value));
+                        self.slots
+                            .iter()
+                            .find(|slot| slot.name == wanted)
+                            .map(|slot| {
+                                (
+                                    value,
+                                    m::Expr::Slot {
+                                        slot: slot.id.clone(),
+                                        path: vec![],
+                                    },
+                                )
+                            })
+                    })
+                    .is_some_and(|(value, expr)| {
+                        el.props
+                            .insert(format!("...{}", self.file.text(value)), expr);
+                        true
+                    })
+                {
                     continue;
                 }
                 return self.placeholder(n, id, "Unsupported spread attributes");
@@ -597,9 +735,9 @@ impl Context<'_> {
                 continue;
             }
             if let Some(target) = &component
-                && !self.signatures[target]
-                    .iter()
-                    .any(|s| s.kind == m::SlotKind::Prop && s.name == key)
+                && !self.signatures[target].iter().any(|s| {
+                    s.kind == m::SlotKind::Prop && (s.name == key || s.name.starts_with("..."))
+                })
             {
                 return self.placeholder(n, id, "Unsupported component prop");
             }
@@ -623,6 +761,15 @@ impl Context<'_> {
                 for sheet in self.sources {
                     sheet.apply_classes(self.file, open, &mut el, class_text.as_deref());
                 }
+            }
+            if class_text.is_some()
+                && let Some(attribute) = attr(self.file, open, "className")
+                && !attribute.is_error()
+            {
+                let source = self.file.loc(attribute.parent().unwrap_or(attribute));
+                el.unresolved_style.retain(|item| {
+                    !(item.syntax == m::StyleSyntax::Class && item.location == source)
+                });
             }
         }
         // Inline declarations have higher precedence regardless of JSX attribute order.
