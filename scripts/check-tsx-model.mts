@@ -1033,15 +1033,53 @@ document.querySelector("output").textContent=JSON.stringify([...document.querySe
   const aside = styles(grouped.children[0].children[0]);
   for (const [name, value] of Object.entries({
     position: "sticky",
-    shadowX: -1,
-    shadowY: 2,
-    shadowBlur: 3,
-    shadowSpread: -4,
-    shadowColor: "#aabbcc80",
+    boxShadow: "-1px 2px 3px -4px #aabbcc80",
     borderBottomLeftRadius: 9,
     borderTopRightRadius: 3,
   }))
     assert.equal(aside[name], value, name);
+  assert.equal(aside.shadowX, undefined);
+
+  writeFileSync(join(builtProject, "App.tsx"), "export function App(){return <button>Go</button>}");
+  writeFileSync(
+    join(builtProject, bundle),
+    `
+@property --ring-offset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}
+@layer base {
+  *{--ring-inset:initial;--ring-shadow:0 0 0 calc(1px + var(--ring-offset-width,0px)) var(--ring-color,currentcolor)}
+  button{box-shadow:var(--ring-inset,0 0 #0000), var(--ring-offset-shadow), var(--ring-shadow), var(--main-shadow)}
+}
+@layer utilities {
+  button{--main-shadow:0 1px 2px 0 var(--shadow-color,#0000000d), inset 0 0 0 1px transparent;--shadow-color:initial}
+}
+`,
+  );
+  const shadowValue = readBuilt().components[0].root.style.find(
+    (d: { property: string }) => d.property === "boxShadow",
+  ).value;
+  assert.deepEqual(shadowValue, {
+    kind: "keyword",
+    value:
+      "0px 0px #00000000, 0px 0px #00000000, 0px 0px 0px 1px currentcolor, 0px 1px 2px #0000000d, inset 0px 0px 0px 1px #00000000",
+  });
+  writeFileSync(
+    join(builtProject, "App.tsx"),
+    "export function App(){return <><button>Go</button><em>Unknown</em></>}",
+  );
+  writeFileSync(
+    join(builtProject, bundle),
+    "button{box-shadow:0 1px 2px #0000000d} em{box-shadow:var(--not-defined)}",
+  );
+  const shadowChildren = readBuilt().components[0].root.children;
+  assert.deepEqual(
+    shadowChildren[0].style.find((d: { property: string }) => d.property === "boxShadow").value,
+    { kind: "keyword", value: "0px 1px 2px #0000000d" },
+  );
+  const unknownShadow = shadowChildren[1].style.find(
+    (d: { property: string }) => d.property === "boxShadow",
+  ).value;
+  assert.equal(unknownShadow.kind, "unresolved");
+  assert.equal(unknownShadow.text, "box-shadow:var(--not-defined)");
 } finally {
   rmSync(builtProject, { recursive: true, force: true });
 }

@@ -37,6 +37,7 @@ const DIRECT: &[(&str, P)] = &[
     ("background-image", P::DotColor),
     ("background-size", P::TileWidth),
     ("background-size", P::TileHeight),
+    ("box-shadow", P::BoxShadow),
     ("box-shadow", P::ShadowX),
     ("box-shadow", P::ShadowY),
     ("box-shadow", P::ShadowBlur),
@@ -246,13 +247,7 @@ fn affected(name: &str) -> Vec<P> {
         "background-image" => return vec![P::DotColor, P::DotRadius],
         "background-size" => return vec![P::TileWidth, P::TileHeight],
         "box-shadow" => {
-            return vec![
-                P::ShadowX,
-                P::ShadowY,
-                P::ShadowBlur,
-                P::ShadowSpread,
-                P::ShadowColor,
-            ];
+            return vec![P::BoxShadow];
         }
         "inset" => return vec![P::Top, P::Right, P::Bottom, P::Left],
         "border-radius" => {
@@ -344,6 +339,7 @@ pub(crate) struct Sheet<'a> {
     horizontal_block: bool,
     rules: BTreeMap<P, Vec<Rule<'a>>>,
     custom_rules: BTreeMap<&'a str, Vec<Rule<'a>>>,
+    registered_vars: BTreeMap<&'a str, &'a str>,
     selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
     vars: BTreeMap<&'a str, Option<&'a str>>,
@@ -839,6 +835,255 @@ fn resolve_embedded_vars(
     (quote.is_none()).then_some(out)
 }
 
+/// Resolve variables inside a box-shadow value. Tailwind-style custom properties set to the
+/// CSS-wide `initial` keyword are absent for this purpose when a var() fallback exists: an
+/// unregistered custom property has no usable initial value, and registered defaults that do
+/// exist are already present as ordinary declarations in the bundled reset.
+fn resolve_shadow_vars(
+    raw: &str,
+    vars: &BTreeMap<&str, Option<&str>>,
+    depth: usize,
+) -> Option<String> {
+    if depth >= 8 {
+        return None;
+    }
+    let mut out = String::new();
+    let mut pos = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    while pos < raw.len() {
+        let c = raw[pos..].chars().next()?;
+        if let Some(mark) = quote {
+            out.push(c);
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == mark {
+                quote = None;
+            }
+            pos += c.len_utf8();
+            continue;
+        }
+        if raw[pos..].starts_with("var(") {
+            let inner_start = pos + 4;
+            let mut cursor = inner_start;
+            let mut nesting = 1usize;
+            let mut inner_quote = None;
+            let mut inner_escaped = false;
+            let mut end = None;
+            while cursor < raw.len() {
+                let inner = raw[cursor..].chars().next()?;
+                if inner_escaped {
+                    inner_escaped = false;
+                } else if inner == '\\' {
+                    inner_escaped = true;
+                } else if let Some(mark) = inner_quote {
+                    if inner == mark {
+                        inner_quote = None;
+                    }
+                } else {
+                    match inner {
+                        '"' | '\'' => inner_quote = Some(inner),
+                        '(' => nesting += 1,
+                        ')' => {
+                            nesting = nesting.saturating_sub(1);
+                            if nesting == 0 {
+                                end = Some(cursor);
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                cursor += inner.len_utf8();
+            }
+            let end = end?;
+            let (name, fallback) = split_var_inner(&raw[inner_start..end])?;
+            let defined = vars.get(name).copied().flatten();
+            let replacement = match defined {
+                Some("initial") => fallback?,
+                Some(value) => value,
+                None => fallback?,
+            };
+            out.push_str(&resolve_shadow_vars(replacement, vars, depth + 1)?);
+            pos = end + 1;
+            continue;
+        }
+        if c == '"' || c == '\'' {
+            quote = Some(c);
+        }
+        out.push(c);
+        pos += c.len_utf8();
+    }
+    (quote.is_none()).then_some(out)
+}
+
+fn split_top_level(raw: &str, delimiter: char) -> Option<Vec<&str>> {
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    let mut depth = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+    for (index, c) in raw.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+            continue;
+        }
+        if let Some(mark) = quote {
+            if c == mark {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            '"' | '\'' => quote = Some(c),
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            c if c == delimiter && depth == 0 => {
+                out.push(raw[start..index].trim());
+                start = index + c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if quote.is_some() || depth != 0 {
+        return None;
+    }
+    out.push(raw[start..].trim());
+    Some(out)
+}
+
+fn shadow_color(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<String> {
+    if raw.eq_ignore_ascii_case("currentcolor") {
+        return Some("currentcolor".into());
+    }
+    if raw.eq_ignore_ascii_case("transparent") {
+        return Some("#00000000".into());
+    }
+    let parsed = if raw.starts_with("color-mix(") {
+        alpha_mix(raw, vars)
+    } else {
+        super::color(raw)
+    }?;
+    let V::Color { value } = parsed else {
+        return None;
+    };
+    Some(value)
+}
+
+fn shadow_length(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<m::Length> {
+    let value = model_length(P::ShadowX, raw, vars)?;
+    let V::Length { value, unit } = value else {
+        return None;
+    };
+    (unit != m::LengthUnit::Percent && value.is_finite()).then_some(m::Length { value, unit })
+}
+
+fn canonical_length(length: m::Length) -> String {
+    let mut number = format!("{:.6}", length.value);
+    while number.contains('.') && number.ends_with('0') {
+        number.pop();
+    }
+    if number.ends_with('.') {
+        number.pop();
+    }
+    if number == "-0" {
+        number = "0".into();
+    }
+    let unit = match length.unit {
+        m::LengthUnit::Px => "px",
+        m::LengthUnit::Rem => "rem",
+        m::LengthUnit::Em => "em",
+        m::LengthUnit::Pt => "pt",
+        m::LengthUnit::Dp => "px",
+        m::LengthUnit::Vw => "vw",
+        m::LengthUnit::Vh => "vh",
+        m::LengthUnit::Svw => "svw",
+        m::LengthUnit::Svh => "svh",
+        m::LengthUnit::Lvw => "lvw",
+        m::LengthUnit::Lvh => "lvh",
+        m::LengthUnit::Dvw => "dvw",
+        m::LengthUnit::Dvh => "dvh",
+        m::LengthUnit::Vmin => "vmin",
+        m::LengthUnit::Vmax => "vmax",
+        m::LengthUnit::Percent => "%",
+    };
+    number + unit
+}
+
+/// Parse the complete CSS box-shadow list after resolving custom properties. Unknown grammar
+/// makes the whole property unresolved; dropping a layer or guessing a color would invent pixels.
+fn parse_box_shadow(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<String> {
+    let resolved = resolve_shadow_vars(raw, vars, 0)?;
+    let resolved = resolved.trim();
+    if resolved.eq_ignore_ascii_case("none") {
+        return Some("none".into());
+    }
+    let layers = split_top_level(resolved, ',')?;
+    if layers.is_empty() || layers.len() > 32 || layers.iter().any(|layer| layer.is_empty()) {
+        return None;
+    }
+    let mut serialized = Vec::new();
+    for layer in layers {
+        let mut inset = false;
+        let mut color = None;
+        let mut lengths = Vec::new();
+        for token in css_words(layer) {
+            if token.eq_ignore_ascii_case("inset") && !inset {
+                inset = true;
+                continue;
+            }
+            if color.is_none()
+                && lengths.len() < 2
+                && let Some(parsed) = shadow_color(token, vars)
+            {
+                color = Some(parsed);
+                continue;
+            }
+            if color.is_none()
+                && !token.bytes().next().is_some_and(|b| b.is_ascii_digit() || b == b'-' || b == b'+')
+                && let Some(parsed) = shadow_color(token, vars)
+            {
+                color = Some(parsed);
+                continue;
+            }
+            lengths.push(shadow_length(token, vars)?);
+        }
+        if !(2..=4).contains(&lengths.len()) {
+            return None;
+        }
+        while lengths.len() < 4 {
+            lengths.push(m::Length {
+                value: 0.,
+                unit: m::LengthUnit::Px,
+            });
+        }
+        if lengths[2].value < 0. {
+            return None;
+        }
+        if lengths[3].value == 0. && lengths[2].value == 0. {
+            lengths.truncate(2);
+        } else if lengths[3].value == 0. {
+            lengths.truncate(3);
+        }
+        let mut parts = Vec::new();
+        if inset {
+            parts.push("inset".into());
+        }
+        parts.extend(lengths.into_iter().map(canonical_length));
+        if let Some(color) = color {
+            parts.push(color);
+        }
+        serialized.push(parts.join(" "));
+    }
+    Some(serialized.join(", "))
+}
+
 fn valid_font_family(part: &str) -> bool {
     let part = part.trim();
     if part.is_empty() {
@@ -1040,6 +1285,7 @@ impl<'a> Sheet<'a> {
             horizontal_block: true,
             rules: BTreeMap::new(),
             custom_rules: BTreeMap::new(),
+            registered_vars: BTreeMap::new(),
             vars: BTreeMap::new(),
             selectors: BTreeMap::from([(
                 "",
@@ -1210,6 +1456,34 @@ impl<'a> Sheet<'a> {
                 }
                 "keyframes_statement" => {}
                 "at_rule" if parts.first().is_some_and(|p| f.text(*p) == "@font-face") => {}
+                "at_rule" if parts.first().is_some_and(|p| f.text(*p) == "@property") => {
+                    // Registered custom properties have an engine-defined initial value even
+                    // when no element rule assigns them. Keep only a literal initial-value;
+                    // malformed or missing registrations stay absent so var() fallbacks decide.
+                    let text = f.text(node);
+                    if let Some(body_start) = text.find('{')
+                        && let Some(body_end) = text.rfind('}')
+                        && body_end > body_start
+                    {
+                        let name = text["@property".len()..body_start].trim();
+                        if name.starts_with("--") {
+                            for declaration in split_top_level(&text[body_start + 1..body_end], ';')
+                                .unwrap_or_default()
+                            {
+                                if let Some(value) = declaration
+                                    .trim()
+                                    .strip_prefix("initial-value")
+                                    .and_then(|rest| rest.strip_prefix(':'))
+                                {
+                                    let value = value.trim();
+                                    if !value.is_empty() {
+                                        sheet.registered_vars.insert(name, value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 "rule_set" => {
                     if let [selectors, body] = parts.as_slice() {
                         sheet
@@ -1264,6 +1538,26 @@ impl<'a> Sheet<'a> {
         }
         for name in ambiguous_variables {
             sheet.vars.insert(name, None);
+        }
+        for (name, value) in sheet.registered_vars.clone() {
+            let uncertain_copy_is_initial = sheet.custom_rules.get(name).is_some_and(|rules| {
+                let mut uncertain = rules.iter().filter(|rule| rule.uncertain);
+                let mut count = 0usize;
+                let same = uncertain.all(|rule| {
+                    count += 1;
+                    rule.value.split_ascii_whitespace().eq(value.split_ascii_whitespace())
+                });
+                count != 0 && same
+            });
+            match sheet.vars.get(name) {
+                None => {
+                    sheet.vars.insert(name, Some(value));
+                }
+                Some(None) if uncertain_copy_is_initial => {
+                    sheet.vars.insert(name, Some(value));
+                }
+                _ => {}
+            }
         }
         sheet.document_vars = sheet.vars.clone();
         for name in scoped_variables {
@@ -1514,8 +1808,11 @@ impl<'a> Sheet<'a> {
         if property == P::FontFamily {
             return font_family_value(rule.value, vars);
         }
+        if rule.name == "box-shadow" && property == P::BoxShadow {
+            return parse_box_shadow(rule.value, vars).map(|value| V::Keyword { value });
+        }
         let raw = rule.value;
-        let raw = if raw.starts_with("var(") {
+        let raw = if raw.starts_with("var(") && raw.ends_with(')') {
             resolved_var(raw, vars, 0)?
         } else {
             raw

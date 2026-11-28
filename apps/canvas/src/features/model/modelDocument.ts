@@ -237,6 +237,7 @@ const directCss: Record<string, string> = {
   borderLeftStyle: "border-left-style",
   borderRadius: "border-radius",
   borderWidth: "border-width",
+  boxShadow: "box-shadow",
 };
 const compositeProperties = new Set([
   "dotRadius",

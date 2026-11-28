@@ -510,6 +510,8 @@ pub enum StyleProperty {
     ShadowBlur,
     ShadowSpread,
     ShadowColor,
+    /// Canonical serialized CSS shadow list. `none` or comma-separated shadow layers.
+    BoxShadow,
     BorderTopLeftRadius,
     BorderTopRightRadius,
     BorderBottomRightRadius,

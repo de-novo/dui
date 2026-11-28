@@ -43,7 +43,7 @@ The reader expands block spacing in horizontal layouts and preserves font-family
 
 Built CSS preserves physical edge border widths, colors and styles, table border collapse, keyword vertical and text alignment, text case and whitespace. The adapter resolves a single backdrop blur and sRGB, oklab, or oklch mixes of a supported color with transparent at an explicit percentage. Other filter chains and color interpolation spaces stay unresolved.
 
-Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops, two explicit tile dimensions and a single color-last outer shadow are represented as model colors and lengths.
+Intrinsic JSX fragments preserve their children without a layout box. Built CSS supports positioning, stacking order, physical offsets and circular corner radii. Dot backgrounds with equal hard stops and two explicit tile dimensions are represented as model colors and lengths. A complete CSS `box-shadow` list is represented as `boxShadow`, a canonical serialized list after custom-property resolution; unsupported grammar or an unknown winning value remains unresolved rather than dropping layers.
 
 ## 1. Principles
 

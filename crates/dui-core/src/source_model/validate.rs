@@ -873,6 +873,7 @@ fn accepts(property: StyleProperty, value: &StyleValue) -> bool {
         P::Top | P::Right | P::Bottom | P::Left => (true, false, false, Some(&["auto"])),
         P::ZIndex => (false, true, false, Some(&["auto"])),
         P::DotColor | P::ShadowColor => (false, false, true, Some(&[])),
+        P::BoxShadow => (false, false, false, None),
         P::DotRadius
         | P::TileWidth
         | P::TileHeight

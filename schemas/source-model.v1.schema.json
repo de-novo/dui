@@ -370,6 +370,7 @@
         "shadowBlur",
         "shadowSpread",
         "shadowColor",
+        "boxShadow",
         "borderTopLeftRadius",
         "borderTopRightRadius",
         "borderBottomRightRadius",
