@@ -235,6 +235,31 @@ impl<'a> Check<'a> {
                 self.non_empty(format!("{pointer}/id"), &face.id);
                 self.non_empty(format!("{pointer}/family"), &face.family);
                 self.location(&format!("{pointer}/location"), &face.location);
+                if let Some(unicode_range) = &face.unicode_range {
+                    self.non_empty(format!("{pointer}/unicodeRange"), unicode_range);
+                }
+                if let Some(stylesheet) = &face.stylesheet {
+                    self.non_empty(format!("{pointer}/stylesheet"), stylesheet);
+                }
+                if let Some(sha256) = &face.stylesheet_sha256
+                    && !is_sha256(sha256)
+                {
+                    self.error(
+                        format!("{pointer}/stylesheetSha256"),
+                        "must be lowercase hex SHA-256",
+                    );
+                }
+                if face.stylesheet.as_ref().is_some_and(|sheet| {
+                    sheet.starts_with("https://")
+                        || sheet.starts_with("http://")
+                        || sheet.starts_with("//")
+                }) && face.stylesheet_sha256.is_none()
+                {
+                    self.error(
+                        format!("{pointer}/stylesheetSha256"),
+                        "remote stylesheet provenance must include its content hash",
+                    );
+                }
                 if face.sources.is_empty() {
                     self.error(format!("{pointer}/sources"), "must not be empty");
                 }
@@ -247,6 +272,7 @@ impl<'a> Check<'a> {
                             sha256,
                             bytes,
                             format,
+                            license,
                         } => {
                             if !is_relative_path(path) {
                                 self.error(
@@ -279,8 +305,19 @@ impl<'a> Check<'a> {
                             if let Some(format) = format {
                                 self.non_empty(format!("{source_pointer}/format"), format);
                             }
+                            if let Some(license) = license {
+                                self.non_empty(format!("{source_pointer}/license"), license);
+                            }
                         }
-                        FontSource::External { url, format } => {
+                        FontSource::External {
+                            url,
+                            format,
+                            asset,
+                            sha256,
+                            bytes,
+                            retrieved_url,
+                            license,
+                        } => {
                             if !(url.starts_with("https://")
                                 || url.starts_with("http://")
                                 || url.starts_with("//"))
@@ -292,6 +329,52 @@ impl<'a> Check<'a> {
                             }
                             if let Some(format) = format {
                                 self.non_empty(format!("{source_pointer}/format"), format);
+                            }
+                            if let Some(license) = license {
+                                self.non_empty(format!("{source_pointer}/license"), license);
+                            }
+                            let materialized = asset.is_some()
+                                || sha256.is_some()
+                                || bytes.is_some()
+                                || retrieved_url.is_some();
+                            if materialized {
+                                let (Some(asset), Some(sha256), Some(bytes), Some(retrieved_url)) =
+                                    (asset, sha256, bytes, retrieved_url)
+                                else {
+                                    self.error(
+                                        source_pointer.clone(),
+                                        "materialized remote font fields must be complete",
+                                    );
+                                    continue;
+                                };
+                                if !is_sha256(sha256) {
+                                    self.error(
+                                        format!("{source_pointer}/sha256"),
+                                        "must be lowercase hex SHA-256",
+                                    );
+                                }
+                                let extension = asset.rsplit_once('.').map(|(_, ext)| ext);
+                                if !matches!(extension, Some("woff2" | "woff" | "ttf" | "otf"))
+                                    || *asset
+                                        != format!("asset-{sha256}.{}", extension.unwrap_or(""))
+                                {
+                                    self.error(
+                                        format!("{source_pointer}/asset"),
+                                        "must be asset-<sha256>.<woff2|woff|ttf|otf>",
+                                    );
+                                }
+                                if *bytes == 0 || *bytes > 4 * 1024 * 1024 {
+                                    self.error(
+                                        format!("{source_pointer}/bytes"),
+                                        "must be within the bounded font size",
+                                    );
+                                }
+                                if !retrieved_url.starts_with("https://") {
+                                    self.error(
+                                        format!("{source_pointer}/retrievedUrl"),
+                                        "must be the final public HTTPS URL",
+                                    );
+                                }
                             }
                         }
                     }

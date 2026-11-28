@@ -4,7 +4,7 @@
 
 > 本文是[英文原文](../en/source-model.md)的简体中文翻译。如有出入，以英文为准。
 
-> 注意：本文档尚未同步英文版关于 `documentStyle.externalStylesheets` 和 `documentStyle.fontFaces` 的最新增补。
+> 注意：本文档尚未同步英文版关于生产字体资源提取、远程字体物化、许可证证据和文档根字体类的最新增补。
 
 > 状态：schema 版本 1，2026-11-27 决定（[#353](https://github.com/de-novo/dui/issues/353)）。[默认流水线](roadmap.md#default-pipeline)的第 1 阶段。相关：[架构](architecture.md) · [领域模型](domain-model.md) · [路线图](roadmap.md)。
 

@@ -104,6 +104,9 @@ export type Model = {
       weight?: string;
       stretch?: string;
       display?: string;
+      unicodeRange?: string;
+      stylesheet?: string;
+      stylesheetSha256?: string;
       sources: (
         | {
             kind: "asset";
@@ -112,8 +115,18 @@ export type Model = {
             sha256: string;
             bytes: number;
             format?: string;
+            license?: string;
           }
-        | { kind: "external"; url: string; format?: string }
+        | {
+            kind: "external";
+            url: string;
+            format?: string;
+            asset?: string;
+            sha256?: string;
+            bytes?: number;
+            retrievedUrl?: string;
+            license?: string;
+          }
       )[];
     }[];
   };
@@ -517,15 +530,23 @@ function fontDescriptor(
   return /^[a-zA-Z0-9][a-zA-Z0-9 .%_-]{0,63}$/.test(value) ? value : undefined;
 }
 
+function fontUnicodeRange(value: string | undefined): string | undefined {
+  return value && value.length <= 256 && /^[Uu+0-9A-Fa-f?,\-\s]+$/.test(value) ? value : undefined;
+}
+
 function fontFacesCss(model: Model, context: ModelRenderContext): string {
   const resolve = context.assetUrl ?? ((asset: string) => asset);
   const rules: string[] = [];
   for (const face of model.documentStyle?.fontFaces ?? []) {
     const sources = face.sources.flatMap((source) => {
-      if (source.kind !== "asset") return [];
+      const asset =
+        source.kind === "asset" || (source.kind === "external" && source.asset && source.sha256)
+          ? source.asset
+          : undefined;
+      if (!asset) return [];
       const format = fontDescriptor(source.format, "");
       return [
-        `url("${escapeCssString(resolve(source.asset))}")${format ? ` format("${escapeCssString(format)}")` : ""}`,
+        `url("${escapeCssString(resolve(asset))}")${format ? ` format("${escapeCssString(format)}")` : ""}`,
       ];
     });
     if (!sources.length || !face.family) continue;
@@ -533,9 +554,10 @@ function fontFacesCss(model: Model, context: ModelRenderContext): string {
     const style = fontDescriptor(face.style, "normal");
     const stretch = fontDescriptor(face.stretch, "normal");
     const display = fontDescriptor(face.display, undefined);
+    const unicodeRange = fontUnicodeRange(face.unicodeRange);
     if (!weight || !style || !stretch) continue;
     rules.push(
-      `@font-face{font-family:"${escapeCssString(face.family)}";src:${sources.join(",")};font-style:${style};font-weight:${weight};font-stretch:${stretch}${display ? `;font-display:${display}` : ""}}`,
+      `@font-face{font-family:"${escapeCssString(face.family)}";src:${sources.join(",")};font-style:${style};font-weight:${weight};font-stretch:${stretch}${display ? `;font-display:${display}` : ""}${unicodeRange ? `;unicode-range:${unicodeRange}` : ""}}`,
     );
   }
   return rules.join("");

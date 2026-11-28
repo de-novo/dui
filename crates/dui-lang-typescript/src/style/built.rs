@@ -1632,9 +1632,9 @@ impl<'a> Sheet<'a> {
 
     /// Effective typography on the document root and body, restricted to rules the
     /// cascade can prove for the static document tree. Uncertain winners stay explicit.
-    pub(crate) fn document_style(&self) -> Option<m::DocumentStyle> {
-        let root = self.document_element_style(DocumentTarget::Root);
-        let body = self.document_element_style(DocumentTarget::Body);
+    pub(crate) fn document_style(&self, root_classes: &[String]) -> Option<m::DocumentStyle> {
+        let root = self.document_element_style(DocumentTarget::Root, root_classes);
+        let body = self.document_element_style(DocumentTarget::Body, root_classes);
         if root.is_none() && body.is_none() {
             return None;
         }
@@ -1646,7 +1646,11 @@ impl<'a> Sheet<'a> {
         })
     }
 
-    fn document_element_style(&self, target: DocumentTarget) -> Option<m::DocumentElementStyle> {
+    fn document_element_style(
+        &self,
+        target: DocumentTarget,
+        root_classes: &[String],
+    ) -> Option<m::DocumentElementStyle> {
         let mut style = Vec::new();
         for property in [
             P::FontFamily,
@@ -1663,16 +1667,20 @@ impl<'a> Sheet<'a> {
             P::MinHeight,
             P::MaxHeight,
         ] {
-            if let Some(declaration) = self.document_declaration(target, property) {
+            if let Some(declaration) = self.document_declaration(target, property, root_classes) {
                 let base_value = declaration.value.clone();
                 style.push(declaration);
                 for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
                     let Some(vars) = self.document_vars_for(scheme) else {
                         continue;
                     };
-                    if let Some(themed) =
-                        self.document_declaration_with(target, property, &vars, Some(scheme))
-                        && themed.value != base_value
+                    if let Some(themed) = self.document_declaration_with(
+                        target,
+                        property,
+                        &vars,
+                        Some(scheme),
+                        root_classes,
+                    ) && themed.value != base_value
                         && !style.iter().any(|existing: &m::StyleDeclaration| {
                             existing.property == property && existing.when == themed.when
                         })
@@ -1689,8 +1697,9 @@ impl<'a> Sheet<'a> {
         &self,
         target: DocumentTarget,
         property: P,
+        root_classes: &[String],
     ) -> Option<m::StyleDeclaration> {
-        self.document_declaration_with(target, property, &self.document_vars, None)
+        self.document_declaration_with(target, property, &self.document_vars, None, root_classes)
     }
 
     fn document_declaration_with(
@@ -1699,6 +1708,7 @@ impl<'a> Sheet<'a> {
         property: P,
         vars: &BTreeMap<&str, Option<&str>>,
         color_scheme: Option<m::ColorScheme>,
+        root_classes: &[String],
     ) -> Option<m::StyleDeclaration> {
         let rules = self.rules.get(&property)?;
         type Rank = (bool, usize, u32, usize);
@@ -1720,6 +1730,7 @@ impl<'a> Sheet<'a> {
                     selector.text,
                     target,
                     self.root_key.as_deref().zip(self.root_value.as_deref()),
+                    root_classes,
                 ) {
                     DocumentMatch::Yes(specificity) => {
                         exact = Some(exact.map_or(specificity, |s: u32| s.max(specificity)));
@@ -3035,6 +3046,7 @@ fn document_compound(
     raw: &str,
     target: DocumentTarget,
     root_attribute: Option<(&str, &str)>,
+    root_classes: &[String],
 ) -> DocumentMatch {
     let tag = target.tag();
     let mut rest = raw.trim();
@@ -3062,8 +3074,16 @@ fn document_compound(
             if end == 0 {
                 return DocumentMatch::Maybe(u32::MAX);
             }
+            let class = &after[..end];
+            if root_classes.iter().any(|known| known == class) {
+                if target == DocumentTarget::Body {
+                    return DocumentMatch::No;
+                }
+                anchored = true;
+            } else {
+                certain = false;
+            }
             specificity = specificity.saturating_add(1024);
-            certain = false;
             rest = &after[end..];
         } else if let Some(after) = rest.strip_prefix('#') {
             let end = ident_end(after);
@@ -3105,7 +3125,7 @@ fn document_compound(
                     for branch in split_selector_list(list) {
                         let branch = if selector_parts(branch).is_some_and(|parts| parts.len() == 1)
                         {
-                            document_compound(branch, target, root_attribute)
+                            document_compound(branch, target, root_attribute, root_classes)
                         } else {
                             DocumentMatch::Maybe(1024)
                         };
@@ -3174,6 +3194,7 @@ fn document_selector(
     sel: &str,
     target: DocumentTarget,
     root_attribute: Option<(&str, &str)>,
+    root_classes: &[String],
 ) -> DocumentMatch {
     let Some(parts) = selector_parts(sel) else {
         return DocumentMatch::Maybe(u32::MAX);
@@ -3181,7 +3202,7 @@ fn document_selector(
     let Some((subject_text, _)) = parts.last() else {
         return DocumentMatch::Maybe(u32::MAX);
     };
-    let mut result = document_compound(subject_text, target, root_attribute);
+    let mut result = document_compound(subject_text, target, root_attribute, root_classes);
     if result == DocumentMatch::No || parts.len() == 1 {
         return result;
     }
@@ -3199,7 +3220,12 @@ fn document_selector(
     {
         return DocumentMatch::Maybe(u32::MAX);
     }
-    let ancestor = document_compound(&ancestors[0].0, DocumentTarget::Root, root_attribute);
+    let ancestor = document_compound(
+        &ancestors[0].0,
+        DocumentTarget::Root,
+        root_attribute,
+        root_classes,
+    );
     result = combine_match(result, ancestor);
     if matches!(
         relationship,

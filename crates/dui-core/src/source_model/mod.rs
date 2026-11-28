@@ -76,6 +76,7 @@ pub enum Language {
     Kotlin,
     Dart,
     Css,
+    Html,
 }
 
 /// Where a fact came from. `inferred` marks a gap filled by AI or a heuristic.
@@ -343,8 +344,8 @@ pub struct DocumentStyle {
     /// resources such as web fonts; the renderer must not execute the document.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external_stylesheets: Vec<String>,
-    /// Web font faces declared by stylesheets. Local sources are content-addressed archive
-    /// assets; external sources are facts only and are never fetched by the default renderer.
+    /// Web font faces declared by stylesheets. Local and materialized remote sources are
+    /// content-addressed archive assets; the renderer never fetches a remote font itself.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub font_faces: Vec<FontFace>,
 }
@@ -362,6 +363,14 @@ pub struct FontFace {
     pub stretch: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unicode_range: Option<String>,
+    /// Project-relative stylesheet path or remote stylesheet URL containing this face.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stylesheet: Option<String>,
+    /// Lowercase hex SHA-256 of the stylesheet bytes used for a remote face.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stylesheet_sha256: Option<String>,
     pub sources: Vec<FontSource>,
     pub origin: Origin,
     pub location: Location,
@@ -382,13 +391,33 @@ pub enum FontSource {
         bytes: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         format: Option<String>,
+        /// License fact read from the font bytes when present; omission means unknown.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        license: Option<String>,
     },
-    /// A remote font URL declared by the source. It is evidence only: archive rendering must
-    /// not fetch it or fall back to the network.
+    /// A remote font URL declared by the source. When the bounded build-stage intake could
+    /// materialize public bytes, the content-addressed archive fields are present; otherwise
+    /// this remains evidence only and archive rendering must not fetch it.
     External {
         url: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         format: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        asset: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        bytes: Option<u64>,
+        /// Final public HTTPS URL after redirects when bytes were materialized.
+        #[serde(
+            rename = "retrievedUrl",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        retrieved_url: Option<String>,
+        /// License fact read from the font bytes when present; omission means unknown.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        license: Option<String>,
     },
 }
 

@@ -127,39 +127,56 @@ fn copy_font_assets(project: &Path, out: &Path, model: &SourceModel) -> Result<(
         .unwrap_or_default()
     {
         for source in &face.sources {
-            let FontSource::Asset {
-                path,
-                asset,
-                sha256,
-                bytes,
-                ..
-            } = source
-            else {
-                continue;
+            let (asset, sha256, bytes, data, label) = match source {
+                FontSource::Asset {
+                    path,
+                    asset,
+                    sha256,
+                    bytes,
+                    ..
+                } => {
+                    if path.is_empty()
+                        || path.starts_with('/')
+                        || path.contains('\\')
+                        || path
+                            .split('/')
+                            .any(|part| part.is_empty() || part == "." || part == "..")
+                        || *bytes == 0
+                        || *bytes > 4 * 1024 * 1024
+                    {
+                        return Err(format!("unsafe font asset path in source model: {path}"));
+                    }
+                    let full = project
+                        .join(path)
+                        .canonicalize()
+                        .map_err(|e| format!("{path}: {e}"))?;
+                    if !full.starts_with(&project) || !full.is_file() {
+                        return Err(format!("font asset escapes the project: {path}"));
+                    }
+                    let data = fs::read(&full).map_err(|e| format!("{path}: {e}"))?;
+                    (asset, sha256, bytes, data, path.clone())
+                }
+                FontSource::External {
+                    url,
+                    asset: Some(asset),
+                    sha256: Some(sha256),
+                    bytes: Some(bytes),
+                    retrieved_url: Some(_),
+                    ..
+                } => {
+                    let data = dui_lang_typescript::cached_font_bytes(sha256)
+                        .map_err(|e| format!("{url}: {e}"))?
+                        .ok_or_else(|| {
+                            format!("materialized font is missing from the bounded cache: {url}")
+                        })?;
+                    (asset, sha256, bytes, data, url.clone())
+                }
+                FontSource::External { .. } => continue,
             };
             if copied.insert(asset.clone(), ()).is_some() {
                 continue;
             }
-            if path.is_empty()
-                || path.starts_with('/')
-                || path.contains('\\')
-                || path
-                    .split('/')
-                    .any(|part| part.is_empty() || part == "." || part == "..")
-                || *bytes == 0
-                || *bytes > 4 * 1024 * 1024
-            {
-                return Err(format!("unsafe font asset path in source model: {path}"));
-            }
-            let full = project
-                .join(path)
-                .canonicalize()
-                .map_err(|e| format!("{path}: {e}"))?;
-            if !full.starts_with(&project) || !full.is_file() {
-                return Err(format!("font asset escapes the project: {path}"));
-            }
-            let data = fs::read(&full).map_err(|e| format!("{path}: {e}"))?;
-            let extension = path
+            let extension = asset
                 .rsplit_once('.')
                 .map(|(_, ext)| ext)
                 .unwrap_or_default();
@@ -169,7 +186,7 @@ fn copy_font_assets(project: &Path, out: &Path, model: &SourceModel) -> Result<(
                 || !font_magic_matches(extension, &data)
             {
                 return Err(format!(
-                    "font asset does not match its source model metadata: {path}"
+                    "font asset does not match its source model metadata: {label}"
                 ));
             }
             total += bytes;

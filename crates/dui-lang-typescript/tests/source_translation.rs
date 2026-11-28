@@ -343,6 +343,7 @@ html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
             sha256,
             bytes,
             format,
+            ..
         } => {
             assert_eq!(path, "dist/assets/fonts/demo.woff2");
             assert_eq!(*bytes, font.len() as u64);
@@ -351,7 +352,7 @@ html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
             assert_eq!(format.as_deref(), Some("woff2"));
             "asset"
         }
-        m::FontSource::External { url, format } => {
+        m::FontSource::External { url, format, .. } => {
             assert_eq!(url, "https://fonts.example.com/demo.woff2");
             assert_eq!(format.as_deref(), Some("woff2"));
             "external"
@@ -360,6 +361,110 @@ html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
     assert_eq!(kinds.next(), Some("asset"));
     assert_eq!(kinds.next(), Some("external"));
     assert_eq!(kinds.next(), None);
+}
+
+
+#[test]
+fn cached_public_remote_fonts_are_materialized_without_network() {
+    use sha2::{Digest, Sha256};
+    let dir = tempfile::tempdir().expect("temp project");
+    let cache = tempfile::tempdir().expect("font cache");
+    // SAFETY: this test process never restores or mutates the variable concurrently; the
+    // extraction tests either have no remote font or tolerate a cache miss.
+    unsafe { std::env::set_var("DUI_FONT_CACHE", cache.path()) };
+    let url = "https://fonts.example.test/demo.woff2";
+    let font = [b"wOF2".as_slice(), &[9u8; 256]].concat();
+    let sha256 = format!("{:x}", Sha256::digest(&font));
+    fs::create_dir_all(cache.path().join("blobs")).expect("blob dir");
+    fs::create_dir_all(cache.path().join("index")).expect("index dir");
+    fs::write(cache.path().join("blobs").join(&sha256), &font).expect("blob");
+    let key = format!("{:x}", Sha256::digest(format!("font-fetch-v1\n{url}").as_bytes()));
+    fs::write(
+        cache.path().join("index").join(format!("{key}.json")),
+        format!(r#"{{"version":1,"url":"{url}","finalUrl":"{url}","sha256":"{sha256}","bytes":{}}}"#, font.len()),
+    )
+    .expect("cache metadata");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        format!(r#"@font-face{{font-family:'Remote Demo';src:url('{url}') format('woff2');font-display:swap}}"#),
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let face = &model.document_style.expect("document").font_faces[0];
+    let m::FontSource::External {
+        asset: Some(asset),
+        sha256: Some(model_sha),
+        bytes: Some(bytes),
+        retrieved_url: Some(retrieved),
+        ..
+    } = &face.sources[0]
+    else {
+        panic!("cached remote font must become a complete materialized source: {:#?}", face.sources)
+    };
+    assert_eq!(asset, &format!("asset-{sha256}.woff2"));
+    assert_eq!(model_sha, &sha256);
+    assert_eq!(*bytes, font.len() as u64);
+    assert_eq!(retrieved, url);
+}
+
+#[test]
+fn default_document_font_provider_class_is_source_proven() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#".font-inter{font-family:Inter,"sans-serif"}.font-manrope{font-family:Manrope,"sans-serif"}"#,
+    )
+    .expect("built css");
+    fs::write(dir.path().join("fonts.ts"), "export const fonts = ['inter', 'manrope'] as const
+").expect("fonts");
+    fs::write(
+        dir.path().join("font-provider.tsx"),
+        r#"import { useEffect, useState } from 'react'
+import { fonts } from './fonts'
+export function FontProvider() {
+  const [font, setFont] = useState(() => fonts[0])
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.add(`font-${font}`)
+  }, [font])
+  return null
+}
+"#,
+    )
+    .expect("provider");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import './font-provider'
+export default function App() { return <main>Hello</main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let root = model
+        .document_style
+        .and_then(|document| document.root)
+        .expect("document root");
+    let family = root
+        .style
+        .iter()
+        .find(|declaration| declaration.property == m::StyleProperty::FontFamily)
+        .expect("font family");
+    assert_eq!(
+        family.value,
+        m::StyleValue::Keyword {
+            value: "Inter,\"sans-serif\"".into()
+        },
+        "{:#?}",
+        root.style
+    );
 }
 
 #[test]

@@ -4,7 +4,7 @@
 
 > 이 문서는 [영어 원문](../en/source-model.md)의 한국어 번역이다. 내용이 다르면 영어가 기준이다.
 
-> 참고: 이 문서에는 아직 영어판의 `documentStyle.externalStylesheets` 및 `documentStyle.fontFaces` 추가 내용이 반영되어 있지 않다.
+> 참고: 이 문서에는 아직 영어판의 프로덕션 글꼴 리소스 추출, 원격 글꼴 실체화, 라이선스 증거 및 문서 루트 글꼴 클래스 추가 내용이 반영되어 있지 않다.
 
 > 상태: 스키마 버전 1, 2026-11-27 결정 ([#353](https://github.com/de-novo/dui/issues/353)). [기본 파이프라인](roadmap.md#default-pipeline)의 1단계다. 관련 문서: [아키텍처](architecture.md) · [도메인 모델](domain-model.md) · [로드맵](roadmap.md).
 
