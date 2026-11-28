@@ -4,111 +4,111 @@
       {
         "iteration": 0,
         "status": "reflected",
-        "ms": 4655
+        "ms": 3880.7
       },
       {
         "iteration": 1,
         "status": "reflected",
-        "ms": 934.9
+        "ms": 449.7
       },
       {
         "iteration": 2,
         "status": "reflected",
-        "ms": 932.1
+        "ms": 449.8
       },
       {
         "iteration": 3,
         "status": "reflected",
-        "ms": 939
+        "ms": 449.7
       },
       {
         "iteration": 4,
         "status": "reflected",
-        "ms": 966.3
+        "ms": 449.6
       },
       {
         "iteration": 5,
         "status": "reflected",
-        "ms": 933.5
+        "ms": 449.6
       },
       {
         "iteration": 6,
         "status": "reflected",
-        "ms": 950
+        "ms": 449.5
       },
       {
         "iteration": 7,
         "status": "reflected",
-        "ms": 933
+        "ms": 449.6
       },
       {
         "iteration": 8,
         "status": "reflected",
-        "ms": 954.7
+        "ms": 449.5
       },
       {
         "iteration": 9,
         "status": "reflected",
-        "ms": 934.5
+        "ms": 449.7
       }
     ],
-    "medianMs": 934.9,
-    "p95Ms": 4655
+    "medianMs": 449.6,
+    "p95Ms": 3880.7
   },
   "mobile": {
     "samples": [
       {
         "iteration": 0,
         "status": "reflected",
-        "ms": 4664.8
+        "ms": 3875.7
       },
       {
         "iteration": 1,
         "status": "reflected",
-        "ms": 929.1
+        "ms": 445
       },
       {
         "iteration": 2,
         "status": "reflected",
-        "ms": 943
+        "ms": 444.8
       },
       {
         "iteration": 3,
         "status": "reflected",
-        "ms": 933.6
+        "ms": 444.6
       },
       {
         "iteration": 4,
         "status": "reflected",
-        "ms": 960.9
+        "ms": 444.6
       },
       {
         "iteration": 5,
         "status": "reflected",
-        "ms": 927.2
+        "ms": 444.7
       },
       {
         "iteration": 6,
         "status": "reflected",
-        "ms": 943.6
+        "ms": 444.5
       },
       {
         "iteration": 7,
         "status": "reflected",
-        "ms": 943.2
+        "ms": 444.7
       },
       {
         "iteration": 8,
         "status": "reflected",
-        "ms": 949.7
+        "ms": 444.6
       },
       {
         "iteration": 9,
         "status": "reflected",
-        "ms": 944.8
+        "ms": 444.9
       }
     ],
-    "medianMs": 943.2,
-    "p95Ms": 4664.8
+    "medianMs": 444.7,
+    "p95Ms": 3875.7
   }
 }
