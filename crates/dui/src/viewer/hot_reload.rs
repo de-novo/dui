@@ -389,7 +389,7 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
             if !kind.is_file()
                 || !matches!(
                     path.extension().and_then(|ext| ext.to_str()),
-                    Some("ts" | "tsx" | "css" | "woff" | "woff2" | "ttf" | "otf")
+                    Some("ts" | "tsx" | "css" | "html" | "woff" | "woff2" | "ttf" | "otf")
                 )
             {
                 continue;
@@ -759,15 +759,17 @@ mod tests {
     }
 
     #[test]
-    fn scan_sources_includes_font_assets() {
+    fn scan_sources_includes_document_and_font_assets() {
         let temp = tempfile::tempdir().expect("tempdir");
         let root = temp.path();
         std::fs::create_dir_all(root.join("src/assets")).expect("mkdir");
         std::fs::write(root.join("src/app.tsx"), "export default function App() {}").expect("tsx");
         std::fs::write(root.join("src/assets/font.woff2"), b"wOF2test").expect("font");
+        std::fs::write(root.join("index.html"), "<html></html>").expect("html");
         let scan = scan_sources(root);
         assert!(scan.contains_key("src/app.tsx"));
         assert!(scan.contains_key("src/assets/font.woff2"));
+        assert!(scan.contains_key("index.html"));
     }
 
     #[test]
