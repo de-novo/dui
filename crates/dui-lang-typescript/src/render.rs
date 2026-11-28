@@ -970,8 +970,62 @@ impl Context<'_> {
         }
         None
     }
+    fn named_read(&self, name: &str) -> Option<m::Expr> {
+        if self.bindings.iter().rev().any(|scope| scope.contains(name)) {
+            Some(m::Expr::Binding {
+                name: name.into(),
+                path: vec![],
+            })
+        } else if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
+            Some(m::Expr::Item {
+                list: list.clone(),
+                path: vec![],
+            })
+        } else {
+            let slot = self.slots.iter().find(|slot| slot.name == name)?;
+            Some(m::Expr::Slot {
+                slot: slot.id.clone(),
+                path: vec![],
+            })
+        }
+    }
+    fn table_chain(&self, n: Ast<'_>) -> Option<m::Expr> {
+        let text = self.file.text(n).trim();
+        let rules = [
+            (
+                ".getRowModel().rows.length",
+                &["rowModel", "rows", "length"][..],
+            ),
+            (".getRowModel().rows", &["rowModel", "rows"][..]),
+            (".getHeaderGroups()", &["headerGroups"][..]),
+            (".getVisibleCells()", &["visibleCells"][..]),
+            (".getPageCount()", &["pageCount"][..]),
+            (".getCanPreviousPage()", &["canPreviousPage"][..]),
+            (".getCanNextPage()", &["canNextPage"][..]),
+        ];
+        for (suffix, path) in rules {
+            let Some(base) = text.strip_suffix(suffix).map(str::trim) else {
+                continue;
+            };
+            if !base
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+            {
+                continue;
+            }
+            let mut expr = self.named_read(base)?;
+            for key in path {
+                expr = Self::append_static_key(expr, (*key).into());
+            }
+            return Some(expr);
+        }
+        None
+    }
     pub(crate) fn expr(&self, node: Ast<'_>) -> m::Expr {
         let n = unwrap_expr(node);
+        if let Some(chain) = self.table_chain(n) {
+            return chain;
+        }
         if let Some(value) = literal(self.file, n) {
             return m::Expr::Literal { value };
         }
