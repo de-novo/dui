@@ -1,0 +1,479 @@
+{
+  "[\"403\", \"700\", 112, 0]": {
+    "chromeMetrics": [
+      82.796875,
+      1.3125,
+      109,
+      27
+    ],
+    "skiaMetrics": [
+      83,
+      1,
+      109,
+      27
+    ],
+    "wrap": [
+      [
+        "403"
+      ],
+      [
+        "403"
+      ],
+      [
+        "403"
+      ]
+    ],
+    "domWidth": 215.8125,
+    "baseline": 125,
+    "ot": 215.796875,
+    "coretext": 215.796875,
+    "skia": 215.796875,
+    "sharedPath": {
+      "ink": 8883,
+      "changed": 1196,
+      "maskXor": 236,
+      "abs": 25060
+    },
+    "nativeText": {
+      "ink": 9376,
+      "changed": 1768,
+      "maskXor": 636,
+      "abs": 155070
+    }
+  },
+  "[\"Access Forbidden\", \"500\", 16, 0]": {
+    "chromeMetrics": [
+      12.0625,
+      0.1829833984375,
+      16,
+      4
+    ],
+    "skiaMetrics": [
+      13,
+      0,
+      16,
+      4
+    ],
+    "wrap": [
+      [
+        "Access",
+        "Forbidden"
+      ],
+      [
+        "Access Forbidden"
+      ],
+      [
+        "Access Forbidden"
+      ]
+    ],
+    "domWidth": 137.09375,
+    "baseline": 125,
+    "ot": 137.09375,
+    "coretext": 137.0859375,
+    "skia": 137.09371948242188,
+    "sharedPath": {
+      "ink": 905,
+      "changed": 692,
+      "maskXor": 70,
+      "abs": 14484
+    },
+    "nativeText": {
+      "ink": 944,
+      "changed": 782,
+      "maskXor": 154,
+      "abs": 33554
+    }
+  },
+  "[\"You don't have necessary permission\", \"400\", 16, 0]": {
+    "chromeMetrics": [
+      11.984375,
+      3.3211669921875,
+      16,
+      4
+    ],
+    "skiaMetrics": [
+      12,
+      3,
+      16,
+      4
+    ],
+    "wrap": [
+      [
+        "You don't have",
+        "necessary",
+        "permission"
+      ],
+      [
+        "You don't have",
+        "necessary permission"
+      ],
+      [
+        "You don't have necessary",
+        "permission"
+      ]
+    ],
+    "domWidth": 280.359375,
+    "baseline": 125,
+    "ot": 280.34375,
+    "coretext": 280.34375,
+    "skia": 280.348876953125,
+    "sharedPath": {
+      "ink": 1595,
+      "changed": 1372,
+      "maskXor": 199,
+      "abs": 31281
+    },
+    "nativeText": {
+      "ink": 1720,
+      "changed": 1552,
+      "maskXor": 318,
+      "abs": 67455
+    }
+  },
+  "[\"to view this resource.\", \"400\", 16, 0]": {
+    "chromeMetrics": [
+      11.984375,
+      0.1875,
+      16,
+      4
+    ],
+    "skiaMetrics": [
+      12,
+      0,
+      16,
+      4
+    ],
+    "wrap": [
+      [
+        "to view this",
+        "resource."
+      ],
+      [
+        "to view this resource."
+      ],
+      [
+        "to view this resource."
+      ]
+    ],
+    "domWidth": 159.90625,
+    "baseline": 125,
+    "ot": 159.8984375,
+    "coretext": 159.8828125,
+    "skia": 159.89151000976562,
+    "sharedPath": {
+      "ink": 867,
+      "changed": 750,
+      "maskXor": 127,
+      "abs": 17091
+    },
+    "nativeText": {
+      "ink": 941,
+      "changed": 855,
+      "maskXor": 170,
+      "abs": 36600
+    }
+  },
+  "[\"Go Back\", \"500\", 14, 0]": {
+    "chromeMetrics": [
+      10.322265625,
+      0.16790771484375,
+      14,
+      3
+    ],
+    "skiaMetrics": [
+      11,
+      0,
+      14,
+      3
+    ],
+    "wrap": [
+      [
+        "Go Back"
+      ],
+      [
+        "Go Back"
+      ],
+      [
+        "Go Back"
+      ]
+    ],
+    "domWidth": 55.71875,
+    "baseline": 125,
+    "ot": 55.7060546875,
+    "coretext": 55.7060546875,
+    "skia": 55.7060546875,
+    "sharedPath": {
+      "ink": 358,
+      "changed": 285,
+      "maskXor": 35,
+      "abs": 6262
+    },
+    "nativeText": {
+      "ink": 377,
+      "changed": 340,
+      "maskXor": 80,
+      "abs": 15367
+    }
+  },
+  "[\"Back to Home\", \"500\", 14, 0]": {
+    "chromeMetrics": [
+      10.185546875,
+      0.16790771484375,
+      14,
+      3
+    ],
+    "skiaMetrics": [
+      11,
+      0,
+      14,
+      3
+    ],
+    "wrap": [
+      [
+        "Back to Home"
+      ],
+      [
+        "Back to Home"
+      ],
+      [
+        "Back to Home"
+      ]
+    ],
+    "domWidth": 93.140625,
+    "baseline": 125,
+    "ot": 93.1396484375,
+    "coretext": 93.1396484375,
+    "skia": 93.1396484375,
+    "sharedPath": {
+      "ink": 533,
+      "changed": 443,
+      "maskXor": 72,
+      "abs": 8504
+    },
+    "nativeText": {
+      "ink": 569,
+      "changed": 492,
+      "maskXor": 96,
+      "abs": 22607
+    }
+  },
+  "[\"503\", \"700\", 112, 0]": {
+    "chromeMetrics": [
+      82.796875,
+      1.3125,
+      109,
+      27
+    ],
+    "skiaMetrics": [
+      83,
+      2,
+      109,
+      27
+    ],
+    "wrap": [
+      [
+        "503"
+      ],
+      [
+        "503"
+      ],
+      [
+        "503"
+      ]
+    ],
+    "domWidth": 209.453125,
+    "baseline": 125,
+    "ot": 209.453125,
+    "coretext": 209.453125,
+    "skia": 209.453125,
+    "sharedPath": {
+      "ink": 9110,
+      "changed": 1220,
+      "maskXor": 219,
+      "abs": 27050
+    },
+    "nativeText": {
+      "ink": 9713,
+      "changed": 1929,
+      "maskXor": 700,
+      "abs": 170960
+    }
+  },
+  "[\"Website is under maintenance!\", \"500\", 16, 0]": {
+    "chromeMetrics": [
+      12.0625,
+      0.1849365234375,
+      16,
+      4
+    ],
+    "skiaMetrics": [
+      13,
+      0,
+      16,
+      4
+    ],
+    "wrap": [
+      [
+        "Website is",
+        "under",
+        "maintenance!"
+      ],
+      [
+        "Website is under",
+        "maintenance!"
+      ],
+      [
+        "Website is under maintenance!"
+      ]
+    ],
+    "domWidth": 233.5,
+    "baseline": 125,
+    "ot": 233.46875,
+    "coretext": 233.484375,
+    "skia": 233.4729766845703,
+    "sharedPath": {
+      "ink": 1465,
+      "changed": 1164,
+      "maskXor": 136,
+      "abs": 23573
+    },
+    "nativeText": {
+      "ink": 1587,
+      "changed": 1311,
+      "maskXor": 251,
+      "abs": 58487
+    }
+  },
+  "[\"The site is not available at the moment.\", \"400\", 16, 0]": {
+    "chromeMetrics": [
+      11.984375,
+      0.1944580078125,
+      16,
+      4
+    ],
+    "skiaMetrics": [
+      12,
+      0,
+      16,
+      4
+    ],
+    "wrap": [
+      [
+        "The site is not",
+        "available at the",
+        "moment."
+      ],
+      [
+        "The site is not available",
+        "at the moment."
+      ],
+      [
+        "The site is not available at the",
+        "moment."
+      ]
+    ],
+    "domWidth": 292.0625,
+    "baseline": 125,
+    "ot": 292.0390625,
+    "coretext": 292.03125,
+    "skia": 292.0373229980469,
+    "sharedPath": {
+      "ink": 1639,
+      "changed": 1405,
+      "maskXor": 228,
+      "abs": 30326
+    },
+    "nativeText": {
+      "ink": 1789,
+      "changed": 1593,
+      "maskXor": 326,
+      "abs": 68120
+    }
+  },
+  "[\"We'll be back online shortly.\", \"400\", 16, 0]": {
+    "chromeMetrics": [
+      11.984375,
+      3.3211669921875,
+      16,
+      4
+    ],
+    "skiaMetrics": [
+      12,
+      3,
+      16,
+      4
+    ],
+    "wrap": [
+      [
+        "We'll be back",
+        "online shortly."
+      ],
+      [
+        "We'll be back online",
+        "shortly."
+      ],
+      [
+        "We'll be back online shortly."
+      ]
+    ],
+    "domWidth": 209.734375,
+    "baseline": 125,
+    "ot": 209.7265625,
+    "coretext": 209.7265625,
+    "skia": 209.72393798828125,
+    "sharedPath": {
+      "ink": 1210,
+      "changed": 1045,
+      "maskXor": 139,
+      "abs": 20903
+    },
+    "nativeText": {
+      "ink": 1279,
+      "changed": 1138,
+      "maskXor": 234,
+      "abs": 51715
+    }
+  },
+  "[\"Learn more\", \"500\", 14, 0]": {
+    "chromeMetrics": [
+      10.185546875,
+      0.16790771484375,
+      14,
+      3
+    ],
+    "skiaMetrics": [
+      11,
+      0,
+      14,
+      3
+    ],
+    "wrap": [
+      [
+        "Learn more"
+      ],
+      [
+        "Learn more"
+      ],
+      [
+        "Learn more"
+      ]
+    ],
+    "domWidth": 76.234375,
+    "baseline": 125,
+    "ot": 76.234375,
+    "coretext": 76.234375,
+    "skia": 76.23329162597656,
+    "sharedPath": {
+      "ink": 419,
+      "changed": 345,
+      "maskXor": 47,
+      "abs": 6753
+    },
+    "nativeText": {
+      "ink": 440,
+      "changed": 385,
+      "maskXor": 71,
+      "abs": 16563
+    }
+  }
+}

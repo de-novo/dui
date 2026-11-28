@@ -1,0 +1,13 @@
+{
+  "chrome": "158.0.8127.37",
+  "resources": {
+    "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Manrope:wght@200..800&display=swap": "e7cb7ad67989e672a6e39d0179eb7d9a3d483292957a0b0c67a7121d666286c0",
+    "https://fonts.gstatic.com/s/inter/v20/UcCo3FwrK3iLTcviYwYZ8UA3.woff2": "dd8a4575be9806105ac3decd02805cd2782fe7c05abb02c582316bc436ce03ae"
+  },
+  "inputSHA256": {
+    "403-1440": "3fe2a30b41066fae503326e81205396b541b1f8f0f6a1d268b44a774082c57cb",
+    "403-390": "f37aab0ee1ad042a8bc3709eee81d47c89303f645a24f18596d442e1930f741c",
+    "503-1440": "62a7daf56a525c6d825c17f5bcacb63e3b7285878e1d7a55c1d4bf7478befa3b",
+    "503-390": "384d121726e3ad5603ecb9c40f092dd4dabfb26b40971786e976b0c4cd43816a"
+  }
+}

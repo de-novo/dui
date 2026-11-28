@@ -1,0 +1,21 @@
+## Drawing-stage isolation on shadcn-admin /403 and /503
+
+**Retain the DOM drawer for web. Carry the final button shadow through the card boundary.** With the original DOM, effective styles and Inter instance restored, all four whole frames matched Chrome exactly. This is a same-browser rendering control. The unmodified shadow card lost only a faint button shadow on these pages; replaying only box-shadow eliminated every differing pixel. Largest RGB-channel difference was 9/255. No production code or #449 compilation work was changed.
+
+| Route and viewport | Stock card differing pixels | Stock max origin / size error | Stock character advance / changed line breaks | Differing pixels after shadow only | All-input control differing pixels |
+|---|---:|---:|---:|---:|---:|
+| /403 · 1440×920 | 1,134 | 0 / 0 px | 0 px / 0 of 6 runs | 0 | 0 |
+| /403 · 390×844 | 1,134 | 0 / 0 px | 0 px / 0 of 6 runs | 0 | 0 |
+| /503 · 1440×920 | 582 | 0 / 0 px | 0 px / 0 of 5 runs | 0 | 0 |
+| /503 · 390×844 | 582 | 0 / 0 px | 0 px / 0 of 5 runs | 0 | 0 |
+
+**Input check.** Reconstructed the feature via the production v1 decoder and drawModel, using a research-only Chrome oracle. Restored original attributes and formatting context for the all-input control. Captured text, element types, source attributes, generated pseudo content, enumerated computed styles and actual CDP font records all matched, across 34 element boxes and 22 text-run observations. Font bytes and viewport are fixed. Stock uses the same source facts projected through the drawer's supported declarations. It drops style/attribute facts and is reported separately. The rich style sidecar also produced four pixel-identical frames, despite some computed CSS serialization differences. Blindly freezing used pixel dimensions introduced geometry error up to 0.015625 px and 232 changed pixels on /403.
+
+| Drawing question | Matched-input alternatives and observed result | Recommendation |
+|---|---|---|
+| Layout | DOM was exact. Taffy 0.16.0 with HarfBuzz intrinsic advances had max origin error 0.015625 px and size error 0.03125 px on the 30 block/flex boxes. The prior Yoga adapter reached 192 px origin error and 292.0625 px size error. Taffy consumed typed layout inputs, with explicit br handled as a forced line break. It produced geometry only. | Retain DOM for web; prefer Taffy for the next independent-layout prototype on this evidence. Results describe these adapters. |
+| Shaping and metrics | On 11 unique English runs, max advance error vs Chrome DOM was 0.03125 px for HarfBuzz OpenType, HarfBuzz CoreText and cosmic-text. Skia canvas reached 0.02703 px. Chrome and Skia Canvas font-box ascent/descent agreed; actual ink ascent/descent differed by up to 0.9375 / 0.6875 px. | cosmic-text is a measured independent text candidate. Its static font instances reproduced the captured variable-font OpenType advances on all 11 runs. |
+| Line wrapping | Stock DOM preserved the observed breaks. cosmic-text word wrapping agreed on 33/33 additional Chrome cases at widths 120, 180 and 240 px, including 12 cases that wrapped. The prior Yoga adapter changed line starts in two runs on each whole frame. | Use an actual shaping and wrapping library for independent rendering. The stress cases do not exercise complex scripts or hyphenation. |
+| Raster and AA | Drawing identical HarfBuzz-positioned glyph outlines through Chrome Canvas and standalone Skia changed 9,917 of 26,984 union-ink pixels. Of these, 1,508 crossed the 50% ink threshold; 8,409 changed coverage on the same side. For native text draws, Skia and cosmic-text/Swash changed 12,145 and 14,427 pixels respectively vs Chrome DOM on a common baseline. Native-text totals also include hinting and glyph placement. | Keep browser paint for Chrome pixel parity. Skia is the closer of the two tested independent text-paint paths by strict differing-pixel count. Parley and Vello were not measured; there is no accuracy ranking for them here. |
+
+The DOM result came from two centered English error pages using one Inter font. It does not establish pixel equality for other routes. The isolated outline experiment measures raster coverage; its 9,917 pixels are separate from the stock card's button-shadow differences.

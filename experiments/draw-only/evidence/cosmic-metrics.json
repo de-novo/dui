@@ -1,0 +1,384 @@
+{
+  "[\"403\", \"700\", 112, 0]": {
+    "staticHB": 215.796875,
+    "cosmic": 215.796875,
+    "lines": [
+      [
+        "403"
+      ],
+      [
+        "403"
+      ],
+      [
+        "403"
+      ]
+    ],
+    "chrome": [
+      [
+        "403"
+      ],
+      [
+        "403"
+      ],
+      [
+        "403"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1886
+  },
+  "[\"Access Forbidden\", \"500\", 16, 0]": {
+    "staticHB": 137.09375,
+    "cosmic": 137.09375,
+    "lines": [
+      [
+        "Access",
+        "Forbidden"
+      ],
+      [
+        "Access Forbidden"
+      ],
+      [
+        "Access Forbidden"
+      ]
+    ],
+    "chrome": [
+      [
+        "Access",
+        "Forbidden"
+      ],
+      [
+        "Access Forbidden"
+      ],
+      [
+        "Access Forbidden"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1004
+  },
+  "[\"You don't have necessary permission\", \"400\", 16, 0]": {
+    "staticHB": 280.34375,
+    "cosmic": 280.34375,
+    "lines": [
+      [
+        "You don't have",
+        "necessary",
+        "permission"
+      ],
+      [
+        "You don't have",
+        "necessary permission"
+      ],
+      [
+        "You don't have necessary",
+        "permission"
+      ]
+    ],
+    "chrome": [
+      [
+        "You don't have",
+        "necessary",
+        "permission"
+      ],
+      [
+        "You don't have",
+        "necessary permission"
+      ],
+      [
+        "You don't have necessary",
+        "permission"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1910
+  },
+  "[\"to view this resource.\", \"400\", 16, 0]": {
+    "staticHB": 159.8984375,
+    "cosmic": 159.8984375,
+    "lines": [
+      [
+        "to view this",
+        "resource."
+      ],
+      [
+        "to view this resource."
+      ],
+      [
+        "to view this resource."
+      ]
+    ],
+    "chrome": [
+      [
+        "to view this",
+        "resource."
+      ],
+      [
+        "to view this resource."
+      ],
+      [
+        "to view this resource."
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1051
+  },
+  "[\"Go Back\", \"500\", 14, 0]": {
+    "staticHB": 55.7060546875,
+    "cosmic": 55.7060546875,
+    "lines": [
+      [
+        "Go Back"
+      ],
+      [
+        "Go Back"
+      ],
+      [
+        "Go Back"
+      ]
+    ],
+    "chrome": [
+      [
+        "Go Back"
+      ],
+      [
+        "Go Back"
+      ],
+      [
+        "Go Back"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 432
+  },
+  "[\"Back to Home\", \"500\", 14, 0]": {
+    "staticHB": 93.1396484375,
+    "cosmic": 93.1396484375,
+    "lines": [
+      [
+        "Back to Home"
+      ],
+      [
+        "Back to Home"
+      ],
+      [
+        "Back to Home"
+      ]
+    ],
+    "chrome": [
+      [
+        "Back to Home"
+      ],
+      [
+        "Back to Home"
+      ],
+      [
+        "Back to Home"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 628
+  },
+  "[\"503\", \"700\", 112, 0]": {
+    "staticHB": 209.453125,
+    "cosmic": 209.453125,
+    "lines": [
+      [
+        "503"
+      ],
+      [
+        "503"
+      ],
+      [
+        "503"
+      ]
+    ],
+    "chrome": [
+      [
+        "503"
+      ],
+      [
+        "503"
+      ],
+      [
+        "503"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 2058
+  },
+  "[\"Website is under maintenance!\", \"500\", 16, 0]": {
+    "staticHB": 233.46875,
+    "cosmic": 233.46875,
+    "lines": [
+      [
+        "Website is",
+        "under",
+        "maintenance!"
+      ],
+      [
+        "Website is under",
+        "maintenance!"
+      ],
+      [
+        "Website is under maintenance!"
+      ]
+    ],
+    "chrome": [
+      [
+        "Website is",
+        "under",
+        "maintenance!"
+      ],
+      [
+        "Website is under",
+        "maintenance!"
+      ],
+      [
+        "Website is under maintenance!"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1643
+  },
+  "[\"The site is not available at the moment.\", \"400\", 16, 0]": {
+    "staticHB": 292.0390625,
+    "cosmic": 292.0390625,
+    "lines": [
+      [
+        "The site is not",
+        "available at the",
+        "moment."
+      ],
+      [
+        "The site is not available",
+        "at the moment."
+      ],
+      [
+        "The site is not available at the",
+        "moment."
+      ]
+    ],
+    "chrome": [
+      [
+        "The site is not",
+        "available at the",
+        "moment."
+      ],
+      [
+        "The site is not available",
+        "at the moment."
+      ],
+      [
+        "The site is not available at the",
+        "moment."
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1948
+  },
+  "[\"We'll be back online shortly.\", \"400\", 16, 0]": {
+    "staticHB": 209.7265625,
+    "cosmic": 209.7265625,
+    "lines": [
+      [
+        "We'll be back",
+        "online shortly."
+      ],
+      [
+        "We'll be back online",
+        "shortly."
+      ],
+      [
+        "We'll be back online shortly."
+      ]
+    ],
+    "chrome": [
+      [
+        "We'll be back",
+        "online shortly."
+      ],
+      [
+        "We'll be back online",
+        "shortly."
+      ],
+      [
+        "We'll be back online shortly."
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 1386
+  },
+  "[\"Learn more\", \"500\", 14, 0]": {
+    "staticHB": 76.234375,
+    "cosmic": 76.234375,
+    "lines": [
+      [
+        "Learn more"
+      ],
+      [
+        "Learn more"
+      ],
+      [
+        "Learn more"
+      ]
+    ],
+    "chrome": [
+      [
+        "Learn more"
+      ],
+      [
+        "Learn more"
+      ],
+      [
+        "Learn more"
+      ]
+    ],
+    "matches": [
+      true,
+      true,
+      true
+    ],
+    "swashChanged": 481
+  }
+}
