@@ -406,11 +406,12 @@ fn theme_states_and_logical_viewport_lengths_are_source_proven() {
     fs::write(
         dir.path().join("dist/assets/index.css"),
         r#":root{--surface:#ffffff;--ink:#111111}
-.dark{--surface:#020618;--ink:#f8fafc}
+.dark{--surface:#020618;--ink:#f8fafc;--input:oklch(100% 0 0/.15)}
 :root[data-theme=dark]{--muted:#90a1b9}
 body{min-height:100svh;background-color:var(--surface);color:var(--ink)}
 .h-svh{height:100svh}.h-full{height:100%}
-.dark\:bg-input:is(.dark *){background-color:#112233}
+.dark\:bg-input:is(.dark *){background-color:color-mix(in oklab,var(--input) 30%,transparent)}
+.dark\:hover\:bg-input:is(.dark *):hover{background-color:#999999}
 .themed{color:var(--muted)}
 @media (prefers-color-scheme: dark){.themed{border-color:#445566}}"#,
     )
@@ -490,7 +491,7 @@ body{min-height:100svh;background-color:var(--surface);color:var(--ink)}
         }
     );
     for (property, expected) in [
-        (m::StyleProperty::Background, "#112233"),
+        (m::StyleProperty::Background, "#ffffff0b"),
         (m::StyleProperty::Color, "#90a1b9"),
         (m::StyleProperty::BorderColor, "#445566"),
     ] {

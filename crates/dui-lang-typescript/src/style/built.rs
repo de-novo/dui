@@ -168,7 +168,7 @@ fn alpha_mix(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<V> {
         .strip_suffix(')')?
         .split(',')
         .map(str::trim);
-    if args.next()? != "in srgb" {
+    if !matches!(args.next()?, "in srgb" | "in oklab" | "in oklch") {
         return None;
     }
     let (base, weight) = args.next()?.rsplit_once(' ')?;
@@ -2072,6 +2072,9 @@ impl<'a> Sheet<'a> {
             let mut rule_exact: Option<(usize, u32, usize)> = None;
             let mut rule_unknown = None;
             for selector in &self.selectors[rule.selectors] {
+                if interaction_selector(selector.text) {
+                    continue;
+                }
                 let mutable_root_attribute = document_scope
                     && (selector.text.starts_with("html[") || selector.text.starts_with(":root["));
                 let theme_class_match = theme_variant_class(selector.text).is_some_and(|class| {
@@ -2334,11 +2337,39 @@ impl<'a> Sheet<'a> {
                     refinement: None,
                 })
         };
+        let winner_theme = unknown
+            .is_some()
+            .then(|| selector_theme_scope(rule.selectors))
+            .flatten();
+        let base_when = match winner_theme {
+            Some(m::ColorScheme::Dark) => {
+                scheme_condition(rule.when.as_ref(), m::ColorScheme::Light)
+            }
+            Some(m::ColorScheme::Light) => {
+                scheme_condition(rule.when.as_ref(), m::ColorScheme::Dark)
+            }
+            None => Some(rule.when.clone().unwrap_or(m::Condition {
+                min_width: None,
+                max_width: None,
+                interaction: None,
+                color_scheme: None,
+                expr: None,
+                equals: None,
+            })),
+        }
+        .filter(|condition| {
+            condition.min_width.is_some()
+                || condition.max_width.is_some()
+                || condition.interaction.is_some()
+                || condition.color_scheme.is_some()
+                || condition.expr.is_some()
+                || condition.equals.is_some()
+        });
         let base_value = super::export_value(value, &rule.source.text);
         el.style.push(m::StyleDeclaration {
             property,
             value: base_value.clone(),
-            when: rule.when.clone(),
+            when: base_when.clone(),
             from: rule.source.clone(),
         });
         for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
@@ -2372,10 +2403,27 @@ impl<'a> Sheet<'a> {
                 .then(|| self.value(property, themed_rule, &themed_vars))
                 .flatten()
             else {
+                if winner_theme == Some(scheme)
+                    && !el.style.iter().any(|existing| {
+                        existing.property == property && existing.when.as_ref() == Some(&when)
+                    })
+                {
+                    el.style.push(m::StyleDeclaration {
+                        property,
+                        value: V::Unresolved {
+                            text: themed_rule.source.text.clone(),
+                            reason: "Cannot determine theme-dependent style value from built CSS"
+                                .into(),
+                            refinement: None,
+                        },
+                        when: Some(when),
+                        from: themed_rule.source.clone(),
+                    });
+                }
                 continue;
             };
             let themed_value = super::export_value(raw, &themed_rule.source.text);
-            if same_effective_value(&themed_value, &base_value)
+            if (base_when.is_none() && same_effective_value(&themed_value, &base_value))
                 || el.style.iter().any(|existing| {
                     existing.property == property && existing.when.as_ref() == Some(&when)
                 })
@@ -2902,6 +2950,42 @@ fn simple_selector_weight(sel: &str) -> Option<u32> {
             };
             sum.checked_add(weight)
         })
+}
+
+fn interaction_selector(sel: &str) -> bool {
+    let mut escaped = false;
+    let mut chars = sel.chars().peekable();
+    while let Some(c) = chars.next() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+            continue;
+        }
+        if c != ':' {
+            continue;
+        }
+        let name: String = chars
+            .by_ref()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '-')
+            .collect();
+        if matches!(
+            name.as_str(),
+            "hover"
+                | "active"
+                | "focus"
+                | "focus-visible"
+                | "focus-within"
+                | "disabled"
+                | "enabled"
+                | "checked"
+        ) {
+            return true;
+        }
+    }
+    false
 }
 
 // Unknown siblings (expressions, fragments or component instances) may emit elements.

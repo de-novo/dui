@@ -26,7 +26,17 @@ fn color(s: &str) -> Option<V> {
 
 fn oklch_color(s: &str) -> Option<V> {
     let inner = s.strip_prefix("oklch(")?.strip_suffix(')')?;
-    let mut parts = inner.split('/').next()?.split_ascii_whitespace();
+    let mut alpha_parts = inner.split('/');
+    let color_part = alpha_parts.next()?;
+    let alpha = match alpha_parts.next().map(str::trim) {
+        None => 1.,
+        Some(raw) if raw.ends_with('%') => raw.strip_suffix('%')?.parse::<f64>().ok()? / 100.,
+        Some(raw) => raw.parse::<f64>().ok()?,
+    };
+    if alpha_parts.next().is_some() || !(0.0..=1.0).contains(&alpha) {
+        return None;
+    }
+    let mut parts = color_part.split_ascii_whitespace();
     let raw_l = parts.next()?;
     let lightness = if let Some(percent) = raw_l.strip_suffix('%') {
         percent.parse::<f64>().ok()? / 100.
@@ -61,6 +71,9 @@ fn oklch_color(s: &str) -> Option<V> {
             "{:02x}",
             (gamma.clamp(0., 1.) * 255.).round() as u8
         ));
+    }
+    if alpha < 1. {
+        hex.push_str(&format!("{:02x}", (alpha * 255.).round() as u8));
     }
     Some(V::Color { value: hex })
 }
