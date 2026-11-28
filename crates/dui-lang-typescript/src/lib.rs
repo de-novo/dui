@@ -135,6 +135,12 @@ fn object_type_fields(files: &Files, file: &File, node: Ast<'_>) -> Vec<m::Field
     if matches!(n.kind(), "object_type" | "interface_body") {
         return fields(files, file, n);
     }
+    if n.kind() == "intersection_type" {
+        return children(n)
+            .into_iter()
+            .flat_map(|part| object_type_fields(files, file, part))
+            .collect();
+    }
     if n.kind() == "type_identifier"
         && let Some((target, name)) = symbol(files, file, file.text(n))
     {
@@ -245,11 +251,18 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
         && let Some(ty) = field(param, "type").map(unwrap_expr)
     {
         for prop in object_type_fields(files, file, ty) {
+            let ty = if prop.name == "children"
+                && matches!(prop.ty, m::TypeRef::Unknown { .. } | m::TypeRef::Node)
+            {
+                m::TypeRef::Node
+            } else {
+                prop.ty
+            };
             out.push(m::Slot {
                 id: format!("{id}.{}", prop.name),
                 name: prop.name.clone(),
                 kind: m::SlotKind::Prop,
-                ty: prop.ty,
+                ty,
                 optional: prop.optional,
                 initial: None,
                 source: None,
@@ -273,7 +286,11 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             if pat.kind() == "identifier"
                 && !matches!(
                     value.kind(),
-                    "arrow_function" | "function_expression" | "object" | "array" | "template_string"
+                    "arrow_function"
+                        | "function_expression"
+                        | "object"
+                        | "array"
+                        | "template_string"
                 )
             {
                 let name = file.text(pat);
@@ -405,6 +422,8 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             location: file.loc(var),
         });
     }
+    let mut seen = std::collections::BTreeSet::new();
+    out.retain(|slot| seen.insert((slot.id.clone(), slot.name.clone())));
     out
 }
 
@@ -508,7 +527,11 @@ fn consequence_node(
     None
 }
 
-fn statements_root(cx: &mut render::Context<'_>, statements: Vec<Ast<'_>>, id: String) -> Option<m::Node> {
+fn statements_root(
+    cx: &mut render::Context<'_>,
+    statements: Vec<Ast<'_>>,
+    id: String,
+) -> Option<m::Node> {
     let mut conditional = Vec::new();
     let mut final_return = None;
     for statement in &statements {
@@ -530,6 +553,9 @@ fn statements_root(cx: &mut render::Context<'_>, statements: Vec<Ast<'_>>, id: S
                     return None;
                 }
             }
+            "switch_statement" if final_return.is_none() && conditional.is_empty() => {
+                return switch_root(cx, *statement, id);
+            }
             _ => return None,
         }
     }
@@ -546,6 +572,59 @@ fn statements_root(cx: &mut render::Context<'_>, statements: Vec<Ast<'_>>, id: S
         root = conditional_node(cx, *condition, yes, root, branch_id);
     }
     Some(root)
+}
+
+fn switch_root(cx: &mut render::Context<'_>, statement: Ast<'_>, id: String) -> Option<m::Node> {
+    let value = crate::syntax::field(statement, "value")?;
+    let body = crate::syntax::field(statement, "body")?;
+    let discriminant = cx.expr(value);
+    let mut cases = Vec::new();
+    let mut fallback = Vec::new();
+    for case in children(body) {
+        if case.kind() == "switch_default" {
+            fallback = vec![statements_root(
+                cx,
+                children(case),
+                format!("{id}.default"),
+            )?];
+        } else if case.kind() == "switch_case" {
+            let case_value = crate::syntax::field(case, "value")?;
+            let statements = children(case)
+                .into_iter()
+                .filter(|child| *child != case_value)
+                .collect();
+            let content = statements_root(cx, statements, format!("{id}.case{}", cases.len()))?;
+            cases.push((case_value, content));
+        }
+    }
+    let mut otherwise = m::Node::Fragment(m::Fragment {
+        children: fallback,
+        id: format!("{id}.otherwise"),
+        location: cx.file.loc(statement),
+    });
+    let count = cases.len();
+    for (index, (case_value, content)) in cases.into_iter().rev().enumerate() {
+        otherwise = m::Node::Branch(m::Branch {
+            id: format!("{id}.switch{}", count - index - 1),
+            on: m::Expr::Binary {
+                operator: "===".into(),
+                left: Box::new(discriminant.clone()),
+                right: Box::new(cx.expr(case_value)),
+            },
+            arms: vec![
+                m::Arm {
+                    when: m::Match::Truthy(true),
+                    children: vec![content],
+                },
+                m::Arm {
+                    when: m::Match::Otherwise,
+                    children: vec![otherwise],
+                },
+            ],
+            location: cx.file.loc(case_value),
+        });
+    }
+    Some(otherwise)
 }
 
 fn component_root(cx: &mut render::Context<'_>, f: Ast<'_>, id: String) -> m::Node {

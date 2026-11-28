@@ -159,6 +159,7 @@ export type ModelRenderContext = {
   initialFontSize?: number;
   colorScheme?: "light" | "dark";
   slotValues?: Record<string, Json>;
+  expressionValues?: Record<string, Json>;
   /** Resolve a content-addressed archive asset for same-run font bytes. */
   assetUrl?: (asset: string) => string;
 };
@@ -347,7 +348,11 @@ function cssValue(v: Value, env: LengthEnvironment): string | undefined {
 }
 
 type Resolved = { known: boolean; value?: unknown };
-type Scope = { slots: Map<string, unknown>; items: Map<string, unknown> };
+type Scope = {
+  slots: Map<string, unknown>;
+  items: Map<string, unknown>;
+  expressions: Map<string, unknown>;
+};
 type NodeContent = { nodeContent: true; nodes: Node[]; scope: Scope };
 const isNodeContent = (value: unknown): value is NodeContent =>
   typeof value === "object" && value !== null && (value as NodeContent).nodeContent === true;
@@ -374,6 +379,9 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
   if (e.kind === "item") {
     if (!scope.items.has(e.list)) return { known: false };
     return lookupPath(scope.items.get(e.list), e.path);
+  }
+  if (e.kind === "opaque" && scope.expressions.has(e.text)) {
+    return { known: true, value: scope.expressions.get(e.text) };
   }
   if (e.kind === "unary") {
     if (e.operator !== "!") return { known: false };
@@ -438,7 +446,11 @@ function truthy(value: unknown): boolean {
   return Boolean(value);
 }
 function copyScope(scope: Scope): Scope {
-  return { slots: new Map(scope.slots), items: new Map(scope.items) };
+  return {
+    slots: new Map(scope.slots),
+    items: new Map(scope.items),
+    expressions: scope.expressions,
+  };
 }
 function lengthPx(
   length: { value: number; unit: string } | undefined,
@@ -842,7 +854,11 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (!c || stack.includes(id) || stack.length >= 64)
         return placeholder("Unresolved component");
       const slots = new Map<string, unknown>();
-      const scope: Scope = { slots, items: new Map() };
+      const scope: Scope = {
+        slots,
+        items: new Map(),
+        expressions: new Map(Object.entries(context.expressionValues ?? {})),
+      };
       const ordinary = new Set(
         (c.slots ?? []).filter((s) => !s.name.startsWith("...")).map((s) => s.name),
       );

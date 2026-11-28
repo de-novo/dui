@@ -93,14 +93,60 @@ impl File {
                     "function_declaration" => n,
                     "class_declaration" => self.class_render(n)?,
 
-                    "variable_declarator" => {
-                        field(n, "value").filter(|v| v.kind() == "arrow_function")?
-                    }
+                    "variable_declarator" => self.component_function(field(n, "value")?, 0)?,
                     _ => return None,
                 };
                 Some((name, f))
             })
             .collect()
+    }
+    /// Transparent component wrappers keep the wrapped function as the source of the declared UI.
+    /// Wrapper arguments may be an inline function or a local component alias (`memo(Item)`).
+    /// The wrapper itself is not executed; only a bounded set of well-known React/observer HOC
+    /// names is treated as transparent, and cycles or other calls remain unsupported.
+    fn component_function<'a>(&'a self, value: Ast<'a>, depth: usize) -> Option<Ast<'a>> {
+        if depth > 8 {
+            return None;
+        }
+        let value = unwrap_expr(value);
+        if matches!(value.kind(), "arrow_function" | "function_expression") {
+            return Some(value);
+        }
+        if value.kind() == "identifier" {
+            let name = self.text(value);
+            if let Some(declarator) = self.find_local_declarator(name) {
+                return self.component_function(field(declarator, "value")?, depth + 1);
+            }
+            return self.declarations().into_iter().find(|node| {
+                node.kind() == "function_declaration" && self.name(*node, "name") == Some(name)
+            });
+        }
+        if value.kind() != "call_expression" {
+            return None;
+        }
+        let function = field(value, "function")?;
+        let wrapper = if function.kind() == "member_expression" {
+            self.name(function, "property")?
+        } else {
+            self.text(function)
+        };
+        if !matches!(wrapper, "memo" | "observer" | "forwardRef") {
+            return None;
+        }
+        let argument = field(value, "arguments").and_then(first)?;
+        self.component_function(argument, depth + 1)
+    }
+    fn find_local_declarator<'a>(&'a self, name: &str) -> Option<Ast<'a>> {
+        let mut pending = vec![self.tree.root_node()];
+        while let Some(node) = pending.pop() {
+            if node.kind() == "variable_declarator"
+                && field(node, "name").is_some_and(|n| self.text(n) == name)
+            {
+                return Some(node);
+            }
+            pending.extend(children(node));
+        }
+        None
     }
     fn class_render<'a>(&self, class: Ast<'a>) -> Option<Ast<'a>> {
         let heritage = children(class)

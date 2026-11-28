@@ -368,7 +368,16 @@
           "project": {
             "id": "project-benchmark",
             "name": "Benchmark Project"
-          }
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": {
+            "displayFilters": {
+              "layout": "list"
+            },
+            "richFilters": {}
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
         },
         "loading": {
           "params": {
@@ -378,7 +387,11 @@
           "project": {
             "id": "project-benchmark",
             "name": "Benchmark Project"
-          }
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": null,
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
         },
         "empty": {
           "params": {
@@ -388,7 +401,16 @@
           "project": {
             "id": "project-benchmark",
             "name": "Benchmark Project"
-          }
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": {
+            "displayFilters": {
+              "layout": "list"
+            },
+            "richFilters": {}
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
         },
         "error": {
           "params": {
@@ -398,7 +420,46 @@
           "project": {
             "id": "project-benchmark",
             "name": "Benchmark Project"
-          }
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": {
+            "displayFilters": {
+              "layout": "list"
+            },
+            "richFilters": {}
+          },
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
+        }
+      },
+      "expressions": {
+        "populated": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": true,
+          "issues?.getIssueLoader() === \"mutation\"": false
+        },
+        "loading": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": false,
+          "issues?.getIssueLoader() === \"mutation\"": false
+        },
+        "empty": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": true,
+          "issues?.getIssueLoader() === \"mutation\"": false
+        },
+        "error": {
+          "props.activeLayout": "list",
+          "EIssueLayoutTypes.LIST": "list",
+          "typeof children": "function",
+          "initialWorkItemFilters": true,
+          "issues?.getIssueLoader() === \"mutation\"": false
         }
       }
     }

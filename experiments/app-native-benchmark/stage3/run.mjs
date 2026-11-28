@@ -2,6 +2,7 @@
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -61,19 +62,38 @@ function scan(target, root) {
 function component(model, wanted) {
   return model.components?.find((c) => c.name === wanted) ?? model.components?.[0];
 }
-function valuesFor(comp, byName) {
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+function payloadHash(value) {
+  return crypto.createHash("sha256").update(stableJson(value)).digest("hex");
+}
+function valuesFor(model, comp, byName) {
   const values = {};
   const missing = [];
+  const bindings = [];
+  const knownSlots = new Set((model.components ?? []).flatMap((component) => (component.slots ?? []).map((slot) => slot.id)));
   for (const [name, value] of Object.entries(byName ?? {})) {
     if (name.includes("#")) {
       values[name] = value;
+      bindings.push({ key: name, slot: name, matched: knownSlots.has(name), valueSha256: payloadHash(value) });
+      if (!knownSlots.has(name)) missing.push(name);
       continue;
     }
     const slot = comp?.slots?.find((s) => s.name === name);
-    if (slot) values[slot.id] = value;
-    else missing.push(name);
+    if (slot) {
+      values[slot.id] = value;
+      bindings.push({ key: name, slot: slot.id, matched: true, valueSha256: payloadHash(value) });
+    } else {
+      missing.push(name);
+      bindings.push({ key: name, matched: false, valueSha256: payloadHash(value) });
+    }
   }
-  return { values, missing };
+  return { values, missing, bindings };
 }
 function comparePng(aPath, bPath, diffPath) {
   if (!fs.existsSync(aPath) || !fs.existsSync(bPath)) return undefined;
@@ -129,16 +149,17 @@ for (const [target, config] of Object.entries(fixtures.targets)) {
   };
   if (!comp) continue;
   for (const state of fixtures.states) {
-    const assignment = valuesFor(comp, config.slots?.[state]);
-    const stateRecord = { missingSlots: assignment.missing, viewports: {}, assertions: config.assertions?.[state] ?? [] };
+    const assignment = valuesFor(model, comp, config.slots?.[state]);
+    const expressionValues = config.expressions?.[state] ?? {};
+    const stateRecord = { missingSlots: assignment.missing, inputBindings: assignment.bindings, expressionBindings: Object.keys(expressionValues).sort(), payloadSha256: payloadHash({ slots: config.slots?.[state] ?? {}, expressions: expressionValues }), viewports: {}, assertions: config.assertions?.[state] ?? [] };
     record.states[state] = stateRecord;
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport, recordVideo: { dir: path.join(out, "videos"), size: viewport } });
       const page = await context.newPage();
       await page.setContent(`<!doctype html><meta charset=utf-8><style>html,body{margin:0;width:${viewport.width}px;height:${viewport.height}px;background:white}#host{width:${viewport.width}px;height:${viewport.height}px;overflow:hidden}</style><div id=host></div>`);
       await page.addScriptTag({ content: bundle });
-      const render = await page.evaluate(({ model, component, values, viewport }) => {
-        const rendered = window.duiStage3.render(model, component, { width: viewport.width, height: viewport.height, slotValues: values });
+      const render = await page.evaluate(({ model, component, values, expressions, viewport }) => {
+        const rendered = window.duiStage3.render(model, component, { width: viewport.width, height: viewport.height, slotValues: values, expressionValues: expressions });
         const host = document.getElementById("host");
         const shadow = host.attachShadow({ mode: "open" });
         shadow.innerHTML = rendered.markup;
@@ -148,7 +169,7 @@ for (const [target, config] of Object.entries(fixtures.targets)) {
           elements: host.shadowRoot.querySelectorAll("*").length,
           placeholders: host.shadowRoot.querySelectorAll("[data-model-placeholder], .model-placeholder, [data-placeholder]").length,
         };
-      }, { model, component: comp.id, values: assignment.values, viewport });
+      }, { model, component: comp.id, values: assignment.values, expressions: expressionValues, viewport });
       await page.waitForTimeout(100);
       const png = path.join(out, `${target}-${state}-${viewport.name}.png`);
       await page.screenshot({ path: png });

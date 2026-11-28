@@ -725,6 +725,45 @@ impl Context<'_> {
                 location: loc,
             });
         }
+        if node.kind() == "jsx_expression" && n.kind() == "identifier" {
+            if let Some(slot) = self
+                .slots
+                .iter()
+                .find(|slot| slot.name == self.file.text(n) && slot.ty == m::TypeRef::Node)
+            {
+                return m::Node::Outlet(m::Outlet {
+                    id,
+                    slot: slot.id.clone(),
+                    location: loc,
+                });
+            }
+        }
+        if node.kind() == "jsx_expression"
+            && n.kind() == "call_expression"
+            && field(n, "function").is_some_and(|function| {
+                function.kind() == "identifier"
+                    && self.slots.iter().any(|slot| {
+                        slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node
+                    })
+            })
+        {
+            let function = field(n, "function").unwrap();
+            let slot = self
+                .slots
+                .iter()
+                .find(|slot| slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node)
+                .unwrap();
+            return m::Node::Outlet(m::Outlet {
+                id,
+                slot: slot.id.clone(),
+                location: loc,
+            });
+        }
+        if matches!(n.kind(), "arrow_function" | "function_expression") {
+            return crate::returned(n)
+                .map(|returned| self.node(returned, id.clone()))
+                .unwrap_or_else(|| self.placeholder(n, id, "Unsupported render function body"));
+        }
         match n.kind() {
             "jsx_element" | "jsx_self_closing_element" => self.element(n, id),
             "ternary_expression" | "binary_expression"
@@ -929,6 +968,13 @@ impl Context<'_> {
                 });
             }
         }
+        if name.ends_with(".Provider") {
+            return m::Node::Fragment(m::Fragment {
+                children: self.child_nodes(n, &id),
+                id,
+                location,
+            });
+        }
         let mut el = m::Element {
             id: id.clone(),
             tag: name.into(),
@@ -968,25 +1014,46 @@ impl Context<'_> {
                 if spread
                     .and_then(first)
                     .filter(|value| value.kind() == "identifier")
-                    .and_then(|value| {
+                    .is_some_and(|value| {
+                        if self.file.text(value) == "props" {
+                            for slot in self
+                                .slots
+                                .iter()
+                                .filter(|slot| slot.kind == m::SlotKind::Prop)
+                            {
+                                let accepted = component.as_ref().is_none_or(|target| {
+                                    self.signatures[target].iter().any(|target_slot| {
+                                        target_slot.kind == m::SlotKind::Prop
+                                            && (*target_slot.name == *slot.name
+                                                || target_slot.name.starts_with("..."))
+                                    })
+                                });
+                                if accepted {
+                                    el.props.insert(
+                                        slot.name.clone().into(),
+                                        m::Expr::Slot {
+                                            slot: slot.id.clone(),
+                                            path: vec![],
+                                        },
+                                    );
+                                }
+                            }
+                            return true;
+                        }
                         let wanted = format!("...{}", self.file.text(value));
                         self.slots
                             .iter()
                             .find(|slot| slot.name == wanted)
-                            .map(|slot| {
-                                (
-                                    value,
+                            .is_some_and(|slot| {
+                                el.props.insert(
+                                    wanted.clone(),
                                     m::Expr::Slot {
                                         slot: slot.id.clone(),
                                         path: vec![],
                                     },
-                                )
+                                );
+                                true
                             })
-                    })
-                    .is_some_and(|(value, expr)| {
-                        el.props
-                            .insert(format!("...{}", self.file.text(value)), expr);
-                        true
                     })
                 {
                     continue;

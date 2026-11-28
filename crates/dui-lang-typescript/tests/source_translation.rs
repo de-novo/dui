@@ -690,3 +690,33 @@ export default function App() {
         app.root
     );
 }
+
+#[test]
+fn transparent_component_wrappers_preserve_component_functions() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { memo, forwardRef } from 'react'
+import { observer } from 'mobx-react'
+function Item({ label }: { label: string }) { return <strong>{label}</strong> }
+const MemoizedItem = memo(Item)
+const Forwarded = forwardRef((props: { label: string }, ref: any) => <p>{props.label}</p>)
+const Observed = observer(function Observed() { return <MemoizedItem label="wrapped" /> })
+export default function App() { return <section><Observed /><Forwarded label="forwarded" /></section> }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    for name in ["MemoizedItem", "Forwarded", "Observed"] {
+        let component = model
+            .components
+            .iter()
+            .find(|component| component.name == name)
+            .unwrap_or_else(|| panic!("missing {name}"));
+        assert!(
+            !matches!(component.root, m::Node::Placeholder(_)),
+            "{name} must unwrap to a renderable component: {:#?}",
+            component.root
+        );
+    }
+}
