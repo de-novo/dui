@@ -1682,9 +1682,8 @@ impl<'a> Sheet<'a> {
         el.style
             .retain(|d| d.property != property || d.from.syntax == m::StyleSyntax::Inline);
         let mut exact: Vec<((usize, u32, usize), &Rule<'_>)> = Vec::new();
-        let mut unknown: Option<&Rule<'_>> = None;
+        let mut unknown_rules = Vec::new();
         let spread = children(open).iter().any(|n| n.kind() == "jsx_expression");
-        let mut unknown_rank = None;
         for (order, rule) in rules.iter().enumerate() {
             let mut rule_exact: Option<(usize, u32, usize)> = None;
             let mut rule_unknown = None;
@@ -1713,10 +1712,7 @@ impl<'a> Sheet<'a> {
             if let Some(candidate) = rule_exact {
                 exact.push((candidate, rule));
             } else if let Some(candidate) = rule_unknown {
-                if unknown_rank.is_none_or(|r| candidate >= r) {
-                    unknown_rank = Some(candidate);
-                    unknown = Some(rule);
-                }
+                unknown_rules.push((candidate, rule));
             }
         }
         let rank = exact.iter().map(|(rank, _)| *rank).max();
@@ -1724,17 +1720,20 @@ impl<'a> Sheet<'a> {
         // With a proven class list, selectors whose outcome cannot be proven are almost always
         // pseudo, responsive or content-dependent variants that do not apply to the resting card.
         // Keep uncertainty only for dynamic class strings, where the base rule itself may exist.
-        let unknown = unknown.filter(|rule| {
+        let mut unknown = None;
+        let mut unknown_rank = None;
+        for (candidate, rule) in unknown_rules {
             let contextual = self.selectors[rule.selectors]
                 .iter()
                 .any(|selector| contextual_selector(selector.text));
-            rule.uncertain
-                || (contextual
-                    && unknown_rank
-                        .is_some_and(|(important, candidate)| important || Some(candidate) >= rank))
-                || (classes.is_none()
-                    && (unknown_rank.is_some_and(|(important, _)| important) || rank.is_none()))
-        });
+            let keep = rule.uncertain
+                || (contextual && (candidate.0 || Some(candidate.1) >= rank))
+                || (classes.is_none() && (candidate.0 || rank.is_none()));
+            if keep && unknown_rank.is_none_or(|current| candidate >= current) {
+                unknown_rank = Some(candidate);
+                unknown = Some(rule);
+            }
+        }
         if !unknown.is_some_and(|r| r.important) && el.style.iter().any(|d| d.property == property)
         {
             return;
