@@ -442,10 +442,29 @@ function modeledRootFontSize(
   return initialFontSize;
 }
 
+function documentConditionStatus(
+  when: Condition | undefined,
+  env: LengthEnvironment,
+  colorScheme: "light" | "dark",
+): "yes" | "no" | "unknown" {
+  if (!when) return "yes";
+  const min = lengthPx(when.minWidth, env.initialFontSize);
+  const max = lengthPx(when.maxWidth, env.initialFontSize);
+  if ((when.minWidth && min === undefined) || (when.maxWidth && max === undefined))
+    return "unknown";
+  if (min !== undefined && env.width < min) return "no";
+  if (max !== undefined && env.width > max) return "no";
+  if (when.interaction) return "no";
+  if (when.colorScheme && when.colorScheme !== colorScheme) return "no";
+  if (when.expr) return "unknown";
+  return "yes";
+}
+
 function documentTypographyCss(
   declarations: Declaration[] | undefined,
   env: LengthEnvironment,
   note: (text: string) => void,
+  colorScheme: "light" | "dark",
   skipFontSize = false,
 ): string {
   const typography = new Set([
@@ -471,8 +490,14 @@ function documentTypographyCss(
       (skipFontSize && declaration.property === "fontSize")
     )
       continue;
+    const applies = documentConditionStatus(declaration.when, env, colorScheme);
+    if (applies === "no") continue;
+    if (applies === "unknown") {
+      note(declaration.from.text);
+      continue;
+    }
     const key = directCss[declaration.property];
-    const value = !declaration.when && cssValue(declaration.value, env);
+    const value = cssValue(declaration.value, env);
     if (key && value && CSS.supports(key, value)) output.push(`${key}:${value}`);
     else note(declaration.from.text);
   }
@@ -560,9 +585,15 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       model.documentStyle?.root?.style,
       env,
       documentNote,
+      colorScheme,
       true,
     );
-    const bodyCss = documentTypographyCss(model.documentStyle?.body?.style, env, documentNote);
+    const bodyCss = documentTypographyCss(
+      model.documentStyle?.body?.style,
+      env,
+      documentNote,
+      colorScheme,
+    );
     const rootBase = `font-family:system-ui,sans-serif;font-size:${rootFontSize}px`;
     const documentCss = isolated
       ? `:host{${[rootBase, rootCss].filter(Boolean).join(";")}}.dui-document-body{${bodyCss}}`

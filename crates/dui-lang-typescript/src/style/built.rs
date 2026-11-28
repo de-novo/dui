@@ -330,6 +330,12 @@ struct Rule<'a> {
     source: m::StyleSource,
 }
 
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ThemeClasses {
+    pub dark: bool,
+    pub light: bool,
+}
+
 pub(crate) struct Sheet<'a> {
     evaluate_width: bool,
     document_vars: BTreeMap<&'a str, Option<&'a str>>,
@@ -341,6 +347,9 @@ pub(crate) struct Sheet<'a> {
     selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
     vars: BTreeMap<&'a str, Option<&'a str>>,
+    theme_classes: ThemeClasses,
+    dark_vars: BTreeMap<&'a str, Option<&'a str>>,
+    light_vars: BTreeMap<&'a str, Option<&'a str>>,
 }
 
 struct Selector<'a> {
@@ -575,7 +584,31 @@ fn merge_width_condition(base: Option<&m::Condition>, next: m::Condition) -> m::
             _ => width,
         });
     }
+    if out.color_scheme.is_none() {
+        out.color_scheme = next.color_scheme;
+    }
     out
+}
+
+fn color_scheme_condition(raw: &str) -> Option<m::Condition> {
+    let feature = raw.trim().strip_prefix('(')?.strip_suffix(')')?.trim();
+    let (name, value) = feature.split_once(':')?;
+    if name.trim() != "prefers-color-scheme" {
+        return None;
+    }
+    let color_scheme = match value.trim() {
+        "dark" => m::ColorScheme::Dark,
+        "light" => m::ColorScheme::Light,
+        _ => return None,
+    };
+    Some(m::Condition {
+        min_width: None,
+        max_width: None,
+        interaction: None,
+        color_scheme: Some(color_scheme),
+        expr: None,
+        equals: None,
+    })
 }
 
 /// Parse a width-only media feature into the model's viewport condition. Unsupported logic stays
@@ -977,14 +1010,15 @@ impl<'a> Sheet<'a> {
         f: &'a File,
         width: Option<u32>,
         root_attribute: Option<(&str, &str)>,
+        theme_classes: ThemeClasses,
     ) -> Result<Self, String> {
-        Self::parse(f, width, root_attribute, true)
+        Self::parse(f, width, root_attribute, true, theme_classes)
     }
 
     /// Parse a source-owned stylesheet. Unlike a built bundle, its `@import` statements are
     /// already represented in the module graph, so the import node itself is not an error.
     pub(crate) fn source(f: &'a File) -> Result<Self, String> {
-        Self::parse(f, None, None, false)
+        Self::parse(f, None, None, false, ThemeClasses::default())
     }
 
     fn parse(
@@ -992,6 +1026,7 @@ impl<'a> Sheet<'a> {
         width: Option<u32>,
         root_attribute: Option<(&str, &str)>,
         require_bundle: bool,
+        theme_classes: ThemeClasses,
     ) -> Result<Self, String> {
         let root = f.tree.root_node();
         if structural_error(f, root) {
@@ -1013,6 +1048,9 @@ impl<'a> Sheet<'a> {
                     subject: Subject::Unknown,
                 }],
             )]),
+            theme_classes,
+            dark_vars: BTreeMap::new(),
+            light_vars: BTreeMap::new(),
         };
         let mut variable_ranks = BTreeMap::new();
         let mut scoped_variables = std::collections::BTreeSet::new();
@@ -1029,6 +1067,11 @@ impl<'a> Sheet<'a> {
                 }
                 "media_statement" => {
                     if let [query, body] = parts.as_slice() {
+                        if let Some(condition) = color_scheme_condition(f.text(*query)) {
+                            let condition = merge_width_condition(when.as_ref(), condition);
+                            stack.push((*body, selector, layer, uncertain, Some(condition)));
+                            continue;
+                        }
                         let matches = width.and_then(|w| width_query(f.text(*query), w));
                         if width.is_some() {
                             if matches != Some(false) {
@@ -1226,7 +1269,71 @@ impl<'a> Sheet<'a> {
         for name in scoped_variables {
             sheet.vars.insert(name, None);
         }
+        sheet.collect_theme_vars();
         Ok(sheet)
+    }
+
+    fn themed_vars(&self, scheme: m::ColorScheme) -> Option<&BTreeMap<&'a str, Option<&'a str>>> {
+        let vars = match scheme {
+            m::ColorScheme::Dark => &self.dark_vars,
+            m::ColorScheme::Light => &self.light_vars,
+        };
+        (!vars.is_empty()).then_some(vars)
+    }
+
+    fn document_vars_for(
+        &self,
+        scheme: m::ColorScheme,
+    ) -> Option<BTreeMap<&'a str, Option<&'a str>>> {
+        let themed = self.themed_vars(scheme)?;
+        let mut vars = self.document_vars.clone();
+        for (name, value) in themed {
+            vars.insert(name, *value);
+        }
+        Some(vars)
+    }
+
+    fn collect_theme_vars(&mut self) {
+        let themes = [
+            (m::ColorScheme::Dark, self.theme_classes.dark, "dark"),
+            (m::ColorScheme::Light, self.theme_classes.light, "light"),
+        ];
+        let mut collected: [(bool, BTreeMap<&str, Option<&str>>); 2] = [
+            (themes[0].0 == m::ColorScheme::Dark, BTreeMap::new()),
+            (themes[1].0 == m::ColorScheme::Light, BTreeMap::new()),
+        ];
+        for (index, (scheme, enabled, class)) in themes.into_iter().enumerate() {
+            if !enabled {
+                continue;
+            }
+            for (name, rules) in &self.custom_rules {
+                let mut best: Option<((usize, bool, usize), Option<&'a str>)> = None;
+                for (order, rule) in rules.iter().enumerate() {
+                    let media_scheme = rule
+                        .when
+                        .as_ref()
+                        .is_some_and(|when| when.color_scheme == Some(scheme));
+                    if rule.uncertain
+                        || (rule.when.is_some() && !media_scheme)
+                        || !(theme_rule_selector(rule.selectors, class)
+                            || (media_scheme
+                                && matches!(rule.selectors, ":root" | "html" | ":host")))
+                    {
+                        continue;
+                    }
+                    let rank = (rule.layer, rule.important, order);
+                    if best.as_ref().is_none_or(|(old, _)| rank >= *old) {
+                        best = Some((rank, Some(rule.value)));
+                    }
+                }
+                if let Some((_, value)) = best {
+                    collected[index].1.insert(name, value);
+                }
+            }
+            let _ = scheme;
+        }
+        self.dark_vars = std::mem::take(&mut collected[0].1);
+        self.light_vars = std::mem::take(&mut collected[1].1);
     }
 
     /// Effective typography on the document root and body, restricted to rules the
@@ -1263,7 +1370,22 @@ impl<'a> Sheet<'a> {
             P::MaxHeight,
         ] {
             if let Some(declaration) = self.document_declaration(target, property) {
+                let base_value = declaration.value.clone();
                 style.push(declaration);
+                for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
+                    let Some(vars) = self.document_vars_for(scheme) else {
+                        continue;
+                    };
+                    if let Some(themed) =
+                        self.document_declaration_with(target, property, &vars, Some(scheme))
+                        && themed.value != base_value
+                        && !style.iter().any(|existing: &m::StyleDeclaration| {
+                            existing.property == property && existing.when == themed.when
+                        })
+                    {
+                        style.push(themed);
+                    }
+                }
             }
         }
         (!style.is_empty()).then_some(m::DocumentElementStyle { style })
@@ -1273,6 +1395,16 @@ impl<'a> Sheet<'a> {
         &self,
         target: DocumentTarget,
         property: P,
+    ) -> Option<m::StyleDeclaration> {
+        self.document_declaration_with(target, property, &self.document_vars, None)
+    }
+
+    fn document_declaration_with(
+        &self,
+        target: DocumentTarget,
+        property: P,
+        vars: &BTreeMap<&str, Option<&str>>,
+        color_scheme: Option<m::ColorScheme>,
     ) -> Option<m::StyleDeclaration> {
         let rules = self.rules.get(&property)?;
         type Rank = (bool, usize, u32, usize);
@@ -1340,13 +1472,17 @@ impl<'a> Sheet<'a> {
             (None, None) => return None,
         };
         let value = if uncertain {
+            let refinement = best
+                .as_ref()
+                .and_then(|(_, certain_rule)| self.value(property, certain_rule, vars))
+                .and_then(final_typed_value);
             V::Unresolved {
                 text: rule.source.text.clone(),
                 reason: "Cannot prove the effective document style from built CSS".into(),
-                refinement: None,
+                refinement,
             }
         } else {
-            self.value(property, rule, &self.document_vars)
+            self.value(property, rule, vars)
                 .map(|value| super::export_value(value, &rule.source.text))
                 .unwrap_or_else(|| V::Unresolved {
                     text: rule.source.text.clone(),
@@ -1357,7 +1493,14 @@ impl<'a> Sheet<'a> {
         Some(m::StyleDeclaration {
             property,
             value,
-            when: None,
+            when: color_scheme.map(|scheme| m::Condition {
+                min_width: None,
+                max_width: None,
+                interaction: None,
+                color_scheme: Some(scheme),
+                expr: None,
+                equals: None,
+            }),
             from: rule.source.clone(),
         })
     }
@@ -1931,7 +2074,14 @@ impl<'a> Sheet<'a> {
             for selector in &self.selectors[rule.selectors] {
                 let mutable_root_attribute = document_scope
                     && (selector.text.starts_with("html[") || selector.text.starts_with(":root["));
-                if selector.subject.excludes(classes, el, spread) && !mutable_root_attribute {
+                let theme_class_match = theme_variant_class(selector.text).is_some_and(|class| {
+                    classes
+                        .is_some_and(|list| list.split_ascii_whitespace().any(|item| item == class))
+                });
+                if selector.subject.excludes(classes, el, spread)
+                    && !mutable_root_attribute
+                    && !theme_class_match
+                {
                     continue;
                 }
                 match contextual_specificity(selector.text, classes, el, file, open) {
@@ -1969,7 +2119,14 @@ impl<'a> Sheet<'a> {
             let contextual = self.selectors[rule.selectors]
                 .iter()
                 .any(|selector| contextual_selector(selector.text));
-            let keep = (rule.uncertain && (rank.is_none() || rule.when.is_some()))
+            let theme_class_match = self.selectors[rule.selectors].iter().any(|selector| {
+                theme_variant_class(selector.text).is_some_and(|class| {
+                    classes
+                        .is_some_and(|list| list.split_ascii_whitespace().any(|item| item == class))
+                })
+            });
+            let keep = theme_class_match
+                || (rule.uncertain && (rank.is_none() || rule.when.is_some()))
                 || ((contextual || document_scope) && (candidate.0 || Some(candidate.1) >= rank))
                 || (classes.is_none() && (candidate.0 || rank.is_none()));
             if keep && unknown_rank.is_none_or(|current| candidate >= current) {
@@ -2006,6 +2163,85 @@ impl<'a> Sheet<'a> {
                     && d.property == [P::BorderWidth, P::BorderColor, P::BorderStyle][i]
             })
         {
+            return;
+        }
+        if unknown.is_none()
+            && exact.iter().any(|(_, rule)| {
+                rule.when
+                    .as_ref()
+                    .is_some_and(|when| when.color_scheme.is_some())
+            })
+            && exact.iter().all(|(_, rule)| {
+                rule.when.as_ref().is_none_or(|when| {
+                    when.min_width.is_none() && when.max_width.is_none() && when.expr.is_none()
+                })
+            })
+        {
+            exact.sort_by_key(|(rank, _)| *rank);
+            el.style.retain(|d| d.property != property);
+            let opaque_inline = el
+                .unresolved_style
+                .iter()
+                .any(|d| d.syntax == m::StyleSyntax::Inline);
+            let declaration_for = |rule: &Rule<'_>, when: Option<m::Condition>| {
+                let value = (!opaque_inline)
+                    .then(|| {
+                        self.value(
+                            property,
+                            rule,
+                            if document_scope {
+                                &self.document_vars
+                            } else {
+                                scoped_vars
+                            },
+                        )
+                    })
+                    .flatten()
+                    .unwrap_or_else(|| V::Unresolved {
+                        text: rule.source.text.clone(),
+                        reason: "Cannot determine style value from built CSS".into(),
+                        refinement: None,
+                    });
+                m::StyleDeclaration {
+                    property,
+                    value: super::export_value(value, &rule.source.text),
+                    when,
+                    from: rule.source.clone(),
+                }
+            };
+            if let Some((_, base)) = exact
+                .iter()
+                .filter(|(_, rule)| rule.when.is_none())
+                .max_by_key(|(rank, _)| *rank)
+            {
+                let declaration = declaration_for(base, None);
+                el.style.push(declaration);
+            } else if let Some((_, first)) = exact.first().copied() {
+                el.style.push(m::StyleDeclaration {
+                    property,
+                    value: V::Unresolved {
+                        text: first.source.text.clone(),
+                        reason:
+                            "Color scheme is unknown; theme-dependent built CSS cannot be proven"
+                                .into(),
+                        refinement: None,
+                    },
+                    when: None,
+                    from: first.source.clone(),
+                });
+            }
+            for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
+                if let Some((_, rule)) = exact
+                    .iter()
+                    .filter(|(_, rule)| {
+                        rule.when.as_ref().and_then(|when| when.color_scheme) == Some(scheme)
+                    })
+                    .max_by_key(|(rank, _)| *rank)
+                {
+                    let declaration = declaration_for(rule, rule.when.clone());
+                    el.style.push(declaration);
+                }
+            }
             return;
         }
         if unknown.is_none()
@@ -2061,12 +2297,11 @@ impl<'a> Sheet<'a> {
             }
             return;
         }
-        let Some(rule) = unknown.or_else(|| {
-            exact
-                .iter()
-                .max_by_key(|(rank, _)| *rank)
-                .map(|(_, rule)| *rule)
-        }) else {
+        let best_exact = exact
+            .iter()
+            .max_by_key(|(rank, _)| *rank)
+            .map(|(_, rule)| *rule);
+        let Some(rule) = unknown.or(best_exact) else {
             return;
         };
         el.style.retain(|d| d.property != property);
@@ -2074,31 +2309,159 @@ impl<'a> Sheet<'a> {
             .unresolved_style
             .iter()
             .any(|d| d.syntax == m::StyleSyntax::Inline);
-        let value = (unknown.is_none() && !opaque_inline)
-            .then(|| {
-                self.value(
-                    property,
-                    rule,
-                    if document_scope {
-                        &self.document_vars
-                    } else {
-                        scoped_vars
-                    },
-                )
-            })
-            .flatten()
-            .unwrap_or_else(|| V::Unresolved {
+        let vars = if document_scope {
+            &self.document_vars
+        } else {
+            scoped_vars
+        };
+        let value = if unknown.is_some() {
+            let refinement = (!opaque_inline)
+                .then(|| best_exact.and_then(|exact_rule| self.value(property, exact_rule, vars)))
+                .flatten()
+                .and_then(final_typed_value);
+            V::Unresolved {
                 text: rule.source.text.clone(),
-                reason: "Cannot determine style value from built CSS".into(),
-                refinement: None,
-            });
+                reason: "Cannot prove the winning built CSS cascade".into(),
+                refinement,
+            }
+        } else {
+            (!opaque_inline)
+                .then(|| self.value(property, rule, vars))
+                .flatten()
+                .unwrap_or_else(|| V::Unresolved {
+                    text: rule.source.text.clone(),
+                    reason: "Cannot determine style value from built CSS".into(),
+                    refinement: None,
+                })
+        };
+        let base_value = super::export_value(value, &rule.source.text);
         el.style.push(m::StyleDeclaration {
             property,
-            value: super::export_value(value, &rule.source.text),
+            value: base_value.clone(),
             when: rule.when.clone(),
             from: rule.source.clone(),
         });
+        for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
+            let Some(document_themed) = self.document_vars_for(scheme) else {
+                continue;
+            };
+            let mut themed_vars = vars.clone();
+            for (name, value) in document_themed {
+                let local_override =
+                    vars.contains_key(name) && !self.document_vars.contains_key(name);
+                if !local_override {
+                    themed_vars.insert(name, value);
+                }
+            }
+            let themed_rule =
+                if unknown.is_some() && selector_theme_scope(rule.selectors) == Some(scheme) {
+                    rule
+                } else {
+                    best_exact.unwrap_or(rule)
+                };
+            if themed_rule.when.as_ref().and_then(|when| when.color_scheme) == Some(scheme) {
+                continue;
+            }
+            let Some(when) = scheme_condition(themed_rule.when.as_ref(), scheme) else {
+                continue;
+            };
+            let Some(raw) = (!opaque_inline)
+                .then(|| self.value(property, themed_rule, &themed_vars))
+                .flatten()
+            else {
+                continue;
+            };
+            let themed_value = super::export_value(raw, &themed_rule.source.text);
+            if same_effective_value(&themed_value, &base_value)
+                || el.style.iter().any(|existing| {
+                    existing.property == property && existing.when.as_ref() == Some(&when)
+                })
+            {
+                continue;
+            }
+            el.style.push(m::StyleDeclaration {
+                property,
+                value: themed_value,
+                when: Some(when),
+                from: themed_rule.source.clone(),
+            });
+        }
     }
+}
+
+fn theme_rule_selector(selectors: &str, class: &str) -> bool {
+    let plain = format!(".{class}");
+    let root = format!(":root.{class}");
+    let html = format!("html.{class}");
+    let host = format!(":host.{class}");
+    let attr = format!("[data-theme={class}]");
+    let root_attr = format!(":root[data-theme={class}]");
+    let html_attr = format!("html[data-theme={class}]");
+    split_selector_list(selectors).into_iter().any(|selector| {
+        matches!(selector, s if s == plain || s == root || s == html || s == host || s == attr || s == root_attr || s == html_attr)
+    })
+}
+
+fn theme_variant_class(selector: &str) -> Option<String> {
+    if selector_theme_scope(selector).is_none() {
+        return None;
+    }
+    let end = [":is(", ":where("]
+        .into_iter()
+        .filter_map(|needle| selector.find(needle))
+        .min()
+        .unwrap_or(selector.len());
+    let prefix = selector[..end].trim();
+    css_ident(prefix.strip_prefix('.')?)
+}
+
+fn selector_theme_scope(selectors: &str) -> Option<m::ColorScheme> {
+    fn scoped(selector: &str, name: &str) -> bool {
+        let class = format!(".{name}");
+        let data = format!("[data-theme={name}");
+        let quoted = format!("[data-theme='{name}'");
+        let double = format!("[data-theme=\"{name}\"");
+        selector.contains(&data)
+            || selector.contains(&quoted)
+            || selector.contains(&double)
+            || selector.contains(&format!(":is({class} "))
+            || selector.contains(&format!(":where({class} "))
+            || selector.starts_with(&format!("{class} "))
+            || selector.contains(&format!(" {class} "))
+            || selector.contains(&format!("html{class}"))
+            || selector.contains(&format!(":root{class}"))
+    }
+    let mut found = None;
+    for selector in split_selector_list(selectors) {
+        let dark = scoped(selector, "dark");
+        let light = scoped(selector, "light");
+        let current = match (dark, light) {
+            (true, false) => m::ColorScheme::Dark,
+            (false, true) => m::ColorScheme::Light,
+            _ => return None,
+        };
+        if found.is_some_and(|scheme| scheme != current) {
+            return None;
+        }
+        found = Some(current);
+    }
+    found
+}
+
+fn scheme_condition(base: Option<&m::Condition>, scheme: m::ColorScheme) -> Option<m::Condition> {
+    let mut out = base.cloned().unwrap_or(m::Condition {
+        min_width: None,
+        max_width: None,
+        interaction: None,
+        color_scheme: None,
+        expr: None,
+        equals: None,
+    });
+    if out.color_scheme.is_some_and(|current| current != scheme) {
+        return None;
+    }
+    out.color_scheme = Some(scheme);
+    Some(out)
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -2114,6 +2477,27 @@ impl DocumentTarget {
             Self::Body => "body",
         }
     }
+}
+
+fn final_typed_value(value: V) -> Option<Box<V>> {
+    (!matches!(value, V::Token { .. } | V::Unresolved { .. })).then_some(Box::new(value))
+}
+
+fn same_effective_value(left: &V, right: &V) -> bool {
+    fn effective(value: &V) -> &V {
+        match value {
+            V::Token {
+                resolved: Some(resolved),
+                ..
+            } => resolved,
+            V::Unresolved {
+                refinement: Some(refinement),
+                ..
+            } => refinement,
+            _ => value,
+        }
+    }
+    effective(left) == effective(right)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -33,6 +33,8 @@ For a direct child or descendant selector with two simple parts, the TSX adapter
 
 When the project selects its theme with a root data attribute, supply the same value during extraction, for example `--root-attribute data-theme=dark`. The adapter resolves simple matching root variable declarations from the bundle. Without that context, conflicting definitions stay unresolved.
 
+Root-scoped `.dark` and `.light` rules, simple `[data-theme=light|dark]` selectors, and exact `(prefers-color-scheme: light|dark)` media rules are compiled as selectable `colorScheme` states when their class, attribute, or media syntax is explicit. Theme-dependent custom properties are overlaid on the unconditional `:root` values for that state. Selectors or cascade results that remain uncertain retain their source text and the best proven typed refinement rather than being guessed. The canvas applies the state matching its explicit color scheme; without that explicit context it does not infer a theme.
+
 The built CSS reader maps display mode, horizontal overflow and auto-fit grids with a minimum column width into model properties. A single flexible track is also supported. A literal body root preserves document colors. Scoped theme overrides stay uncertain when the ancestor chain cannot be established.
 
 The bundled CSS reader resolves independent row and column gaps and common flex shorthands into growth, shrinkage and basis.

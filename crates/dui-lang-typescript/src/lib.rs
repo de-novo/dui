@@ -891,9 +891,13 @@ fn extract_in_context_impl(
         },
         stats,
     ) = syntax::load_cached(project, entry, built_css, &mut diagnostics, cache)?;
+    let theme_classes = style::built::ThemeClasses {
+        dark: true,
+        light: true,
+    };
     let built = artifact
         .as_ref()
-        .map(|p| style::built::Sheet::new(&files[p], width, root_attribute))
+        .map(|p| style::built::Sheet::new(&files[p], width, root_attribute, theme_classes))
         .transpose()?;
     let mut sheet_diagnostics = Vec::new();
     let source_sheets: Vec<_> = stylesheet_order(&files, &entry)

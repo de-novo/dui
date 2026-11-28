@@ -1,5 +1,5 @@
 use dui_core::source_model as m;
-use dui_lang_typescript::extract;
+use dui_lang_typescript::{extract, extract_in_context};
 use std::fs;
 use std::path::Path;
 
@@ -397,4 +397,114 @@ fn invalid_local_fonts_stay_out_of_the_model_and_report_a_diagnostic() {
         "{:#?}",
         model.diagnostics
     );
+}
+
+#[test]
+fn theme_states_and_logical_viewport_lengths_are_source_proven() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#":root{--surface:#ffffff;--ink:#111111}
+.dark{--surface:#020618;--ink:#f8fafc}
+:root[data-theme=dark]{--muted:#90a1b9}
+body{min-height:100svh;background-color:var(--surface);color:var(--ink)}
+.h-svh{height:100svh}.h-full{height:100%}
+.dark\:bg-input:is(.dark *){background-color:#112233}
+.themed{color:var(--muted)}
+@media (prefers-color-scheme: dark){.themed{border-color:#445566}}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <div className="h-svh dark:bg-input themed"><div className="h-full">Hello</div></div>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract_in_context(
+        dir.path(),
+        Path::new("App.tsx"),
+        Some(Path::new("dist/assets/index.css")),
+        Some(1440),
+        None,
+    )
+    .expect("extract");
+    let document = model.document_style.expect("document style");
+    let body = document.body.expect("body");
+    let dark_background = body
+        .style
+        .iter()
+        .find(|declaration| {
+            declaration.property == m::StyleProperty::Background
+                && declaration.when.as_ref().and_then(|when| when.color_scheme)
+                    == Some(m::ColorScheme::Dark)
+        })
+        .expect("dark document background");
+    let effective_document = match &dark_background.value {
+        m::StyleValue::Unresolved {
+            refinement: Some(refinement),
+            ..
+        } => refinement.as_ref(),
+        value => value,
+    };
+    assert_eq!(
+        effective_document,
+        &m::StyleValue::Color {
+            value: "#020618".into()
+        },
+        "scheme-scoped root variables must resolve the selectable dark document state"
+    );
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let m::Node::Element(root) = &app.root else {
+        panic!("App root must be an element")
+    };
+    let declarations = |property| {
+        root.style
+            .iter()
+            .filter(move |declaration| declaration.property == property)
+            .collect::<Vec<_>>()
+    };
+    let height = declarations(m::StyleProperty::Height)
+        .into_iter()
+        .next()
+        .expect("height");
+    let m::StyleValue::Unresolved {
+        refinement: Some(refinement),
+        ..
+    } = &height.value
+    else {
+        panic!(
+            "100svh must remain unresolved with a typed refinement: {:#?}",
+            height
+        )
+    };
+    assert_eq!(
+        refinement.as_ref(),
+        &m::StyleValue::Length {
+            value: 100.,
+            unit: m::LengthUnit::Svh,
+        }
+    );
+    for (property, expected) in [
+        (m::StyleProperty::Background, "#112233"),
+        (m::StyleProperty::Color, "#90a1b9"),
+        (m::StyleProperty::BorderColor, "#445566"),
+    ] {
+        assert!(
+            declarations(property).iter().any(|declaration| {
+                declaration.when.as_ref().and_then(|when| when.color_scheme)
+                    == Some(m::ColorScheme::Dark)
+                    && declaration.value
+                        == m::StyleValue::Color {
+                            value: expected.into(),
+                        }
+            }),
+            "missing selectable dark {property:?} state {expected}: {:#?}",
+            declarations(property)
+        );
+    }
 }
