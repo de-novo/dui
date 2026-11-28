@@ -628,6 +628,57 @@ body{min-height:100svh;background-color:var(--surface);color:var(--ink)}
 }
 
 #[test]
+fn built_css_wide_inherit_is_preserved_for_form_controls() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
+    fs::write(
+        dir.path().join("dist/assets/index.css"),
+        r#"button,input{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;background-color:#0000}"#,
+    )
+    .expect("built css");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"export default function App() { return <main><button>Go Back</button></main>; }
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    fn find_button(node: &m::Node) -> Option<&m::Element> {
+        match node {
+            m::Node::Element(element) if element.tag == "button" => Some(element),
+            m::Node::Element(element) => element.children.iter().find_map(find_button),
+            _ => None,
+        }
+    }
+    let button = find_button(&app.root).expect("button");
+    for property in [
+        m::StyleProperty::FontFamily,
+        m::StyleProperty::FontSize,
+        m::StyleProperty::LineHeight,
+        m::StyleProperty::FontWeight,
+        m::StyleProperty::LetterSpacing,
+        m::StyleProperty::Color,
+    ] {
+        assert!(
+            button.style.iter().any(|declaration| {
+                declaration.property == property
+                    && declaration.value
+                        == m::StyleValue::Keyword {
+                            value: "inherit".into(),
+                        }
+            }),
+            "missing inherited {property:?}: {:#?}",
+            button.style
+        );
+    }
+}
+
+#[test]
 fn destructured_query_reads_are_slots() {
     let dir = tempfile::tempdir().expect("temp project");
     fs::write(

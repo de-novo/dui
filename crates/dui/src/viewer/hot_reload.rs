@@ -2,7 +2,7 @@
 //! never writes to the immutable run archive and never starts an app host, browser or emulator.
 use crate::tsx_map;
 use dui_core::source_model::{Node, SourceModel};
-use dui_lang_typescript::{ParseCache, extract_incremental};
+use dui_lang_typescript::{ParseCache, extract_incremental_watched};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -43,7 +43,7 @@ struct HotState {
     status_revision: u64,
     watch_status: &'static str,
     reason: Option<String>,
-    model: SourceModel,
+    model: Arc<SourceModel>,
     nodes: Vec<Value>,
     edges: Vec<Value>,
     discovery: Value,
@@ -387,7 +387,7 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
             let name = name.to_string_lossy();
             if matches!(
                 name.as_ref(),
-                ".git" | "node_modules" | "target" | "dist" | "build" | ".next" | ".dui"
+                ".git" | "node_modules" | "target" | ".next" | ".dui"
             ) {
                 continue;
             }
@@ -398,12 +398,16 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
                 pending.push(path);
                 continue;
             }
-            if !kind.is_file()
-                || !matches!(
-                    path.extension().and_then(|ext| ext.to_str()),
-                    Some("ts" | "tsx" | "css" | "html" | "woff" | "woff2" | "ttf" | "otf")
-                )
-            {
+            let watched_extension = matches!(
+                path.extension().and_then(|ext| ext.to_str()),
+                Some("ts" | "tsx" | "css" | "html" | "woff" | "woff2" | "ttf" | "otf")
+            );
+            let root_resolution_config = path
+                .strip_prefix(root)
+                .ok()
+                .and_then(|relative| relative.to_str())
+                .is_some_and(|relative| matches!(relative, "tsconfig.json" | "jsconfig.json"));
+            if !kind.is_file() || !(watched_extension || root_resolution_config) {
                 continue;
             }
             let Ok(meta) = entry.metadata() else {
@@ -427,6 +431,17 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
     out
 }
 
+fn dependency_structure_changed(
+    before: &BTreeMap<String, (u64, u128)>,
+    after: &BTreeMap<String, (u64, u128)>,
+    changed: &[String],
+) -> bool {
+    changed.iter().any(|path| {
+        before.contains_key(path) != after.contains_key(path)
+            || matches!(path.as_str(), "tsconfig.json" | "jsconfig.json")
+    })
+}
+
 fn scan_changed(
     before: &BTreeMap<String, (u64, u128)>,
     after: &BTreeMap<String, (u64, u128)>,
@@ -439,6 +454,22 @@ fn scan_changed(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
+}
+
+fn hot_timing_enabled() -> bool {
+    std::env::var_os("DUI_HOT_TIMING").is_some()
+}
+
+fn hot_wall_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_millis())
+}
+
+fn log_hot_timing(value: Value) {
+    if hot_timing_enabled() {
+        eprintln!("{value}");
+    }
 }
 
 impl HotSession {
@@ -456,7 +487,7 @@ impl HotSession {
                 status_revision: 0,
                 watch_status: "starting",
                 reason: None,
-                model: archive_model.clone(),
+                model: Arc::new(archive_model.clone()),
                 nodes: archive_nodes,
                 edges: archive_edges,
                 discovery: archive_discovery,
@@ -525,7 +556,7 @@ impl HotSession {
         });
         if since.is_none() || stale_client {
             body["kind"] = json!("snapshot");
-            if let Ok(model) = serde_json::to_value(&guard.model) {
+            if let Ok(model) = serde_json::to_value(guard.model.as_ref()) {
                 body["model"] = model;
             }
             body["graph"] = json!({
@@ -560,7 +591,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
     let mut scan = scan_sources(&project);
     let mut previous = archive_model;
     loop {
-        match extract_incremental(&project, &entry, &mut cache) {
+        match extract_incremental_watched(&project, &entry, &mut cache, true) {
             Ok((model, stats)) => {
                 let changed_scan = Vec::new();
                 if model != previous {
@@ -588,7 +619,7 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.status_revision += 1;
                         state.watch_status = "ready";
                         state.reason = None;
-                        state.model = model.clone();
+                        state.model = Arc::new(model.clone());
                         state.nodes = nodes;
                         state.edges = edges;
                         state.discovery = discovery;
@@ -611,8 +642,8 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         state.reason = None;
                         // The archive may predate the watcher. The first extraction still publishes
                         // the current source as a patch relative to that immutable baseline.
-                        if state.revision == 0 && state.model != previous {
-                            state.model = previous.clone();
+                        if state.revision == 0 && state.model.as_ref() != &previous {
+                            state.model = Arc::new(previous.clone());
                         }
                     });
                 }
@@ -630,19 +661,31 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
             } else {
                 IDLE_POLL_INTERVAL
             });
+            let scan_started = Instant::now();
+            let scan_start_wall = hot_wall_ms();
             let next = scan_sources(&project);
+            let scan_ms = scan_started.elapsed().as_secs_f64() * 1000.0;
+            let scan_end_wall = hot_wall_ms();
             if next == scan {
                 continue;
             }
             let changed = scan_changed(&scan, &next);
+            let structure_changed = dependency_structure_changed(&scan, &next, &changed);
             scan = next;
-            match extract_incremental(&project, &entry, &mut cache) {
+            let extraction_started = Instant::now();
+            let extraction_start_wall = hot_wall_ms();
+            match extract_incremental_watched(&project, &entry, &mut cache, structure_changed) {
                 Ok((model, stats)) => {
+                    let extraction_ms = extraction_started.elapsed().as_secs_f64() * 1000.0;
+                    let extraction_end_wall = hot_wall_ms();
+                    let diff_started = Instant::now();
                     let (patch, model_changed) =
                         diff_model(&previous, &model, 0, &changed, &stats.parsed);
+                    let diff_ms = diff_started.elapsed().as_secs_f64() * 1000.0;
                     if !model_changed {
                         continue;
                     }
+                    let projection_started = Instant::now();
                     let current_projection = tsx_map::project_model(&previous);
                     let projection = tsx_map::project_model(&model);
                     let graph_patch = diff_graph(
@@ -653,12 +696,14 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         &projection.edges,
                         &projection.discovery,
                     );
+                    let projection_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
+                    let publish_started = Instant::now();
                     publish_state(&inner, |state| {
                         state.revision += 1;
                         state.status_revision += 1;
                         state.watch_status = "ready";
                         state.reason = None;
-                        state.model = model.clone();
+                        state.model = Arc::new(model.clone());
                         state.nodes = projection.nodes;
                         state.edges = projection.edges;
                         state.discovery = projection.discovery;
@@ -669,6 +714,23 @@ fn watch_loop(inner: Arc<Inner>, project: PathBuf, entry: PathBuf, archive_model
                         }
                         state.graph_patch = patch_has_changes(&graph_patch).then_some(graph_patch);
                     });
+                    let publish_ms = publish_started.elapsed().as_secs_f64() * 1000.0;
+                    log_hot_timing(json!({
+                        "kind":"hot-edit",
+                        "scanStartWallMs":scan_start_wall,
+                        "scanEndWallMs":scan_end_wall,
+                        "scanMs":scan_ms,
+                        "extractionStartWallMs":extraction_start_wall,
+                        "extractionEndWallMs":extraction_end_wall,
+                        "extractionMs":extraction_ms,
+                        "diffMs":diff_ms,
+                        "projectionMs":projection_ms,
+                        "publishMs":publish_ms,
+                        "publishWallMs":hot_wall_ms(),
+                        "changedFiles":changed,
+                        "parsedFiles":stats.parsed,
+                        "reusedFiles":stats.reused.len(),
+                    }));
                     previous = model;
                 }
                 Err(reason) => publish_state(&inner, |state| {

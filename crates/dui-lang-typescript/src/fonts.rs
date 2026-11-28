@@ -22,6 +22,7 @@ const MAX_REMOTE_SHEETS: usize = 16;
 const MAX_CACHE_BYTES: u64 = 64 * 1024 * 1024;
 const FONT_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+#[derive(Clone)]
 pub(crate) struct DocumentResources {
     pub external_stylesheets: Vec<String>,
     pub stylesheet_links: BTreeMap<String, m::Location>,
@@ -1104,6 +1105,7 @@ fn import_urls(sheet: &CssSheet) -> Vec<String> {
     out
 }
 
+#[derive(Clone)]
 pub(crate) struct FontIntake {
     pub faces: Vec<m::FontFace>,
     pub extra_files: Vec<m::SourceFile>,

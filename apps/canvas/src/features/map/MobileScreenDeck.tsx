@@ -84,12 +84,11 @@ const MobileApproximateCard = memo(
     if (!render) return null;
     return (
       <>
+        <div className="mobile-deck-status-row">
+          <span>{t.approximateModel}</span>
+        </div>
         <div className="mobile-deck-frame mobile-deck-frame-model" data-showing="model">
-          <ApproximateModelFrame
-            render={render}
-            label={t.approximateModel}
-            showUnresolved={false}
-          />
+          <ApproximateModelFrame render={render} showUnresolved={false} />
         </div>
         {render.unresolved.length > 0 && (
           <div className="mobile-model-unresolved" title={render.unresolved.join("\n")}>
