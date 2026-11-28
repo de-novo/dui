@@ -512,7 +512,9 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (when.expr) {
         const value = resolveExpr(when.expr, scope);
         if (!value.known) unknown = true;
-        else if (when.equals !== undefined ? !sameJson(value.value, when.equals) : !truthy(value.value))
+        else if (
+          when.equals !== undefined ? !sameJson(value.value, when.equals) : !truthy(value.value)
+        )
           return "no";
       }
       return unknown ? "unknown" : "yes";
