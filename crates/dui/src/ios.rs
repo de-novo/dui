@@ -305,6 +305,22 @@ impl SurfaceAdapter for IosMobileSurface {
     }
 
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
+        let manifest: Value =
+            serde_json::from_slice(&fs::read(spec).map_err(|e| failure(2, &e.to_string()))?)
+                .map_err(|e| failure(2, &e.to_string()))?;
+        let plan_only = manifest["capture"] == false;
+        if plan_only {
+            let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
+            return analysis::exercise_with_renderer(
+                None,
+                facts,
+                spec,
+                Some(project),
+                out,
+                None,
+                force,
+            );
+        }
         let cmd = match SimctlCmd::resolve() {
             Ok(c) => c,
             Err(reason) => {
@@ -314,9 +330,6 @@ impl SurfaceAdapter for IosMobileSurface {
                 return Err((5, reply));
             }
         };
-        let manifest: Value =
-            serde_json::from_slice(&fs::read(spec).map_err(|e| failure(2, &e.to_string()))?)
-                .map_err(|e| failure(2, &e.to_string()))?;
         let requested = manifest["udid"]
             .as_str()
             .or_else(|| manifest["device"].as_str());

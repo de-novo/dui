@@ -298,12 +298,25 @@ impl SurfaceAdapter for AndroidSurface {
     }
 
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
-        let Some(adb) = adb_executable() else {
-            return Err(failure(3, "adb executable not found"));
-        };
         let manifest: Value =
             serde_json::from_slice(&fs::read(spec).map_err(|e| failure(2, &e.to_string()))?)
                 .map_err(|e| failure(2, &e.to_string()))?;
+        let plan_only = manifest["capture"] == false;
+        if plan_only {
+            let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
+            return analysis::exercise_with_renderer(
+                None,
+                facts,
+                spec,
+                Some(project),
+                out,
+                None,
+                force,
+            );
+        }
+        let Some(adb) = adb_executable() else {
+            return Err(failure(3, "adb executable not found"));
+        };
         let requested_serial = manifest["serial"].as_str();
         let serial = match find_online_android_device(&adb, requested_serial) {
             Ok(s) => s,

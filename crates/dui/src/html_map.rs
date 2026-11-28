@@ -37,6 +37,10 @@ impl<'a> HtmlLinks<'a> {
 }
 
 impl Renderer for HtmlLinks<'_> {
+    fn plans_without_heavy_runtime(&self) -> bool {
+        true
+    }
+
     fn capture(
         &mut self,
         spec: &Value,
