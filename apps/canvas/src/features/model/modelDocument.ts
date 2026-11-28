@@ -631,7 +631,11 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       for (const [name, expr] of Object.entries(n.props ?? {})) {
         const value = resolveExpr(expr, scope);
         if (!value.known || value.value === undefined || value.value === null) continue;
-        if (name.startsWith("...") && typeof value.value === "object" && !Array.isArray(value.value)) {
+        if (
+          name.startsWith("...") &&
+          typeof value.value === "object" &&
+          !Array.isArray(value.value)
+        ) {
           for (const [key, spread] of Object.entries(value.value)) entries.push([key, spread]);
         } else entries.push([name, value.value]);
       }
@@ -662,9 +666,12 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return placeholder("Unresolved component");
       const slots = new Map<string, unknown>();
       const scope: Scope = { slots, items: new Map() };
-      const ordinary = new Set((c.slots ?? []).filter((s) => !s.name.startsWith("...")).map((s) => s.name));
+      const ordinary = new Set(
+        (c.slots ?? []).filter((s) => !s.name.startsWith("...")).map((s) => s.name),
+      );
       const rest = new Map<string, unknown>();
-      for (const [key, value] of props) if (!ordinary.has(key) && value !== undefined) rest.set(key, value);
+      for (const [key, value] of props)
+        if (!ordinary.has(key) && value !== undefined) rest.set(key, value);
       for (const s of c.slots ?? []) {
         const initial = s.name.startsWith("...")
           ? { known: true, value: Object.fromEntries(rest) }
