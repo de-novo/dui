@@ -1,6 +1,6 @@
 // Draw the versioned model in an inert document. Source tags, attributes and CSS never pass through.
 import { Ajv2020 } from "ajv/dist/2020.js";
-import schema from "../../../../../schemas/source-model.v1.schema.json";
+import schema from "../../../../../schemas/source-model.v1.schema.json" with { type: "json" };
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 export type Expr =
@@ -9,6 +9,7 @@ export type Expr =
   | { kind: "item"; list: string; path?: string[] }
   | { kind: "binding"; name: string; path?: string[] }
   | { kind: "object"; properties: Record<string, Expr> }
+  | { kind: "index"; object: Expr; key: Expr }
   | { kind: "unary"; operator: string; value: Expr }
   | { kind: "binary"; operator: string; left: Expr; right: Expr }
   | { kind: "opaque"; text: string; reads?: Expr[] };
@@ -366,7 +367,8 @@ function cssValue(v: Value, env: LengthEnvironment): string | undefined {
   }
 }
 
-type Resolved = { known: boolean; value?: unknown };
+export type ResolvedExpression = { known: boolean; value?: unknown };
+type Resolved = ResolvedExpression;
 type Scope = {
   slots: Map<string, unknown>;
   items: Map<string, unknown>;
@@ -416,6 +418,26 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
   }
   if (e.kind === "opaque" && scope.expressions.has(e.text)) {
     return { known: true, value: scope.expressions.get(e.text) };
+  }
+  if (e.kind === "index") {
+    const object = resolveExpr(e.object, scope);
+    if (!object.known) return { known: false };
+    const keyValue = resolveExpr(e.key, scope);
+    if (!keyValue.known) return { known: false };
+    const key =
+      typeof keyValue.value === "string"
+        ? keyValue.value
+        : typeof keyValue.value === "number" && Number.isFinite(keyValue.value)
+          ? String(keyValue.value)
+          : undefined;
+    if (
+      key === undefined ||
+      (typeof object.value !== "object" && typeof object.value !== "function") ||
+      object.value === null ||
+      !Object.hasOwn(object.value, key)
+    )
+      return { known: false };
+    return { known: true, value: (object.value as Record<string, unknown>)[key] };
   }
   if (e.kind === "object") {
     const value: Record<string, unknown> = {};
@@ -468,11 +490,33 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
   }
   return { known: false };
 }
+
+export function resolveModelExpression(
+  e: Expr,
+  values: {
+    slots?: Record<string, unknown>;
+    items?: Record<string, unknown>;
+    bindings?: Record<string, unknown>;
+    expressions?: Record<string, unknown>;
+  } = {},
+): ResolvedExpression {
+  return resolveExpr(e, {
+    slots: new Map(Object.entries(values.slots ?? {})),
+    items: new Map(Object.entries(values.items ?? {})),
+    bindings: new Map(Object.entries(values.bindings ?? {})),
+    expressions: new Map(Object.entries(values.expressions ?? {})),
+  });
+}
 function exprLabel(e: Expr): string {
   if (e.kind === "literal") return JSON.stringify(e.value);
   if (e.kind === "opaque") return e.text.length > 42 ? e.text.slice(0, 41) + "…" : e.text;
   if (e.kind === "unary") return e.operator + exprLabel(e.value);
   if (e.kind === "binary") return `${exprLabel(e.left)}${e.operator}${exprLabel(e.right)}`;
+  if (e.kind === "index") return `${exprLabel(e.object)}[${exprLabel(e.key)}]`;
+  if (e.kind === "object")
+    return `{${Object.entries(e.properties)
+      .map(([key, value]) => `${key}:${exprLabel(value)}`)
+      .join(",")}}`;
   const base = e.kind === "slot" ? e.slot : e.kind === "binding" ? e.name : `${e.list} item`;
   const name = base.split("#").at(-1)?.split(".").at(-1) ?? base;
   return name + (e.path?.length ? "." + e.path.join(".") : "");
@@ -971,6 +1015,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
           const value = resolveExpr(expr, scope);
           if (value.known && (typeof value.value === "string" || typeof value.value === "number"))
             text.append(String(value.value));
+          else if (value.known && isNodeContent(value.value))
+            drawChildren(value.value.nodes, value.value.scope, stack, text);
           else if (
             !value.known ||
             (typeof value.value === "object" && value.value !== null && value.value !== undefined)
@@ -1034,10 +1080,12 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return group;
       }
       if (n.kind === "createElement") {
-        const resolved = n.tag ? resolveExpr(n.tag, scope) : { known: false };
+        const tagExpr = n.tag as unknown as Expr | undefined;
+        const resolved = tagExpr ? resolveExpr(tagExpr, scope) : { known: false };
         const tag =
           resolved.known && typeof resolved.value === "string" ? resolved.value : undefined;
-        if (!tag || !tags.has(tag)) return placeholder(n.tag ? exprLabel(n.tag) : "createElement");
+        if (!tag || !tags.has(tag))
+          return placeholder(tagExpr ? exprLabel(tagExpr) : "createElement");
         const el = doc.createElement(tag);
         el.dataset.modelNode = n.id;
         applyProps(el, n, scope);

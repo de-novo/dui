@@ -212,6 +212,12 @@ pub enum Expr {
     Object {
         properties: BTreeMap<String, Expr>,
     },
+    /// A bounded keyed lookup. Both object and key are model expressions; a missing key or
+    /// unknown input stays unresolved rather than falling back to another entry.
+    Index {
+        object: Box<Expr>,
+        key: Box<Expr>,
+    },
     /// A deterministic unary operation over a modeled value.
     Unary {
         operator: String,
@@ -355,8 +361,12 @@ pub struct Outlet {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub enum BindingPattern {
-    Identifier { name: String },
-    Object { properties: BTreeMap<String, String> },
+    Identifier {
+        name: String,
+    },
+    Object {
+        properties: BTreeMap<String, String>,
+    },
 }
 
 /// A render-function value template. `children` is the function body's UI template.

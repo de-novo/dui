@@ -841,8 +841,16 @@ export default function App() {
         }
         out
     };
-    assert!(kinds("Frame").contains(&"invoke"), "Frame: {:?}", kinds("Frame"));
-    assert!(kinds("App").contains(&"renderFunction"), "App: {:?}", kinds("App"));
+    assert!(
+        kinds("Frame").contains(&"invoke"),
+        "Frame: {:?}",
+        kinds("Frame")
+    );
+    assert!(
+        kinds("App").contains(&"renderFunction"),
+        "App: {:?}",
+        kinds("App")
+    );
     assert!(
         kinds("Dynamic").contains(&"createElement"),
         "Dynamic: {:?}",
@@ -857,12 +865,76 @@ export default function App() {
     let mut found = false;
     while let Some(node) = stack.pop() {
         if let m::Node::RenderFunction(function) = node {
-            found = function.parameters.iter().any(|parameter| matches!(
-                parameter,
-                m::BindingPattern::Object { properties } if properties.get("filter").is_some()
-            ));
+            found = function.parameters.iter().any(|parameter| {
+                matches!(
+                    parameter,
+                    m::BindingPattern::Object { properties } if properties.get("filter").is_some()
+                )
+            });
         }
         stack.extend(node.children());
     }
-    assert!(found, "object render-prop parameter missing: {:#?}", app.root);
+    assert!(
+        found,
+        "object render-prop parameter missing: {:#?}",
+        app.root
+    );
+}
+
+#[test]
+fn dynamic_keyed_lookup_is_modeled_across_props_derived_locals_and_loop_items() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"type RowProps = { id?: string; rows?: Record<string, string> };
+function Row(props: RowProps) {
+  const { id = "fallback", rows: rowsById = {} } = props;
+  const row = rowsById[id];
+  return <p>{row}</p>;
+}
+export default function Rows({ ids, rows }: { ids: string[]; rows: Record<string, string> }) {
+  return <>{ids.map((id) => <Row key={id} id={id} rows={rows} />)}</>;
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let row = model
+        .components
+        .iter()
+        .find(|component| component.name == "Row")
+        .expect("Row");
+    let slot = |name: &str| {
+        row.slots
+            .iter()
+            .find(|slot| slot.name == name)
+            .unwrap_or_else(|| panic!("missing Row slot {name}: {:#?}", row.slots))
+    };
+    assert!(
+        matches!(slot("id").initial.as_ref(), Some(m::Expr::Literal { value }) if value == "fallback"),
+        "props-object destructuring must preserve the source default: {:#?}",
+        slot("id")
+    );
+    assert!(
+        matches!(slot("rows").initial.as_ref(), Some(m::Expr::Literal { value }) if value.as_object().is_some_and(|object| object.is_empty())),
+        "object source defaults must stay literal JSON rather than opaque text: {:#?}",
+        slot("rows")
+    );
+    assert!(
+        matches!(slot("rowsById").initial.as_ref(), Some(m::Expr::Slot { slot, path }) if slot.ends_with("#Row.rows") && path.is_empty()),
+        "destructured aliases must read their source prop: {:#?}",
+        slot("rowsById")
+    );
+    let initial = slot("row").initial.as_ref().expect("derived row initial");
+    let m::Expr::Index { object, key } = initial else {
+        panic!("rows[id] must become a keyed lookup: {initial:#?}")
+    };
+    assert!(
+        matches!(object.as_ref(), m::Expr::Slot { slot, path } if slot.ends_with("#Row.rowsById") && path.is_empty()),
+        "lookup object must be the destructured rows alias: {object:#?}"
+    );
+    assert!(
+        matches!(key.as_ref(), m::Expr::Slot { slot, path } if slot.ends_with("#Row.id") && path.is_empty()),
+        "lookup key must be the id prop value, not a literal path segment: {key:#?}"
+    );
 }

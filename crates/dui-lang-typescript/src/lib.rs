@@ -50,7 +50,10 @@ fn resolve_relative_module(files: &Files, from: &str, request: &str) -> Option<S
 fn export_text(text: &str) -> &str {
     text.strip_prefix('"')
         .and_then(|text| text.strip_suffix('"'))
-        .or_else(|| text.strip_prefix('\'').and_then(|text| text.strip_suffix('\'')))
+        .or_else(|| {
+            text.strip_prefix('\'')
+                .and_then(|text| text.strip_suffix('\''))
+        })
         .unwrap_or(text)
 }
 fn reexported_symbol<'a>(
@@ -257,11 +260,215 @@ fn object_type_fields(files: &Files, file: &File, node: Ast<'_>) -> Vec<m::Field
     Vec::new()
 }
 
+/// Lower a deterministic component-body derivation that uses only modeled slots. This is
+/// intentionally narrower than JavaScript evaluation: no calls, mutation, arithmetic or effects.
+fn derived_append_key(expr: m::Expr, key: String) -> m::Expr {
+    match expr {
+        m::Expr::Slot { slot, mut path } => {
+            path.push(key);
+            m::Expr::Slot { slot, path }
+        }
+        object => m::Expr::Index {
+            object: Box::new(object),
+            key: Box::new(m::Expr::Literal { value: key.into() }),
+        },
+    }
+}
+
+fn derived_chain(
+    file: &File,
+    slots: &[m::Slot],
+    props_object: Option<&str>,
+    mut n: Ast<'_>,
+    depth: usize,
+) -> Option<m::Expr> {
+    if depth >= 24 {
+        return None;
+    }
+    enum Segment<'a> {
+        Static(String),
+        Key(Ast<'a>),
+    }
+    let mut segments = Vec::new();
+    while matches!(n.kind(), "member_expression" | "subscript_expression") {
+        if segments.len() >= 24 {
+            return None;
+        }
+        if n.kind() == "member_expression" {
+            segments.push(Segment::Static(file.name(n, "property")?.into()));
+        } else {
+            let index = field(n, "index")?;
+            let static_key = literal(file, index).and_then(|value| match value {
+                Value::String(value) => Some(value),
+                Value::Number(value) => Some(value.to_string()),
+                _ => None,
+            });
+            if let Some(key) = static_key {
+                segments.push(Segment::Static(key));
+            } else {
+                segments.push(Segment::Key(index));
+            }
+        }
+        n = field(n, "object")?;
+    }
+    if !matches!(n.kind(), "identifier" | "shorthand_property_identifier") {
+        return None;
+    }
+    segments.reverse();
+    let name = file.text(n);
+    let slot_name = if Some(name) == props_object {
+        let Some(Segment::Static(first)) = segments.first() else {
+            return None;
+        };
+        let first = first.clone();
+        segments.drain(..1);
+        first
+    } else {
+        name.into()
+    };
+    let slot = slots.iter().find(|slot| slot.name == slot_name)?;
+    let mut expr = m::Expr::Slot {
+        slot: slot.id.clone(),
+        path: vec![],
+    };
+    for segment in segments {
+        match segment {
+            Segment::Static(key) => expr = derived_append_key(expr, key),
+            Segment::Key(node) => {
+                let key = derived_expr(file, slots, props_object, node, depth + 1)?;
+                expr = m::Expr::Index {
+                    object: Box::new(expr),
+                    key: Box::new(key),
+                };
+            }
+        }
+    }
+    Some(expr)
+}
+
+fn derived_expr(
+    file: &File,
+    slots: &[m::Slot],
+    props_object: Option<&str>,
+    node: Ast<'_>,
+    depth: usize,
+) -> Option<m::Expr> {
+    if depth >= 24 {
+        return None;
+    }
+    let n = unwrap_expr(node);
+    if let Some(value) = literal(file, n) {
+        return Some(m::Expr::Literal { value });
+    }
+    if let Some(read) = derived_chain(file, slots, props_object, n, depth) {
+        return Some(read);
+    }
+    if n.kind() == "unary_expression" && file.name(n, "operator") == Some("!") {
+        return Some(m::Expr::Unary {
+            operator: "!".into(),
+            value: Box::new(derived_expr(
+                file,
+                slots,
+                props_object,
+                field(n, "argument")?,
+                depth + 1,
+            )?),
+        });
+    }
+    if n.kind() == "binary_expression" {
+        let operator = file.name(n, "operator")?;
+        if matches!(
+            operator,
+            "&&" | "||" | "??" | "===" | "!==" | ">" | ">=" | "<" | "<="
+        ) {
+            return Some(m::Expr::Binary {
+                operator: operator.into(),
+                left: Box::new(derived_expr(
+                    file,
+                    slots,
+                    props_object,
+                    field(n, "left")?,
+                    depth + 1,
+                )?),
+                right: Box::new(derived_expr(
+                    file,
+                    slots,
+                    props_object,
+                    field(n, "right")?,
+                    depth + 1,
+                )?),
+            });
+        }
+    }
+    None
+}
+
+fn default_expr(
+    file: &File,
+    slots: &[m::Slot],
+    props_object: Option<&str>,
+    node: Ast<'_>,
+) -> m::Expr {
+    if let Some(value) = render::static_literal(file, node) {
+        return m::Expr::Literal { value };
+    }
+    if let Some(expr) = derived_expr(file, slots, props_object, node, 0) {
+        return expr;
+    }
+    m::Expr::Opaque {
+        text: file.text(node).into(),
+        reads: vec![],
+    }
+}
+
+fn destructured_props<'a>(
+    file: &'a File,
+    pattern: Ast<'a>,
+) -> Vec<(String, String, Option<Ast<'a>>, Ast<'a>)> {
+    children(pattern)
+        .into_iter()
+        .filter_map(|bind| match bind.kind() {
+            "shorthand_property_identifier_pattern" => {
+                let name = file.text(bind).to_owned();
+                Some((name.clone(), name, None, bind))
+            }
+            "object_assignment_pattern" => {
+                let left = field(bind, "left")?;
+                if left.kind() != "shorthand_property_identifier_pattern" {
+                    return None;
+                }
+                let name = file.text(left).to_owned();
+                Some((name.clone(), name, field(bind, "right"), bind))
+            }
+            "pair_pattern" => {
+                let prop = field(bind, "key").and_then(|key| render::object_key(file, key))?;
+                let value = field(bind, "value")?;
+                if value.kind() == "assignment_pattern" {
+                    let left = field(value, "left")?;
+                    if left.kind() != "identifier" {
+                        return None;
+                    }
+                    Some((prop, file.text(left).into(), field(value, "right"), bind))
+                } else if matches!(
+                    value.kind(),
+                    "identifier" | "shorthand_property_identifier_pattern"
+                ) {
+                    Some((prop, file.text(value).into(), None, bind))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
     if f.kind() == "method_definition" {
         return class_view::props(file, f, id);
     }
     let mut out = Vec::new();
+    let props_object = props_object_name(file, f);
     if let Some(param) = field(f, "parameters").and_then(first)
         && let Some(pat) = field(param, "pattern").filter(|p| p.kind() == "object_pattern")
     {
@@ -318,7 +525,9 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             let name = file.text(name_node);
             let prop = props.iter().find(|p| p.name == name);
             let mut ty = prop.map(|p| p.ty.clone()).unwrap_or_else(unknown);
-            if name == "children" && matches!(ty, m::TypeRef::Unknown { ref text, .. } if !text.as_deref().is_some_and(|text| text.contains("=>"))) {
+            if name == "children"
+                && matches!(ty, m::TypeRef::Unknown { ref text, .. } if !text.as_deref().is_some_and(|text| text.contains("=>")))
+            {
                 ty = m::TypeRef::Node;
             }
             out.push(m::Slot {
@@ -327,14 +536,7 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
                 kind: m::SlotKind::Prop,
                 ty,
                 optional: prop.is_some_and(|p| p.optional) || default.is_some(),
-                initial: default.map(|n| {
-                    literal(file, n)
-                        .map(|value| m::Expr::Literal { value })
-                        .unwrap_or_else(|| m::Expr::Opaque {
-                            text: file.text(n).into(),
-                            reads: vec![],
-                        })
-                }),
+                initial: default.map(|n| default_expr(file, &out, props_object, n)),
                 source: None,
                 origin: m::Origin::Syntax,
                 location: file.loc(name_node),
@@ -378,6 +580,53 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             continue;
         };
         if value.kind() != "call_expression" {
+            if pat.kind() == "object_pattern"
+                && value.kind() == "identifier"
+                && Some(file.text(value)) == props_object
+            {
+                for (prop, local, default, bind) in destructured_props(file, pat) {
+                    let initial = default.map(|n| default_expr(file, &out, props_object, n));
+                    let prop_id = format!("{id}.{prop}");
+                    if let Some(slot) = out
+                        .iter_mut()
+                        .find(|slot| slot.kind == m::SlotKind::Prop && slot.name == prop)
+                    {
+                        if initial.is_some() {
+                            slot.initial = initial.clone();
+                            slot.optional = true;
+                        }
+                    } else {
+                        out.push(m::Slot {
+                            id: prop_id.clone(),
+                            name: prop.clone(),
+                            kind: m::SlotKind::Prop,
+                            ty: unknown(),
+                            optional: initial.is_some(),
+                            initial: initial.clone(),
+                            source: None,
+                            origin: m::Origin::Syntax,
+                            location: file.loc(bind),
+                        });
+                    }
+                    if local != prop && !out.iter().any(|slot| slot.name == local) {
+                        out.push(m::Slot {
+                            id: format!("{id}.{local}"),
+                            name: local,
+                            kind: m::SlotKind::External,
+                            ty: unknown(),
+                            optional: true,
+                            initial: Some(m::Expr::Slot {
+                                slot: prop_id,
+                                path: vec![],
+                            }),
+                            source: Some(file.text(bind).into()),
+                            origin: m::Origin::Syntax,
+                            location: file.loc(bind),
+                        });
+                    }
+                }
+                continue;
+            }
             if pat.kind() == "identifier"
                 && !matches!(
                     value.kind(),
@@ -395,7 +644,7 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
                     kind: m::SlotKind::External,
                     ty: unknown(),
                     optional: true,
-                    initial: None,
+                    initial: derived_expr(file, &out, props_object, value, 0),
                     source: Some(file.text(value).into()),
                     origin: m::Origin::Syntax,
                     location: file.loc(var),

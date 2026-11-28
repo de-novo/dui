@@ -438,7 +438,22 @@
           "components/issues/issue-layouts/list/list-group.tsx#ListGroup.isExpanded": true,
           "components/issues/issue-layouts/list/list-group.tsx#ListGroup.shouldExpand": true,
           "components/issues/issue-layouts/list/list-group.tsx#ListGroup.groupIssueCount": 2,
-          "components/core/render-if-visible-HOC.tsx#RenderIfVisible.isVisible": true
+          "components/core/render-if-visible-HOC.tsx#RenderIfVisible.isVisible": true,
+          "components/work-item-filters/filters-hoc/base.tsx#WorkItemFilterRoot.workItemLayoutFilter": {
+            "layout": "list",
+            "filters": {}
+          },
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/base-list-root.tsx#BaseListRoot.projectId": "project-benchmark",
+          "components/issues/issue-layouts/list/roots/project-root.tsx#ListLayout.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/roots/project-root.tsx#ListLayout.projectId": "project-benchmark",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.projectId": "project-benchmark",
+          "components/rich-filters/transition-components.tsx#CssTransition.phase": "entered",
+          "components/issues/bulk-operations/root.tsx#IssueBulkOperationsRoot.isSelectionActive": false,
+          "components/issues/bulk-operations/root.tsx#IssueBulkOperationsRoot.selectionHelpers": {
+            "isSelectionDisabled": false
+          }
         },
         "loading": {
           "params": {
@@ -504,7 +519,14 @@
           "initialWorkItemFilters": true,
           "issues?.getIssueLoader() === \"mutation\"": false,
           "!issue.tempId": true,
-          "issue?.tempId !== undefined": false
+          "issue?.tempId !== undefined": false,
+          "issues?.getIssueLoader() === \"init-loader\" || issueCount === undefined": false,
+          "issues.getGroupIssueCount(undefined, undefined, false) === 0 && layout !== EIssueLayoutTypes.CALENDAR": false,
+          "validateEmptyIssueGroups(groupIssueCount)": false,
+          "issues?.getIssueLoader()": false,
+          "filter.configManager.areConfigsReady": true,
+          "!filter.configManager.areConfigsReady && !hasAnyConditions": false,
+          "this.state.hasError": false
         },
         "loading": {
           "props.activeLayout": "list",

@@ -460,6 +460,24 @@
         {
           "additionalProperties": false,
           "required": [
+            "object",
+            "key"
+          ],
+          "properties": {
+            "kind": {
+              "const": "index"
+            },
+            "object": {
+              "$ref": "#/$defs/expr"
+            },
+            "key": {
+              "$ref": "#/$defs/expr"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": [
             "operator",
             "value"
           ],

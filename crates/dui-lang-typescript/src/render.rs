@@ -35,7 +35,7 @@ fn tag(n: Ast<'_>) -> Ast<'_> {
     field(n, "open_tag").unwrap_or(n)
 }
 
-fn object_key(file: &File, key: Ast<'_>) -> Option<String> {
+pub(crate) fn object_key(file: &File, key: Ast<'_>) -> Option<String> {
     let raw = file.text(key);
     match key.kind() {
         "property_identifier" | "private_property_identifier" | "number" => Some(raw.into()),
@@ -310,6 +310,31 @@ struct VariantClasses {
     cases: Vec<(String, String)>,
 }
 
+fn push_direct_reads(expr: &m::Expr, reads: &mut Vec<m::Expr>) {
+    match expr {
+        m::Expr::Slot { .. } | m::Expr::Item { .. } | m::Expr::Binding { .. } => {
+            if !reads.contains(expr) {
+                reads.push(expr.clone());
+            }
+        }
+        m::Expr::Index { object, key } => {
+            push_direct_reads(object, reads);
+            push_direct_reads(key, reads);
+        }
+        m::Expr::Object { properties } => {
+            for value in properties.values() {
+                push_direct_reads(value, reads);
+            }
+        }
+        m::Expr::Unary { value, .. } => push_direct_reads(value, reads),
+        m::Expr::Binary { left, right, .. } => {
+            push_direct_reads(left, reads);
+            push_direct_reads(right, reads);
+        }
+        m::Expr::Literal { .. } | m::Expr::Opaque { .. } => {}
+    }
+}
+
 impl Context<'_> {
     fn component(&self, name: &str) -> Option<String> {
         let (file, export) = symbol(self.files, self.file, name)?;
@@ -401,66 +426,126 @@ impl Context<'_> {
         })
     }
 
-    fn binding(&self, mut n: Ast<'_>) -> Option<m::Expr> {
-        let mut path = Vec::new();
+    fn append_static_key(expr: m::Expr, key: String) -> m::Expr {
+        match expr {
+            m::Expr::Slot { slot, mut path } => {
+                path.push(key);
+                m::Expr::Slot { slot, path }
+            }
+            m::Expr::Item { list, mut path } => {
+                path.push(key);
+                m::Expr::Item { list, path }
+            }
+            m::Expr::Binding { name, mut path } => {
+                path.push(key);
+                m::Expr::Binding { name, path }
+            }
+            object => m::Expr::Index {
+                object: Box::new(object),
+                key: Box::new(m::Expr::Literal { value: key.into() }),
+            },
+        }
+    }
+
+    fn binding(&self, n: Ast<'_>) -> Option<m::Expr> {
+        self.binding_at(n, 0)
+    }
+
+    /// Lower a bounded member/subscript chain. Static properties remain field paths on direct
+    /// reads; computed keys become explicit indexed expressions. Unsupported or deeply nested
+    /// chains return `None` so the caller records opaque source instead of guessing a value.
+    fn binding_at(&self, mut n: Ast<'_>, depth: usize) -> Option<m::Expr> {
+        const EXPRESSION_DEPTH_LIMIT: usize = 24;
+        if depth >= EXPRESSION_DEPTH_LIMIT {
+            return None;
+        }
+        enum Segment<'a> {
+            Static(String),
+            Key(Ast<'a>),
+        }
+        let mut segments = Vec::new();
         while matches!(n.kind(), "member_expression" | "subscript_expression") {
+            if segments.len() >= EXPRESSION_DEPTH_LIMIT {
+                return None;
+            }
             if n.kind() == "member_expression" {
-                path.push(self.file.name(n, "property")?.into());
+                segments.push(Segment::Static(self.file.name(n, "property")?.into()));
             } else {
-                let index = field(n, "index").and_then(|index| literal(self.file, index))?;
-                path.push(index.as_u64()?.to_string());
+                let index = field(n, "index")?;
+                let static_key = literal(self.file, index).and_then(|value| match value {
+                    serde_json::Value::String(value) => Some(value),
+                    serde_json::Value::Number(value) => Some(value.to_string()),
+                    _ => None,
+                });
+                if let Some(key) = static_key {
+                    segments.push(Segment::Static(key));
+                } else {
+                    segments.push(Segment::Key(index));
+                }
             }
             n = field(n, "object")?;
         }
-        if self.class_render && n.kind() == "this" {
-            path.reverse();
-            if let [props, name, rest @ ..] = path.as_slice()
-                && props == "props"
-                && let Some(slot) = self.slots.iter().find(|s| &s.name == name)
-            {
-                return Some(m::Expr::Slot {
-                    slot: slot.id.clone(),
-                    path: rest.to_vec(),
-                });
+        segments.reverse();
+        let mut expr = if self.class_render && n.kind() == "this" {
+            if !matches!(segments.first(), Some(Segment::Static(props)) if props == "props") {
+                return None;
             }
-            return None;
-        }
-        if !matches!(n.kind(), "identifier" | "shorthand_property_identifier") {
-            return None;
-        }
-        path.reverse();
-        let name = self.file.text(n);
-        if Some(name) == self.props_object
-            && let [first, rest @ ..] = path.as_slice()
-            && let Some(slot) = self.slots.iter().find(|s| &s.name == first)
-        {
-            return Some(m::Expr::Slot {
+            let Some(Segment::Static(name)) = segments.get(1) else {
+                return None;
+            };
+            let slot = self.slots.iter().find(|s| &s.name == name)?;
+            segments.drain(..2);
+            m::Expr::Slot {
                 slot: slot.id.clone(),
-                path: rest.to_vec(),
-            });
-        }
-        if self.bindings.iter().rev().any(|scope| scope.contains(name)) {
-            return Some(m::Expr::Binding {
-                name: name.into(),
-                path,
-            });
-        }
-        if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
-            Some(m::Expr::Item {
-                list: list.clone(),
-                path,
-            })
-        } else if self.class_render {
-            None
+                path: vec![],
+            }
+        } else if matches!(n.kind(), "identifier" | "shorthand_property_identifier") {
+            let name = self.file.text(n);
+            if Some(name) == self.props_object {
+                let Some(Segment::Static(first)) = segments.first() else {
+                    return None;
+                };
+                let slot = self.slots.iter().find(|s| &s.name == first)?;
+                segments.drain(..1);
+                m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: vec![],
+                }
+            } else if self.bindings.iter().rev().any(|scope| scope.contains(name)) {
+                m::Expr::Binding {
+                    name: name.into(),
+                    path: vec![],
+                }
+            } else if let Some((_, list)) = self.items.iter().rev().find(|(item, _)| item == name) {
+                m::Expr::Item {
+                    list: list.clone(),
+                    path: vec![],
+                }
+            } else if self.class_render {
+                return None;
+            } else {
+                let slot = self.slots.iter().find(|s| s.name == name)?;
+                m::Expr::Slot {
+                    slot: slot.id.clone(),
+                    path: vec![],
+                }
+            }
         } else {
-            self.slots
-                .iter()
-                .find(|s| s.name == name)
-                .map(|s| m::Expr::Slot {
-                    slot: s.id.clone(),
-                    path,
-                })
+            return None;
+        };
+        for segment in segments {
+            match segment {
+                Segment::Static(key) => expr = Self::append_static_key(expr, key),
+                Segment::Key(key_node) => {
+                    let key = self.structured_operand_at(key_node, depth + 1)?;
+                    expr = m::Expr::Index {
+                        object: Box::new(expr),
+                        key: Box::new(key),
+                    };
+                }
+            }
         }
+        Some(expr)
     }
     /// Evaluate only syntax-proven immutable bindings and closed boolean/string/class-helper
     /// expressions. Anything outside this bounded subset remains opaque rather than executed.
@@ -638,25 +723,54 @@ impl Context<'_> {
             _ => None,
         }
     }
-    fn structured_operand(&self, node: Ast<'_>) -> Option<m::Expr> {
+    fn structured_operand_at(&self, node: Ast<'_>, depth: usize) -> Option<m::Expr> {
+        if depth >= 24 {
+            return None;
+        }
         let n = unwrap_expr(node);
         if let Some(value) = literal(self.file, n) {
             return Some(m::Expr::Literal { value });
         }
-        if let Some(read) = self.binding(n) {
+        if let Some(read) = self.binding_at(n, depth) {
             return Some(read);
         }
         if let Some(value) = self.static_value(n) {
             return Some(m::Expr::Literal { value });
         }
-        self.structured_expr(n)
+        self.structured_expr_at(n, depth)
     }
     fn structured_expr(&self, node: Ast<'_>) -> Option<m::Expr> {
+        self.structured_expr_at(node, 0)
+    }
+    fn structured_expr_at(&self, node: Ast<'_>, depth: usize) -> Option<m::Expr> {
+        if depth >= 24 {
+            return None;
+        }
         let n = unwrap_expr(node);
+        if n.kind() == "object" {
+            let mut properties = BTreeMap::new();
+            for child in children(n) {
+                match child.kind() {
+                    "pair" => {
+                        let key = field(child, "key").and_then(|key| object_key(self.file, key))?;
+                        let value =
+                            self.structured_operand_at(field(child, "value")?, depth + 1)?;
+                        properties.insert(key, value);
+                    }
+                    "shorthand_property_identifier" => {
+                        let key = self.file.text(child).to_owned();
+                        let value = self.binding_at(child, depth + 1)?;
+                        properties.insert(key, value);
+                    }
+                    _ => return None,
+                }
+            }
+            return Some(m::Expr::Object { properties });
+        }
         if n.kind() == "unary_expression" && self.file.name(n, "operator") == Some("!") {
             return Some(m::Expr::Unary {
                 operator: "!".into(),
-                value: Box::new(self.structured_operand(field(n, "argument")?)?),
+                value: Box::new(self.structured_operand_at(field(n, "argument")?, depth + 1)?),
             });
         }
         if n.kind() == "binary_expression" {
@@ -667,8 +781,8 @@ impl Context<'_> {
             ) {
                 return Some(m::Expr::Binary {
                     operator: operator.into(),
-                    left: Box::new(self.structured_operand(field(n, "left")?)?),
-                    right: Box::new(self.structured_operand(field(n, "right")?)?),
+                    left: Box::new(self.structured_operand_at(field(n, "left")?, depth + 1)?),
+                    right: Box::new(self.structured_operand_at(field(n, "right")?, depth + 1)?),
                 });
             }
         }
@@ -693,9 +807,7 @@ impl Context<'_> {
         pending.reverse();
         while let Some(c) = pending.pop() {
             if let Some(read) = self.binding(c) {
-                if !reads.contains(&read) {
-                    reads.push(read)
-                }
+                push_direct_reads(&read, &mut reads);
             } else if !matches!(c.kind(), "arrow_function" | "function_expression") {
                 pending.extend(children(c).into_iter().rev())
             }
@@ -990,8 +1102,7 @@ impl Context<'_> {
         field(n, "function").is_some_and(|function| {
             function.kind() == "member_expression"
                 && self.file.name(function, "property") == Some("createElement")
-                && field(function, "object")
-                    .is_some_and(|object| self.file.text(object) == "React")
+                && field(function, "object").is_some_and(|object| self.file.text(object) == "React")
         })
     }
     fn unique_declarator<'a>(file: &'a File, name: &str) -> Option<Ast<'a>> {

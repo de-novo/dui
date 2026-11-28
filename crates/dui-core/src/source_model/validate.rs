@@ -712,7 +712,10 @@ impl<'a> Check<'a> {
                             }
                             for (key, name) in properties {
                                 self.non_empty(format!("{parameter_pointer}/properties"), key);
-                                self.non_empty(format!("{parameter_pointer}/properties/{key}"), name);
+                                self.non_empty(
+                                    format!("{parameter_pointer}/properties/{key}"),
+                                    name,
+                                );
                                 if !bound.insert(name.as_str()) {
                                     self.error(
                                         format!("{parameter_pointer}/properties/{key}"),
@@ -793,6 +796,10 @@ impl<'a> Check<'a> {
                     self.expr(&format!("{pointer}/properties/{key}"), value, scope);
                 }
             }
+            Expr::Index { object, key } => {
+                self.expr(&format!("{pointer}/object"), object, scope);
+                self.expr(&format!("{pointer}/key"), key, scope);
+            }
             Expr::Unary { operator, value } => {
                 if operator != "!" {
                     self.error(format!("{pointer}/operator"), "unsupported unary operator");
@@ -823,6 +830,7 @@ impl<'a> Check<'a> {
                         }
                         Expr::Literal { .. }
                         | Expr::Object { .. }
+                        | Expr::Index { .. }
                         | Expr::Opaque { .. }
                         | Expr::Unary { .. }
                         | Expr::Binary { .. } => {
