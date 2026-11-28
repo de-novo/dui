@@ -1,5 +1,5 @@
 //! Source ranges, declarations and local module imports. No project code is executed.
-use dui_core::source_model::{Diagnostic, Location};
+use dui_core::source_model::{Component, Diagnostic, Edge, Location};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -672,6 +672,13 @@ pub struct Sources {
     pub files: BTreeMap<String, Arc<File>>,
 }
 
+pub(crate) struct RenderedFile {
+    pub fingerprint: String,
+    pub cacheable: bool,
+    pub components: Vec<Component>,
+    pub edges: Vec<Edge>,
+}
+
 struct CachedFile {
     sha256: String,
     len: u64,
@@ -682,6 +689,7 @@ struct CachedFile {
 #[derive(Default)]
 pub struct ParseCache {
     files: BTreeMap<String, CachedFile>,
+    pub(crate) rendered: BTreeMap<String, RenderedFile>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
