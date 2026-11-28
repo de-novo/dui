@@ -13,9 +13,9 @@ pub use fonts::cached_font_bytes;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -502,6 +502,19 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
                     origin: m::Origin::Syntax,
                     location: file.loc(rest),
                 });
+                if !out.iter().any(|slot| slot.name == "children") {
+                    out.push(m::Slot {
+                        id: format!("{id}.children"),
+                        name: "children".into(),
+                        kind: m::SlotKind::Prop,
+                        ty: m::TypeRef::Node,
+                        optional: true,
+                        initial: None,
+                        source: None,
+                        origin: m::Origin::Syntax,
+                        location: file.loc(rest),
+                    });
+                }
                 continue;
             }
             let (name_node, default) = match bind.kind() {
@@ -662,10 +675,20 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
         let Some(callee) = file.name(call, "function") else {
             continue;
         };
+        let function_node = field(call, "function");
         let local = file
             .bindings
             .get(callee)
-            .is_some_and(|(module, name)| module == "react" && name == "useState");
+            .is_some_and(|(module, name)| module == "react" && name == "useState")
+            || function_node.is_some_and(|function| {
+                function.kind() == "member_expression"
+                    && file.name(function, "property") == Some("useState")
+                    && field(function, "object").is_some_and(|object| {
+                        file.bindings
+                            .get(file.text(object))
+                            .is_some_and(|(module, _)| module == "react")
+                    })
+            });
         let query = !local
             && field(call, "function").is_some_and(|function| {
                 let text = file.text(function);
@@ -723,7 +746,7 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
         let arg = field(call, "arguments").and_then(first);
         let initial = if local {
             arg.map(|n| {
-                literal(file, n)
+                render::static_literal(file, n)
                     .map(|value| m::Expr::Literal { value })
                     .unwrap_or_else(|| m::Expr::Opaque {
                         text: file.text(n).into(),
@@ -1152,6 +1175,310 @@ fn constant_env(file: &File, function: Ast<'_>, slots: &[m::Slot]) -> BTreeMap<S
     out
 }
 
+fn object_property_nodes<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
+    if unwrap_expr(object).kind() != "object" {
+        return Vec::new();
+    }
+    children(unwrap_expr(object))
+        .into_iter()
+        .filter_map(|child| {
+            if child.kind() != "pair" {
+                return None;
+            }
+            let key = field(child, "key").and_then(|key| render::object_key(file, key))?;
+            Some((key, field(child, "value")?))
+        })
+        .collect()
+}
+
+fn find_value_declarator<'a>(file: &File, root: Ast<'a>, name: &str) -> Option<Ast<'a>> {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        if node.kind() == "variable_declarator"
+            && field(node, "name").is_some_and(|n| n.kind() == "identifier" && file.text(n) == name)
+        {
+            return Some(node);
+        }
+        pending.extend(children(node));
+    }
+    None
+}
+
+fn static_value_node<'a>(
+    files: &'a Files,
+    file: &'a File,
+    node: Ast<'a>,
+    depth: usize,
+) -> Option<(&'a File, Ast<'a>)> {
+    if depth > 8 {
+        return None;
+    }
+    let node = unwrap_expr(node);
+    if node.kind() != "identifier" {
+        return Some((file, node));
+    }
+    let name = file.text(node);
+    if let Some(declarator) = find_value_declarator(file, file.tree.root_node(), name)
+        && let Some(value) = field(declarator, "value")
+    {
+        return static_value_node(files, file, value, depth + 1);
+    }
+    let (target, export) = symbol(files, file, name)?;
+    let declarator = find_value_declarator(target, target.tree.root_node(), export)?;
+    static_value_node(files, target, field(declarator, "value")?, depth + 1)
+}
+
+fn binding_names(file: &File, pattern: Option<Ast<'_>>) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut pending = pattern.into_iter().collect::<Vec<_>>();
+    while let Some(node) = pending.pop() {
+        match node.kind() {
+            "identifier" | "shorthand_property_identifier_pattern" => {
+                out.insert(file.text(node).to_owned());
+            }
+            "pair_pattern" => {
+                if let Some(value) = field(node, "value") {
+                    pending.push(value);
+                }
+            }
+            _ => pending.extend(children(node)),
+        }
+    }
+    out
+}
+
+fn lower_table_template(
+    files: &Files,
+    file: &File,
+    function: Ast<'_>,
+    id: String,
+    signatures: &BTreeMap<String, Vec<m::Slot>>,
+    modules: &style::modules::Modules,
+    tailwind: bool,
+    built: Option<&style::built::Sheet<'_>>,
+    sources: &[style::built::Sheet<'_>],
+    model: &mut m::SourceModel,
+) -> Option<Value> {
+    let parameter = field(function, "parameter").or_else(|| field(function, "parameters"));
+    let mut cx = render::Context {
+        file,
+        files,
+        slots: &[],
+        props_object: None,
+        class_render: false,
+        tailwind,
+        built,
+        sources,
+        modules: modules.bindings(file, function),
+        signatures,
+        items: vec![],
+        bindings: vec![binding_names(file, parameter)],
+        constants: BTreeMap::new(),
+        model,
+    };
+    let body = returned(function)?;
+    Some(serde_json::to_value(cx.node(body, id)).ok()?)
+}
+
+fn materialize_tanstack_tables(
+    files: &Files,
+    model: &mut m::SourceModel,
+    signatures: &BTreeMap<String, Vec<m::Slot>>,
+    modules: &style::modules::Modules,
+    tailwind: bool,
+    built: Option<&style::built::Sheet<'_>>,
+    sources: &[style::built::Sheet<'_>],
+) {
+    for component_index in 0..model.components.len() {
+        let component = model.components[component_index].clone();
+        for slot_index in 0..component.slots.len() {
+            let slot = component.slots[slot_index].clone();
+            if !matches!(slot.kind, m::SlotKind::Local | m::SlotKind::External)
+                || !slot.source.as_deref().is_some_and(|source| {
+                    source.contains("useTable") || source.contains("useReactTable")
+                })
+            {
+                continue;
+            }
+            let Some(file) = files.get(&slot.location.file) else {
+                continue;
+            };
+            let Some(declarator) = find_value_declarator(file, file.tree.root_node(), &slot.name)
+            else {
+                continue;
+            };
+            let Some(call) = field(declarator, "value").map(unwrap_expr) else {
+                continue;
+            };
+            if call.kind() != "call_expression" {
+                continue;
+            }
+            let Some(options) = field(call, "arguments").and_then(first).map(unwrap_expr) else {
+                continue;
+            };
+            if options.kind() != "object" {
+                continue;
+            }
+            let properties = object_property_nodes(file, options)
+                .into_iter()
+                .collect::<BTreeMap<_, _>>();
+            let Some(data_node) = properties.get("data").copied() else {
+                continue;
+            };
+            let Some(columns_node) = properties.get("columns").copied() else {
+                continue;
+            };
+            let component_function = file
+                .functions()
+                .into_iter()
+                .find(|(name, _)| *name == component.name)
+                .map(|(_, function)| function);
+            let Some(component_function) = component_function else {
+                continue;
+            };
+            let owner = render::Context {
+                file,
+                files,
+                slots: &component.slots,
+                props_object: props_object_name(file, component_function),
+                class_render: component_function.kind() == "method_definition",
+                tailwind,
+                built,
+                sources,
+                modules: modules.bindings(file, component_function),
+                signatures,
+                items: vec![],
+                bindings: vec![],
+                constants: constant_env(file, component_function, &component.slots),
+                model,
+            };
+            let data = owner.expr(data_node);
+            let mut state = BTreeMap::new();
+            for key in [
+                "sorting",
+                "columnFilters",
+                "columnVisibility",
+                "rowSelection",
+                "pagination",
+            ] {
+                if let Some(node) = properties
+                    .get("state")
+                    .and_then(|v| {
+                        object_property_nodes(file, *v)
+                            .into_iter()
+                            .find(|(name, _)| name == key)
+                    })
+                    .map(|(_, node)| node)
+                    .or_else(|| {
+                        properties
+                            .get("initialState")
+                            .and_then(|v| {
+                                object_property_nodes(file, *v)
+                                    .into_iter()
+                                    .find(|(name, _)| name == key)
+                            })
+                            .map(|(_, node)| node)
+                    })
+                {
+                    state.insert(key.into(), owner.expr(node));
+                }
+            }
+            let row_id_path = properties.get("getRowId").and_then(|node| {
+                let text = file.text(*node);
+                let body = text
+                    .rsplit("=>")
+                    .nth(0)?
+                    .trim()
+                    .trim_start_matches("row.")
+                    .trim();
+                (!body.is_empty()
+                    && body
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '_' || c == '.'))
+                .then(|| body.split('.').map(str::to_owned).collect::<Vec<_>>())
+            });
+            let Some((columns_file, columns_array)) =
+                static_value_node(files, file, columns_node, 0)
+            else {
+                continue;
+            };
+            if unwrap_expr(columns_array).kind() != "array" {
+                continue;
+            }
+            let mut columns = Vec::new();
+            for (column_index, column_node) in
+                children(unwrap_expr(columns_array)).into_iter().enumerate()
+            {
+                if unwrap_expr(column_node).kind() != "object" {
+                    continue;
+                }
+                let column_properties =
+                    object_property_nodes(columns_file, unwrap_expr(column_node))
+                        .into_iter()
+                        .collect::<BTreeMap<_, _>>();
+                let literal_string = |node: Option<&Ast<'_>>| {
+                    node.and_then(|node| literal(columns_file, unwrap_expr(*node)))
+                        .and_then(|value| value.as_str().map(str::to_owned))
+                };
+                let accessor_key = literal_string(column_properties.get("accessorKey"));
+                let id = literal_string(column_properties.get("id"))
+                    .or_else(|| accessor_key.clone())
+                    .unwrap_or_else(|| column_index.to_string());
+                let mut column = serde_json::Map::new();
+                column.insert("id".into(), id.clone().into());
+                if let Some(accessor) = accessor_key {
+                    column.insert("accessorKey".into(), accessor.into());
+                }
+                for (property, target) in [("header", "headerNode"), ("cell", "cellNode")] {
+                    let Some(node) = column_properties.get(property).copied() else {
+                        continue;
+                    };
+                    let node = unwrap_expr(node);
+                    if let Some(value) = literal(columns_file, node)
+                        .and_then(|value| value.as_str().map(str::to_owned))
+                    {
+                        column.insert(property.into(), value.into());
+                    } else if matches!(node.kind(), "arrow_function" | "function_expression")
+                        && let Some(template) = lower_table_template(
+                            files,
+                            columns_file,
+                            node,
+                            format!("{}.{}.{}", slot.id, id, property),
+                            signatures,
+                            modules,
+                            tailwind,
+                            built,
+                            sources,
+                            owner.model,
+                        )
+                    {
+                        column.insert(target.into(), template);
+                    }
+                }
+                columns.push(Value::Object(column));
+            }
+            if columns.is_empty() {
+                continue;
+            }
+            let mut table = BTreeMap::new();
+            table.insert("$duiTable".into(), m::Expr::Literal { value: 1.into() });
+            table.insert("data".into(), data);
+            table.insert(
+                "columns".into(),
+                m::Expr::Literal {
+                    value: columns.into(),
+                },
+            );
+            table.insert("state".into(), m::Expr::Object { properties: state });
+            if let Some(path) = row_id_path {
+                table.insert("rowIdPath".into(), m::Expr::Literal { value: path.into() });
+            }
+            model.components[component_index].slots[slot_index].initial =
+                Some(m::Expr::Object { properties: table });
+        }
+    }
+}
+
 fn discover_built_css(project: &Path) -> Option<std::path::PathBuf> {
     for directory in ["dist", "build"] {
         let root = project.join(directory);
@@ -1464,6 +1791,94 @@ fn built_sheet_key(
     format!("{:x}", hasher.finalize())
 }
 
+fn merge_unique<T>(target: &mut Vec<T>, incoming: Vec<T>, key: impl Fn(&T) -> String) {
+    for value in incoming {
+        let value_key = key(&value);
+        if !target.iter().any(|existing| key(existing) == value_key) {
+            target.push(value);
+        }
+    }
+}
+
+fn merge_models(target: &mut m::SourceModel, incoming: m::SourceModel) {
+    merge_unique(&mut target.files, incoming.files, |file| file.path.clone());
+    merge_unique(&mut target.screens, incoming.screens, |screen| {
+        screen.id.clone()
+    });
+    merge_unique(&mut target.components, incoming.components, |component| {
+        component.id.clone()
+    });
+    merge_unique(&mut target.item_schemas, incoming.item_schemas, |schema| {
+        schema.id.clone()
+    });
+    merge_unique(&mut target.tokens, incoming.tokens, |token| {
+        token.id.clone()
+    });
+    merge_unique(&mut target.edges, incoming.edges, |edge| edge.id.clone());
+    if target.document_style.is_none() {
+        target.document_style = incoming.document_style;
+    }
+    for diagnostic in incoming.diagnostics {
+        if !target.diagnostics.contains(&diagnostic) {
+            target.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// Extract several independent TSX roots into one deterministic model. The roots share one parse
+/// and render cache, and duplicate shared components are kept once under their stable file#name id.
+pub fn extract_entries_incremental(
+    project: &Path,
+    entries: &[PathBuf],
+    cache: &mut ParseCache,
+    dependency_structure_changed: bool,
+) -> Result<(m::SourceModel, LoadStats), String> {
+    let Some(first) = entries.first() else {
+        return Err("expected at least one TSX entry".into());
+    };
+    let built = discover_built_css(project);
+    let (mut merged, mut stats) = extract_in_context_impl(
+        project,
+        first,
+        built.as_deref(),
+        None,
+        None,
+        cache,
+        dependency_structure_changed,
+    )?;
+    for entry in &entries[1..] {
+        let (model, next) = extract_in_context_impl(
+            project,
+            entry,
+            built.as_deref(),
+            None,
+            None,
+            cache,
+            dependency_structure_changed,
+        )?;
+        merge_models(&mut merged, model);
+        stats.parsed.extend(next.parsed);
+        stats.reused.extend(next.reused);
+    }
+    merged.files.sort_by(|a, b| a.path.cmp(&b.path));
+    merged.screens.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.components.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.tokens.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.edges.sort_by(|a, b| a.id.cmp(&b.id));
+    stats.parsed.sort();
+    stats.parsed.dedup();
+    stats.reused.sort();
+    stats.reused.dedup();
+    m::validate(&merged).map_err(|errs| format!("invalid merged source model: {errs:?}"))?;
+    Ok((merged, stats))
+}
+
+pub fn extract_entries(project: &Path, entries: &[PathBuf]) -> Result<m::SourceModel, String> {
+    let mut cache = ParseCache::default();
+    extract_entries_incremental(project, entries, &mut cache, true).map(|(model, _)| model)
+}
+
 fn extract_in_context_impl(
     project: &Path,
     entry: &Path,
@@ -1748,6 +2163,15 @@ fn extract_in_context_impl(
         log_render_file(&file.path, false, file_render_start);
     }
     log_extract_phase("component_model_render", component_render_start);
+    materialize_tanstack_tables(
+        &files,
+        &mut model,
+        &signatures,
+        &modules,
+        tailwind,
+        built,
+        &source_sheets,
+    );
     let route_discovery_start = Instant::now();
     routes::discover(&files, &mut model);
     log_extract_phase("route_discovery", route_discovery_start);

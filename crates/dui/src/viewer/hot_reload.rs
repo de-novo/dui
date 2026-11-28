@@ -2,7 +2,7 @@
 //! never writes to the immutable run archive and never starts an app host, browser or emulator.
 use crate::tsx_map;
 use dui_core::source_model::{Node, SourceModel};
-use dui_lang_typescript::{ParseCache, extract_incremental_watched};
+use dui_lang_typescript::{ParseCache, extract_entries_incremental, extract_incremental_watched};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -475,7 +475,7 @@ fn log_hot_timing(value: Value) {
 impl HotSession {
     pub(crate) fn start(
         project: PathBuf,
-        entry: PathBuf,
+        entries: Vec<PathBuf>,
         archive_model: SourceModel,
         archive_nodes: Vec<Value>,
         archive_edges: Vec<Value>,
@@ -500,7 +500,7 @@ impl HotSession {
         });
         let thread_inner = Arc::clone(&inner);
         thread::spawn(move || {
-            watch_loop(thread_inner, project, entry, archive_model);
+            watch_loop(thread_inner, project, entries, archive_model);
         });
         Self { inner }
     }
@@ -580,6 +580,30 @@ impl HotSession {
     }
 }
 
+fn state_nodes(inner: &Inner) -> Vec<Value> {
+    inner
+        .state
+        .lock()
+        .map(|state| state.nodes.clone())
+        .unwrap_or_default()
+}
+
+fn state_edges(inner: &Inner) -> Vec<Value> {
+    inner
+        .state
+        .lock()
+        .map(|state| state.edges.clone())
+        .unwrap_or_default()
+}
+
+fn state_discovery(inner: &Inner) -> Value {
+    inner
+        .state
+        .lock()
+        .map(|state| state.discovery.clone())
+        .unwrap_or(Value::Null)
+}
+
 fn publish_state(inner: &Inner, update: impl FnOnce(&mut HotState)) {
     if let Ok(mut guard) = inner.state.lock() {
         update(&mut guard);
@@ -587,17 +611,36 @@ fn publish_state(inner: &Inner, update: impl FnOnce(&mut HotState)) {
     }
 }
 
+fn extract_current(
+    project: &Path,
+    entries: &[PathBuf],
+    cache: &mut ParseCache,
+    dependency_structure_changed: bool,
+) -> Result<(SourceModel, dui_lang_typescript::LoadStats), String> {
+    let (extracted, stats) = if let [entry] = entries {
+        extract_incremental_watched(project, entry, cache, dependency_structure_changed)?
+    } else {
+        extract_entries_incremental(project, entries, cache, dependency_structure_changed)?
+    };
+    let routes = crate::nextjs::discover_app_routes(project);
+    if routes.is_empty() {
+        Ok((extracted, stats))
+    } else {
+        crate::nextjs::attach_route_model(project, extracted, &routes).map(|model| (model, stats))
+    }
+}
+
 fn watch_loop(
     inner: Arc<Inner>,
     project: PathBuf,
-    entry: PathBuf,
+    entries: Vec<PathBuf>,
     archive_model: Arc<SourceModel>,
 ) {
     let mut cache = ParseCache::default();
     let mut scan = scan_sources(&project);
     let mut previous = archive_model;
     loop {
-        match extract_incremental_watched(&project, &entry, &mut cache, true) {
+        match extract_current(&project, &entries, &mut cache, true) {
             Ok((model, stats)) => {
                 let model = Arc::new(model);
                 let changed_scan = Vec::new();
@@ -606,18 +649,22 @@ fn watch_loop(
                         diff_model(&previous, &model, 0, &changed_scan, &stats.parsed);
                     let projection = tsx_map::project_model(&model);
                     let (graph_patch, nodes, edges, discovery) = {
-                        let current = tsx_map::project_model(&previous);
+                        let (merged_nodes, merged_edges) = crate::nextjs::merge_projected_graph(
+                            &state_nodes(&inner),
+                            &state_edges(&inner),
+                            &model,
+                        );
                         (
                             diff_graph(
-                                &current.nodes,
-                                &current.edges,
-                                &current.discovery,
-                                &projection.nodes,
-                                &projection.edges,
+                                &state_nodes(&inner),
+                                &state_edges(&inner),
+                                &state_discovery(&inner),
+                                &merged_nodes,
+                                &merged_edges,
                                 &projection.discovery,
                             ),
-                            projection.nodes,
-                            projection.edges,
+                            merged_nodes,
+                            merged_edges,
                             projection.discovery,
                         )
                     };
@@ -681,7 +728,7 @@ fn watch_loop(
             scan = next;
             let extraction_started = Instant::now();
             let extraction_start_wall = hot_wall_ms();
-            match extract_incremental_watched(&project, &entry, &mut cache, structure_changed) {
+            match extract_current(&project, &entries, &mut cache, structure_changed) {
                 Ok((model, stats)) => {
                     let model = Arc::new(model);
                     let extraction_ms = extraction_started.elapsed().as_secs_f64() * 1000.0;
@@ -694,14 +741,18 @@ fn watch_loop(
                         continue;
                     }
                     let projection_started = Instant::now();
-                    let current_projection = tsx_map::project_model(&previous);
                     let projection = tsx_map::project_model(&model);
+                    let (merged_nodes, merged_edges) = crate::nextjs::merge_projected_graph(
+                        &state_nodes(&inner),
+                        &state_edges(&inner),
+                        &model,
+                    );
                     let graph_patch = diff_graph(
-                        &current_projection.nodes,
-                        &current_projection.edges,
-                        &current_projection.discovery,
-                        &projection.nodes,
-                        &projection.edges,
+                        &state_nodes(&inner),
+                        &state_edges(&inner),
+                        &state_discovery(&inner),
+                        &merged_nodes,
+                        &merged_edges,
                         &projection.discovery,
                     );
                     let projection_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
@@ -712,8 +763,8 @@ fn watch_loop(
                         state.watch_status = "ready";
                         state.reason = None;
                         state.model = Arc::clone(&model);
-                        state.nodes = projection.nodes;
-                        state.edges = projection.edges;
+                        state.nodes = merged_nodes;
+                        state.edges = merged_edges;
                         state.discovery = projection.discovery;
                         if model_changed {
                             let mut patch = patch;

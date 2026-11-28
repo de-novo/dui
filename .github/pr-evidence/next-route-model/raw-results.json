@@ -1,0 +1,54 @@
+{
+  "measuredAt": "2026-12-20T00:00:00Z",
+  "base": "d381531de4f7",
+  "projects": {
+    "next-shadcn-admin": {
+      "run": "/private/tmp/dui-t1945u-testhome/.dui/projects/14091878b907e25b6078e03b8624db4b0c7c9cd260e26d26671dba77e9827cd4/runs/0001795864132873-WZG5tv",
+      "routes": 37,
+      "components": 538,
+      "sourceEntries": 44,
+      "targetNode": {
+        "component": "next-app-router:/dashboard/users#route",
+        "location": {
+          "column": 16,
+          "end": 478,
+          "file": "src/app/(main)/dashboard/users/page.tsx",
+          "line": 14,
+          "start": 425
+        }
+      },
+      "diagnostics": 648,
+      "browserless": true,
+      "captureCells": 0
+    },
+    "shadcn-store": {
+      "run": "/private/tmp/dui-t1945u-testhome/.dui/projects/42aea3a4705a7838259ec0b42276243fb84141c8c2ee403abb0f7fa4e537ad4c/runs/0001795864173361-FcLUkT",
+      "routes": 32,
+      "components": 499,
+      "sourceEntries": 35,
+      "targetNode": {
+        "component": "next-app-router:/users#route",
+        "location": {
+          "column": 16,
+          "end": 282,
+          "file": "app/(shell)/users/page.tsx",
+          "line": 8,
+          "start": 197
+        }
+      },
+      "diagnostics": 390,
+      "browserless": true,
+      "captureCells": 0
+    }
+  },
+  "mountedProbe": {
+    "next-shadcn-admin": {
+      "width": 1440,
+      "height": 920,
+      "approximateModelHosts": 1,
+      "tablesInApproximate": 0,
+      "tableRowsPopulated": false,
+      "limitation": "Root layout composition reaches only unresolved script/body placeholders; nested route content does not yet mount in the card."
+    }
+  }
+}

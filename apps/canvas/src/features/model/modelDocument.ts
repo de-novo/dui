@@ -201,7 +201,7 @@ export interface SourceModelRenderer {
 }
 
 const tags = new Set(
-  "main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label input textarea select option progress meter ul ol li dl dt dd small form output dialog table caption thead tbody tfoot tr th td br hr".split(
+  "html head body main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label input textarea select option progress meter ul ol li dl dt dd small form output dialog table caption thead tbody tfoot tr th td br hr".split(
     " ",
   ),
 );
@@ -389,6 +389,124 @@ const isFunctionContent = (value: unknown): value is FunctionContent =>
   value !== null &&
   (value as FunctionContent).functionContent === true;
 
+
+type TableColumn = {
+  id?: string;
+  accessorKey?: string;
+  header?: string;
+  cellNode?: unknown;
+  headerNode?: unknown;
+};
+
+function tableRuntime(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const source = value as Record<string, unknown>;
+  if (source.$duiTable !== 1 || !Array.isArray(source.data) || !Array.isArray(source.columns))
+    return undefined;
+  const columns = source.columns.filter(
+    (column): column is TableColumn =>
+      typeof column === "object" && column !== null && typeof (column as TableColumn).id === "string",
+  );
+  const state =
+    typeof source.state === "object" && source.state !== null
+      ? (source.state as Record<string, unknown>)
+      : {};
+  const visibility =
+    typeof state.columnVisibility === "object" && state.columnVisibility !== null
+      ? (state.columnVisibility as Record<string, unknown>)
+      : {};
+  const visibleColumns = columns.filter((column) => visibility[column.id!] !== false);
+  const accessor = (row: unknown, column: TableColumn) => {
+    const key = column.accessorKey ?? column.id;
+    if (!key || typeof row !== "object" || row === null) return undefined;
+    return (row as Record<string, unknown>)[key];
+  };
+  const rows = [...source.data];
+  if (Array.isArray(state.sorting)) {
+    for (const sort of [...state.sorting].reverse()) {
+      if (typeof sort !== "object" || sort === null) continue;
+      const id = (sort as Record<string, unknown>).id;
+      if (typeof id !== "string") continue;
+      const column = columns.find((candidate) => candidate.id === id);
+      if (!column) continue;
+      const direction = (sort as Record<string, unknown>).desc === true ? -1 : 1;
+      rows.sort((a, b) => {
+        const av = accessor(a, column);
+        const bv = accessor(b, column);
+        let order = 0;
+        if (typeof av === "number" && typeof bv === "number") order = av - bv;
+        else if (typeof av === "string" && typeof bv === "string") {
+          const ad = Date.parse(av);
+          const bd = Date.parse(bv);
+          order =
+            Number.isFinite(ad) && Number.isFinite(bd) ? ad - bd : av.localeCompare(bv);
+        }
+        return order * direction;
+      });
+    }
+  }
+  const pagination =
+    typeof state.pagination === "object" && state.pagination !== null
+      ? (state.pagination as Record<string, unknown>)
+      : {};
+  const pageSize =
+    typeof pagination.pageSize === "number" && pagination.pageSize > 0
+      ? Math.floor(pagination.pageSize)
+      : rows.length || 1;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageIndexRaw = typeof pagination.pageIndex === "number" ? Math.floor(pagination.pageIndex) : 0;
+  const pageIndex = Math.max(0, Math.min(pageIndexRaw, pageCount - 1));
+  const pageRows = rows.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize);
+  const rowIdPath = Array.isArray(source.rowIdPath) ? (source.rowIdPath as string[]) : [];
+  const rowModels = pageRows.map((original, index) => {
+    const keyed = rowIdPath.reduce<unknown>(
+      (current, key) =>
+        typeof current === "object" && current !== null
+          ? (current as Record<string, unknown>)[key]
+          : undefined,
+      original,
+    );
+    const id = String(keyed ?? index);
+    return {
+      id,
+      index,
+      original,
+      visibleCells: visibleColumns.map((column) => ({
+        id: `${id}_${column.id}`,
+        columnId: column.id,
+        row: original,
+        rowId: id,
+      })),
+    };
+  });
+  return {
+    rowModel: { rows: rowModels },
+    headerGroups: [
+      {
+        id: "0",
+        headers: visibleColumns.map((column) => ({
+          id: column.id,
+          columnId: column.id,
+          isPlaceholder: false,
+        })),
+      },
+    ],
+    pageCount,
+    canPreviousPage: pageIndex > 0,
+    canNextPage: pageIndex + 1 < pageCount,
+    columns,
+    state,
+  };
+}
+
+function tableLookup(value: unknown, path: string[] | undefined): Resolved | undefined {
+  const runtime = tableRuntime(value);
+  if (!runtime || !path?.length) return undefined;
+  const first = path[0];
+  if (!Object.hasOwn(runtime, first)) return undefined;
+  return lookupPath(runtime, path);
+}
+
 function lookupPath(value: unknown, path: string[] | undefined): Resolved {
   let current = value;
   for (const key of path ?? []) {
@@ -406,7 +524,8 @@ function resolveExpr(e: Expr, scope: Scope): Resolved {
   if (e.kind === "literal") return { known: true, value: e.value };
   if (e.kind === "slot") {
     if (!scope.slots.has(e.slot)) return { known: false };
-    return lookupPath(scope.slots.get(e.slot), e.path);
+    const value = scope.slots.get(e.slot);
+    return tableLookup(value, e.path) ?? lookupPath(value, e.path);
   }
   if (e.kind === "item") {
     if (!scope.items.has(e.list)) return { known: false };
@@ -1093,6 +1212,70 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return el;
       }
       if (n.kind !== "element") return placeholder(n.reason ?? n.kind);
+      if (n.tag === "script" || n.tag === "head") return doc.createDocumentFragment();
+      if (n.tag === "html") {
+        const group = doc.createDocumentFragment();
+        drawChildren(n.children, scope, stack, group);
+        return group;
+      }
+      if (n.tag?.endsWith(".FlexRender")) {
+        const tableValue = [...scope.slots.values()].find((value) => tableRuntime(value));
+        const table = tableRuntime(tableValue);
+        const cellValue = n.props?.cell ? resolveExpr(n.props.cell, scope) : { known: false };
+        const headerValue = n.props?.header ? resolveExpr(n.props.header, scope) : { known: false };
+        const rendered = cellValue.known ? cellValue.value : headerValue.known ? headerValue.value : undefined;
+        const columnId =
+          typeof rendered === "object" && rendered !== null
+            ? (rendered as Record<string, unknown>).columnId
+            : undefined;
+        const column = (table?.columns as TableColumn[] | undefined)?.find(
+          (candidate) => candidate.id === columnId,
+        );
+        const group = doc.createDocumentFragment();
+        if (!table || !column) return group;
+        const isCell = cellValue.known;
+        const template = (isCell ? column.cellNode : column.headerNode) as Node | undefined;
+        if (!isCell && typeof column.header === "string") {
+          group.append(column.header);
+          return group;
+        }
+        if (template && typeof template === "object" && typeof template.kind === "string") {
+          const nested = copyScope(scope);
+          const row =
+            typeof rendered === "object" && rendered !== null
+              ? (rendered as Record<string, unknown>).row
+              : undefined;
+          nested.bindings.set("table", tableValue);
+          nested.bindings.set("column", column);
+          if (isCell) {
+            nested.bindings.set("cell", rendered);
+            nested.bindings.set("row", {
+              id:
+                typeof rendered === "object" && rendered !== null
+                  ? (rendered as Record<string, unknown>).rowId
+                  : undefined,
+              original: row,
+            });
+          } else {
+            nested.bindings.set("header", rendered);
+          }
+          group.append(draw(template, nested, stack));
+          return group;
+        }
+        if (isCell) {
+          const row =
+            typeof rendered === "object" && rendered !== null
+              ? (rendered as Record<string, unknown>).row
+              : undefined;
+          const key = column.accessorKey ?? column.id;
+          const value =
+            key && typeof row === "object" && row !== null
+              ? (row as Record<string, unknown>)[key]
+              : undefined;
+          if (typeof value === "string" || typeof value === "number") group.append(String(value));
+        }
+        return group;
+      }
       if (n.module) {
         const el = doc.createElement("span");
         el.dataset.modelNode = n.id;
@@ -1106,7 +1289,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return el;
       }
       if (!tags.has(n.tag!)) return placeholder(n.reason ?? n.tag ?? n.kind);
-      const tag = n.tag === "body" ? "div" : n.tag!;
+      const tag = n.tag === "html" || n.tag === "head" || n.tag === "body" ? "div" : n.tag!;
       const el = doc.createElement(tag);
       el.dataset.modelNode = n.id;
       applyStyles(el, n, scope);
