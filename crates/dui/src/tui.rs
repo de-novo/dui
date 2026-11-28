@@ -557,10 +557,21 @@ impl SurfaceAdapter for UniversalTuiSurface {
     }
 
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
+        let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
+        if crate::html_map::HtmlLinks::wanted(spec) {
+            return analysis::exercise_with_renderer(
+                None,
+                facts,
+                spec,
+                Some(project),
+                out,
+                None,
+                force,
+            );
+        }
         let Some(python) = python_executable() else {
             return Err(failure(3, "python3 PTY runtime not available"));
         };
-        let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
         let mut renderer = PtyRenderer { project, python };
         let runtime_tag = Some(json!({"product": "dui-pty-vt100"}));
         analysis::exercise_with_renderer(

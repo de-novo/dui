@@ -31,10 +31,6 @@ impl SurfaceAdapter for ViteWebSurface {
         &TypeScript
     }
 
-    fn maps_without_renderer(&self) -> bool {
-        true
-    }
-
     fn run(&self, project: &Path, spec: &Path, out: &Path, force: bool) -> Reply {
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
         crate::host::run_vite_web_with_facts(project, spec, facts, out, force)
@@ -127,8 +123,9 @@ impl SurfaceRegistry {
             let _ = crate::analysis::store(&out.join("report.json"), &reply);
             return Err((5, reply));
         };
-        // A map without capture needs no renderer on surfaces that can plan without one.
-        let plan_only = manifest["capture"] == false && adapter.maps_without_renderer();
+        // A map without capture needs no renderer environment at all: the analysis pipeline
+        // plans cells as not-rendered instead of falling back to a browser, dev server or device.
+        let plan_only = manifest["capture"] == false;
         if !plan_only && let Err(reason) = adapter.check_env() {
             let reply = unrenderable_reply(surface_id, &reason);
             let _ = fs::create_dir_all(out);

@@ -201,13 +201,18 @@ impl SurfaceAdapter for NextJsWebSurface {
         let manifest_spec: Value =
             serde_json::from_slice(&fs::read(spec).map_err(|e| failure(2, &e.to_string()))?)
                 .map_err(|e| failure(2, &e.to_string()))?;
-        let host_spec = match next_host_spec(project, &manifest_spec) {
-            Ok(h) => h,
-            Err(reason) => {
-                let reply = crate::surface::unrenderable_reply(SURFACE_NEXTJS_WEB, &reason);
-                let _ = fs::create_dir_all(out);
-                let _ = analysis::store(&out.join("report.json"), &reply);
-                return Err((5, reply));
+        let plan_only = manifest_spec["capture"] == false;
+        let host_spec = if plan_only {
+            Value::Null
+        } else {
+            match next_host_spec(project, &manifest_spec) {
+                Ok(h) => h,
+                Err(reason) => {
+                    let reply = crate::surface::unrenderable_reply(SURFACE_NEXTJS_WEB, &reason);
+                    let _ = fs::create_dir_all(out);
+                    let _ = analysis::store(&out.join("report.json"), &reply);
+                    return Err((5, reply));
+                }
             }
         };
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
@@ -243,7 +248,11 @@ impl SurfaceAdapter for NextJsWebSurface {
         analysis::store(&effective_manifest, &effective_spec)?;
 
         let exe = crate::chromium::executable();
-        let browser_version = crate::chromium::version_tag(&exe);
+        let browser_version = if plan_only {
+            None
+        } else {
+            crate::chromium::version_tag(&exe)
+        };
         let mut lazy = LazyNextBrowser {
             project,
             host_spec,
@@ -252,7 +261,7 @@ impl SurfaceAdapter for NextJsWebSurface {
             session: None,
             browser: None,
         };
-        let renderer = exe.is_file().then_some(&mut lazy as &mut dyn Renderer);
+        let renderer = (!plan_only && exe.is_file()).then_some(&mut lazy as &mut dyn Renderer);
         let mut report = analysis::exercise_with_renderer(
             renderer,
             facts,

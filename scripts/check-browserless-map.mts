@@ -3,7 +3,15 @@
 // edges and the limitation that links only scripts add are missing.
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { extname, join, resolve } from "node:path";
@@ -173,6 +181,114 @@ try {
   );
   assert.equal(unresolvedRoute.location.file, "App.tsx");
   assert.equal(unresolvedRoute.location.line, 2);
+  // Regression for the Never rule: a default Next map neither resolves/starts `next dev` nor
+  // launches Chromium, even when both executables are explicitly configured.
+  const nextApp = join(stage, "next-app");
+  mkdirSync(join(nextApp, "app", "pricing"), { recursive: true });
+  mkdirSync(join(nextApp, "app", "orders", "[id]"), { recursive: true });
+  writeFileSync(
+    join(nextApp, "package.json"),
+    JSON.stringify({ name: "next-app", private: true, dependencies: { next: "16.4.6" } }),
+  );
+  writeFileSync(join(nextApp, "app", "page.tsx"), "export default function Home(){return <main/>}");
+  writeFileSync(
+    join(nextApp, "app", "pricing", "page.tsx"),
+    "export default function Pricing(){return <main/>}",
+  );
+  writeFileSync(
+    join(nextApp, "app", "orders", "[id]", "page.tsx"),
+    "export default function Order(){return <main/>}",
+  );
+  const fakebin = join(stage, "fakebin");
+  mkdirSync(fakebin);
+  const nextLog = join(stage, "next-launched.log");
+  const chromeLog = join(stage, "chrome-launched.log");
+  writeFileSync(
+    join(fakebin, "next"),
+    `#!/usr/bin/env node
+require("node:fs").appendFileSync(process.env.DUI_FAKE_NEXT_LOG, process.argv.slice(2).join(" ") + "\n");
+if (process.argv.includes("dev")) {
+  require("node:http").createServer((_req, res) => res.end("<html><body>fake</body></html>"))
+    .listen(Number(process.env.PORT), "127.0.0.1");
+}
+`,
+  );
+  writeFileSync(
+    join(fakebin, "chrome"),
+    `#!/bin/sh
+echo called >> "$DUI_FAKE_CHROME_LOG"
+exit 1
+`,
+  );
+  chmodSync(join(fakebin, "next"), 0o755);
+  chmodSync(join(fakebin, "chrome"), 0o755);
+  const nextReport = JSON.parse(
+    execFileSync(binary, ["map", nextApp], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: join(stage, "next-home"),
+        DUI_CHROMIUM: join(fakebin, "chrome"),
+        DUI_NEXT_BIN: join(fakebin, "next"),
+        DUI_FAKE_NEXT_LOG: nextLog,
+        DUI_FAKE_CHROME_LOG: chromeLog,
+      },
+    }),
+  ) as Report & { nextAppRoutes: unknown[] };
+  assert.equal(nextReport.browser, null);
+  assert.equal(nextReport.nextAppRoutes.length, 3);
+  assert.ok(nextReport.cells.length >= 4, "static Next routes are planned");
+  assert.ok(
+    nextReport.cells.every(
+      (c) => c.status === "unverified" && c.reason === "not-rendered" && !c.image,
+    ),
+    "Next cells are planned without evidence",
+  );
+  assert.equal(existsSync(nextLog), false, "default Next map must not invoke next");
+  assert.equal(existsSync(chromeLog), false, "default Next map must not invoke Chromium");
+
+  // A host command is the app's dev server. It is explicit capture infrastructure, not input to
+  // the default lightweight map.
+  const commandApp = join(stage, "command-app");
+  mkdirSync(commandApp);
+  const commandLog = join(stage, "command-started.log");
+  writeFileSync(
+    join(commandApp, "server.mjs"),
+    `import fs from "node:fs";
+fs.writeFileSync(process.env.DUI_COMMAND_LOG, "started");
+`,
+  );
+  writeFileSync(
+    join(commandApp, "dui.json"),
+    JSON.stringify({
+      host: "command",
+      command: [process.execPath, "server.mjs"],
+      env: { DUI_COMMAND_LOG: commandLog },
+      path: "/",
+      widths: [375],
+    }),
+  );
+  const commandReport = JSON.parse(
+    execFileSync(binary, ["map", commandApp], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: join(stage, "command-home"),
+        DUI_CHROMIUM: join(stage, "no-browser"),
+      },
+    }),
+  ) as Report;
+  assert.equal(commandReport.browser, null);
+  assert.deepEqual(
+    commandReport.cells.map((c) => [c.path, c.status, c.reason]),
+    [["/", "unverified", "not-rendered"]],
+  );
+  assert.equal(
+    existsSync(commandLog),
+    false,
+    "default command-host map must not start the command",
+  );
+
   const filters = join(stage, "filters");
   mkdirSync(filters);
   writeFileSync(

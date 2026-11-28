@@ -199,7 +199,11 @@ impl SurfaceAdapter for ElectronDesktopSurface {
         let manifest_spec: Value =
             serde_json::from_slice(&fs::read(spec).map_err(|e| failure(2, &e.to_string()))?)
                 .map_err(|e| failure(2, &e.to_string()))?;
-        if manifest_spec["mode"].as_str() == Some("binary") && electron_binary(project).is_none() {
+        let plan_only = manifest_spec["capture"] == false;
+        if !plan_only
+            && manifest_spec["mode"].as_str() == Some("binary")
+            && electron_binary(project).is_none()
+        {
             let reason = UnrenderableReason::new(
                 "no-electron-binary",
                 "Electron binary not found (install electron or set DUI_ELECTRON)",
@@ -211,7 +215,11 @@ impl SurfaceAdapter for ElectronDesktopSurface {
         }
         let facts = analysis::analyze_with_oracle(self.oracle(), project, spec)?;
         let exe = crate::chromium::executable();
-        let browser_version = crate::chromium::version_tag(&exe);
+        let browser_version = if plan_only {
+            None
+        } else {
+            crate::chromium::version_tag(&exe)
+        };
         let mut lazy = LazyElectronBrowser {
             project,
             manifest_spec,
@@ -220,7 +228,7 @@ impl SurfaceAdapter for ElectronDesktopSurface {
             session: None,
             browser: None,
         };
-        let renderer = exe.is_file().then_some(&mut lazy as &mut dyn Renderer);
+        let renderer = (!plan_only && exe.is_file()).then_some(&mut lazy as &mut dyn Renderer);
         analysis::exercise_with_renderer(
             renderer,
             facts,
