@@ -1093,6 +1093,12 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return el;
       }
       if (n.kind !== "element") return placeholder(n.reason ?? n.kind);
+      if (n.tag === "script" || n.tag === "head") return doc.createDocumentFragment();
+      if (n.tag === "html") {
+        const group = doc.createDocumentFragment();
+        drawChildren(n.children, scope, stack, group);
+        return group;
+      }
       if (n.module) {
         const el = doc.createElement("span");
         el.dataset.modelNode = n.id;

@@ -166,6 +166,185 @@ fn object_entries<'a>(file: &File, object: Ast<'a>) -> Vec<(String, Ast<'a>)> {
         .collect()
 }
 
+fn strip_type_assertion(mut n: Ast<'_>) -> Ast<'_> {
+    while matches!(n.kind(), "as_expression" | "satisfies_expression") {
+        let Some(child) = first(n) else { break };
+        n = child;
+    }
+    n
+}
+
+fn static_number(value: &serde_json::Value) -> Option<f64> {
+    value.as_f64()
+}
+
+fn static_bool(value: &serde_json::Value) -> bool {
+    truthy_json(value)
+}
+
+fn eval_static(
+    files: &Files,
+    file: &File,
+    node: Ast<'_>,
+    depth: usize,
+) -> Option<serde_json::Value> {
+    if depth >= 16 {
+        return None;
+    }
+    let n = strip_type_assertion(unwrap_expr(node));
+    if let Some(value) = literal(file, n) {
+        return Some(value);
+    }
+    match n.kind() {
+        "array" => {
+            let mut out = Vec::new();
+            for child in children(n) {
+                if child.kind() == "spread_element" {
+                    let value = eval_static(files, file, first(child)?, depth + 1)?;
+                    out.extend(value.as_array()?.iter().cloned());
+                } else {
+                    out.push(eval_static(files, file, child, depth + 1)?);
+                }
+            }
+            Some(out.into())
+        }
+        "object" => {
+            let mut out = serde_json::Map::new();
+            for child in children(n) {
+                match child.kind() {
+                    "pair" => {
+                        let key = field(child, "key").and_then(|key| object_key(file, key))?;
+                        let value = eval_static(files, file, field(child, "value")?, depth + 1)?;
+                        out.insert(key, value);
+                    }
+                    "spread_element" => {
+                        let value = eval_static(files, file, first(child)?, depth + 1)?;
+                        for (key, value) in value.as_object()? {
+                            out.insert(key.clone(), value.clone());
+                        }
+                    }
+                    "shorthand_property_identifier" => {
+                        let key = file.text(child).to_owned();
+                        let value = eval_static(files, file, child, depth + 1)?;
+                        out.insert(key, value);
+                    }
+                    _ => return None,
+                }
+            }
+            Some(out.into())
+        }
+        "identifier" | "shorthand_property_identifier" => {
+            let name = file.text(n);
+            if let Some(declarator) = find_declarator(file, file.tree.root_node(), name)
+                && let Some(value) = field(declarator, "value")
+            {
+                return eval_static(files, file, value, depth + 1);
+            }
+            let (target, export) = symbol(files, file, name)?;
+            let declarator = find_declarator(target, target.tree.root_node(), export)?;
+            eval_static(files, target, field(declarator, "value")?, depth + 1)
+        }
+        "member_expression" => {
+            let object = eval_static(files, file, field(n, "object")?, depth + 1)?;
+            let property = file.name(n, "property")?;
+            object.get(property).cloned()
+        }
+        "subscript_expression" => {
+            let object = eval_static(files, file, field(n, "object")?, depth + 1)?;
+            let index = eval_static(files, file, field(n, "index")?, depth + 1)?;
+            if let Some(key) = index.as_str() {
+                object.get(key).cloned()
+            } else if let Some(index) = index.as_u64() {
+                object.get(index as usize).cloned()
+            } else {
+                None
+            }
+        }
+        "unary_expression" => {
+            let value = eval_static(files, file, field(n, "argument")?, depth + 1)?;
+            match file.name(n, "operator")? {
+                "!" => Some((!static_bool(&value)).into()),
+                "-" => static_number(&value).map(|value| (-value).into()),
+                "+" => static_number(&value).map(|value| value.into()),
+                _ => None,
+            }
+        }
+        "binary_expression" => {
+            let left = eval_static(files, file, field(n, "left")?, depth + 1)?;
+            let operator = file.name(n, "operator")?;
+            if operator == "&&" {
+                return if static_bool(&left) {
+                    eval_static(files, file, field(n, "right")?, depth + 1)
+                } else {
+                    Some(left)
+                };
+            }
+            if operator == "||" {
+                return if static_bool(&left) {
+                    Some(left)
+                } else {
+                    eval_static(files, file, field(n, "right")?, depth + 1)
+                };
+            }
+            if operator == "??" {
+                return if left.is_null() {
+                    eval_static(files, file, field(n, "right")?, depth + 1)
+                } else {
+                    Some(left)
+                };
+            }
+            let right = eval_static(files, file, field(n, "right")?, depth + 1)?;
+            match operator {
+                "+" => plus_json(left, right),
+                "-" | "*" | "/" | "%" => {
+                    let a = static_number(&left)?;
+                    let b = static_number(&right)?;
+                    let value = match operator {
+                        "-" => a - b,
+                        "*" => a * b,
+                        "/" => a / b,
+                        _ => a % b,
+                    };
+                    serde_json::Number::from_f64(value).map(serde_json::Value::Number)
+                }
+                "===" => Some((left == right).into()),
+                "!==" => Some((left != right).into()),
+                ">" | ">=" | "<" | "<=" => {
+                    let a = static_number(&left)?;
+                    let b = static_number(&right)?;
+                    Some(
+                        (match operator {
+                            ">" => a > b,
+                            ">=" => a >= b,
+                            "<" => a < b,
+                            _ => a <= b,
+                        })
+                        .into(),
+                    )
+                }
+                _ => None,
+            }
+        }
+        "ternary_expression" => {
+            let condition = eval_static(files, file, field(n, "condition")?, depth + 1)?;
+            eval_static(
+                files,
+                file,
+                field(
+                    n,
+                    if static_bool(&condition) {
+                        "consequence"
+                    } else {
+                        "alternative"
+                    },
+                )?,
+                depth + 1,
+            )
+        }
+        _ => None,
+    }
+}
+
 fn find_declarator<'a>(file: &File, root: Ast<'a>, name: &str) -> Option<Ast<'a>> {
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
@@ -551,6 +730,9 @@ impl Context<'_> {
     /// expressions. Anything outside this bounded subset remains opaque rather than executed.
     fn static_value(&self, node: Ast<'_>) -> Option<serde_json::Value> {
         let n = unwrap_expr(node);
+        if let Some(value) = eval_static(self.files, self.file, n, 0) {
+            return Some(value);
+        }
         if let Some(value) = static_literal(self.file, n) {
             return Some(value);
         }
@@ -1264,8 +1446,21 @@ impl Context<'_> {
             }
         }
         if name.ends_with(".Provider") {
+            let mut children = self.child_nodes(n, &id);
+            if children.is_empty()
+                && let Some(slot) = self
+                    .slots
+                    .iter()
+                    .find(|slot| slot.kind == m::SlotKind::Prop && slot.name == "children")
+            {
+                children.push(m::Node::Outlet(m::Outlet {
+                    id: format!("{id}.children"),
+                    slot: slot.id.clone(),
+                    location: location.clone(),
+                }));
+            }
             return m::Node::Fragment(m::Fragment {
-                children: self.child_nodes(n, &id),
+                children,
                 id,
                 location,
             });

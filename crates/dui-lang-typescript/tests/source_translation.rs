@@ -989,3 +989,70 @@ export default function Rows({ ids, rows }: { ids: string[]; rows: Record<string
         "lookup key must be the id prop value, not a literal path segment: {key:#?}"
     );
 }
+
+#[test]
+fn imported_static_arrays_and_provider_children_stay_source_proven() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("data.ts"),
+        r#"export const rows = [{ name: "Olivia", minutes: 7 * 2 }];"#,
+    )
+    .expect("data");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { rows } from "./data";
+function TooltipProvider({ delay = 0, ...props }: any) {
+  return <Primitive.Provider delay={delay} {...props} />;
+}
+export default function App() {
+  return <TooltipProvider>{rows.map((row) => <p key={row.name}>{row.name}</p>)}</TooltipProvider>;
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    let m::Node::Instance(instance) = &app.root else {
+        panic!("provider instance missing: {:#?}", app.root)
+    };
+    let provider = model
+        .components
+        .iter()
+        .find(|component| component.name == "TooltipProvider")
+        .expect("provider");
+    assert!(
+        provider.slots.iter().any(|slot| slot.name == "children"),
+        "rest-forwarding provider must expose its children input: {:#?}",
+        provider.slots
+    );
+    let mut stack = vec![&provider.root];
+    let mut outlets = 0;
+    while let Some(node) = stack.pop() {
+        if matches!(node, m::Node::Outlet(outlet) if outlet.slot.ends_with("#TooltipProvider.children"))
+        {
+            outlets += 1;
+        }
+        stack.extend(node.children());
+    }
+    assert_eq!(
+        outlets, 1,
+        "self-closing provider must pass children through"
+    );
+    let list = instance
+        .children
+        .iter()
+        .find_map(|node| match node {
+            m::Node::List(list) => Some(list),
+            _ => None,
+        })
+        .expect("rows list");
+    assert!(
+        matches!(&list.source, m::Expr::Literal { value } if value[0]["name"] == "Olivia" && value[0]["minutes"].as_f64() == Some(14.0)),
+        "imported static rows must remain source literals: {:#?}",
+        list.source
+    );
+}

@@ -502,6 +502,19 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
                     origin: m::Origin::Syntax,
                     location: file.loc(rest),
                 });
+                if !out.iter().any(|slot| slot.name == "children") {
+                    out.push(m::Slot {
+                        id: format!("{id}.children"),
+                        name: "children".into(),
+                        kind: m::SlotKind::Prop,
+                        ty: m::TypeRef::Node,
+                        optional: true,
+                        initial: None,
+                        source: None,
+                        origin: m::Origin::Syntax,
+                        location: file.loc(rest),
+                    });
+                }
                 continue;
             }
             let (name_node, default) = match bind.kind() {
