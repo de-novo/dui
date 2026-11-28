@@ -12,7 +12,13 @@ use dui_core::source_model as m;
 pub use fonts::cached_font_bytes;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::Path,
+    sync::Arc,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 use syntax::{File, children, field, first, unwrap_expr};
 pub use syntax::{LoadStats, ParseCache};
 use tree_sitter::Node as Ast;
@@ -477,8 +483,16 @@ pub fn extract_in_context(
     root_attribute: Option<(&str, &str)>,
 ) -> Result<m::SourceModel, String> {
     let mut cache = ParseCache::default();
-    extract_in_context_impl(project, entry, built_css, width, root_attribute, &mut cache)
-        .map(|(model, _)| model)
+    extract_in_context_impl(
+        project,
+        entry,
+        built_css,
+        width,
+        root_attribute,
+        &mut cache,
+        true,
+    )
+    .map(|(model, _)| model)
 }
 
 /// Extract with a caller-owned parse cache. Unchanged files reuse their trees; changed files are
@@ -490,7 +504,63 @@ pub fn extract_incremental(
     cache: &mut ParseCache,
 ) -> Result<(m::SourceModel, LoadStats), String> {
     let built = discover_built_css(project);
-    extract_in_context_impl(project, entry, built.as_deref(), None, None, cache)
+    extract_in_context_impl(project, entry, built.as_deref(), None, None, cache, true)
+}
+
+/// Extract through a watcher that can prove whether module-resolution structure changed.
+///
+/// Pass `dependency_structure_changed` when any source file was added or removed, or when a
+/// module-resolution configuration file changed. When it is false, unchanged parse trees keep
+/// their previously scanned imports; files whose bytes changed are still parsed and scanned again.
+pub fn extract_incremental_watched(
+    project: &Path,
+    entry: &Path,
+    cache: &mut ParseCache,
+    dependency_structure_changed: bool,
+) -> Result<(m::SourceModel, LoadStats), String> {
+    let built = discover_built_css(project);
+    extract_in_context_impl(
+        project,
+        entry,
+        built.as_deref(),
+        None,
+        None,
+        cache,
+        dependency_structure_changed,
+    )
+}
+
+fn timing_enabled() -> bool {
+    std::env::var_os("DUI_HOT_TIMING").is_some()
+}
+
+fn timing_wall_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_millis())
+}
+
+fn log_extract_phase(phase: &str, start: Instant) {
+    if timing_enabled() {
+        eprintln!(
+            "{{\"kind\":\"extract-phase\",\"phase\":\"{}\",\"ms\":{:.3},\"wallMs\":{}}}",
+            phase,
+            start.elapsed().as_secs_f64() * 1000.0,
+            timing_wall_ms()
+        );
+    }
+}
+
+fn log_render_file(path: &str, cached: bool, start: Instant) {
+    if timing_enabled() {
+        eprintln!(
+            "{{\"kind\":\"render-file\",\"path\":\"{}\",\"cached\":{},\"ms\":{:.3},\"wallMs\":{}}}",
+            path.replace('\\', "\\").replace('"', "\""),
+            cached,
+            start.elapsed().as_secs_f64() * 1000.0,
+            timing_wall_ms()
+        );
+    }
 }
 
 fn hash_part(hasher: &mut Sha256, part: &str) {
@@ -500,28 +570,68 @@ fn hash_part(hasher: &mut Sha256, part: &str) {
     hasher.update([0]);
 }
 
-fn dependency_closure(files: &Files, start: &str) -> Vec<String> {
-    let mut seen = std::collections::BTreeSet::new();
-    let mut pending = vec![start.to_owned()];
-    while let Some(path) = pending.pop() {
-        if !seen.insert(path.clone()) {
+fn dependency_closures(files: &Files) -> BTreeMap<String, Vec<String>> {
+    let paths: Vec<String> = files.keys().cloned().collect();
+    let indexes: BTreeMap<&str, usize> = paths
+        .iter()
+        .enumerate()
+        .map(|(index, path)| (path.as_str(), index))
+        .collect();
+    let words = paths.len().div_ceil(64);
+    let mut reachability = vec![vec![0u64; words]; paths.len()];
+    for (index, path) in paths.iter().enumerate() {
+        reachability[index][index / 64] |= 1u64 << (index % 64);
+        let Some(file) = files.get(path) else {
             continue;
-        }
-        if let Some(file) = files.get(&path) {
-            pending.extend(
-                file.imports
-                    .iter()
-                    .filter(|path| files.contains_key(*path))
-                    .cloned(),
-            );
+        };
+        for dependency in &file.imports {
+            if let Some(dependency) = indexes.get(dependency.as_str()) {
+                reachability[index][dependency / 64] |= 1u64 << (dependency % 64);
+            }
         }
     }
-    seen.into_iter().collect()
+    for pivot in 0..paths.len() {
+        let pivot_row = reachability[pivot].clone();
+        for row in &mut reachability {
+            if row[pivot / 64] & (1u64 << (pivot % 64)) == 0 {
+                continue;
+            }
+            for (cell, pivot_cell) in row.iter_mut().zip(&pivot_row) {
+                *cell |= pivot_cell;
+            }
+        }
+    }
+    paths
+        .iter()
+        .enumerate()
+        .map(|(index, path)| {
+            let closure = paths
+                .iter()
+                .enumerate()
+                .filter(|(dependency, _)| {
+                    reachability[index][dependency / 64] & (1u64 << (dependency % 64)) != 0
+                })
+                .map(|(_, dependency)| dependency.clone())
+                .collect();
+            (path.clone(), closure)
+        })
+        .collect()
+}
+
+fn dependency_content_hash(files: &Files, closure: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    for dependency in closure {
+        hash_part(&mut hasher, dependency);
+        if let Some(file) = files.get(dependency) {
+            hash_part(&mut hasher, &file.sha256);
+        }
+    }
+    format!("{:x}", hasher.finalize())
 }
 
 fn semantic_fingerprint(
     files: &Files,
-    path: &str,
+    dependency_hash: &str,
     entry: &str,
     artifact: Option<&str>,
     sheet_order: &[String],
@@ -558,12 +668,71 @@ fn semantic_fingerprint(
     for path in sheet_order {
         hash_part(&mut hasher, path);
     }
-    for dependency in dependency_closure(files, path) {
-        hash_part(&mut hasher, &dependency);
-        if let Some(file) = files.get(&dependency) {
-            hash_part(&mut hasher, &file.sha256);
-        }
+    hash_part(&mut hasher, dependency_hash);
+    format!("{:x}", hasher.finalize())
+}
+
+fn font_intake_key(
+    files: &Files,
+    artifact: Option<&str>,
+    resources: &fonts::DocumentResources,
+) -> String {
+    let mut hasher = Sha256::new();
+    hash_part(&mut hasher, "font-intake-v1");
+    hash_part(&mut hasher, artifact.unwrap_or(""));
+    for file in files.values().filter(|file| file.path.ends_with(".css")) {
+        hash_part(&mut hasher, &file.path);
+        hash_part(&mut hasher, &file.sha256);
     }
+    if let Some(html) = &resources.html_file {
+        hash_part(&mut hasher, &html.path);
+        hash_part(&mut hasher, &html.sha256);
+    }
+    for url in &resources.external_stylesheets {
+        hash_part(&mut hasher, url);
+    }
+    for (path, location) in &resources.local_stylesheets {
+        hash_part(&mut hasher, path);
+        hash_part(&mut hasher, &location.start.to_string());
+        hash_part(&mut hasher, &location.end.to_string());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn cached_font_inputs_current(project: &Path, intake: &fonts::FontIntake) -> bool {
+    intake.extra_files.iter().all(|file| {
+        fs::read(project.join(&file.path))
+            .ok()
+            .is_some_and(|bytes| format!("{:x}", Sha256::digest(&bytes)) == file.sha256)
+    }) && intake.faces.iter().all(|face| {
+        face.sources.iter().all(|source| match source {
+            m::FontSource::Asset { path, sha256, .. } => fs::read(project.join(path))
+                .ok()
+                .is_some_and(|bytes| format!("{:x}", Sha256::digest(&bytes)) == *sha256),
+            _ => true,
+        })
+    })
+}
+
+fn built_sheet_key(
+    file: &File,
+    width: Option<u32>,
+    root_attribute: Option<(&str, &str)>,
+    theme_classes: style::built::ThemeClasses,
+) -> String {
+    let mut hasher = Sha256::new();
+    hash_part(&mut hasher, "built-sheet-v1");
+    hash_part(&mut hasher, &file.sha256);
+    hash_part(
+        &mut hasher,
+        &width.map_or(String::new(), |width| width.to_string()),
+    );
+    if let Some((key, value)) = root_attribute {
+        hash_part(&mut hasher, key);
+        hash_part(&mut hasher, value);
+    }
+    hash_part(&mut hasher, if theme_classes.dark { "dark" } else { "" });
+    hash_part(&mut hasher, if theme_classes.light { "light" } else { "" });
     format!("{:x}", hasher.finalize())
 }
 
@@ -574,6 +743,7 @@ fn extract_in_context_impl(
     width: Option<u32>,
     root_attribute: Option<(&str, &str)>,
     cache: &mut ParseCache,
+    refresh_imports: bool,
 ) -> Result<(m::SourceModel, LoadStats), String> {
     if let Some((name, value)) = root_attribute
         && (built_css.is_none()
@@ -593,7 +763,9 @@ fn extract_in_context_impl(
     if width.is_some() && (built_css.is_none() || width == Some(0)) {
         return Err("viewport width requires built CSS and a positive width in CSS pixels".into());
     }
+    let extract_start = Instant::now();
     let mut diagnostics = Vec::new();
+    let load_cached_start = Instant::now();
     let (
         syntax::Sources {
             entry,
@@ -601,15 +773,50 @@ fn extract_in_context_impl(
             files,
         },
         stats,
-    ) = syntax::load_cached(project, entry, built_css, &mut diagnostics, cache)?;
+    ) = syntax::load_cached(
+        project,
+        entry,
+        built_css,
+        &mut diagnostics,
+        cache,
+        refresh_imports,
+    )?;
+    log_extract_phase("load_cached", load_cached_start);
+    let built_sheet_start = Instant::now();
     let theme_classes = style::built::ThemeClasses {
         dark: true,
         light: true,
     };
-    let built = artifact
+    let built_sheet = artifact
         .as_ref()
-        .map(|p| style::built::Sheet::new(&files[p], width, root_attribute, theme_classes))
+        .map(|path| {
+            let file = files[path].clone();
+            let key = built_sheet_key(&file, width, root_attribute, theme_classes);
+            if let Some(cached) = cache
+                .built_sheet
+                .as_ref()
+                .filter(|cached| cached.key == key)
+            {
+                return Ok::<Arc<syntax::CachedSheet>, String>(cached.sheet.clone());
+            }
+            let sheet = syntax::CachedSheetTryBuilder {
+                file,
+                sheet_builder: |file| {
+                    style::built::Sheet::new(file, width, root_attribute, theme_classes)
+                },
+            }
+            .try_build()
+            .map(std::sync::Arc::new)?;
+            cache.built_sheet = Some(syntax::CachedBuiltSheet {
+                key,
+                sheet: sheet.clone(),
+            });
+            Ok(sheet)
+        })
         .transpose()?;
+    let built = built_sheet.as_ref().map(|sheet| sheet.borrow_sheet());
+    log_extract_phase("built_sheet_parse", built_sheet_start);
+    let source_sheets_start = Instant::now();
     let mut sheet_diagnostics = Vec::new();
     let sheet_order = stylesheet_order(&files, &entry);
     let source_sheets: Vec<_> = sheet_order
@@ -635,6 +842,8 @@ fn extract_in_context_impl(
             }
         })
         .collect();
+    log_extract_phase("source_sheet_parse", source_sheets_start);
+    let model_scan_start = Instant::now();
     let mut model = m::SourceModel {
         schema_version: m::SCHEMA_VERSION,
         extractor: m::Extractor {
@@ -651,6 +860,11 @@ fn extract_in_context_impl(
         diagnostics,
     };
     model.diagnostics.extend(sheet_diagnostics);
+    let dependency_closures = dependency_closures(&files);
+    let dependency_hashes: BTreeMap<String, String> = dependency_closures
+        .iter()
+        .map(|(path, closure)| (path.clone(), dependency_content_hash(&files, closure)))
+        .collect();
     let mut signatures = BTreeMap::new();
     for file in files.values() {
         let css = file.path.ends_with(".css");
@@ -664,33 +878,61 @@ fn extract_in_context_impl(
             sha256: file.sha256.clone(),
             imports: file.imports.iter().cloned().collect(),
         });
-        if css {
-            model.tokens.extend(style::theme(file));
-            continue;
-        }
-        for n in file
-            .declarations()
-            .into_iter()
-            .filter(|n| n.kind() == "interface_declaration")
-        {
-            if let (Some(name), Some(body)) = (file.name(n, "name"), field(n, "body")) {
-                model.item_schemas.push(m::ItemSchema {
-                    id: format!("{}#{name}", file.path),
-                    name: name.into(),
-                    fields: fields(&files, file, body),
-                    origin: m::Origin::Syntax,
-                    location: file.loc(n),
-                });
+        let dependency_hash = dependency_hashes[&file.path].clone();
+        let facts = if let Some((key, facts)) = cache.facts.get(&file.path) {
+            (*key == dependency_hash).then(|| (key.clone(), facts.clone()))
+        } else {
+            None
+        };
+        let (_, facts) = facts.unwrap_or_else(|| {
+            let mut tokens = Vec::new();
+            let mut item_schemas = Vec::new();
+            let mut file_signatures = Vec::new();
+            if css {
+                tokens.extend(style::theme(file));
+            } else {
+                for n in file
+                    .declarations()
+                    .into_iter()
+                    .filter(|n| n.kind() == "interface_declaration")
+                {
+                    if let (Some(name), Some(body)) = (file.name(n, "name"), field(n, "body")) {
+                        item_schemas.push(m::ItemSchema {
+                            id: format!("{}#{name}", file.path),
+                            name: name.into(),
+                            fields: fields(&files, file, body),
+                            origin: m::Origin::Syntax,
+                            location: file.loc(n),
+                        });
+                    }
+                }
+                if file.path.ends_with(".tsx") {
+                    for (name, f) in file.functions() {
+                        let id = format!("{}#{name}", file.path);
+                        file_signatures.push((id.clone(), slots(&files, file, f, &id)));
+                    }
+                }
             }
-        }
-        if !file.path.ends_with(".tsx") {
-            continue;
-        }
-        for (name, f) in file.functions() {
-            let id = format!("{}#{name}", file.path);
-            signatures.insert(id.clone(), slots(&files, file, f, &id));
+            let facts = Arc::new(syntax::FileFacts {
+                tokens,
+                item_schemas,
+                signatures: file_signatures,
+            });
+            cache
+                .facts
+                .insert(file.path.clone(), (dependency_hash, facts.clone()));
+            (String::new(), facts)
+        });
+        model.tokens.extend(facts.tokens.iter().cloned());
+        model
+            .item_schemas
+            .extend(facts.item_schemas.iter().cloned());
+        for (id, slots) in &facts.signatures {
+            signatures.insert(id.clone(), slots.clone());
         }
     }
+    log_extract_phase("model_files_tokens_schemas_signatures", model_scan_start);
+    let tailwind_start = Instant::now();
     let root_classes = root_classes::default_document_classes(&files);
     let tailwind = files.values().any(|f| {
         f.path.ends_with(".css")
@@ -700,11 +942,16 @@ fn extract_in_context_impl(
                         .is_some_and(|p| matches!(f.text(p), "\"tailwindcss\"" | "'tailwindcss'"))
             })
     });
+    log_extract_phase("tailwind_detection", tailwind_start);
+    let modules_start = Instant::now();
     let modules = style::modules::Modules::new(&files);
+    log_extract_phase("module_css_parse", modules_start);
+    let component_render_start = Instant::now();
     for file in files.values().filter(|f| f.path.ends_with(".tsx")) {
+        let file_render_start = Instant::now();
         let fingerprint = semantic_fingerprint(
             &files,
-            &file.path,
+            &dependency_hashes[&file.path],
             &entry,
             artifact.as_deref(),
             &sheet_order,
@@ -720,6 +967,7 @@ fn extract_in_context_impl(
         {
             model.components.extend(cached.components.iter().cloned());
             model.edges.extend(cached.edges.iter().cloned());
+            log_render_file(&file.path, true, file_render_start);
             continue;
         }
         let component_start = model.components.len();
@@ -737,7 +985,7 @@ fn extract_in_context_impl(
                 slots: slot,
                 class_render: f.kind() == "method_definition",
                 tailwind,
-                built: built.as_ref(),
+                built,
                 sources: &source_sheets,
                 modules: modules.bindings(file, f),
                 signatures: &signatures,
@@ -774,8 +1022,13 @@ fn extract_in_context_impl(
                 edges,
             },
         );
+        log_render_file(&file.path, false, file_render_start);
     }
+    log_extract_phase("component_model_render", component_render_start);
+    let route_discovery_start = Instant::now();
     routes::discover(&files, &mut model);
+    log_extract_phase("route_discovery", route_discovery_start);
+    let route_postprocess_start = Instant::now();
     if model.screens.is_empty() {
         let candidates: Vec<_> = model
             .components
@@ -819,6 +1072,8 @@ fn extract_in_context_impl(
     model.edges.sort_by(|a, b| a.id.cmp(&b.id));
     model.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
     model.tokens.sort_by(|a, b| a.id.cmp(&b.id));
+    log_extract_phase("route_postprocess", route_postprocess_start);
+    let document_style_start = Instant::now();
     if let Some(sheet) = &built {
         model.document_style = sheet.document_style(&root_classes);
     } else {
@@ -827,19 +1082,40 @@ fn extract_in_context_impl(
             .rev()
             .find_map(|sheet| sheet.document_style(&root_classes));
     }
+    log_extract_phase("document_style", document_style_start);
+    let external_stylesheet_start = Instant::now();
     let resources = fonts::document_resources(project, artifact.as_deref().map(Path::new));
+    log_extract_phase("external_stylesheet_scan", external_stylesheet_start);
+    let font_face_start = Instant::now();
     if let Some(html) = resources.html_file.clone()
         && !model.files.iter().any(|file| file.path == html.path)
     {
         model.files.push(html);
     }
-    let intake = fonts::font_faces(
-        project,
-        &files,
-        artifact.as_deref(),
-        &resources,
-        &mut model.diagnostics,
-    );
+    let font_key = font_intake_key(&files, artifact.as_deref(), &resources);
+    let intake = if let Some(cached) = cache.fonts.as_ref().filter(|cached| {
+        cached.key == font_key && cached_font_inputs_current(project, &cached.intake)
+    }) {
+        cached.intake.clone()
+    } else {
+        let diagnostic_start = model.diagnostics.len();
+        let intake = fonts::font_faces(
+            project,
+            &files,
+            artifact.as_deref(),
+            &resources,
+            &mut model.diagnostics,
+        );
+        if model.diagnostics.len() == diagnostic_start {
+            cache.fonts = Some(syntax::CachedFontIntake {
+                key: font_key,
+                intake: intake.clone(),
+            });
+        } else {
+            cache.fonts = None;
+        }
+        intake
+    };
     for file in intake.extra_files {
         if !model
             .files
@@ -862,6 +1138,10 @@ fn extract_in_context_impl(
         document.external_stylesheets = resources.external_stylesheets;
         document.font_faces = intake.faces;
     }
+    log_extract_phase("font_face_scan", font_face_start);
+    let validate_start = Instant::now();
     m::validate(&model).map_err(|errs| format!("invalid source model: {errs:?}"))?;
+    log_extract_phase("validate_model", validate_start);
+    log_extract_phase("extract_total", extract_start);
     Ok((model, stats))
 }

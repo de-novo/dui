@@ -6,7 +6,7 @@ use super::{
     Component, Condition, Edge, EdgeTarget, Expr, FontSource, Location, Match, Node,
     SCHEMA_VERSION, Slot, SourceModel, StyleDeclaration, StyleProperty, StyleValue, TypeRef,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -44,6 +44,14 @@ struct Scope<'a> {
     lists: Vec<&'a str>,
 }
 
+/// Node ancestry retained for edge validation. The component's slot map can be rebuilt from
+/// the component on demand, so storing it once per node would repeat the largest part of the
+/// scope for every element in the model.
+struct NodeScope<'a> {
+    component: &'a Component,
+    lists: Vec<&'a str>,
+}
+
 struct Check<'a> {
     model: &'a SourceModel,
     errors: Vec<ModelError>,
@@ -53,7 +61,7 @@ struct Check<'a> {
     schemas: BTreeSet<&'a str>,
     tokens: BTreeMap<&'a str, &'a StyleValue>,
     slot_ids: BTreeSet<&'a str>,
-    nodes: BTreeMap<&'a str, Scope<'a>>,
+    nodes: HashMap<&'a str, NodeScope<'a>>,
 }
 
 impl<'a> Check<'a> {
@@ -83,7 +91,7 @@ impl<'a> Check<'a> {
                 .map(|token| (token.id.as_str(), &token.value))
                 .collect(),
             slot_ids: BTreeSet::new(),
-            nodes: BTreeMap::new(),
+            nodes: HashMap::new(),
         }
     }
 
@@ -579,7 +587,11 @@ impl<'a> Check<'a> {
     fn node(&mut self, pointer: &str, node: &'a Node, scope: &Scope<'a>) {
         let id = node.id();
         self.non_empty(format!("{pointer}/id"), id);
-        if self.nodes.insert(id, scope.clone()).is_some() {
+        let retained = NodeScope {
+            component: scope.component,
+            lists: scope.lists.clone(),
+        };
+        if self.nodes.insert(id, retained).is_some() {
             self.error(
                 format!("{pointer}/id"),
                 format!("duplicate identifier {id:?}"),
@@ -891,7 +903,16 @@ impl<'a> Check<'a> {
     fn edge(&mut self, pointer: &str, edge: &Edge) {
         self.non_empty(format!("{pointer}/id"), &edge.id);
         self.location(&format!("{pointer}/location"), &edge.location);
-        let scope = self.nodes.get(edge.from.as_str()).cloned();
+        let scope = self.nodes.get(edge.from.as_str()).map(|node| Scope {
+            component: node.component,
+            slots: node
+                .component
+                .slots
+                .iter()
+                .map(|slot| (slot.id.as_str(), slot))
+                .collect(),
+            lists: node.lists.clone(),
+        });
         if scope.is_none() {
             self.error(
                 format!("{pointer}/from"),

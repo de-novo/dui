@@ -363,7 +363,6 @@ html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
     assert_eq!(kinds.next(), None);
 }
 
-
 #[test]
 fn cached_public_remote_fonts_are_materialized_without_network() {
     use sha2::{Digest, Sha256};
@@ -378,10 +377,16 @@ fn cached_public_remote_fonts_are_materialized_without_network() {
     fs::create_dir_all(cache.path().join("blobs")).expect("blob dir");
     fs::create_dir_all(cache.path().join("index")).expect("index dir");
     fs::write(cache.path().join("blobs").join(&sha256), &font).expect("blob");
-    let key = format!("{:x}", Sha256::digest(format!("font-fetch-v1\n{url}").as_bytes()));
+    let key = format!(
+        "{:x}",
+        Sha256::digest(format!("font-fetch-v1\n{url}").as_bytes())
+    );
     fs::write(
         cache.path().join("index").join(format!("{key}.json")),
-        format!(r#"{{"version":1,"url":"{url}","finalUrl":"{url}","sha256":"{sha256}","bytes":{}}}"#, font.len()),
+        format!(
+            r#"{{"version":1,"url":"{url}","finalUrl":"{url}","sha256":"{sha256}","bytes":{}}}"#,
+            font.len()
+        ),
     )
     .expect("cache metadata");
     fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
@@ -406,7 +411,10 @@ fn cached_public_remote_fonts_are_materialized_without_network() {
         ..
     } = &face.sources[0]
     else {
-        panic!("cached remote font must become a complete materialized source: {:#?}", face.sources)
+        panic!(
+            "cached remote font must become a complete materialized source: {:#?}",
+            face.sources
+        )
     };
     assert_eq!(asset, &format!("asset-{sha256}.woff2"));
     assert_eq!(model_sha, &sha256);
@@ -423,8 +431,12 @@ fn default_document_font_provider_class_is_source_proven() {
         r#".font-inter{font-family:Inter,"sans-serif"}.font-manrope{font-family:Manrope,"sans-serif"}"#,
     )
     .expect("built css");
-    fs::write(dir.path().join("fonts.ts"), "export const fonts = ['inter', 'manrope'] as const
-").expect("fonts");
+    fs::write(
+        dir.path().join("fonts.ts"),
+        "export const fonts = ['inter', 'manrope'] as const
+",
+    )
+    .expect("fonts");
     fs::write(
         dir.path().join("font-provider.tsx"),
         r#"import { useEffect, useState } from 'react'
@@ -665,4 +677,3 @@ fn built_css_wide_inherit_is_preserved_for_form_controls() {
         );
     }
 }
-

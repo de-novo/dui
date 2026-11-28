@@ -14,6 +14,7 @@ tree-sitter-typescript.workspace = true
 tree-sitter-css.workspace = true
 ureq.workspace = true
 brotli-decompressor.workspace = true
+ouroboros.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

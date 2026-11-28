@@ -2,7 +2,7 @@
 use super::{P, V, modules, shorthand, spacing, uniform_gap};
 use crate::syntax::{File, children, first};
 use dui_core::source_model as m;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use tree_sitter::Node as Ast;
 
 // Each supported property uses the same value parser as a source stylesheet.
@@ -322,6 +322,7 @@ struct Rule<'a> {
     name: &'a str,
     important: bool,
     value: &'a str,
+    theme_sensitive: bool,
     source: m::StyleSource,
 }
 
@@ -338,7 +339,13 @@ pub(crate) struct Sheet<'a> {
     root_value: Option<String>,
     horizontal_block: bool,
     rules: BTreeMap<P, Vec<Rule<'a>>>,
+    class_rules: BTreeMap<P, BTreeMap<String, Vec<usize>>>,
+    context_class_rules: BTreeMap<P, BTreeMap<String, Vec<usize>>>,
+    context_rules: BTreeMap<P, Vec<usize>>,
+    general_rules: BTreeMap<P, Vec<usize>>,
     custom_rules: BTreeMap<&'a str, Vec<Rule<'a>>>,
+    custom_class_rules: BTreeMap<&'a str, BTreeMap<String, Vec<usize>>>,
+    custom_general_rules: BTreeMap<&'a str, Vec<usize>>,
     registered_vars: BTreeMap<&'a str, &'a str>,
     selectors: BTreeMap<&'a str, Vec<Selector<'a>>>,
     // Only a unique, unconditional document-root definition can be inherited here.
@@ -346,6 +353,8 @@ pub(crate) struct Sheet<'a> {
     theme_classes: ThemeClasses,
     dark_vars: BTreeMap<&'a str, Option<&'a str>>,
     light_vars: BTreeMap<&'a str, Option<&'a str>>,
+    dark_document_vars: BTreeMap<&'a str, Option<&'a str>>,
+    light_document_vars: BTreeMap<&'a str, Option<&'a str>>,
 }
 
 struct Selector<'a> {
@@ -365,6 +374,135 @@ enum Subject<'a> {
     Id(&'a str),
     All(Vec<Self>),
     Any(Vec<Self>),
+}
+
+fn required_subject_class<'a>(subject: &'a Subject<'a>) -> Option<&'a str> {
+    match subject {
+        Subject::Class(class) => Some(class),
+        Subject::All(parts) => parts.iter().find_map(required_subject_class),
+        _ => None,
+    }
+}
+
+fn css_variable_names(raw: &str) -> Vec<&str> {
+    let bytes = raw.as_bytes();
+    let mut out = Vec::new();
+    let mut index = 0;
+    while index + 1 < bytes.len() {
+        if bytes[index] == b'-' && bytes[index + 1] == b'-' {
+            let start = index;
+            index += 2;
+            while index < bytes.len()
+                && (bytes[index].is_ascii_alphanumeric() || matches!(bytes[index], b'-' | b'_'))
+            {
+                index += 1;
+            }
+            out.push(&raw[start..index]);
+        } else {
+            index += 1;
+        }
+    }
+    out
+}
+
+fn references_dependent_var(raw: &str, dependent: &BTreeSet<String>) -> bool {
+    let names = css_variable_names(raw);
+    if names.iter().any(|name| dependent.contains(*name)) {
+        return true;
+    }
+    // If a variable reference uses syntax outside the bounded identifier subset, stay
+    // conservative rather than dropping a possible theme-dependent declaration.
+    raw.contains("var(") && names.is_empty()
+}
+
+fn strip_selector_wrapper(mut selector: &str) -> &str {
+    loop {
+        let trimmed = selector.trim();
+        let inner = [":where(", ":is("].iter().find_map(|prefix| {
+            trimmed
+                .strip_prefix(prefix)
+                .and_then(|rest| rest.strip_suffix(')'))
+        });
+        let Some(inner) = inner else {
+            return trimmed;
+        };
+        let mut depth = 0usize;
+        let mut escaped = false;
+        let mut top_level_comma = false;
+        for c in inner.chars() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match c {
+                '\\' => escaped = true,
+                '(' => depth += 1,
+                ')' => depth = depth.saturating_sub(1),
+                ',' if depth == 0 => top_level_comma = true,
+                _ => {}
+            }
+        }
+        if top_level_comma {
+            return trimmed;
+        }
+        selector = inner;
+    }
+}
+
+fn split_context_selector(selector: &str) -> Option<(&str, &str)> {
+    let selector = strip_selector_wrapper(selector);
+    let mut depth = 0usize;
+    let mut escaped = false;
+    let mut direct = None;
+    let mut whitespace = None;
+    for (index, c) in selector.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match c {
+            '\\' => escaped = true,
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            '>' if depth == 0 && direct.is_none() => direct = Some(index),
+            c if depth == 0 && c.is_ascii_whitespace() && direct.is_none() => {
+                whitespace.get_or_insert(index);
+            }
+            _ => {}
+        }
+    }
+    if let Some(index) = direct {
+        let ancestor = selector[..index].trim();
+        let target = selector[index + 1..].trim();
+        return (!ancestor.is_empty() && !target.is_empty()).then_some((ancestor, target));
+    }
+    let index = whitespace?;
+    let ancestor = selector[..index].trim();
+    let target = selector[index..].trim();
+    if ancestor.is_empty() || target.is_empty() || target.split_ascii_whitespace().count() != 1 {
+        return None;
+    }
+    Some((ancestor, target))
+}
+
+fn required_context_class(selector: &str) -> Option<String> {
+    let (ancestor, _) = split_context_selector(selector)?;
+    let class = ancestor.strip_prefix('.')?;
+    let mut end = class.len();
+    let mut escaped = false;
+    for (index, c) in class.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+        } else if matches!(c, ':' | '.' | '[' | '#') {
+            end = index;
+            break;
+        }
+    }
+    css_ident(&class[..end])
 }
 
 impl Subject<'_> {
@@ -1046,7 +1184,10 @@ fn parse_box_shadow(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<St
                 continue;
             }
             if color.is_none()
-                && !token.bytes().next().is_some_and(|b| b.is_ascii_digit() || b == b'-' || b == b'+')
+                && !token
+                    .bytes()
+                    .next()
+                    .is_some_and(|b| b.is_ascii_digit() || b == b'-' || b == b'+')
                 && let Some(parsed) = shadow_color(token, vars)
             {
                 color = Some(parsed);
@@ -1250,6 +1391,14 @@ fn model_length<'a>(
     super::length(raw)
 }
 
+struct ScopedStyle<'a> {
+    vars: BTreeMap<&'a str, Option<&'a str>>,
+    light_vars: Option<BTreeMap<&'a str, Option<&'a str>>>,
+    dark_vars: Option<BTreeMap<&'a str, Option<&'a str>>>,
+    ancestor_classes: BTreeSet<String>,
+    ancestor_classes_complete: bool,
+}
+
 impl<'a> Sheet<'a> {
     pub(crate) fn new(
         f: &'a File,
@@ -1284,7 +1433,13 @@ impl<'a> Sheet<'a> {
             root_value: root_attribute.map(|(_, v)| v.to_owned()),
             horizontal_block: true,
             rules: BTreeMap::new(),
+            class_rules: BTreeMap::new(),
+            context_class_rules: BTreeMap::new(),
+            context_rules: BTreeMap::new(),
+            general_rules: BTreeMap::new(),
             custom_rules: BTreeMap::new(),
+            custom_class_rules: BTreeMap::new(),
+            custom_general_rules: BTreeMap::new(),
             registered_vars: BTreeMap::new(),
             vars: BTreeMap::new(),
             selectors: BTreeMap::from([(
@@ -1297,6 +1452,8 @@ impl<'a> Sheet<'a> {
             theme_classes,
             dark_vars: BTreeMap::new(),
             light_vars: BTreeMap::new(),
+            dark_document_vars: BTreeMap::new(),
+            light_document_vars: BTreeMap::new(),
         };
         let mut variable_ranks = BTreeMap::new();
         let mut scoped_variables = std::collections::BTreeSet::new();
@@ -1369,6 +1526,7 @@ impl<'a> Sheet<'a> {
                             important,
                             name: prop,
                             value,
+                            theme_sensitive: false,
                             source: m::StyleSource {
                                 syntax: m::StyleSyntax::Stylesheet,
                                 text: f.text(node).into(),
@@ -1445,6 +1603,7 @@ impl<'a> Sheet<'a> {
                                 when: when.clone(),
                                 name: prop,
                                 value,
+                                theme_sensitive: false,
                                 source: m::StyleSource {
                                     syntax: m::StyleSyntax::Stylesheet,
                                     text: f.text(node).into(),
@@ -1536,6 +1695,99 @@ impl<'a> Sheet<'a> {
                 }
             }
         }
+        for (property, rules) in &sheet.rules {
+            for (index, rule) in rules.iter().enumerate() {
+                let selectors = &sheet.selectors[rule.selectors];
+                let mut subject_keyed = BTreeSet::new();
+                let mut context_keyed = BTreeSet::new();
+                let mut subject_only = true;
+                let mut context_only = true;
+                for selector in selectors {
+                    // Document-root and theme exceptions can deliberately bypass a missing
+                    // subject class in apply_property. Keep those rules in the always-scanned
+                    // set rather than letting an index hide them.
+                    let exception = selector.text.starts_with("html[")
+                        || selector.text.starts_with(":root[")
+                        || selector_theme_scope(selector.text).is_some();
+                    if exception {
+                        subject_only = false;
+                        context_only = false;
+                    } else if let Some(class) = required_subject_class(&selector.subject) {
+                        subject_keyed.insert(class.to_owned());
+                        context_only = false;
+                    } else if let Some(class) = required_context_class(selector.text) {
+                        context_keyed.insert(class);
+                        subject_only = false;
+                    } else {
+                        subject_only = false;
+                        context_only = false;
+                    }
+                }
+                if context_only && !context_keyed.is_empty() {
+                    sheet
+                        .context_rules
+                        .entry(*property)
+                        .or_default()
+                        .push(index);
+                    for class in context_keyed {
+                        sheet
+                            .context_class_rules
+                            .entry(*property)
+                            .or_default()
+                            .entry(class)
+                            .or_default()
+                            .push(index);
+                    }
+                } else if subject_only && !subject_keyed.is_empty() {
+                    for class in subject_keyed {
+                        sheet
+                            .class_rules
+                            .entry(*property)
+                            .or_default()
+                            .entry(class)
+                            .or_default()
+                            .push(index);
+                    }
+                } else {
+                    sheet
+                        .general_rules
+                        .entry(*property)
+                        .or_default()
+                        .push(index);
+                }
+            }
+        }
+        for (name, rules) in &sheet.custom_rules {
+            for (index, rule) in rules.iter().enumerate() {
+                let selectors = &sheet.selectors[rule.selectors];
+                let mut keyed = std::collections::BTreeSet::new();
+                let mut general = false;
+                for selector in selectors {
+                    if let Some(class) = required_subject_class(&selector.subject) {
+                        keyed.insert(class.to_owned());
+                    } else {
+                        general = true;
+                    }
+                }
+                if general {
+                    sheet
+                        .custom_general_rules
+                        .entry(*name)
+                        .or_default()
+                        .push(index);
+                } else {
+                    for class in keyed {
+                        sheet
+                            .custom_class_rules
+                            .entry(*name)
+                            .or_default()
+                            .entry(class)
+                            .or_default()
+                            .push(index);
+                    }
+                }
+            }
+        }
         for name in ambiguous_variables {
             sheet.vars.insert(name, None);
         }
@@ -1545,7 +1797,9 @@ impl<'a> Sheet<'a> {
                 let mut count = 0usize;
                 let same = uncertain.all(|rule| {
                     count += 1;
-                    rule.value.split_ascii_whitespace().eq(value.split_ascii_whitespace())
+                    rule.value
+                        .split_ascii_whitespace()
+                        .eq(value.split_ascii_whitespace())
                 });
                 count != 0 && same
             });
@@ -1564,27 +1818,77 @@ impl<'a> Sheet<'a> {
             sheet.vars.insert(name, None);
         }
         sheet.collect_theme_vars();
+        for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
+            let themed = match scheme {
+                m::ColorScheme::Dark => &sheet.dark_vars,
+                m::ColorScheme::Light => &sheet.light_vars,
+            };
+            if themed.is_empty() {
+                continue;
+            }
+            let mut merged = sheet.document_vars.clone();
+            for (name, value) in themed {
+                merged.insert(name, *value);
+            }
+            match scheme {
+                m::ColorScheme::Dark => sheet.dark_document_vars = merged,
+                m::ColorScheme::Light => sheet.light_document_vars = merged,
+            }
+        }
+        let mut dependent: BTreeSet<String> = sheet
+            .dark_vars
+            .keys()
+            .chain(sheet.light_vars.keys())
+            .map(|name| (*name).to_owned())
+            .collect();
+        loop {
+            let mut added = Vec::new();
+            for (name, value) in sheet
+                .vars
+                .iter()
+                .chain(sheet.dark_vars.iter())
+                .chain(sheet.light_vars.iter())
+            {
+                if dependent.contains(*name) {
+                    continue;
+                }
+                if value.is_some_and(|value| references_dependent_var(value, &dependent)) {
+                    added.push((*name).to_owned());
+                }
+            }
+            for (name, rules) in &sheet.custom_rules {
+                if dependent.contains(*name) {
+                    continue;
+                }
+                if rules
+                    .iter()
+                    .any(|rule| references_dependent_var(rule.value, &dependent))
+                {
+                    added.push((*name).to_owned());
+                }
+            }
+            if added.is_empty() {
+                break;
+            }
+            dependent.extend(added);
+        }
+        for rules in sheet.rules.values_mut() {
+            for rule in rules {
+                rule.theme_sensitive = references_dependent_var(rule.value, &dependent);
+            }
+        }
         Ok(sheet)
-    }
-
-    fn themed_vars(&self, scheme: m::ColorScheme) -> Option<&BTreeMap<&'a str, Option<&'a str>>> {
-        let vars = match scheme {
-            m::ColorScheme::Dark => &self.dark_vars,
-            m::ColorScheme::Light => &self.light_vars,
-        };
-        (!vars.is_empty()).then_some(vars)
     }
 
     fn document_vars_for(
         &self,
         scheme: m::ColorScheme,
-    ) -> Option<BTreeMap<&'a str, Option<&'a str>>> {
-        let themed = self.themed_vars(scheme)?;
-        let mut vars = self.document_vars.clone();
-        for (name, value) in themed {
-            vars.insert(name, *value);
-        }
-        Some(vars)
+    ) -> Option<&BTreeMap<&'a str, Option<&'a str>>> {
+        let vars = match scheme {
+            m::ColorScheme::Dark => &self.dark_document_vars,
+            m::ColorScheme::Light => &self.light_document_vars,
+        };
+        (!vars.is_empty()).then_some(vars)
     }
 
     fn collect_theme_vars(&mut self) {
@@ -1677,7 +1981,7 @@ impl<'a> Sheet<'a> {
                     if let Some(themed) = self.document_declaration_with(
                         target,
                         property,
-                        &vars,
+                        vars,
                         Some(scheme),
                         root_classes,
                     ) && themed.value != base_value
@@ -2268,7 +2572,12 @@ impl<'a> Sheet<'a> {
             };
             tag = parent;
         };
-        let scoped_vars = self.scoped_vars(file, open, el, classes);
+        let trace = std::env::var_os("DUI_HOT_STYLE_TRACE").is_some()
+            && file.path.contains("features/errors");
+        let scoped_started = std::time::Instant::now();
+        let scoped = self.scoped_vars(file, open, el, classes);
+        let scoped_ms = scoped_started.elapsed().as_secs_f64() * 1000.0;
+        let properties_started = std::time::Instant::now();
         for &(_, property) in DIRECT {
             self.apply_property(
                 property,
@@ -2277,7 +2586,21 @@ impl<'a> Sheet<'a> {
                 file,
                 open,
                 document_scope,
-                &scoped_vars,
+                &scoped.vars,
+                &scoped.light_vars,
+                &scoped.dark_vars,
+                &scoped.ancestor_classes,
+                scoped.ancestor_classes_complete,
+            );
+        }
+        if trace {
+            eprintln!(
+                "{{\"kind\":\"style-trace\",\"file\":\"{}\",\"tag\":\"{}\",\"classes\":{:?},\"scopedMs\":{:.3},\"propertiesMs\":{:.3}}}",
+                file.path,
+                el.tag,
+                classes,
+                scoped_ms,
+                properties_started.elapsed().as_secs_f64() * 1000.0
             );
         }
     }
@@ -2288,8 +2611,10 @@ impl<'a> Sheet<'a> {
         open: Ast<'_>,
         el: &m::Element,
         classes: Option<&str>,
-    ) -> BTreeMap<&'a str, Option<&'a str>> {
+    ) -> ScopedStyle<'a> {
         let mut vars = self.vars.clone();
+        let mut ancestor_classes = BTreeSet::new();
+        let mut ancestor_classes_complete = true;
         let mut chain = vec![(open, el.clone(), classes.map(str::to_owned))];
         let mut tag = open;
         loop {
@@ -2331,11 +2656,59 @@ impl<'a> Sheet<'a> {
             tag = parent;
         }
         chain.reverse();
+        for (index, (open, element, _)) in chain.iter().enumerate() {
+            if index + 1 == chain.len() {
+                continue;
+            }
+            if !element.tag.starts_with(|c: char| c.is_ascii_lowercase())
+                || children(*open).iter().any(|n| n.kind() == "jsx_expression")
+            {
+                ancestor_classes_complete = false;
+                continue;
+            }
+            let class_attribute = open
+                .children_by_field_name("attribute", &mut open.walk())
+                .find(|a| {
+                    a.kind() == "jsx_attribute"
+                        && first(*a).is_some_and(|k| file.text(k) == "className")
+                });
+            if let Some(attribute) = class_attribute {
+                if let Some(class) = children(attribute)
+                    .get(1)
+                    .and_then(|value| crate::literal(file, *value))
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                {
+                    ancestor_classes.extend(class.split_ascii_whitespace().map(str::to_owned));
+                } else {
+                    ancestor_classes_complete = false;
+                }
+            }
+        }
         for (open, element, classes) in chain {
             let classes = classes.as_deref();
             for (name, rules) in &self.custom_rules {
                 let mut best: Option<((usize, u32, usize), &str)> = None;
-                for (order, rule) in rules.iter().enumerate() {
+                let mut candidate_indexes = Vec::new();
+                if classes.is_none() {
+                    candidate_indexes.extend(0..rules.len());
+                } else {
+                    if let Some(general) = self.custom_general_rules.get(name) {
+                        candidate_indexes.extend(general.iter().copied());
+                    }
+                    if let Some(classes) = classes
+                        && let Some(by_class) = self.custom_class_rules.get(name)
+                    {
+                        for class in classes.split_ascii_whitespace() {
+                            if let Some(indexes) = by_class.get(class) {
+                                candidate_indexes.extend(indexes.iter().copied());
+                            }
+                        }
+                    }
+                    candidate_indexes.sort_unstable();
+                    candidate_indexes.dedup();
+                }
+                for index in candidate_indexes {
+                    let (order, rule) = (index, &rules[index]);
                     if rule.uncertain || rule.important || rule.when.is_some() {
                         continue;
                     }
@@ -2358,7 +2731,28 @@ impl<'a> Sheet<'a> {
                 }
             }
         }
-        vars
+        let themed_scoped = |scheme| {
+            self.document_vars_for(scheme).map(|document_themed| {
+                let mut themed_vars = vars.clone();
+                for (name, value) in document_themed {
+                    let local_override =
+                        vars.contains_key(name) && !self.document_vars.contains_key(name);
+                    if !local_override {
+                        themed_vars.insert(name, *value);
+                    }
+                }
+                themed_vars
+            })
+        };
+        let light_vars = themed_scoped(m::ColorScheme::Light);
+        let dark_vars = themed_scoped(m::ColorScheme::Dark);
+        ScopedStyle {
+            vars,
+            light_vars,
+            dark_vars,
+            ancestor_classes,
+            ancestor_classes_complete,
+        }
     }
 
     fn apply_property(
@@ -2370,6 +2764,10 @@ impl<'a> Sheet<'a> {
         open: Ast<'_>,
         document_scope: bool,
         scoped_vars: &BTreeMap<&'a str, Option<&'a str>>,
+        light_scoped_vars: &Option<BTreeMap<&'a str, Option<&'a str>>>,
+        dark_scoped_vars: &Option<BTreeMap<&'a str, Option<&'a str>>>,
+        _ancestor_classes: &BTreeSet<String>,
+        _ancestor_classes_complete: bool,
     ) {
         let Some(rules) = self.rules.get(&property) else {
             return;
@@ -2379,7 +2777,50 @@ impl<'a> Sheet<'a> {
         let mut exact: Vec<((usize, u32, usize), &Rule<'_>)> = Vec::new();
         let mut unknown_rules = Vec::new();
         let spread = children(open).iter().any(|n| n.kind() == "jsx_expression");
-        for (order, rule) in rules.iter().enumerate() {
+        let mut candidate_indexes = Vec::new();
+        if spread || classes.is_none() {
+            candidate_indexes.extend(0..rules.len());
+        } else {
+            if let Some(general) = self.general_rules.get(&property) {
+                candidate_indexes.extend(general.iter().copied());
+            }
+            // Ancestor context outside a component's own JSX is unknowable while rendering the
+            // component in isolation. Keep contextual rules conservative here; the subject-class
+            // index still supplies the large win without hiding externally influenced cascade.
+            if let Some(all_context) = self.context_rules.get(&property) {
+                candidate_indexes.extend(all_context.iter().copied());
+            }
+            if let Some(classes) = classes
+                && let Some(by_class) = self.class_rules.get(&property)
+            {
+                for class in classes.split_ascii_whitespace() {
+                    if let Some(indexes) = by_class.get(class) {
+                        candidate_indexes.extend(indexes.iter().copied());
+                    }
+                }
+            }
+            candidate_indexes.sort_unstable();
+            candidate_indexes.dedup();
+        }
+        if std::env::var_os("DUI_HOT_STYLE_TRACE").is_some()
+            && file.path.contains("features/errors")
+        {
+            let selector_count = candidate_indexes
+                .iter()
+                .map(|index| self.selectors[rules[*index].selectors].len())
+                .sum::<usize>();
+            eprintln!(
+                "{{\"kind\":\"property-trace\",\"file\":\"{}\",\"tag\":\"{}\",\"property\":\"{:?}\",\"ruleCount\":{},\"candidates\":{},\"selectors\":{}}}",
+                file.path,
+                el.tag,
+                property,
+                rules.len(),
+                candidate_indexes.len(),
+                selector_count
+            );
+        }
+        for index in candidate_indexes {
+            let (order, rule) = (index, &rules[index]);
             let mut rule_exact: Option<(usize, u32, usize)> = None;
             let mut rule_unknown = None;
             for selector in &self.selectors[rule.selectors] {
@@ -2684,17 +3125,6 @@ impl<'a> Sheet<'a> {
             from: rule.source.clone(),
         });
         for scheme in [m::ColorScheme::Light, m::ColorScheme::Dark] {
-            let Some(document_themed) = self.document_vars_for(scheme) else {
-                continue;
-            };
-            let mut themed_vars = vars.clone();
-            for (name, value) in document_themed {
-                let local_override =
-                    vars.contains_key(name) && !self.document_vars.contains_key(name);
-                if !local_override {
-                    themed_vars.insert(name, value);
-                }
-            }
             let themed_rule =
                 if unknown.is_some() && selector_theme_scope(rule.selectors) == Some(scheme) {
                     rule
@@ -2707,6 +3137,15 @@ impl<'a> Sheet<'a> {
             if themed_rule.when.as_ref().and_then(|when| when.color_scheme) == Some(scheme) {
                 continue;
             }
+            if !themed_rule.theme_sensitive && winner_theme != Some(scheme) {
+                continue;
+            }
+            let Some(themed_vars) = (match scheme {
+                m::ColorScheme::Light => light_scoped_vars,
+                m::ColorScheme::Dark => dark_scoped_vars,
+            }) else {
+                continue;
+            };
             let Some(when) = scheme_condition(themed_rule.when.as_ref(), scheme) else {
                 continue;
             };

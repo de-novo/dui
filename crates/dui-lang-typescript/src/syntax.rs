@@ -1,5 +1,5 @@
 //! Source ranges, declarations and local module imports. No project code is executed.
-use dui_core::source_model::{Component, Diagnostic, Edge, Location};
+use dui_core::source_model::{Component, Diagnostic, Edge, ItemSchema, Location, Slot, Token};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -525,10 +525,38 @@ struct CachedFile {
     file: Arc<File>,
 }
 
+#[ouroboros::self_referencing(pub_extras)]
+pub(crate) struct CachedSheet {
+    #[allow(dead_code)]
+    file: Arc<File>,
+    #[borrows(file)]
+    #[covariant]
+    pub(crate) sheet: crate::style::built::Sheet<'this>,
+}
+
+pub(crate) struct CachedBuiltSheet {
+    pub key: String,
+    pub sheet: Arc<CachedSheet>,
+}
+
+pub(crate) struct CachedFontIntake {
+    pub key: String,
+    pub intake: crate::fonts::FontIntake,
+}
+
+pub(crate) struct FileFacts {
+    pub tokens: Vec<Token>,
+    pub item_schemas: Vec<ItemSchema>,
+    pub signatures: Vec<(String, Vec<Slot>)>,
+}
+
 #[derive(Default)]
 pub struct ParseCache {
     files: BTreeMap<String, CachedFile>,
     pub(crate) rendered: BTreeMap<String, RenderedFile>,
+    pub(crate) fonts: Option<CachedFontIntake>,
+    pub(crate) built_sheet: Option<CachedBuiltSheet>,
+    pub(crate) facts: BTreeMap<String, (String, Arc<FileFacts>)>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -543,8 +571,16 @@ pub fn load_cached(
     built_css: Option<&Path>,
     diagnostics: &mut Vec<Diagnostic>,
     cache: &mut ParseCache,
+    refresh_imports: bool,
 ) -> Result<(Sources, LoadStats), String> {
-    load_inner(root, entry, built_css, diagnostics, Some(cache))
+    load_inner(
+        root,
+        entry,
+        built_css,
+        diagnostics,
+        Some(cache),
+        refresh_imports,
+    )
 }
 
 fn load_inner(
@@ -553,6 +589,7 @@ fn load_inner(
     built_css: Option<&Path>,
     diagnostics: &mut Vec<Diagnostic>,
     mut cache: Option<&mut ParseCache>,
+    refresh_imports: bool,
 ) -> Result<(Sources, LoadStats), String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let aliases = path_aliases(&root);
@@ -583,8 +620,10 @@ fn load_inner(
             .and_then(|cache| cache.files.get(&path))
             .filter(|cached| cached.len == len && cached.modified == modified)
             .map(|cached| cached.file.clone());
+        let mut reused_parse = false;
         let mut file = if let Some(file) = metadata_hit {
             stats.reused.push(path.clone());
+            reused_parse = true;
             file
         } else {
             let src = fs::read_to_string(root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
@@ -599,6 +638,7 @@ fn load_inner(
                 .map(|cached| cached.file.clone());
             if let Some(file) = content_hit {
                 stats.reused.push(path.clone());
+                reused_parse = true;
                 if let Some(cache) = cache.as_mut() {
                     cache.files.insert(
                         path.clone(),
@@ -636,20 +676,22 @@ fn load_inner(
                 location: Some(file.loc(file.tree.root_node())),
             });
         }
-        let mut scan = scan_imports(&root, &file, &aliases);
-        if file.imports != scan.imports
-            || file.ordered_imports != scan.ordered_imports
-            || file.bindings != scan.bindings
-            || file.dynamic_imports != scan.dynamic_imports
-        {
-            let mut updated = (*file).clone();
-            updated.imports = scan.imports;
-            updated.ordered_imports = scan.ordered_imports;
-            updated.bindings = scan.bindings;
-            updated.dynamic_imports = scan.dynamic_imports;
-            file = Arc::new(updated);
+        if refresh_imports || !reused_parse {
+            let mut scan = scan_imports(&root, &file, &aliases);
+            if file.imports != scan.imports
+                || file.ordered_imports != scan.ordered_imports
+                || file.bindings != scan.bindings
+                || file.dynamic_imports != scan.dynamic_imports
+            {
+                let mut updated = (*file).clone();
+                updated.imports = scan.imports;
+                updated.ordered_imports = scan.ordered_imports;
+                updated.bindings = scan.bindings;
+                updated.dynamic_imports = scan.dynamic_imports;
+                file = Arc::new(updated);
+            }
+            diagnostics.append(&mut scan.diagnostics);
         }
-        diagnostics.append(&mut scan.diagnostics);
         if let Some(cache) = cache.as_mut() {
             cache.files.insert(
                 path.clone(),
