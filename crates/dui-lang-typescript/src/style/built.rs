@@ -931,6 +931,12 @@ impl<'a> Sheet<'a> {
                             ambiguous_variables.insert(prop);
                         } else if root && !uncertain && !important {
                             sheet.vars.insert(prop, Some(value));
+                        } else if selector
+                            .split(',')
+                            .map(str::trim)
+                            .any(|s| s.starts_with(":root["))
+                        {
+                            ambiguous_variables.insert(prop);
                         } else {
                             sheet.vars.entry(prop).or_insert(None);
                         }
@@ -1466,6 +1472,9 @@ impl<'a> Sheet<'a> {
             "background" => "background-color",
             name => name,
         };
+        if property == P::BorderRadius && rule.name != "border-radius" {
+            return None;
+        }
         if let Some(sides) = shorthand(name, raw) {
             return sides
                 .into_iter()
@@ -1473,7 +1482,7 @@ impl<'a> Sheet<'a> {
                 .map(|(_, v)| v);
         }
         if property == P::FontFamily {
-            return Some(V::Keyword { value: raw.into() });
+            return (!raw.contains(',')).then(|| V::Keyword { value: raw.into() });
         }
         if matches!(
             property,
@@ -1716,7 +1725,13 @@ impl<'a> Sheet<'a> {
         // pseudo, responsive or content-dependent variants that do not apply to the resting card.
         // Keep uncertainty only for dynamic class strings, where the base rule itself may exist.
         let unknown = unknown.filter(|rule| {
+            let contextual = self.selectors[rule.selectors]
+                .iter()
+                .any(|selector| contextual_selector(selector.text));
             rule.uncertain
+                || (contextual
+                    && unknown_rank
+                        .is_some_and(|(important, candidate)| important || Some(candidate) >= rank))
                 || (classes.is_none()
                     && (unknown_rank.is_some_and(|(important, _)| important) || rank.is_none()))
         });
@@ -2198,6 +2213,26 @@ fn document_selector(
     } else {
         DocumentMatch::Maybe(u32::MAX)
     }
+}
+
+fn contextual_selector(sel: &str) -> bool {
+    let mut depth = 0usize;
+    let mut escaped = false;
+    for c in sel.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match c {
+            '\\' => escaped = true,
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            '>' | '+' | '~' if depth == 0 => return true,
+            c if c.is_ascii_whitespace() && depth == 0 => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 // Matching an ancestor can be uncertain while its selector weight is still exact.
