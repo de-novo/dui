@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -1462,6 +1462,94 @@ fn built_sheet_key(
     hash_part(&mut hasher, if theme_classes.dark { "dark" } else { "" });
     hash_part(&mut hasher, if theme_classes.light { "light" } else { "" });
     format!("{:x}", hasher.finalize())
+}
+
+fn merge_unique<T>(target: &mut Vec<T>, incoming: Vec<T>, key: impl Fn(&T) -> String) {
+    for value in incoming {
+        let value_key = key(&value);
+        if !target.iter().any(|existing| key(existing) == value_key) {
+            target.push(value);
+        }
+    }
+}
+
+fn merge_models(target: &mut m::SourceModel, incoming: m::SourceModel) {
+    merge_unique(&mut target.files, incoming.files, |file| file.path.clone());
+    merge_unique(&mut target.screens, incoming.screens, |screen| {
+        screen.id.clone()
+    });
+    merge_unique(&mut target.components, incoming.components, |component| {
+        component.id.clone()
+    });
+    merge_unique(&mut target.item_schemas, incoming.item_schemas, |schema| {
+        schema.id.clone()
+    });
+    merge_unique(&mut target.tokens, incoming.tokens, |token| {
+        token.id.clone()
+    });
+    merge_unique(&mut target.edges, incoming.edges, |edge| edge.id.clone());
+    if target.document_style.is_none() {
+        target.document_style = incoming.document_style;
+    }
+    for diagnostic in incoming.diagnostics {
+        if !target.diagnostics.contains(&diagnostic) {
+            target.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// Extract several independent TSX roots into one deterministic model. The roots share one parse
+/// and render cache, and duplicate shared components are kept once under their stable file#name id.
+pub fn extract_entries_incremental(
+    project: &Path,
+    entries: &[PathBuf],
+    cache: &mut ParseCache,
+    dependency_structure_changed: bool,
+) -> Result<(m::SourceModel, LoadStats), String> {
+    let Some(first) = entries.first() else {
+        return Err("expected at least one TSX entry".into());
+    };
+    let built = discover_built_css(project);
+    let (mut merged, mut stats) = extract_in_context_impl(
+        project,
+        first,
+        built.as_deref(),
+        None,
+        None,
+        cache,
+        dependency_structure_changed,
+    )?;
+    for entry in &entries[1..] {
+        let (model, next) = extract_in_context_impl(
+            project,
+            entry,
+            built.as_deref(),
+            None,
+            None,
+            cache,
+            dependency_structure_changed,
+        )?;
+        merge_models(&mut merged, model);
+        stats.parsed.extend(next.parsed);
+        stats.reused.extend(next.reused);
+    }
+    merged.files.sort_by(|a, b| a.path.cmp(&b.path));
+    merged.screens.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.components.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.item_schemas.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.tokens.sort_by(|a, b| a.id.cmp(&b.id));
+    merged.edges.sort_by(|a, b| a.id.cmp(&b.id));
+    stats.parsed.sort();
+    stats.parsed.dedup();
+    stats.reused.sort();
+    stats.reused.dedup();
+    m::validate(&merged).map_err(|errs| format!("invalid merged source model: {errs:?}"))?;
+    Ok((merged, stats))
+}
+
+pub fn extract_entries(project: &Path, entries: &[PathBuf]) -> Result<m::SourceModel, String> {
+    let mut cache = ParseCache::default();
+    extract_entries_incremental(project, entries, &mut cache, true).map(|(model, _)| model)
 }
 
 fn extract_in_context_impl(

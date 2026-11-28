@@ -201,7 +201,7 @@ export interface SourceModelRenderer {
 }
 
 const tags = new Set(
-  "main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label input textarea select option progress meter ul ol li dl dt dd small form output dialog table caption thead tbody tfoot tr th td br hr".split(
+  "html head body main section article header footer nav aside div span strong em h1 h2 h3 h4 h5 h6 p code pre a button label input textarea select option progress meter ul ol li dl dt dd small form output dialog table caption thead tbody tfoot tr th td br hr".split(
     " ",
   ),
 );
@@ -1106,7 +1106,7 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         return el;
       }
       if (!tags.has(n.tag!)) return placeholder(n.reason ?? n.tag ?? n.kind);
-      const tag = n.tag === "body" ? "div" : n.tag!;
+      const tag = n.tag === "html" || n.tag === "head" || n.tag === "body" ? "div" : n.tag!;
       const el = doc.createElement(tag);
       el.dataset.modelNode = n.id;
       applyStyles(el, n, scope);

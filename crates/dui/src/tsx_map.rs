@@ -65,7 +65,7 @@ pub(crate) fn project_model(model: &SourceModel) -> SourceProjection {
         .map(|s| {
             json!({
                 "id":s.id, "kind":"screen", "label":s.route.as_ref().unwrap_or(&s.name), "name":s.name,
-                "component":s.component, "location":s.location
+                "component":s.component, "location":s.location, "sourceModel":true
             })
         })
         .collect();
@@ -114,7 +114,11 @@ fn font_magic_matches(extension: &str, bytes: &[u8]) -> bool {
 
 /// Copy only the bounded local font assets named by the model. The archive write re-checks
 /// path, type, byte length and digest instead of trusting the model JSON in memory.
-fn copy_font_assets(project: &Path, out: &Path, model: &SourceModel) -> Result<(), String> {
+pub(crate) fn copy_font_assets(
+    project: &Path,
+    out: &Path,
+    model: &SourceModel,
+) -> Result<(), String> {
     use dui_core::source_model::FontSource;
     use sha2::{Digest, Sha256};
     let project = project.canonicalize().map_err(|e| e.to_string())?;

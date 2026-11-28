@@ -794,14 +794,26 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
                     })
             }
         });
-        let Some(entry) = inferred_entry else {
+        let declared_entries: Vec<PathBuf> = graph["sourceEntries"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(PathBuf::from)
+            .collect();
+        let entries = if declared_entries.is_empty() {
+            inferred_entry.clone().into_iter().collect::<Vec<_>>()
+        } else {
+            declared_entries
+        };
+        if entries.is_empty() {
             send_json(
                 &mut stream,
                 404,
                 &json!({"status":"error","reason":"source-entry-unavailable"}),
             );
             return;
-        };
+        }
         let nodes = graph["nodes"].as_array().cloned().unwrap_or_default();
         let edges = graph["edges"].as_array().cloned().unwrap_or_default();
         let discovery = graph["screenDiscovery"].clone();
@@ -815,7 +827,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<ViewerState>>) {
             } else {
                 let session = hot_reload::HotSession::start(
                     project,
-                    entry,
+                    entries,
                     archive_model,
                     nodes,
                     edges,
