@@ -77,6 +77,8 @@ Existing paths include local web URLs, native route discovery and captures on se
 
 A new language needs one adapter that maps that language onto this model: layout elements, declared state and data, navigation, and style syntax. The model, the approximate renderer, hot reload, and Figma export are reused.
 
+The engine targets accurate primitive rendering. The fixed web inventory diagnoses changes to the shared engine. Evaluate Taffy or Yoga for layout, a CSS parser and cascade library under the dependency policy, and a real font engine for measurement. Ship changes by engine. Each engine PR records before/after fidelity and visible reload counts, median and p95, with desktop and mobile comparisons. Then compare pinned applications and SwiftUI and Compose examples against their platform references.
+
 dui’s platform-independent build and hot reload system translates source into a shared model without requiring a Vite or Next.js development server. Thin framework adapters translate into boxes, layout, text, styles and images. The engine aims to draw these primitives as users see them. Compare them with Chrome on the web and with the actual platform on native targets. Record raw differences first, then propose tolerances. Unknown inputs retain their source and unresolved status.
 
 <a id="swappable-renderers"></a>
