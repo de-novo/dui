@@ -10,7 +10,14 @@ struct ProbeView: View {
     @State private var frames = 0
     let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     var body: some View {
-        Text(verbatim: model?.text ?? "Waiting")
+        GeometryReader { geometry in
+            let width = CGFloat(model?.viewportWidth ?? 390)
+            let height: CGFloat = width == 390 ? 844 : 920
+            Text(verbatim: model?.text ?? "Waiting")
+                .frame(width: width, height: height)
+                .scaleEffect(min(geometry.size.width / width, geometry.size.height / height))
+                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+        }
             .onReceive(Timer.publish(every: 1.0 / 60, on: .main, in: .common).autoconnect()) { _ in
                 guard let bytes = try? Data(contentsOf: dir.appendingPathComponent("model.json")),
                       let next = try? JSONDecoder().decode(SceneText.self, from: bytes) else { return }

@@ -17,7 +17,7 @@ for screen in ['DetailView','ProfileView']:
         if decl.count('(call_expr ')!=1 or 'name="Text"' not in decl: raise ValueError('unsupported declaration')
         values=re.findall(r'string_literal_expr[^\n]+value="([^"]*)"',decl)
         if values!=[text]: raise ValueError(values)
-        tmp=docs/'model.pending';tmp.write_text(json.dumps({'screen':screen,'text':values[0],'revision':index}));os.replace(tmp,docs/'model.json')
+        tmp=docs/'model.pending';tmp.write_text(json.dumps({'screen':screen,'text':values[0],'revision':index, 'viewportWidth':int(os.getenv('DUI_VIEWPORT','390'))}));os.replace(tmp,docs/'model.json')
         ms=(time.perf_counter_ns()-start)/1e6
         rss=int(re.search(r'(\d+)\s+maximum resident set size',p.stderr)[1]);ack=docs/'ack'
         if index:row['analysis'].append({'ms':ms,'rssBytes':rss})
@@ -38,4 +38,16 @@ for screen in ['DetailView','ProfileView']:
                 procs=subprocess.check_output(['ps','-axo','rss=,comm='],text=True)
                 sizes=[int(line.split()[0])*1024 for line in procs.splitlines() if line.rstrip().endswith('/SurfaceProbe')]
                 if len(sizes)==1: row.setdefault('rendererRSS',[]).append(sizes[0])
+        if device := os.getenv('DUI_PROBE_SIMULATOR'):
+            from PIL import Image
+            path=stage/f'{screen}-device-{os.environ["DUI_VIEWPORT"]}-{index}.png'
+            subprocess.run(['xcrun','simctl','io',device,'screenshot',str(path)],check=True,capture_output=True)
+            with Image.open(path) as image:
+                w,h=image.size
+                crop=image.convert('RGB').crop((w//2-220,h//2-180,w//2+220,h//2+180))
+                colors=crop.getextrema()
+                if all(hi-lo<20 for lo,hi in colors):raise ValueError('blank device crop')
+                current=hashlib.sha256(crop.tobytes()).digest()
+                if index==0: baseline=current
+                elif (current==baseline)!=(index%2==0):raise ValueError('device crop failed to reflect edit')
 (stage/(sys.argv[3] if len(sys.argv)>3 else 'native-matrix.json')).write_text(json.dumps(output,indent=2))

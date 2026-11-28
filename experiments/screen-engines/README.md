@@ -30,3 +30,7 @@ python3 experiments/screen-engines/figure.py "$stage"
 ```
 
 The first shadcn-admin install reported pnpm's ignored dependency build scripts. The installed graph built the full static production app successfully. The native default CLI produced route metadata without a drawable model for SwiftUI. Initial Android default attempts returned exit 5 before SDK provisioning. Records in native-default.json include exit status and output filenames; these are diagnostic attempts, not failed image comparisons.
+
+The foreground iOS probe uses the same logical sizes on a physical iPhone 17 Pro simulator surface (1206×2622), uniformly scaled to fit. It acknowledges after two foreground main-run-loop timer ticks. Every edit and revert is subsequently checked against the baseline center crop in a real simulator screenshot. Logical reference parity uses the full official SwiftUI surfaces. Run foreground.sh with the same stage and simulator after simulator boot migration completes. Capture the two ordinary fixture windows with reference.sh into the stage's native-ok directory.
+
+The Android extension is documented in android/README.md. Source, model, edit, framebuffer and memory measurements use two literal Text scenes. The two real settings screens in the native device archive are supplementary Android references. They exercise Switch/Row/state beyond the literal Text adapter. Run the Android probe before figure.py to produce the combined native evidence.
