@@ -1,12 +1,18 @@
 import { useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { useI18n } from "../../i18n/LocaleContext";
-import { readModel, type Model, type ModelRenderResult, type SourceModelRenderer } from "./modelDocument";
+import {
+  readModel,
+  type Model,
+  type ModelRenderResult,
+  type SourceModelRenderer,
+} from "./modelDocument";
 import { createEngineModelRenderer } from "./engineModelRenderer";
 
 const unavailableRenderer: SourceModelRenderer = {
   render: () => {
-    const markup = '<div class="dui-engine-error" style="padding:8px;color:#b00020">dui layout engine unavailable</div>';
+    const markup =
+      '<div class="dui-engine-error" style="padding:8px;color:#b00020">dui layout engine unavailable</div>';
     return { html: markup, markup, unresolved: ["engine-unavailable"] };
   },
 };
