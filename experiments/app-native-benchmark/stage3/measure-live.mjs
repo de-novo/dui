@@ -28,6 +28,14 @@ const targets = {
     after: '<div className="h-full w-full">Benchmark save marker {n}',
     probe: "Benchmark save marker {n}",
   },
+  obora: {
+    root: process.env.OBORA_WEB_ROOT,
+    entry: "src/features/organization.tsx",
+    file: "src/features/organization.tsx",
+    before: '  return (\n    <div className="mx-auto w-full max-w-5xl space-y-6">',
+    after: '  return (\n    <div className="mx-auto w-full max-w-5xl space-y-6">Benchmark save marker {n}',
+    probe: "Benchmark save marker {n}",
+  },
 };
 const iterations = 10, deadlineMs = 2000;
 const viewports = [{id:"desktop",width:1440,height:920},{id:"mobile",width:390,height:844}];

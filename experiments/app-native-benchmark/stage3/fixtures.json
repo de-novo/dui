@@ -344,6 +344,9 @@
             "isFetchingNextPage": false
           }
         }
+      },
+      "pixelEvidence": {
+        "error": "negative-only: HTTP 500 and absence of list/empty sentinel; no positive error sentinel in source"
       }
     },
     "plane": {
@@ -377,7 +380,31 @@
             },
             "richFilters": {}
           },
-          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": [
+            {
+              "id": "issue-benchmark-1",
+              "name": "Benchmark issue one",
+              "project_id": "project-benchmark",
+              "sequence_id": 1,
+              "created_at": "2026-01-01T00:00:00.000Z",
+              "updated_at": "2026-01-01T00:00:00.000Z",
+              "sub_issues_count": 0,
+              "is_draft": false,
+              "archived_at": null
+            },
+            {
+              "id": "issue-benchmark-2",
+              "name": "Benchmark issue two",
+              "project_id": "project-benchmark",
+              "sequence_id": 2,
+              "created_at": "2026-01-01T00:00:00.000Z",
+              "updated_at": "2026-01-01T00:00:00.000Z",
+              "sub_issues_count": 0,
+              "is_draft": false,
+              "archived_at": null
+            }
+          ]
         },
         "loading": {
           "params": {
@@ -391,7 +418,8 @@
           "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workspaceSlug": "bench",
           "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.projectId": "project-benchmark",
           "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.workItemFilters": null,
-          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": []
         },
         "empty": {
           "params": {
@@ -410,7 +438,8 @@
             },
             "richFilters": {}
           },
-          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": []
         },
         "error": {
           "params": {
@@ -429,7 +458,8 @@
             },
             "richFilters": {}
           },
-          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list"
+          "components/issues/issue-layouts/roots/project-layout-root.tsx#ProjectLayoutRoot.activeLayout": "list",
+          "boundaryIssues": []
         }
       },
       "expressions": {
@@ -438,28 +468,108 @@
           "EIssueLayoutTypes.LIST": "list",
           "typeof children": "function",
           "initialWorkItemFilters": true,
-          "issues?.getIssueLoader() === \"mutation\"": false
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
         },
         "loading": {
           "props.activeLayout": "list",
           "EIssueLayoutTypes.LIST": "list",
           "typeof children": "function",
           "initialWorkItemFilters": false,
-          "issues?.getIssueLoader() === \"mutation\"": false
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
         },
         "empty": {
           "props.activeLayout": "list",
           "EIssueLayoutTypes.LIST": "list",
           "typeof children": "function",
           "initialWorkItemFilters": true,
-          "issues?.getIssueLoader() === \"mutation\"": false
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
         },
         "error": {
           "props.activeLayout": "list",
           "EIssueLayoutTypes.LIST": "list",
           "typeof children": "function",
           "initialWorkItemFilters": true,
-          "issues?.getIssueLoader() === \"mutation\"": false
+          "issues?.getIssueLoader() === \"mutation\"": false,
+          "!issue.tempId": true,
+          "issue?.tempId !== undefined": false
+        }
+      },
+      "sourceTraces": [
+        {
+          "id": "plane-grouped-entities-before-list-return",
+          "file": "components/issues/issue-layouts/list/default.tsx",
+          "inOrder": [
+            "const groupIds = groups.map",
+            "let entities: Record<string, string[]> = {}",
+            "if (is_list)",
+            "entities = Object.assign(orderedGroups, { [groupIds[0]]: groupedIssueIds[ALL_ISSUES] ?? [] })",
+            "return (",
+            "entities={entities}",
+            "groups.map((group: IGroupByColumn)"
+          ]
+        },
+        {
+          "id": "plane-issue-ids-to-row-title",
+          "file": "components/issues/issue-layouts/list/blocks-list.tsx",
+          "inOrder": [
+            "issueIds.map((issueId: string, index: number)",
+            "issueId={issueId}",
+            "issuesMap={issuesMap}"
+          ]
+        },
+        {
+          "id": "plane-row-issue-name",
+          "file": "components/issues/issue-layouts/list/block.tsx",
+          "inOrder": [
+            "const issue = issuesMap[issueId]",
+            "{issue.name}"
+          ]
+        }
+      ],
+      "projection": {
+        "states": [
+          "populated"
+        ],
+        "component": "IssueBlock",
+        "itemsKey": "boundaryIssues",
+        "itemSlot": "components/issues/issue-layouts/list/block.tsx#IssueBlock.issue",
+        "itemIdSlot": "components/issues/issue-layouts/list/block.tsx#IssueBlock.issueId",
+        "issuesMapSlot": "components/issues/issue-layouts/list/block.tsx#IssueBlock.issuesMap",
+        "shared": {
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.groupId": "all",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.displayProperties": {
+            "key": true,
+            "issue_type": false
+          },
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.nestingLevel": 0,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.spacingLeft": 0,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isExpanded": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isCurrentBlockDragging": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.canDrag": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isEpic": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.workspaceSlug": "bench",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.projectId": "project-benchmark",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isSidebarCollapsed": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.currentProjectNextSequenceId": 3,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.subIssuesCount": 0,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.canEditIssueProperties": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isDraggingAllowed": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isMobile": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.projectIdentifier": "BEN",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isIssueSelected": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isIssueActive": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.isSubIssue": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.canSelectIssues": false,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.maxSequenceId": 3,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.keyMinWidth": 0,
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.workItemLink": "/bench/projects/project-benchmark/issues/issue-benchmark",
+          "components/issues/issue-layouts/list/block.tsx#IssueBlock.budgetPx": 0
         }
       }
     }

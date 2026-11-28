@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const shared = createRequire(import.meta.url);
 const { chromium } = shared("playwright-core");
@@ -22,7 +23,7 @@ if (!url) throw new Error("--url or STAGE3_REFERENCE_URL is required");
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
-const states = {
+const builtinStates = {
   calcom: {
     populated: { text: ["Benchmark Intro", "Benchmark Deep Dive"], absentText: ["Create your first event type"] },
     loading: { selectors: [".animate-pulse"], absentText: ["Benchmark Intro", "Benchmark Deep Dive", "Create your first event type"] },
@@ -38,7 +39,11 @@ const states = {
     error: { absentText: ["Benchmark issue one", "Benchmark issue two"], requireStatus: 500 },
   },
 }[target];
-if (!states) throw new Error(`No built-in reference adapter for ${target}; provide a local adapter overlay`);
+const external = process.env.STAGE3_REFERENCE_ADAPTER
+  ? (await import(pathToFileURL(path.resolve(process.env.STAGE3_REFERENCE_ADAPTER)).href)).default
+  : undefined;
+const states = external?.states ?? builtinStates;
+if (!states) throw new Error(`No reference adapter for ${target}; provide STAGE3_REFERENCE_ADAPTER`);
 
 const viewports = [
   { name: "desktop", width: 1440, height: 920 },
@@ -75,9 +80,9 @@ function emptyPlanePayload(body) {
   json.next_page_results = false;
   return JSON.stringify(json);
 }
-const adapter = target === "calcom"
+const adapter = external?.adapter ?? (target === "calcom"
   ? { match: calcomDataUrl, empty: emptyCalcomPayload }
-  : { match: planeDataUrl, empty: emptyPlanePayload };
+  : { match: planeDataUrl, empty: emptyPlanePayload });
 
 const browser = await chromium.launch({ executablePath: chrome, headless: true });
 const report = { target, url, schemaVersion: 1, states: {} };
@@ -94,19 +99,19 @@ for (const [state, assertion] of Object.entries(states)) {
       const request = route.request();
       if (!adapter.match(request.url())) return route.continue();
       const started = Date.now();
-      if (state === "loading") {
+      if (!adapter.statefulUpstream && state === "loading") {
         requests.push({ url: request.url(), action: "held-open" });
         return new Promise(() => {});
       }
-      if (state === "error") {
+      if (!adapter.statefulUpstream && state === "error") {
         requests.push({ url: request.url(), action: "rewritten-error", status: 500, durationMs: Date.now() - started });
         return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "benchmark forced error" }) });
       }
       const response = await route.fetch();
       const body = await response.text();
       let outBody = body;
-      let action = "observed";
-      if (state === "empty") {
+      let action = adapter.statefulUpstream ? "observed-stateful-upstream" : "observed";
+      if (!adapter.statefulUpstream && state === "empty") {
         outBody = adapter.empty(body);
         action = "rewritten-empty";
       }
@@ -121,6 +126,7 @@ for (const [state, assertion] of Object.entries(states)) {
       });
       return route.fulfill({ response, body: outBody });
     });
+    if (external?.cookies) await context.addCookies(external.cookies(state, viewport, url));
     const page = await context.newPage();
     await page.goto(url, { waitUntil: state === "loading" ? "domcontentloaded" : "networkidle", timeout: 30000 }).catch((error) => {
       if (state !== "loading") throw error;
@@ -145,7 +151,7 @@ for (const [state, assertion] of Object.entries(states)) {
     const forbiddenText = (assertion.absentText ?? []).filter((text) => visible.text.includes(text));
     const missingSelectors = (assertion.selectors ?? []).filter((_, index) => !selectorResults[index]);
     const statusOk = !assertion.requireStatus || requests.some((request) => request.status === assertion.requireStatus);
-    const passed = !missingText.length && !forbiddenText.length && !missingSelectors.length && statusOk && requests.length > 0;
+    const passed = !missingText.length && !forbiddenText.length && !missingSelectors.length && statusOk && (adapter.allowNoBrowserRequests || requests.length > 0);
     const png = path.join(out, `${target}-${state}-${viewport.name}.png`);
     await page.screenshot({ path: png, fullPage: false });
     report.states[state].viewports[viewport.name] = {
@@ -158,12 +164,14 @@ for (const [state, assertion] of Object.entries(states)) {
       textLength: visible.text.length,
       requests,
     };
-    await context.close();
+    await Promise.race([context.close(), new Promise((resolve) => setTimeout(resolve, 1000))]);
     if (!passed) {
       console.error(`${target}/${state}/${viewport.name} assertion failed`, { missingText, forbiddenText, missingSelectors, statusOk });
     }
   }
 }
-await browser.close();
+await Promise.race([browser.close(), new Promise((resolve) => setTimeout(resolve, 1000))]);
 fs.writeFileSync(path.join(out, "reference-provenance.json"), JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ target, out, states: Object.fromEntries(Object.entries(report.states).map(([state, r]) => [state, Object.fromEntries(Object.entries(r.viewports).map(([viewport, v]) => [viewport, v.passed]))])) }, null, 2));
+
+process.exit(0);

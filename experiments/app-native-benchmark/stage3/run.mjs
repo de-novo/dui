@@ -62,6 +62,23 @@ function scan(target, root) {
 function component(model, wanted) {
   return model.components?.find((c) => c.name === wanted) ?? model.components?.[0];
 }
+function sourceTraces(root, traces) {
+  return (traces ?? []).map((trace) => {
+    const file = path.join(root, trace.file);
+    const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+    let offset = 0;
+    const missing = [];
+    for (const pattern of trace.inOrder ?? []) {
+      const found = text.indexOf(pattern, offset);
+      if (found < 0) {
+        missing.push(pattern);
+      } else {
+        offset = found + pattern.length;
+      }
+    }
+    return { ...trace, fileExists: fs.existsSync(file), passed: fs.existsSync(file) && missing.length === 0, missing };
+  });
+}
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value && typeof value === "object") {
@@ -72,12 +89,16 @@ function stableJson(value) {
 function payloadHash(value) {
   return crypto.createHash("sha256").update(stableJson(value)).digest("hex");
 }
-function valuesFor(model, comp, byName) {
+function valuesFor(model, comp, byName, ignoredKeys = new Set()) {
   const values = {};
   const missing = [];
   const bindings = [];
   const knownSlots = new Set((model.components ?? []).flatMap((component) => (component.slots ?? []).map((slot) => slot.id)));
   for (const [name, value] of Object.entries(byName ?? {})) {
+    if (ignoredKeys.has(name)) {
+      bindings.push({ key: name, matched: true, projectionInput: true, valueSha256: payloadHash(value) });
+      continue;
+    }
     if (name.includes("#")) {
       values[name] = value;
       bindings.push({ key: name, slot: name, matched: knownSlots.has(name), valueSha256: payloadHash(value) });
@@ -148,28 +169,73 @@ for (const [target, config] of Object.entries(fixtures.targets)) {
     slots: comp?.slots?.map((s) => ({ id: s.id, name: s.name, kind: s.kind })) ?? [],
   };
   if (!comp) continue;
+  record.sourceTraces = sourceTraces(root, config.sourceTraces);
   for (const state of fixtures.states) {
-    const assignment = valuesFor(model, comp, config.slots?.[state]);
+    const projection = config.projection;
+    const projectionActive = !!projection?.component && (projection.states ?? []).includes(state);
+    const mountComp = projectionActive ? component(model, projection.component) : comp;
+    const ignoredKeys = new Set(projection?.itemsKey ? [projection.itemsKey] : []);
+    const stateInput = config.slots?.[state] ?? {};
+    const boundaryInput = Object.fromEntries(Object.entries(stateInput).filter(([key]) => key.includes("#") || key === projection?.itemsKey));
+    const input = { ...(projectionActive ? boundaryInput : stateInput), ...(projectionActive ? projection.shared ?? {} : {}) };
+    const assignment = valuesFor(model, mountComp, input, ignoredKeys);
     const expressionValues = config.expressions?.[state] ?? {};
-    const stateRecord = { missingSlots: assignment.missing, inputBindings: assignment.bindings, expressionBindings: Object.keys(expressionValues).sort(), payloadSha256: payloadHash({ slots: config.slots?.[state] ?? {}, expressions: expressionValues }), viewports: {}, assertions: config.assertions?.[state] ?? [] };
+    const stateRecord = {
+      missingSlots: assignment.missing,
+      inputBindings: assignment.bindings,
+      expressionBindings: Object.keys(expressionValues).sort(),
+      payloadSha256: payloadHash({ slots: input, expressions: expressionValues }),
+      viewports: {},
+      assertions: config.assertions?.[state] ?? [],
+      mount: {
+        component: mountComp?.id,
+        requestedComponent: comp.id,
+        boundaryProjection: projectionActive,
+        projectionItemCount: projectionActive ? (config.slots?.[state]?.[projection.itemsKey] ?? []).length : undefined,
+        evidence: projectionActive ? "explicit-data-boundary projection; not full-page composition" : "extracted entry composition",
+      },
+    };
     record.states[state] = stateRecord;
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport, recordVideo: { dir: path.join(out, "videos"), size: viewport } });
       const page = await context.newPage();
       await page.setContent(`<!doctype html><meta charset=utf-8><style>html,body{margin:0;width:${viewport.width}px;height:${viewport.height}px;background:white}#host{width:${viewport.width}px;height:${viewport.height}px;overflow:hidden}</style><div id=host></div>`);
       await page.addScriptTag({ content: bundle });
-      const render = await page.evaluate(({ model, component, values, expressions, viewport }) => {
-        const rendered = window.duiStage3.render(model, component, { width: viewport.width, height: viewport.height, slotValues: values, expressionValues: expressions });
+      const render = await page.evaluate(({ model, component, values, expressions, viewport, projectionActive, projection, items }) => {
         const host = document.getElementById("host");
         const shadow = host.attachShadow({ mode: "open" });
-        shadow.innerHTML = rendered.markup;
-        return {
-          unresolved: rendered.unresolved,
-          text: host.shadowRoot.textContent.replace(/\s+/g, " ").trim(),
-          elements: host.shadowRoot.querySelectorAll("*").length,
-          placeholders: host.shadowRoot.querySelectorAll("[data-model-placeholder], .model-placeholder, [data-placeholder]").length,
+        const unresolved = [];
+        const renderOne = (slotValues) => window.duiStage3.render(model, component, { width: viewport.width, height: viewport.height, slotValues, expressionValues: expressions });
+        const append = (rendered, first) => {
+          unresolved.push(...rendered.unresolved);
+          if (first) {
+            shadow.innerHTML = rendered.markup;
+            return;
+          }
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = rendered.markup;
+          for (const child of [...wrapper.children]) {
+            if (child.tagName !== "STYLE") shadow.append(child);
+          }
         };
-      }, { model, component: comp.id, values: assignment.values, expressions: expressionValues, viewport });
+        if (projectionActive) {
+          items.forEach((item, index) => {
+            const itemValues = { ...values };
+            if (projection.itemSlot) itemValues[projection.itemSlot] = item;
+            if (projection.itemIdSlot) itemValues[projection.itemIdSlot] = item.id;
+            if (projection.issuesMapSlot) itemValues[projection.issuesMapSlot] = { [item.id]: item };
+            append(renderOne(itemValues), index === 0);
+          });
+        } else {
+          append(renderOne(values), true);
+        }
+        return {
+          unresolved,
+          text: [...shadow.children].filter((el) => el.tagName !== "STYLE").map((el) => el.textContent).join(" ").replace(/\s+/g, " ").trim(),
+          elements: shadow.querySelectorAll("*").length,
+          placeholders: shadow.querySelectorAll("[data-model-placeholder], .model-placeholder, [data-placeholder]").length,
+        };
+      }, { model, component: mountComp.id, values: assignment.values, expressions: expressionValues, viewport, projectionActive, projection, items: projectionActive ? config.slots?.[state]?.[projection.itemsKey] ?? [] : [] });
       await page.waitForTimeout(100);
       const png = path.join(out, `${target}-${state}-${viewport.name}.png`);
       await page.screenshot({ path: png });
@@ -183,14 +249,14 @@ for (const [target, config] of Object.entries(fixtures.targets)) {
       const missingText = expected.filter((text) => !render.text.includes(text));
       const mounted = render.elements > 0 && render.text.length > 0;
       let cause;
-      if (comp.root.kind === "placeholder") cause = "extraction";
+      if (mountComp.root.kind === "placeholder") cause = "extraction";
       else if (assignment.missing.length) cause = "mock-state";
       else if (!mounted || render.unresolved.length || missingText.length) cause = "render";
       else cause = "none";
       const envTarget = target.toUpperCase().replaceAll("-", "_");
       const reference = process.env[`${envTarget}_REFERENCE_${state.toUpperCase()}_${viewport.name.toUpperCase()}`] ?? config.references?.[state]?.[viewport.name];
       const diff = reference ? comparePng(reference, png, path.join(out, `${target}-${state}-${viewport.name}-diff.png`)) : undefined;
-      stateRecord.viewports[viewport.name] = { png: path.basename(png), mounted, textLength: render.text.length, elements: render.elements, missingText, unresolved: render.unresolved.slice(0, 20), cause, pixel: diff };
+      stateRecord.viewports[viewport.name] = { png: path.basename(png), mounted, textLength: render.text.length, elements: render.elements, missingText, unresolved: render.unresolved.slice(0, 20), cause, pixel: diff, pixelEvidence: projectionActive ? "boundary-projection-not-page-composition" : config.pixelEvidence?.[state] ?? "extracted-entry" };
     }
   }
 }
