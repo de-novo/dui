@@ -11,6 +11,7 @@ mod syntax;
 use dui_core::source_model as m;
 pub use fonts::cached_font_bytes;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 use syntax::{File, children, field, first, unwrap_expr};
 pub use syntax::{LoadStats, ParseCache};
@@ -492,6 +493,80 @@ pub fn extract_incremental(
     extract_in_context_impl(project, entry, built.as_deref(), None, None, cache)
 }
 
+fn hash_part(hasher: &mut Sha256, part: &str) {
+    hasher.update(part.len().to_string());
+    hasher.update([0]);
+    hasher.update(part.as_bytes());
+    hasher.update([0]);
+}
+
+fn dependency_closure(files: &Files, start: &str) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut pending = vec![start.to_owned()];
+    while let Some(path) = pending.pop() {
+        if !seen.insert(path.clone()) {
+            continue;
+        }
+        if let Some(file) = files.get(&path) {
+            pending.extend(
+                file.imports
+                    .iter()
+                    .filter(|path| files.contains_key(*path))
+                    .cloned(),
+            );
+        }
+    }
+    seen.into_iter().collect()
+}
+
+fn semantic_fingerprint(
+    files: &Files,
+    path: &str,
+    entry: &str,
+    artifact: Option<&str>,
+    sheet_order: &[String],
+    width: Option<u32>,
+    root_attribute: Option<(&str, &str)>,
+    theme_classes: style::built::ThemeClasses,
+    tailwind: bool,
+) -> String {
+    let mut hasher = Sha256::new();
+    hash_part(&mut hasher, "semantic-v1");
+    hash_part(&mut hasher, entry);
+    hash_part(&mut hasher, artifact.unwrap_or(""));
+    hash_part(
+        &mut hasher,
+        &width.map_or(String::new(), |width| width.to_string()),
+    );
+    if let Some((key, value)) = root_attribute {
+        hash_part(&mut hasher, key);
+        hash_part(&mut hasher, value);
+    }
+    hash_part(&mut hasher, if theme_classes.dark { "dark" } else { "" });
+    hash_part(&mut hasher, if theme_classes.light { "light" } else { "" });
+    hash_part(&mut hasher, if tailwind { "tailwind" } else { "" });
+    // Global stylesheet order affects the cascade of every component. Module stylesheets are
+    // included conservatively because their extracted theme tokens are currently global.
+    for path in files
+        .values()
+        .filter(|file| file.path.ends_with(".css"))
+        .map(|file| &file.path)
+    {
+        hash_part(&mut hasher, path);
+        hash_part(&mut hasher, &files[path].sha256);
+    }
+    for path in sheet_order {
+        hash_part(&mut hasher, path);
+    }
+    for dependency in dependency_closure(files, path) {
+        hash_part(&mut hasher, &dependency);
+        if let Some(file) = files.get(&dependency) {
+            hash_part(&mut hasher, &file.sha256);
+        }
+    }
+    format!("{:x}", hasher.finalize())
+}
+
 fn extract_in_context_impl(
     project: &Path,
     entry: &Path,
@@ -536,8 +611,10 @@ fn extract_in_context_impl(
         .map(|p| style::built::Sheet::new(&files[p], width, root_attribute, theme_classes))
         .transpose()?;
     let mut sheet_diagnostics = Vec::new();
-    let source_sheets: Vec<_> = stylesheet_order(&files, &entry)
-        .into_iter()
+    let sheet_order = stylesheet_order(&files, &entry);
+    let source_sheets: Vec<_> = sheet_order
+        .iter()
+        .cloned()
         .filter(|path| {
             path.ends_with(".css")
                 && !path.ends_with(".module.css")
@@ -625,6 +702,30 @@ fn extract_in_context_impl(
     });
     let modules = style::modules::Modules::new(&files);
     for file in files.values().filter(|f| f.path.ends_with(".tsx")) {
+        let fingerprint = semantic_fingerprint(
+            &files,
+            &file.path,
+            &entry,
+            artifact.as_deref(),
+            &sheet_order,
+            width,
+            root_attribute,
+            theme_classes,
+            tailwind,
+        );
+        if let Some(cached) = cache
+            .rendered
+            .get(&file.path)
+            .filter(|cached| cached.cacheable && cached.fingerprint == fingerprint)
+        {
+            model.components.extend(cached.components.iter().cloned());
+            model.edges.extend(cached.edges.iter().cloned());
+            continue;
+        }
+        let component_start = model.components.len();
+        let screen_start = model.screens.len();
+        let edge_start = model.edges.len();
+        let diagnostic_start = model.diagnostics.len();
         for (name, f) in file.functions() {
             let id = format!("{}#{name}", file.path);
             let mut slot_values = signatures[&id].clone();
@@ -660,6 +761,19 @@ fn extract_in_context_impl(
                 root,
             });
         }
+        let components = model.components[component_start..].to_vec();
+        let screens = model.screens[screen_start..].to_vec();
+        let edges = model.edges[edge_start..].to_vec();
+        let diagnostics = model.diagnostics[diagnostic_start..].to_vec();
+        cache.rendered.insert(
+            file.path.clone(),
+            syntax::RenderedFile {
+                fingerprint,
+                cacheable: screens.is_empty() && diagnostics.is_empty(),
+                components,
+                edges,
+            },
+        );
     }
     routes::discover(&files, &mut model);
     if model.screens.is_empty() {

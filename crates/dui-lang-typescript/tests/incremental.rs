@@ -198,3 +198,41 @@ export default function App() {
     let fresh = extract(root, &entry).expect("fresh");
     assert_eq!(incremental, fresh);
 }
+
+#[test]
+fn dependency_prop_signature_edits_invalidate_dependent_renders() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path();
+    write(
+        root,
+        "src/main.tsx",
+        r#"import { Child } from "./child";
+export default function App() {
+  return <main><Child label="visible" /></main>;
+}
+"#,
+    );
+    write(
+        root,
+        "src/child.tsx",
+        r#"export function Child({ label }: { label: string }) {
+  return <p>{label}</p>;
+}
+"#,
+    );
+    let entry = root.join("src/main.tsx");
+    let mut cache = ParseCache::default();
+    let (initial, _) = extract_incremental(root, &entry, &mut cache).expect("initial");
+    write(
+        root,
+        "src/child.tsx",
+        r#"export function Child({ text }: { text: string }) {
+  return <p>{text}</p>;
+}
+"#,
+    );
+    let (incremental, _) = extract_incremental(root, &entry, &mut cache).expect("incremental");
+    let fresh = extract(root, &entry).expect("fresh");
+    assert_eq!(incremental, fresh);
+    assert_ne!(incremental, initial);
+}
