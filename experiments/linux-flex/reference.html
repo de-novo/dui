@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Flex geometry reference</title>
+<style>*{box-sizing:border-box}body{margin:0}.root,.row{display:flex}.root{justify-content:center}.row{align-items:start}.row i{min-width:0;background:#224e86}.row i:nth-child(even){background:#b65534}</style>
+<div class="root"><div class="row"></div></div><pre></pre>
+<script>
+const root=document.querySelector(".root"),row=root.firstChild, records=[];
+const sizes=[[94.5,26],[76.25,32],[110,24],[58.75,28]];
+for(const [w,h] of sizes){const i=document.createElement("i");i.style.width=w+"px";i.style.height=h+"px";row.append(i)}
+for(const width of [390,1440])for(const cap of [168,265,360,660])for(const gap of [0,7.5,18])
+for(const wrap of [0,1])for(const j of [0,1,2])for(const reverse of [0,1]){
+ root.style.width=width+"px";Object.assign(row.style,{width:Math.min(width-32,cap)+"px",gap:gap+"px",flexWrap:wrap?"wrap":"nowrap",justifyContent:["start","center","space-between"][j],flexDirection:reverse?"row-reverse":"row"});
+ records.push([width,cap,gap,wrap,j,reverse,...Array.from(row.children).flatMap(i=>{const b=i.getBoundingClientRect();return [b.x,b.y,b.width,b.height]})].join(","))
+}
+document.querySelector("pre").textContent=records.join("\n");
+</script>

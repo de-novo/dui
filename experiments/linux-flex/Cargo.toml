@@ -1,0 +1,11 @@
+[package]
+name = "dui-linux-flex-study"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "Apache-2.0"
+
+[workspace]
+
+[dependencies]
+taffy = { version = "=0.15.1", default-features = false, features = ["taffy_tree", "flexbox"] }
