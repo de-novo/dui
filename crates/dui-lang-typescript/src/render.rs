@@ -752,7 +752,7 @@ impl Context<'_> {
             && field(n, "function").is_some_and(|function| {
                 function.kind() == "identifier"
                     && self.slots.iter().any(|slot| {
-                        slot.name == self.file.text(function) && matches!(slot.ty, m::TypeRef::Node | m::TypeRef::Function)
+                        slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node
                     })
             })
         {
@@ -760,7 +760,7 @@ impl Context<'_> {
             let slot = self
                 .slots
                 .iter()
-                .find(|slot| slot.name == self.file.text(function) && matches!(slot.ty, m::TypeRef::Node | m::TypeRef::Function))
+                .find(|slot| slot.name == self.file.text(function) && slot.ty == m::TypeRef::Node)
                 .unwrap();
             return m::Node::Outlet(m::Outlet {
                 id,
