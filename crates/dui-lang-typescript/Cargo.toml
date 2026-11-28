@@ -12,8 +12,8 @@ sha2.workspace = true
 tree-sitter.workspace = true
 tree-sitter-typescript.workspace = true
 tree-sitter-css.workspace = true
-ureq = { version = "3.5.2", default-features = false, features = ["native-tls-no-default", "gzip"] }
-brotli-decompressor = "6.2.0"
+ureq.workspace = true
+brotli-decompressor.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

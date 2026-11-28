@@ -15,6 +15,8 @@ license = "Apache-2.0"
 version = "0.2.0"
 
 [workspace.dependencies]
+ureq = { version = "3.5.2", default-features = false, features = ["native-tls-no-default", "gzip"] }
+brotli-decompressor = "6.2.0"
 dui-lang-typescript = { path = "crates/dui-lang-typescript" }
 tree-sitter = "0.25.10"
 tree-sitter-css = "0.25.0"
