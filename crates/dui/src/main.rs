@@ -22,6 +22,7 @@ mod replay;
 mod retry;
 mod screen_map;
 mod snapshot_assets;
+mod source_inputs;
 mod surface;
 mod transition;
 mod tsx_map;

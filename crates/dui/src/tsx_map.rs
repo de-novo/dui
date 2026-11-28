@@ -201,16 +201,24 @@ fn copy_font_assets(project: &Path, out: &Path, model: &SourceModel) -> Result<(
 
 pub(crate) fn publish(project: &Path, entry: &Path) -> Reply {
     let model = dui_lang_typescript::extract(project, entry).map_err(|e| failure(2, &e))?;
+    let source_inputs = crate::source_inputs::configured(project, &model)?;
     let projection = project_model(&model);
     let source_entry = project_relative_entry(project, entry);
-    let graph = json!({"nodes":projection.nodes,"edges":projection.edges,"cells":[],"overview":[],"screenDiscovery":projection.discovery,
+    let mut graph = json!({"nodes":projection.nodes,"edges":projection.edges,"cells":[],"overview":[],"screenDiscovery":projection.discovery,
          "sourceModel":"source-model.json","sourceEntry":source_entry});
-    let report = json!({"screenDiscovery":projection.discovery,"sourceModel":"source-model.json","sourceEntry":source_entry,"browser":null,
+    let mut report = json!({"screenDiscovery":projection.discovery,"sourceModel":"source-model.json","sourceEntry":source_entry,"browser":null,
         "sourceFiles":model.files.iter().map(|f| &f.path).collect::<Vec<_>>(),"cells":[],
         "coverage":crate::coverage::base(&[])});
+    if source_inputs.is_some() {
+        graph["sourceInputs"] = json!(crate::source_inputs::ARCHIVE_FILE);
+        report["sourceInputs"] = json!(crate::source_inputs::ARCHIVE_FILE);
+    }
     archive::publish(archive::provenance(project)?, |out| {
         fs::create_dir_all(out).map_err(io)?;
         fs::write(out.join("source-model.json"), model.to_json().map_err(io)?).map_err(io)?;
+        if let Some(inputs) = &source_inputs {
+            analysis::store(&out.join(crate::source_inputs::ARCHIVE_FILE), inputs)?;
+        }
         copy_font_assets(project, out, &model).map_err(|e| failure(2, &e))?;
         analysis::store(&out.join("graph.json"), &graph)?;
         analysis::store(&out.join("report.json"), &report)?;

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Model, ModelRenderResult, SourceModelRenderer } from "./modelDocument";
+import type { SourceInputRenderContext } from "./sourceInputs";
 
 const modelFontStyles = new Map<string, { style: HTMLStyleElement; count: number }>();
 
@@ -53,16 +54,24 @@ export function useApproximateModelRender(
   width: number,
   height?: number,
   assetUrl?: (asset: string) => string,
+  input?: SourceInputRenderContext,
 ): ModelRenderResult | undefined {
   const colorScheme = useViewerColorScheme();
   return useMemo(() => {
     if (!renderer || !model || !componentId) return undefined;
     try {
-      return renderer.render(model, componentId, { width, height, colorScheme, assetUrl });
+      return renderer.render(model, componentId, {
+        width,
+        height,
+        colorScheme,
+        assetUrl,
+        slotValues: input?.slotValues,
+        expressionValues: input?.expressionValues,
+      });
     } catch {
       return undefined;
     }
-  }, [renderer, model, componentId, width, height, colorScheme, assetUrl]);
+  }, [renderer, model, componentId, width, height, colorScheme, assetUrl, input]);
 }
 
 /** Mounts the renderer's inert markup in a shadow root. It cannot receive clicks or run code. */

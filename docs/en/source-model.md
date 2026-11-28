@@ -120,9 +120,42 @@ An **expression** says where a value comes from.
 | `literal` | A JSON `value` written in the source |
 | `slot` | A read of a slot of the same component, with an optional field `path` such as `["length"]` |
 | `item` | A read of the current item of an enclosing `list` node, with a field `path`. These are the field-to-UI bindings |
+| `object` | A bounded object literal with statically visible keys |
+| `index` | A bounded keyed lookup. A missing key or unknown input stays unresolved rather than falling back to another entry |
 | `unary` | A deterministic `!` operation over one expression |
 | `binary` | A deterministic `&&`, `||`, `??`, equality, or numeric comparison operation over two expressions |
 | `opaque` | Code the model does not evaluate: its `text` and the slot and item `reads` in it |
+
+### Explicit runtime input states
+
+A source model remains a record of source facts. Runtime fixture values are supplied separately in trusted local project configuration. Set `sourceInputs` in `dui.json` either to this object or to a project-relative JSON file containing it:
+
+```json
+{
+  "defaultState": "populated",
+  "states": {
+    "populated": {
+      "slots": {
+        "src/Orders.tsx#Orders.orders": [
+          { "id": "o1", "title": "Fixture order", "status": "open" }
+        ]
+      },
+      "expressions": {
+        "formatCurrency(order.total)": "$42.00"
+      }
+    },
+    "empty": {
+      "slots": {
+        "src/Orders.tsx#Orders.orders": []
+      }
+    }
+  }
+}
+```
+
+Slot keys are the exact stable slot ids in the extracted model; expression keys are the exact `text` of opaque expressions. `dui map PROJECT --entry ENTRY.tsx` validates every supplied key against the extraction and fails rather than guessing or ignoring an unknown key. Valid values are copied verbatim into the immutable run archive as `source-inputs.json`, and the viewer graph references it as `sourceInputs`. The archive values are explicit review evidence, not secrets.
+
+In the viewer, an explicit `state` URL parameter selects that state exactly. When no state is selected, `defaultState` applies. An unknown explicit state selects no values. The renderer receives only the selected state's slot and expression maps; unsupplied slots keep their source-modeled initials or placeholders. Hot reload patches source facts only and reapplies the same immutable input state after every patch. No application code, browser route interception or network payload injection is part of this path.
 
 ## 5. Nodes
 

@@ -118,9 +118,42 @@ flowchart LR
 | `literal` | 源码中写出的 JSON `value` |
 | `slot` | 读取同一组件的槽位，可带字段 `path`，例如 `["length"]` |
 | `item` | 读取外层 `list` 节点的当前项，并带字段 `path`。这就是字段到 UI 的绑定 |
+| `object` | 具有静态可见键的有界对象字面量 |
+| `index` | 有界键查找。键缺失或输入未知时保持未解析，而不回退到其他条目 |
 | `unary` | 对一个表达式进行确定性的 `!` 运算 |
 | `binary` | 对两个表达式进行确定性的 `&&`、`||`、`??`、相等性或数值比较运算 |
 | `opaque` | 模型不求值的代码：其 `text` 以及其中的槽位与列表项 `reads` |
+
+### 显式运行时输入状态
+
+源模型仍然只记录源代码事实。运行时夹具值在可信本地项目配置中单独提供。在 `dui.json` 中把 `sourceInputs` 设置为该对象，或设置为包含该对象的项目相对 JSON 文件：
+
+```json
+{
+  "defaultState": "populated",
+  "states": {
+    "populated": {
+      "slots": {
+        "src/Orders.tsx#Orders.orders": [
+          { "id": "o1", "title": "Fixture order", "status": "open" }
+        ]
+      },
+      "expressions": {
+        "formatCurrency(order.total)": "$42.00"
+      }
+    },
+    "empty": {
+      "slots": {
+        "src/Orders.tsx#Orders.orders": []
+      }
+    }
+  }
+}
+```
+
+槽位键是提取模型中的完整稳定槽位 id；表达式键是不透明表达式的精确 `text`。`dui map PROJECT --entry ENTRY.tsx` 会按提取结果验证每个提供的键，未知键会导致失败，而不会猜测或静默忽略。有效值会逐字复制到不可变运行归档中的 `source-inputs.json`，查看器图以 `sourceInputs` 引用它。归档值是显式审查证据，不应存放机密。
+
+在查看器中，显式的 `state` URL 参数精确选择该状态。未选择状态时应用 `defaultState`。未知的显式状态不选择任何值。渲染器只接收所选状态的槽位和表达式映射；未提供的槽位保留源模型中的初始值或占位符。热重载只修补源代码事实，并在每个补丁后重新应用同一不可变输入状态。此路径不运行应用代码，也不使用浏览器路由拦截或网络载荷注入。
 
 ## 5. 节点
 

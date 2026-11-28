@@ -54,6 +54,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import type { Screen, ScreenMap as Archive } from "../../data/overview";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
+import type { SourceInputRenderContext } from "../model/sourceInputs";
 import type { CanvasDiffVisualMode, ScreenCanvasDiff } from "../../model/canvasDiff";
 
 /** Where an outgoing link edge starts on a card: the first anchor to its target, and the others. */
@@ -74,6 +75,7 @@ type CardNode = Node<
     sourceModel?: Model;
     modelRenderer?: SourceModelRenderer;
     modelHeight?: number;
+    modelInput?: SourceInputRenderContext;
     width: number;
     cardWidth: number;
     frameHeight: number;
@@ -312,6 +314,7 @@ function Card({
         cardWidth={data.cardWidth}
         frameHeight={data.frameHeight}
         modelHeight={data.modelHeight}
+        modelInput={data.modelInput}
         openComments={data.openComments}
         screenDiff={data.screenDiff}
         diffVisualMode={data.diffVisualMode}
@@ -529,6 +532,7 @@ export function ScreenMap({
   sourceModel,
   modelRenderer,
   modelHeight,
+  modelInput,
   selectedId,
   focusActive = false,
   openCommentsByPath,
@@ -557,6 +561,8 @@ export function ScreenMap({
   modelRenderer?: SourceModelRenderer;
   /** Explicit logical viewport height for source-model cards. */
   modelHeight?: number;
+  /** Explicit archived fixture values for the selected source-input state. */
+  modelInput?: SourceInputRenderContext;
   selectedId?: string | null;
   focusActive?: boolean;
   openCommentsByPath?: Record<string, number>;
@@ -666,6 +672,7 @@ export function ScreenMap({
             sourceModel,
             modelRenderer,
             modelHeight,
+            modelInput,
             width,
             cardWidth,
             frameHeight: nodeFrameHeight,
@@ -690,6 +697,7 @@ export function ScreenMap({
       sourceModel,
       modelRenderer,
       modelHeight,
+      modelInput,
       diffsByPath,
       diffActive,
       mode,

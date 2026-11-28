@@ -6,6 +6,7 @@ import { isNotCaptured, type Cell, type Screen } from "../../data/overview";
 import { useI18n } from "../../i18n/LocaleContext";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
+import type { SourceInputRenderContext } from "../model/sourceInputs";
 import {
   resolveCardDiffImageUrl,
   type CanvasDiffVisualMode,
@@ -55,6 +56,7 @@ export function CaptureCard({
   sourceModel,
   modelRenderer,
   modelHeight,
+  modelInput,
 }: {
   screen: Screen;
   cell?: Cell;
@@ -88,6 +90,8 @@ export function CaptureCard({
   modelRenderer?: SourceModelRenderer;
   /** Explicit logical viewport height for the source model, when one is selected. */
   modelHeight?: number;
+  /** Explicit archived fixture values for the selected source-input state. */
+  modelInput?: SourceInputRenderContext;
 }) {
   const { t } = useI18n();
   const modelRender = useApproximateModelRender(
@@ -97,6 +101,7 @@ export function CaptureCard({
     cardWidth && cardWidth > 0 ? cardWidth : 375,
     modelHeight ?? frameHeight,
     imageUrl,
+    modelInput,
   );
   const modelCard = !screenDiff && modelRender ? modelRender : undefined;
   const [loadedSize, setLoadedSize] = useState<{ src: string; w: number; h: number } | null>(null);

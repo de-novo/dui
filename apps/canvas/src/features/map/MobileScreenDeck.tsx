@@ -11,6 +11,7 @@ import {
 import { captureBadgeCounts, routeName } from "./CaptureCard";
 import { ApproximateModelFrame, useApproximateModelRender } from "../model/ApproximateModelFrame";
 import type { Model, SourceModelRenderer } from "../model/modelDocument";
+import type { SourceInputRenderContext } from "../model/sourceInputs";
 import { liveCell, useLiveFrame } from "./liveFrames";
 import { memo, useState } from "react";
 
@@ -60,6 +61,7 @@ const MobileApproximateCard = memo(
     width,
     height,
     imageUrl,
+    input,
   }: {
     renderer?: SourceModelRenderer;
     model?: Model;
@@ -67,6 +69,7 @@ const MobileApproximateCard = memo(
     width: number;
     height?: number;
     imageUrl: (name: string) => string;
+    input?: SourceInputRenderContext;
   }) {
     const { t } = useI18n();
     const render = useApproximateModelRender(
@@ -76,6 +79,7 @@ const MobileApproximateCard = memo(
       width,
       height,
       imageUrl,
+      input,
     );
     if (!render) return null;
     return (
@@ -95,7 +99,14 @@ const MobileApproximateCard = memo(
       </>
     );
   },
-  (before, after) => before.renderer === after.renderer && before.screen === after.screen,
+  (before, after) =>
+    before.renderer === after.renderer &&
+    before.model === after.model &&
+    before.screen === after.screen &&
+    before.width === after.width &&
+    before.height === after.height &&
+    before.imageUrl === after.imageUrl &&
+    before.input === after.input,
 );
 
 export type MobileViewMode = "deck" | "map";
@@ -127,12 +138,15 @@ export function MobileScreenDeck({
   liveRun,
   sourceModel,
   modelRenderer,
+  modelInput,
   viewportHeight,
 }: {
   /** Render cards without a capture from source (the run's project can run). */
   liveRun?: string;
   sourceModel?: Model;
   modelRenderer?: SourceModelRenderer;
+  /** Explicit archived fixture values for the selected source-input state. */
+  modelInput?: SourceInputRenderContext;
   /** Explicit logical viewport height for source-model cards. */
   viewportHeight?: number;
   archive: Archive;
@@ -294,6 +308,7 @@ export function MobileScreenDeck({
                     width={width && width > 0 ? width : 375}
                     height={viewportHeight ?? Math.round((width && width > 0 ? width : 375) * 1.6)}
                     imageUrl={imageUrl}
+                    input={modelInput}
                   />
                 )}
                 {screen.nativeSource && !cell && !src && !screen.component && (
