@@ -363,7 +363,6 @@ html{font-family:var(--demo-font,'Demo Sans',sans-serif)}"#,
     assert_eq!(kinds.next(), None);
 }
 
-
 #[test]
 fn cached_public_remote_fonts_are_materialized_without_network() {
     use sha2::{Digest, Sha256};
@@ -378,10 +377,16 @@ fn cached_public_remote_fonts_are_materialized_without_network() {
     fs::create_dir_all(cache.path().join("blobs")).expect("blob dir");
     fs::create_dir_all(cache.path().join("index")).expect("index dir");
     fs::write(cache.path().join("blobs").join(&sha256), &font).expect("blob");
-    let key = format!("{:x}", Sha256::digest(format!("font-fetch-v1\n{url}").as_bytes()));
+    let key = format!(
+        "{:x}",
+        Sha256::digest(format!("font-fetch-v1\n{url}").as_bytes())
+    );
     fs::write(
         cache.path().join("index").join(format!("{key}.json")),
-        format!(r#"{{"version":1,"url":"{url}","finalUrl":"{url}","sha256":"{sha256}","bytes":{}}}"#, font.len()),
+        format!(
+            r#"{{"version":1,"url":"{url}","finalUrl":"{url}","sha256":"{sha256}","bytes":{}}}"#,
+            font.len()
+        ),
     )
     .expect("cache metadata");
     fs::create_dir_all(dir.path().join("dist/assets")).expect("assets");
@@ -406,7 +411,10 @@ fn cached_public_remote_fonts_are_materialized_without_network() {
         ..
     } = &face.sources[0]
     else {
-        panic!("cached remote font must become a complete materialized source: {:#?}", face.sources)
+        panic!(
+            "cached remote font must become a complete materialized source: {:#?}",
+            face.sources
+        )
     };
     assert_eq!(asset, &format!("asset-{sha256}.woff2"));
     assert_eq!(model_sha, &sha256);
@@ -423,8 +431,12 @@ fn default_document_font_provider_class_is_source_proven() {
         r#".font-inter{font-family:Inter,"sans-serif"}.font-manrope{font-family:Manrope,"sans-serif"}"#,
     )
     .expect("built css");
-    fs::write(dir.path().join("fonts.ts"), "export const fonts = ['inter', 'manrope'] as const
-").expect("fonts");
+    fs::write(
+        dir.path().join("fonts.ts"),
+        "export const fonts = ['inter', 'manrope'] as const
+",
+    )
+    .expect("fonts");
     fs::write(
         dir.path().join("font-provider.tsx"),
         r#"import { useEffect, useState } from 'react'
@@ -613,4 +625,68 @@ body{min-height:100svh;background-color:var(--surface);color:var(--ink)}
             declarations(property)
         );
     }
+}
+
+#[test]
+fn destructured_query_reads_are_slots() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { useQuery } from '@tanstack/react-query'
+export default function App() {
+  const { data, isPending: pending, isError = false } = useQuery({ queryKey: ['items'] })
+  if (pending) return <p>Loading</p>
+  if (isError) return <p>Error</p>
+  return <ul>{data.map((item) => <li key={item}>{item}</li>)}</ul>
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|component| component.name == "App")
+        .expect("App");
+    for name in ["data", "pending", "isError"] {
+        let slot = app
+            .slots
+            .iter()
+            .find(|slot| slot.name == name)
+            .unwrap_or_else(|| panic!("missing {name} slot: {:#?}", app.slots));
+        assert_eq!(slot.kind, m::SlotKind::Query);
+        assert!(
+            slot.source
+                .as_deref()
+                .is_some_and(|source| source.contains("useQuery"))
+        );
+    }
+}
+
+#[test]
+fn conditional_early_returns_become_state_branches() {
+    let dir = tempfile::tempdir().expect("temp project");
+    fs::write(
+        dir.path().join("App.tsx"),
+        r#"import { useQuery } from '@tanstack/react-query'
+export default function App() {
+  const org = useQuery({ queryKey: ['org'] })
+  if (org.isError) return <p>Error</p>
+  if (org.isPending) return <p>Loading</p>
+  return <ul>{org.data.map((item) => <li key={item}>{item}</li>)}</ul>
+}
+"#,
+    )
+    .expect("entry");
+    let model = extract(dir.path(), Path::new("App.tsx")).expect("extract");
+    let app = model
+        .components
+        .iter()
+        .find(|c| c.name == "App")
+        .expect("App");
+    assert!(
+        matches!(&app.root, m::Node::Branch(branch) if matches!(&branch.arms[1].children[0], m::Node::Branch(_))),
+        "early returns must become nested branches: {:#?}",
+        app.root
+    );
 }

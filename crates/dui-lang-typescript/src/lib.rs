@@ -235,6 +235,51 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             .bindings
             .get(callee)
             .is_some_and(|(module, name)| module == "react" && name == "useState");
+        let query = !local
+            && field(call, "function").is_some_and(|function| {
+                let text = file.text(function);
+                text.ends_with("useQuery")
+                    || text.ends_with("useInfiniteQuery")
+                    || text.ends_with("useSWR")
+            });
+        if !local && pat.kind() == "object_pattern" {
+            for bind in children(pat) {
+                let name_node = match bind.kind() {
+                    "shorthand_property_identifier_pattern" => Some(bind),
+                    "pair_pattern" => field(bind, "value").filter(|value| {
+                        matches!(
+                            value.kind(),
+                            "identifier" | "shorthand_property_identifier_pattern"
+                        )
+                    }),
+                    "object_assignment_pattern" => field(bind, "left").filter(|value| {
+                        matches!(
+                            value.kind(),
+                            "identifier" | "shorthand_property_identifier_pattern"
+                        )
+                    }),
+                    _ => None,
+                };
+                let Some(name_node) = name_node else { continue };
+                let name = file.text(name_node);
+                out.push(m::Slot {
+                    id: format!("{id}.{name}"),
+                    name: name.into(),
+                    kind: if query {
+                        m::SlotKind::Query
+                    } else {
+                        m::SlotKind::External
+                    },
+                    ty: unknown(),
+                    optional: false,
+                    initial: None,
+                    source: Some(file.text(call).into()),
+                    origin: m::Origin::Syntax,
+                    location: file.loc(name_node),
+                });
+            }
+            continue;
+        }
         let binding = if local && pat.kind() == "array_pattern" {
             pat.child(1).filter(|c| c.kind() == "identifier")
         } else if !local && pat.kind() == "identifier" {
@@ -283,6 +328,8 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
             name: name.into(),
             kind: if local {
                 m::SlotKind::Local
+            } else if query {
+                m::SlotKind::Query
             } else {
                 m::SlotKind::External
             },
@@ -295,6 +342,186 @@ fn slots(files: &Files, file: &File, f: Ast<'_>, id: &str) -> Vec<m::Slot> {
         });
     }
     out
+}
+
+fn return_expression(statement: Ast<'_>) -> Option<Ast<'_>> {
+    if statement.kind() != "return_statement" {
+        return None;
+    }
+    first(statement).map(unwrap_expr)
+}
+
+fn conditional_return(statement: Ast<'_>) -> Option<(Ast<'_>, Ast<'_>)> {
+    if statement.kind() != "if_statement" || field(statement, "alternative").is_some() {
+        return None;
+    }
+    let condition = field(statement, "condition")?;
+    let consequence = field(statement, "consequence")?;
+    if consequence.kind() == "return_statement" {
+        return return_expression(consequence).map(|content| (condition, content));
+    }
+    if consequence.kind() != "statement_block" {
+        return None;
+    }
+    let statements = children(consequence);
+    if statements.len() != 1 {
+        return None;
+    }
+    return_expression(statements[0]).map(|content| (condition, content))
+}
+
+fn condition_shape<'a>(
+    file: &'a File,
+    condition: Ast<'a>,
+) -> (
+    Ast<'a>,
+    m::Match,
+    Option<Ast<'a>>,
+    Option<Ast<'a>>,
+    Option<&'a str>,
+) {
+    let condition = unwrap_expr(condition);
+    if condition.kind() == "binary_expression" {
+        let operator = file.name(condition, "operator");
+        if matches!(operator, Some("&&" | "||")) {
+            return (
+                condition,
+                m::Match::Truthy(true),
+                field(condition, "left"),
+                field(condition, "right"),
+                operator,
+            );
+        }
+        if operator == Some("===")
+            && let (Some(left), Some(value)) = (
+                field(condition, "left"),
+                field(condition, "right").and_then(|right| literal(file, right)),
+            )
+        {
+            return (left, m::Match::Equals(value), None, None, None);
+        }
+    }
+    if condition.kind() == "unary_expression"
+        && file.name(condition, "operator") == Some("!")
+        && let Some(argument) = field(condition, "argument")
+    {
+        return (argument, m::Match::Truthy(false), None, None, None);
+    }
+    (condition, m::Match::Truthy(true), None, None, None)
+}
+
+fn conditional_node(
+    cx: &mut render::Context<'_>,
+    condition: Ast<'_>,
+    content: Ast<'_>,
+    otherwise: m::Node,
+    id: String,
+) -> m::Node {
+    let location = cx.file.loc(condition);
+    let (on, when, _left, _right, _operator) = condition_shape(cx.file, condition);
+    let yes = cx.node(content, format!("{id}.0.0"));
+    let (truthy, fallback) = if when == m::Match::Truthy(false) {
+        (otherwise.clone(), yes)
+    } else {
+        (yes, otherwise)
+    };
+    m::Node::Branch(m::Branch {
+        id,
+        on: cx.expr(on),
+        arms: vec![
+            m::Arm {
+                when,
+                children: vec![truthy],
+            },
+            m::Arm {
+                when: m::Match::Otherwise,
+                children: vec![fallback],
+            },
+        ],
+        location,
+    })
+}
+
+fn component_root(cx: &mut render::Context<'_>, f: Ast<'_>, id: String) -> m::Node {
+    if f.kind() == "method_definition" {
+        return crate::returned(f)
+            .map(|n| cx.node(n, id.clone()))
+            .unwrap_or_else(|| {
+                m::Node::Placeholder(m::Placeholder {
+                    id,
+                    reason: "Unsupported component body".into(),
+                    location: cx.file.loc(f),
+                })
+            });
+    }
+    let Some(body) = field(f, "body") else {
+        return m::Node::Placeholder(m::Placeholder {
+            id,
+            reason: "Unsupported component body".into(),
+            location: cx.file.loc(f),
+        });
+    };
+    if body.kind() != "statement_block" {
+        return cx.node(unwrap_expr(body), id);
+    }
+    let statements = children(body);
+    let mut conditional = Vec::new();
+    let mut final_return = None;
+    let mut supported = true;
+    for statement in &statements {
+        match statement.kind() {
+            "lexical_declaration"
+            | "variable_declaration"
+            | "expression_statement"
+            | "function_declaration" => {}
+            "return_statement" => {
+                if final_return.is_some() {
+                    supported = false;
+                    break;
+                }
+                final_return = return_expression(*statement);
+            }
+            "if_statement" if final_return.is_none() => {
+                if let Some(early) = conditional_return(*statement) {
+                    conditional.push(early);
+                } else {
+                    supported = false;
+                    break;
+                }
+            }
+            _ => {
+                supported = false;
+                break;
+            }
+        }
+    }
+    if !supported || final_return.is_none() {
+        return crate::returned(f)
+            .map(|n| cx.node(n, id.clone()))
+            .unwrap_or_else(|| {
+                m::Node::Placeholder(m::Placeholder {
+                    id,
+                    reason: "Unsupported component body".into(),
+                    location: cx.file.loc(f),
+                })
+            });
+    }
+    let final_id = if conditional.is_empty() {
+        id.clone()
+    } else {
+        format!("{id}.final")
+    };
+    let mut root = cx.node(final_return.expect("checked final return"), final_id);
+    for (index, (condition, content)) in conditional.iter().rev().enumerate() {
+        root = conditional_node(
+            cx,
+            *condition,
+            *content,
+            root,
+            format!("{id}.return{index}"),
+        );
+    }
+    root
 }
 
 fn stylesheet_order(files: &Files, entry: &str) -> Vec<String> {
@@ -645,14 +872,7 @@ fn extract_in_context_impl(
                 constants: constant_env(file, f, slot),
                 model: &mut model,
             };
-            let root = match returned(f) {
-                Some(n) => cx.node(n, format!("{id}@0")),
-                None => m::Node::Placeholder(m::Placeholder {
-                    id: format!("{id}@0"),
-                    reason: "Unsupported component body".into(),
-                    location: file.loc(f),
-                }),
-            };
+            let root = component_root(&mut cx, f, format!("{id}@0"));
             model.components.push(m::Component {
                 id,
                 name: name.into(),

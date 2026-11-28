@@ -616,7 +616,7 @@ impl Context<'_> {
             _ => None,
         }
     }
-    fn expr(&self, node: Ast<'_>) -> m::Expr {
+    pub(crate) fn expr(&self, node: Ast<'_>) -> m::Expr {
         let n = unwrap_expr(node);
         if let Some(value) = literal(self.file, n) {
             return m::Expr::Literal { value };

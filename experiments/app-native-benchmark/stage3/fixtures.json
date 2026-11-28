@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "states": [
+    "populated",
+    "loading",
+    "empty",
+    "error"
+  ],
+  "targets": {
+    "calcom": {
+      "entry": "modules/event-types/views/event-types-listing-view.tsx",
+      "component": "EventTypesPage",
+      "assertions": {
+        "populated": [
+          "Benchmark Intro",
+          "Benchmark Deep Dive"
+        ],
+        "empty": [],
+        "loading": [],
+        "error": []
+      },
+      "slots": {
+        "populated": {
+          "userEventGroupsData": {
+            "eventTypeGroups": [
+              {
+                "id": 1,
+                "teamId": null,
+                "parentId": null,
+                "bookerUrl": "https://booker.example.test",
+                "metadata": {
+                  "readOnly": false
+                },
+                "profile": {
+                  "slug": "bench-user",
+                  "name": "Bench User"
+                },
+                "eventTypes": [
+                  {
+                    "id": 101,
+                    "title": "Benchmark Intro",
+                    "slug": "benchmark-intro",
+                    "length": 30,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic intro",
+                    "eventTypeColor": null
+                  },
+                  {
+                    "id": 102,
+                    "title": "Benchmark Deep Dive",
+                    "slug": "benchmark-deep-dive",
+                    "length": 60,
+                    "hidden": false,
+                    "schedulingType": null,
+                    "safeDescription": "Synthetic deep dive",
+                    "eventTypeColor": null
+                  }
+                ]
+              }
+            ]
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          }
+        },
+        "loading": {
+          "userEventGroupsData": {
+            "eventTypeGroups": []
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          }
+        },
+        "empty": {
+          "userEventGroupsData": {
+            "eventTypeGroups": []
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          }
+        },
+        "error": {
+          "userEventGroupsData": {
+            "eventTypeGroups": []
+          },
+          "user": {
+            "id": 1,
+            "completedOnboarding": true
+          }
+        }
+      }
+    },
+    "plane": {
+      "entry": "app/(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/issues/(list)/page.tsx",
+      "component": "ProjectIssuesPage",
+      "builtCss": "build/client/assets/root-CzK3JmXp.css",
+      "assertions": {
+        "populated": [
+          "Benchmark issue one",
+          "Benchmark issue two"
+        ],
+        "empty": [],
+        "loading": [],
+        "error": []
+      },
+      "slots": {
+        "populated": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          }
+        },
+        "loading": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          }
+        },
+        "empty": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          }
+        },
+        "error": {
+          "params": {
+            "projectId": "project-benchmark",
+            "workspaceSlug": "bench"
+          },
+          "project": {
+            "id": "project-benchmark",
+            "name": "Benchmark Project"
+          }
+        }
+      }
+    }
+  }
+}

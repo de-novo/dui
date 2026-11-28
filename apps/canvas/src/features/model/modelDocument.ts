@@ -156,6 +156,7 @@ export type ModelRenderContext = {
   /** Initial user-agent font size for media thresholds and root font percentages. */
   initialFontSize?: number;
   colorScheme?: "light" | "dark";
+  slotValues?: Record<string, Json>;
   /** Resolve a content-addressed archive asset for same-run font bytes. */
   assetUrl?: (asset: string) => string;
 };
@@ -805,13 +806,16 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       for (const [key, value] of props)
         if (!ordinary.has(key) && value !== undefined) rest.set(key, value);
       for (const s of c.slots ?? []) {
+        const explicit = Object.hasOwn(context.slotValues ?? {}, s.id);
         const initial = s.name.startsWith("...")
           ? { known: true, value: Object.fromEntries(rest) }
           : props.has(s.name)
             ? { known: true, value: props.get(s.name) }
-            : s.initial
-              ? resolveExpr(s.initial, scope)
-              : { known: false };
+            : explicit
+              ? { known: true, value: context.slotValues?.[s.id] }
+              : s.initial
+                ? resolveExpr(s.initial, scope)
+                : { known: false };
         if (initial.known) slots.set(s.id, initial.value);
       }
       return draw(c.root, scope, [...stack, id]);

@@ -209,13 +209,93 @@ struct Alias {
     replacements: Vec<PathBuf>,
 }
 
+fn jsonc_lenient(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    let mut string = false;
+    let mut escape = false;
+    while let Some(c) = chars.next() {
+        if string {
+            out.push(c);
+            if escape {
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                string = false;
+            }
+            continue;
+        }
+        match c {
+            '"' => {
+                string = true;
+                out.push(c);
+            }
+            '/' if chars.peek() == Some(&'/') => {
+                for c in chars.by_ref() {
+                    if c == '\n' {
+                        out.push('\n');
+                        break;
+                    }
+                }
+            }
+            '/' if chars.peek() == Some(&'*') => {
+                chars.next();
+                let mut last = '\0';
+                for c in chars.by_ref() {
+                    if last == '*' && c == '/' {
+                        break;
+                    }
+                    if c == '\n' {
+                        out.push('\n');
+                    }
+                    last = c;
+                }
+            }
+            _ => out.push(c),
+        }
+    }
+    let bytes = out.as_bytes();
+    let mut compact = String::with_capacity(out.len());
+    let mut string = false;
+    let mut escape = false;
+    for (index, &b) in bytes.iter().enumerate() {
+        let c = b as char;
+        if string {
+            compact.push(c);
+            if escape {
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                string = false;
+            }
+            continue;
+        }
+        if c == '"' {
+            string = true;
+            compact.push(c);
+            continue;
+        }
+        if c == ',' {
+            let mut rest = &out[index + 1..];
+            rest = rest.trim_start();
+            if rest.starts_with('}') || rest.starts_with(']') {
+                continue;
+            }
+        }
+        compact.push(c);
+    }
+    compact
+}
+
 fn path_aliases(root: &Path) -> Vec<Alias> {
     let Ok(text) = fs::read_to_string(root.join("tsconfig.json"))
         .or_else(|_| fs::read_to_string(root.join("jsconfig.json")))
     else {
         return Vec::new();
     };
-    let Ok(config) = serde_json::from_str::<serde_json::Value>(&text) else {
+    let Ok(config) = serde_json::from_str::<serde_json::Value>(&jsonc_lenient(&text)) else {
         return Vec::new();
     };
     let Some(options) = config.get("compilerOptions") else {
@@ -302,6 +382,7 @@ fn resolve(root: &Path, from: &str, request: &str, aliases: &[Alias]) -> Option<
                 }
             }));
         }
+        bases.push(root.join(request));
     }
     bases
         .into_iter()
@@ -347,7 +428,7 @@ fn scan_imports(root: &Path, file: &File, aliases: &[Alias]) -> ImportScan {
             continue;
         };
         let mut module = request.to_owned();
-        if request.starts_with('.') || uses_alias(request, aliases) {
+        {
             if let Some(resolved) = resolve(root, &file.path, request, aliases) {
                 module = resolved;
                 if module != file.path {
