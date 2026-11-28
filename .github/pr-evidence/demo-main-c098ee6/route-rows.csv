@@ -1,0 +1,209 @@
+app,routeCanonical,independentRoute,dynamic,classification,independent,defaultMapPath,represented,contentBearing,contentReason
+shadcn-admin,/,/,False,main,True,,False,False,route not represented in bare default archive
+shadcn-admin,/401,/401,False,error-public,True,,False,False,route not represented in bare default archive
+shadcn-admin,/403,/403,False,error-public,True,,False,False,route not represented in bare default archive
+shadcn-admin,/404,/404,False,error-public,True,,False,False,route not represented in bare default archive
+shadcn-admin,/500,/500,False,error-public,True,,False,False,route not represented in bare default archive
+shadcn-admin,/503,/503,False,error-public,True,,False,False,route not represented in bare default archive
+shadcn-admin,/apps,/apps,False,main,True,,False,False,route not represented in bare default archive
+shadcn-admin,/chats,/chats,False,main,True,,False,False,route not represented in bare default archive
+shadcn-admin,/clerk/sign-in,/clerk/sign-in,False,clerk-external-auth,True,,False,False,route not represented in bare default archive
+shadcn-admin,/clerk/sign-up,/clerk/sign-up,False,clerk-external-auth,True,,False,False,route not represented in bare default archive
+shadcn-admin,/clerk/user-management,/clerk/user-management,False,clerk-external-auth,True,,False,False,route not represented in bare default archive
+shadcn-admin,/errors/forbidden,/errors/forbidden,True,error-dynamic-authenticated,True,,False,False,route not represented in bare default archive
+shadcn-admin,/errors/internal-server-error,/errors/internal-server-error,True,error-dynamic-authenticated,True,,False,False,route not represented in bare default archive
+shadcn-admin,/errors/maintenance-error,/errors/maintenance-error,True,error-dynamic-authenticated,True,,False,False,route not represented in bare default archive
+shadcn-admin,/errors/not-found,/errors/not-found,True,error-dynamic-authenticated,True,,False,False,route not represented in bare default archive
+shadcn-admin,/errors/unauthorized,/errors/unauthorized,True,error-dynamic-authenticated,True,,False,False,route not represented in bare default archive
+shadcn-admin,/forgot-password,/forgot-password,False,auth-local-login,True,,False,False,route not represented in bare default archive
+shadcn-admin,/help-center,/help-center,False,main,True,,False,False,route not represented in bare default archive
+shadcn-admin,/otp,/otp,False,auth-local-login,True,,False,False,route not represented in bare default archive
+shadcn-admin,/settings,/settings,False,settings,True,,False,False,route not represented in bare default archive
+shadcn-admin,/settings/account,/settings/account,False,settings,True,,False,False,route not represented in bare default archive
+shadcn-admin,/settings/appearance,/settings/appearance,False,settings,True,,False,False,route not represented in bare default archive
+shadcn-admin,/settings/display,/settings/display,False,settings,True,,False,False,route not represented in bare default archive
+shadcn-admin,/settings/notifications,/settings/notifications,False,settings,True,,False,False,route not represented in bare default archive
+shadcn-admin,/sign-in,/sign-in,False,auth-local-login,True,,False,False,route not represented in bare default archive
+shadcn-admin,/sign-in-2,/sign-in-2,False,auth-local-login,True,,False,False,route not represented in bare default archive
+shadcn-admin,/sign-up,/sign-up,False,auth-local-login,True,,False,False,route not represented in bare default archive
+shadcn-admin,/tasks,/tasks,False,main,True,,False,False,route not represented in bare default archive
+shadcn-admin,/users,/users,False,main,True,,False,False,route not represented in bare default archive
+astrowind,/,/,False,concrete-static-html,True,/,True,False,no mounted source-model frame in bare default archive
+astrowind,/404,/404,False,concrete-static-html,True,,False,False,route not represented in bare default archive
+astrowind,/about,/about,False,concrete-static-html,True,/about,True,False,no mounted source-model frame in bare default archive
+astrowind,/astrowind-template-in-depth,/astrowind-template-in-depth,False,concrete-static-html,True,/astrowind-template-in-depth,True,False,no mounted source-model frame in bare default archive
+astrowind,/blog,/blog,True,concrete-static-html,True,/blog,True,False,no mounted source-model frame in bare default archive
+astrowind,/build-websites-with-ai,/build-websites-with-ai,False,concrete-static-html,True,/build-websites-with-ai,True,False,no mounted source-model frame in bare default archive
+astrowind,/category/documentation,/category/documentation,True,concrete-static-html,True,/category/documentation,True,False,no mounted source-model frame in bare default archive
+astrowind,/category/resources,/category/resources,True,concrete-static-html,True,/category/resources,True,False,no mounted source-model frame in bare default archive
+astrowind,/category/tutorials,/category/tutorials,True,concrete-static-html,True,/category/tutorials,True,False,no mounted source-model frame in bare default archive
+astrowind,/contact,/contact,False,concrete-static-html,True,/contact,True,False,no mounted source-model frame in bare default archive
+astrowind,/decapcms,/decapcms,False,concrete-external-cms-shell,True,,False,False,route not represented in bare default archive
+astrowind,/get-started-website-with-astro-tailwind-css,/get-started-website-with-astro-tailwind-css,False,concrete-static-html,True,/get-started-website-with-astro-tailwind-css,True,False,no mounted source-model frame in bare default archive
+astrowind,/homes/mobile-app,/homes/mobile-app,False,concrete-static-html,True,/homes/mobile-app,True,False,no mounted source-model frame in bare default archive
+astrowind,/homes/personal,/homes/personal,False,concrete-static-html,True,/homes/personal,True,False,no mounted source-model frame in bare default archive
+astrowind,/homes/saas,/homes/saas,False,concrete-static-html,True,/homes/saas,True,False,no mounted source-model frame in bare default archive
+astrowind,/homes/startup,/homes/startup,False,concrete-static-html,True,/homes/startup,True,False,no mounted source-model frame in bare default archive
+astrowind,/how-to-customize-astrowind-to-your-brand,/how-to-customize-astrowind-to-your-brand,False,concrete-static-html,True,/how-to-customize-astrowind-to-your-brand,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing,/landing,False,concrete-static-html,True,/landing,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing/click-through,/landing/click-through,False,concrete-static-html,True,/landing/click-through,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing/lead-generation,/landing/lead-generation,False,concrete-static-html,True,/landing/lead-generation,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing/pre-launch,/landing/pre-launch,False,concrete-static-html,True,/landing/pre-launch,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing/product,/landing/product,False,concrete-static-html,True,/landing/product,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing/sales,/landing/sales,False,concrete-static-html,True,/landing/sales,True,False,no mounted source-model frame in bare default archive
+astrowind,/landing/subscription,/landing/subscription,False,concrete-static-html,True,/landing/subscription,True,False,no mounted source-model frame in bare default archive
+astrowind,/markdown-elements-demo-post,/markdown-elements-demo-post,False,concrete-static-html,True,/markdown-elements-demo-post,True,False,no mounted source-model frame in bare default archive
+astrowind,/pricing,/pricing,False,concrete-static-html,True,/pricing,True,False,no mounted source-model frame in bare default archive
+astrowind,/privacy,/privacy,False,concrete-static-html,True,/privacy,True,False,no mounted source-model frame in bare default archive
+astrowind,/services,/services,False,concrete-static-html,True,/services,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/ai,/tag/ai,True,concrete-static-html,True,/tag/ai,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/astro,/tag/astro,True,concrete-static-html,True,/tag/astro,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/blog,/tag/blog,True,concrete-static-html,True,/tag/blog,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/front-end,/tag/front-end,True,concrete-static-html,True,/tag/front-end,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/landing-pages,/tag/landing-pages,True,concrete-static-html,True,/tag/landing-pages,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/markdown,/tag/markdown,True,concrete-static-html,True,/tag/markdown,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/resources,/tag/resources,True,concrete-static-html,True,/tag/resources,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/tailwind-css,/tag/tailwind-css,True,concrete-static-html,True,/tag/tailwind-css,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/theme,/tag/theme,True,concrete-static-html,True,/tag/theme,True,False,no mounted source-model frame in bare default archive
+astrowind,/tag/tools,/tag/tools,True,concrete-static-html,True,/tag/tools,True,False,no mounted source-model frame in bare default archive
+astrowind,/terms,/terms,False,concrete-static-html,True,/terms,True,False,no mounted source-model frame in bare default archive
+astrowind,/useful-resources-to-create-websites,/useful-resources-to-create-websites,False,concrete-static-html,True,/useful-resources-to-create-websites,True,False,no mounted source-model frame in bare default archive
+astro-paper,/,/,False,concrete-static-html,True,/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/404,/404,False,concrete-static-html,True,,False,False,route not represented in bare default archive
+astro-paper,/about,/about,False,concrete-static-html,True,/about/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/archives,/archives,False,concrete-static-html,True,/archives/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts,/posts,True,concrete-static-html,True,/posts/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/2,/posts/2,True,concrete-static-html,True,/posts/2,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/3,/posts/3,True,concrete-static-html,True,,False,False,route not represented in bare default archive
+astro-paper,/posts/4,/posts/4,True,concrete-static-html,True,,False,False,route not represented in bare default archive
+astro-paper,/posts/5,/posts/5,True,concrete-static-html,True,,False,False,route not represented in bare default archive
+astro-paper,/posts/adding-new-posts-in-astropaper-theme,/posts/adding-new-posts-in-astropaper-theme,True,concrete-static-html,True,/posts/adding-new-posts-in-astropaper-theme/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/astro-paper-2,/posts/astro-paper-2,True,concrete-static-html,True,/posts/astro-paper-2/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/astro-paper-v3,/posts/astro-paper-v3,True,concrete-static-html,True,/posts/astro-paper-v3/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/astro-paper-v4,/posts/astro-paper-v4,True,concrete-static-html,True,/posts/astro-paper-v4/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/astro-paper-v5,/posts/astro-paper-v5,True,concrete-static-html,True,/posts/astro-paper-v5/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/astro-paper-v6,/posts/astro-paper-v6,True,concrete-static-html,True,/posts/astro-paper-v6/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/customizing-astropaper-theme-color-schemes,/posts/customizing-astropaper-theme-color-schemes,True,concrete-static-html,True,/posts/customizing-astropaper-theme-color-schemes/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/dynamic-og-image-generation-in-astropaper-blog-posts,/posts/dynamic-og-image-generation-in-astropaper-blog-posts,True,concrete-static-html,True,/posts/dynamic-og-image-generation-in-astropaper-blog-posts/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/examples/how-do-i-develop-my-portfolio-and-blog,/posts/examples/how-do-i-develop-my-portfolio-and-blog,True,concrete-static-html,True,/posts/examples/how-do-i-develop-my-portfolio-and-blog/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/examples/how-do-i-develop-my-terminal-portfolio-website-with-react,/posts/examples/how-do-i-develop-my-terminal-portfolio-website-with-react,True,concrete-static-html,True,/posts/examples/how-do-i-develop-my-terminal-portfolio-website-with-react/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/examples/tailwind-typography,/posts/examples/tailwind-typography,True,concrete-static-html,True,/posts/examples/tailwind-typography/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/how-to-add-latex-equations-in-blog-posts,/posts/how-to-add-latex-equations-in-blog-posts,True,concrete-static-html,True,/posts/how-to-add-latex-equations-in-blog-posts/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/how-to-configure-astropaper-theme,/posts/how-to-configure-astropaper-theme,True,concrete-static-html,True,/posts/how-to-configure-astropaper-theme/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/how-to-integrate-giscus-comments,/posts/how-to-integrate-giscus-comments,True,concrete-static-html,True,/posts/how-to-integrate-giscus-comments/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/how-to-update-dependencies,/posts/how-to-update-dependencies,True,concrete-static-html,True,/posts/how-to-update-dependencies/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/predefined-color-schemes,/posts/predefined-color-schemes,True,concrete-static-html,True,/posts/predefined-color-schemes/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/posts/setting-dates-via-git-hooks,/posts/setting-dates-via-git-hooks,True,concrete-static-html,True,/posts/setting-dates-via-git-hooks/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/search,/search,False,concrete-static-html,True,/search/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags,/tags,False,concrete-static-html,True,/tags/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/astro,/tags/astro,False,concrete-static-html,True,/tags/astro/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/blog,/tags/blog,False,concrete-static-html,True,/tags/blog/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/color-schemes,/tags/color-schemes,False,concrete-static-html,True,/tags/color-schemes/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/configuration,/tags/configuration,False,concrete-static-html,True,/tags/configuration/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/contextapi,/tags/contextapi,False,concrete-static-html,True,/tags/contextapi/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/docs,/tags/docs,False,concrete-static-html,True,/tags/docs/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/docs/2,/tags/docs/2,False,concrete-static-html,True,/tags/docs/2,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/faq,/tags/faq,False,concrete-static-html,True,/tags/faq/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/headlesscms,/tags/headlesscms,False,concrete-static-html,True,/tags/headlesscms/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/javascript,/tags/javascript,False,concrete-static-html,True,/tags/javascript/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/nextjs,/tags/nextjs,False,concrete-static-html,True,/tags/nextjs/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/reactjs,/tags/reactjs,False,concrete-static-html,True,/tags/reactjs/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/release,/tags/release,False,concrete-static-html,True,/tags/release/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/release/2,/tags/release/2,False,concrete-static-html,True,/tags/release/2,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/styled-components,/tags/styled-components,False,concrete-static-html,True,/tags/styled-components/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/tailwindcss,/tags/tailwindcss,False,concrete-static-html,True,/tags/tailwindcss/,True,False,no mounted source-model frame in bare default archive
+astro-paper,/tags/typescript,/tags/typescript,False,concrete-static-html,True,/tags/typescript/,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/,/,False,concrete-app-router-page,True,/,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/auth/v1/login,/auth/v1/login,False,concrete-app-router-page,True,/auth/v1/login,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/auth/v1/register,/auth/v1/register,False,concrete-app-router-page,True,/auth/v1/register,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/auth/v2/login,/auth/v2/login,False,concrete-app-router-page,True,/auth/v2/login,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/auth/v2/register,/auth/v2/register,False,concrete-app-router-page,True,/auth/v2/register,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/chat,/chat,False,concrete-app-router-page,True,/chat,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard,/dashboard,False,concrete-app-router-page,True,/dashboard,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/academy,/dashboard/academy,False,concrete-app-router-page,True,/dashboard/academy,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/analytics,/dashboard/analytics,False,concrete-app-router-page,True,/dashboard/analytics,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/analytics-v1,/dashboard/analytics-v1,False,concrete-app-router-page,True,/dashboard/analytics-v1,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/calendar,/dashboard/calendar,False,concrete-app-router-page,True,/dashboard/calendar,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/chat,/dashboard/chat,False,concrete-app-router-page,True,/dashboard/chat,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/coming-soon,/dashboard/coming-soon,False,concrete-app-router-page,True,/dashboard/coming-soon,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/crm,/dashboard/crm,False,concrete-app-router-page,True,/dashboard/crm,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/crm-v1,/dashboard/crm-v1,False,concrete-app-router-page,True,/dashboard/crm-v1,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/crypto,/dashboard/crypto,False,concrete-app-router-page,True,/dashboard/crypto,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/default,/dashboard/default,False,concrete-app-router-page,True,/dashboard/default,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/default-v1,/dashboard/default-v1,False,concrete-app-router-page,True,/dashboard/default-v1,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/ecommerce,/dashboard/ecommerce,False,concrete-app-router-page,True,/dashboard/ecommerce,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/file-manager,/dashboard/file-manager,False,concrete-app-router-page,True,/dashboard/file-manager,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/finance,/dashboard/finance,False,concrete-app-router-page,True,/dashboard/finance,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/finance-v1,/dashboard/finance-v1,False,concrete-app-router-page,True,/dashboard/finance-v1,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/hr,/dashboard/hr,False,concrete-app-router-page,True,/dashboard/hr,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/infrastructure,/dashboard/infrastructure,False,concrete-app-router-page,True,/dashboard/infrastructure,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/invoice,/dashboard/invoice,False,concrete-app-router-page,True,/dashboard/invoice,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/kanban,/dashboard/kanban,False,concrete-app-router-page,True,/dashboard/kanban,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/logistics,/dashboard/logistics,False,concrete-app-router-page,True,/dashboard/logistics,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/mail,/dashboard/mail,False,concrete-app-router-page,True,/dashboard/mail,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/patient-monitoring,/dashboard/patient-monitoring,False,concrete-app-router-page,True,/dashboard/patient-monitoring,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/productivity,/dashboard/productivity,False,concrete-app-router-page,True,/dashboard/productivity,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/products,/dashboard/products,False,concrete-app-router-page,True,/dashboard/products,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/profile,/dashboard/profile,False,concrete-app-router-page,True,/dashboard/profile,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/roles,/dashboard/roles,False,concrete-app-router-page,True,/dashboard/roles,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/tasks,/dashboard/tasks,False,concrete-app-router-page,True,/dashboard/tasks,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/dashboard/users,/dashboard/users,False,concrete-app-router-page,True,/dashboard/users,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/mail,/mail,False,concrete-app-router-page,True,/mail,True,False,no mounted source-model frame in bare default archive
+next-shadcn-admin,/unauthorized,/unauthorized,False,concrete-app-router-page,True,/unauthorized,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/,/,False,concrete-app-router-page,True,/,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/analytics,/analytics,False,concrete-app-router-page,True,/analytics,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/calendar,/calendar,False,concrete-app-router-page,True,/calendar,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/chat,/chat,False,concrete-app-router-page,True,/chat,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/errors/forbidden,/errors/forbidden,False,concrete-app-router-page,True,/errors/forbidden,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/errors/internal-server-error,/errors/internal-server-error,False,concrete-app-router-page,True,/errors/internal-server-error,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/errors/not-found,/errors/not-found,False,concrete-app-router-page,True,/errors/not-found,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/errors/unauthorized,/errors/unauthorized,False,concrete-app-router-page,True,/errors/unauthorized,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/errors/under-maintenance,/errors/under-maintenance,False,concrete-app-router-page,True,/errors/under-maintenance,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/faqs,/faqs,False,concrete-app-router-page,True,/faqs,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/forgot-password,/forgot-password,False,concrete-app-router-page,True,/forgot-password,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/forgot-password-2,/forgot-password-2,False,concrete-app-router-page,True,/forgot-password-2,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/forgot-password-3,/forgot-password-3,False,concrete-app-router-page,True,/forgot-password-3,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/landing,/landing,False,concrete-app-router-page,True,/landing,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/mail,/mail,False,concrete-app-router-page,True,/mail,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/notifications,/notifications,False,concrete-app-router-page,True,/notifications,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/pricing,/pricing,False,concrete-app-router-page,True,/pricing,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/settings,/settings,False,concrete-app-router-page,True,/settings,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/settings/account,/settings/account,False,concrete-app-router-page,True,/settings/account,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/settings/appearance,/settings/appearance,False,concrete-app-router-page,True,/settings/appearance,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/settings/connections,/settings/connections,False,concrete-app-router-page,True,/settings/connections,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/settings/notifications,/settings/notifications,False,concrete-app-router-page,True,/settings/notifications,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/settings/profile,/settings/profile,False,concrete-app-router-page,True,/settings/profile,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/sign-in,/sign-in,False,concrete-app-router-page,True,/sign-in,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/sign-in-2,/sign-in-2,False,concrete-app-router-page,True,/sign-in-2,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/sign-in-3,/sign-in-3,False,concrete-app-router-page,True,/sign-in-3,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/sign-up,/sign-up,False,concrete-app-router-page,True,/sign-up,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/sign-up-2,/sign-up-2,False,concrete-app-router-page,True,/sign-up-2,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/sign-up-3,/sign-up-3,False,concrete-app-router-page,True,/sign-up-3,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/tasks,/tasks,False,concrete-app-router-page,True,/tasks,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/users,/users,False,concrete-app-router-page,True,/users,True,False,no mounted source-model frame in bare default archive
+shadcn-store,/users/_,/users/_,True,concrete-dynamic-static-param,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/,,False,,False,/,False,False,no mounted source-model frame in bare default archive
+shadcn-vue-admin,/apps,/apps,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/auth/forgot-password,/auth/forgot-password,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/auth/otp,/auth/otp,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/auth/sign-in,/auth/sign-in,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/auth/sign-in-2,/auth/sign-in-2,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/auth/sign-up,/auth/sign-up,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/billing,/billing,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/dashboard,/dashboard,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/errors/401,/errors/401,True,concrete-dynamic-error-code,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/errors/403,/errors/403,True,concrete-dynamic-error-code,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/errors/404,/errors/404,True,concrete-dynamic-error-code,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/errors/500,/errors/500,True,concrete-dynamic-error-code,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/errors/503,/errors/503,True,concrete-dynamic-error-code,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/help-center,/help-center,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/marketing,/marketing,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/marketing/hello,/marketing/hello,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/prop-components,/prop-components,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/settings,/settings,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/settings/account,/settings/account,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/settings/appearance,/settings/appearance,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/settings/display,/settings/display,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/settings/notifications,/settings/notifications,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/tasks,/tasks,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
+shadcn-vue-admin,/users,/users,False,concrete-vue-page,True,,False,False,route not represented in bare default archive
