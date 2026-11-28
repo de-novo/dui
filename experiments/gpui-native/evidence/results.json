@@ -1,0 +1,386 @@
+[
+  {
+    "platform": "ios",
+    "fixture": "Detail",
+    "width": 390,
+    "mode": "cosmic",
+    "inkPixels": 425,
+    "changedInkPixels": 377,
+    "changedPercent": 88.70588235294117,
+    "exact": false,
+    "referenceBounds": [
+      174,
+      415,
+      216,
+      429
+    ],
+    "previewBounds": [
+      175,
+      415,
+      216,
+      429
+    ],
+    "saveToObservedMs": [
+      227.490042,
+      233.828416,
+      252.020416,
+      264.722667,
+      235.408542,
+      225.452,
+      242.123458,
+      253.617541
+    ]
+  },
+  {
+    "platform": "ios",
+    "fixture": "Profile",
+    "width": 390,
+    "mode": "cosmic",
+    "inkPixels": 435,
+    "changedInkPixels": 389,
+    "changedPercent": 89.42528735632185,
+    "exact": false,
+    "referenceBounds": [
+      172,
+      415,
+      219,
+      429
+    ],
+    "previewBounds": [
+      173,
+      415,
+      218,
+      429
+    ],
+    "saveToObservedMs": [
+      235.042,
+      219.584292,
+      236.083083,
+      235.080458,
+      225.8305,
+      220.9835,
+      230.282292,
+      226.030375
+    ]
+  },
+  {
+    "platform": "ios",
+    "fixture": "Stack",
+    "width": 390,
+    "mode": "cosmic",
+    "inkPixels": 5304,
+    "changedInkPixels": 4954,
+    "changedPercent": 93.40120663650076,
+    "exact": false,
+    "referenceBounds": [
+      93,
+      367,
+      261,
+      478
+    ],
+    "previewBounds": [
+      92,
+      366,
+      248,
+      478
+    ],
+    "saveToObservedMs": [
+      246.019666,
+      247.192625,
+      267.479625,
+      230.974792,
+      241.075917,
+      241.136791,
+      266.402667,
+      226.206917
+    ]
+  },
+  {
+    "platform": "android",
+    "fixture": "Detail",
+    "width": 390,
+    "mode": "cosmic",
+    "inkPixels": 352,
+    "changedInkPixels": 291,
+    "changedPercent": 82.67045454545455,
+    "exact": false,
+    "referenceBounds": [
+      174,
+      415,
+      216,
+      428
+    ],
+    "previewBounds": [
+      174,
+      414,
+      216,
+      428
+    ],
+    "saveToObservedMs": [
+      229.570583,
+      84.561541,
+      247.900792,
+      95.187167,
+      273.078209,
+      98.708166,
+      103.809959,
+      471.865709
+    ]
+  },
+  {
+    "platform": "android",
+    "fixture": "Profile",
+    "width": 390,
+    "mode": "cosmic",
+    "inkPixels": 414,
+    "changedInkPixels": 376,
+    "changedPercent": 90.82125603864735,
+    "exact": false,
+    "referenceBounds": [
+      171,
+      414,
+      219,
+      428
+    ],
+    "previewBounds": [
+      171,
+      413,
+      219,
+      428
+    ],
+    "saveToObservedMs": [
+      175.579583,
+      179.794959,
+      120.64025,
+      270.099084,
+      347.215791,
+      409.206792,
+      216.568041,
+      124.607041
+    ]
+  },
+  {
+    "platform": "android",
+    "fixture": "Stack",
+    "width": 390,
+    "mode": "cosmic",
+    "inkPixels": 5198,
+    "changedInkPixels": 4814,
+    "changedPercent": 92.61254328587918,
+    "exact": false,
+    "referenceBounds": [
+      93,
+      368,
+      257,
+      477
+    ],
+    "previewBounds": [
+      92,
+      366,
+      259,
+      476
+    ],
+    "saveToObservedMs": [
+      232.207084,
+      211.26025,
+      233.960583,
+      225.173791,
+      221.300292,
+      231.085167,
+      210.833,
+      218.877709
+    ]
+  },
+  {
+    "platform": "ios",
+    "fixture": "Detail",
+    "width": 1440,
+    "mode": "cosmic",
+    "inkPixels": 427,
+    "changedInkPixels": 380,
+    "changedPercent": 88.99297423887587,
+    "exact": false,
+    "referenceBounds": [
+      699,
+      453,
+      741,
+      467
+    ],
+    "previewBounds": [
+      700,
+      453,
+      741,
+      467
+    ],
+    "saveToObservedMs": [
+      340.261292,
+      345.264917,
+      354.13275,
+      338.032458,
+      331.3375,
+      365.891583,
+      342.593041,
+      348.724792
+    ]
+  },
+  {
+    "platform": "ios",
+    "fixture": "Profile",
+    "width": 1440,
+    "mode": "cosmic",
+    "inkPixels": 436,
+    "changedInkPixels": 390,
+    "changedPercent": 89.44954128440367,
+    "exact": false,
+    "referenceBounds": [
+      697,
+      453,
+      744,
+      467
+    ],
+    "previewBounds": [
+      698,
+      453,
+      743,
+      467
+    ],
+    "saveToObservedMs": [
+      338.635708,
+      338.66725,
+      347.63475,
+      335.094875,
+      335.962667,
+      341.908958,
+      321.758625,
+      340.104208
+    ]
+  },
+  {
+    "platform": "ios",
+    "fixture": "Stack",
+    "width": 1440,
+    "mode": "cosmic",
+    "inkPixels": 5305,
+    "changedInkPixels": 4954,
+    "changedPercent": 93.38360037700282,
+    "exact": false,
+    "referenceBounds": [
+      618,
+      405,
+      786,
+      516
+    ],
+    "previewBounds": [
+      617,
+      404,
+      773,
+      516
+    ],
+    "saveToObservedMs": [
+      408.333542,
+      354.526,
+      352.390584,
+      342.995875,
+      377.553292,
+      355.7985,
+      341.418375,
+      348.791125
+    ]
+  },
+  {
+    "platform": "android",
+    "fixture": "Detail",
+    "width": 1440,
+    "mode": "cosmic",
+    "inkPixels": 354,
+    "changedInkPixels": 291,
+    "changedPercent": 82.20338983050847,
+    "exact": false,
+    "referenceBounds": [
+      699,
+      453,
+      741,
+      466
+    ],
+    "previewBounds": [
+      698,
+      452,
+      741,
+      466
+    ],
+    "saveToObservedMs": [
+      220.497041,
+      398.574334,
+      265.53725,
+      892.477708,
+      266.178166,
+      176.67275,
+      230.030458,
+      141.282667
+    ]
+  },
+  {
+    "platform": "android",
+    "fixture": "Profile",
+    "width": 1440,
+    "mode": "cosmic",
+    "inkPixels": 415,
+    "changedInkPixels": 376,
+    "changedPercent": 90.60240963855422,
+    "exact": false,
+    "referenceBounds": [
+      696,
+      452,
+      744,
+      466
+    ],
+    "previewBounds": [
+      696,
+      451,
+      744,
+      466
+    ],
+    "saveToObservedMs": [
+      344.064208,
+      356.673625,
+      361.661375,
+      342.806917,
+      131.207167,
+      387.074583,
+      168.824417,
+      358.230917
+    ]
+  },
+  {
+    "platform": "android",
+    "fixture": "Stack",
+    "width": 1440,
+    "mode": "cosmic",
+    "inkPixels": 5189,
+    "changedInkPixels": 4809,
+    "changedPercent": 92.67681634226248,
+    "exact": false,
+    "referenceBounds": [
+      618,
+      406,
+      782,
+      515
+    ],
+    "previewBounds": [
+      617,
+      404,
+      784,
+      514
+    ],
+    "saveToObservedMs": [
+      348.224417,
+      345.793458,
+      339.736,
+      339.614083,
+      352.444333,
+      345.305,
+      116.464041,
+      405.024
+    ]
+  }
+]
