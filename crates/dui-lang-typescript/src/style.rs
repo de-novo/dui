@@ -393,6 +393,47 @@ fn spacing_value(name: &str, raw: &str) -> Option<V> {
 
 // Physical left/right only have a direction-independent logical mapping when equal.
 fn shorthand(name: &str, raw: &str) -> Option<Vec<(P, V)>> {
+    if name == "border" {
+        let mut width = None;
+        let mut line = None;
+        let mut paint = None;
+        for word in raw.split_ascii_whitespace() {
+            if width.is_none()
+                && let Some(value) = length(word)
+            {
+                width = Some(value);
+                continue;
+            }
+            if line.is_none()
+                && matches!(
+                    word,
+                    "none"
+                        | "hidden"
+                        | "dotted"
+                        | "dashed"
+                        | "solid"
+                        | "double"
+                        | "groove"
+                        | "ridge"
+                        | "inset"
+                        | "outset"
+                )
+            {
+                line = Some(V::Keyword { value: word.into() });
+                continue;
+            }
+            if paint.is_none()
+                && let Some(value) = color(word)
+            {
+                paint = Some(value);
+            }
+        }
+        return Some(vec![
+            (P::BorderWidth, width?),
+            (P::BorderStyle, line?),
+            (P::BorderColor, paint?),
+        ]);
+    }
     if matches!(name, "padding-inline" | "margin-inline") {
         let mut words = raw.split_ascii_whitespace();
         let start = spacing_value(name, words.next()?)?;

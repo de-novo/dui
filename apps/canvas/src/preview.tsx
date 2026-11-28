@@ -48,7 +48,7 @@ const engineUnavailableRenderer: SourceModelRenderer = {
     return { html: markup, markup, unresolved: ["engine-unavailable"] };
   },
 };
-const modelRenderer = await createEngineModelRenderer().catch(() => engineUnavailableRenderer);
+const modelRendererPromise = createEngineModelRenderer().catch(() => engineUnavailableRenderer);
 
 const CaptureDiffView = lazy(() =>
   import("./features/diff/CaptureDiffView").then((m) => ({ default: m.CaptureDiffView })),
@@ -135,6 +135,16 @@ function MapView({
   );
   const archive = hot.archive;
   const sourceModel = hot.model;
+  const [modelRenderer, setModelRenderer] = useState<SourceModelRenderer>();
+  useEffect(() => {
+    let active = true;
+    void modelRendererPromise.then((renderer) => {
+      if (active) setModelRenderer(() => renderer);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const mapArea = useRef<HTMLDivElement>(null);
   const overviewLayer = useRef<HTMLDivElement>(null);
   const topBarRef = useRef<HTMLDivElement>(null);

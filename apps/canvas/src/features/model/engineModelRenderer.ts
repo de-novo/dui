@@ -27,6 +27,7 @@ type Computed = {
   fontWeight: number;
   fontStyle: string;
   lineHeight: number;
+  lineHeightExplicit: boolean;
   letterSpacing: number;
   color: string;
   textAlign: string;
@@ -297,6 +298,7 @@ function computeStyle(
     fontWeight: inheritedFrom.fontWeight,
     fontStyle: inheritedFrom.fontStyle,
     lineHeight: inheritedFrom.lineHeight,
+    lineHeightExplicit: inheritedFrom.lineHeightExplicit,
     letterSpacing: inheritedFrom.letterSpacing,
     color: inheritedFrom.color,
     textAlign: inheritedFrom.textAlign,
@@ -342,8 +344,10 @@ function computeStyle(
       case "lineHeight": {
         const lineHeight =
           lengthValue(value, context.width ?? 375, computed.fontSize) ?? numberValue(value);
-        if (typeof lineHeight === "number")
+        if (typeof lineHeight === "number") {
           computed.lineHeight = lineHeight > 4 ? lineHeight : lineHeight * computed.fontSize;
+          computed.lineHeightExplicit = true;
+        }
         break;
       }
       case "letterSpacing": {
@@ -387,6 +391,7 @@ function rootComputed(context: ModelRenderContext, documentStyle: any): Computed
     fontWeight: 400,
     fontStyle: "normal",
     lineHeight: (context.initialFontSize ?? 16) * 1.2,
+    lineHeightExplicit: false,
     letterSpacing: 0,
     color: context.colorScheme === "dark" ? "rgb(255 255 255 / 1)" : "rgb(0 0 0 / 1)",
     textAlign: "start",
@@ -406,6 +411,7 @@ function rootComputed(context: ModelRenderContext, documentStyle: any): Computed
         fontWeight: next.fontWeight,
         fontStyle: next.fontStyle,
         lineHeight: next.lineHeight,
+        lineHeightExplicit: next.lineHeightExplicit,
         letterSpacing: next.letterSpacing,
         color: next.color,
         textAlign: next.textAlign,
@@ -948,6 +954,15 @@ function buildTaffy(scene: Scene, tree: TaffyTree, context: ModelRenderContext):
   return id;
 }
 
+function attrNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 function intrinsicSize(scene: Scene, engine: TextEngine): { width: number; height: number } {
   if (scene.tag === "button") {
     const measured = engine.measure(scene.text ?? "", {
@@ -999,9 +1014,9 @@ function intrinsicSize(scene: Scene, engine: TextEngine): { width: number; heigh
     case "img":
     case "svg": {
       const width =
-        numberValue(scene.computed.values.width) ?? numberValue(scene.attrs?.width) ?? 300;
+        numberValue(scene.computed.values.width) ?? attrNumber(scene.attrs?.width) ?? 300;
       const height =
-        numberValue(scene.computed.values.height) ?? numberValue(scene.attrs?.height) ?? 150;
+        numberValue(scene.computed.values.height) ?? attrNumber(scene.attrs?.height) ?? 150;
       return { width, height };
     }
     default:
@@ -1056,8 +1071,9 @@ function paintStyle(scene: Scene): string {
   if (background) declarations.push(`background:${background}`);
   const fg = colorValue(v.color) ?? stringValue(v.color);
   declarations.push(`color:${fg ?? scene.computed.color}`);
+  const fontLine = scene.computed.lineHeightExplicit ? `/${scene.computed.lineHeight}px` : "";
   declarations.push(
-    `font:${scene.computed.fontStyle} ${scene.computed.fontWeight} ${scene.computed.fontSize}px/${scene.computed.lineHeight}px ${scene.computed.fontFamily}`,
+    `font:${scene.computed.fontStyle} ${scene.computed.fontWeight} ${scene.computed.fontSize}px${fontLine} ${scene.computed.fontFamily}`,
   );
   if (scene.computed.letterSpacing)
     declarations.push(`letter-spacing:${scene.computed.letterSpacing}px`);
@@ -1098,6 +1114,12 @@ function paintStyle(scene: Scene): string {
         `border-${side.toLowerCase()}:${width ?? 0}px ${line ?? "solid"} ${color ?? borderColor ?? "currentColor"}`,
       );
   }
+  const gap = lengthValue(v.gap, 0, scene.computed.fontSize);
+  if (typeof gap === "number") declarations.push(`gap:${gap}px`);
+  const rowGap = lengthValue(v.rowGap, 0, scene.computed.fontSize);
+  if (typeof rowGap === "number") declarations.push(`row-gap:${rowGap}px`);
+  const columnGap = lengthValue(v.columnGap, 0, scene.computed.fontSize);
+  if (typeof columnGap === "number") declarations.push(`column-gap:${columnGap}px`);
   const opacity = numberValue(v.opacity);
   if (opacity !== undefined) declarations.push(`opacity:${opacity}`);
   const overflow = stringValue(v.overflowX);
@@ -1136,6 +1158,15 @@ function paintAttributes(scene: Scene): string {
     "height",
     "src",
     "viewBox",
+    "fill",
+    "stroke",
+    "stroke-width",
+    "x",
+    "y",
+    "cx",
+    "cy",
+    "r",
+    "d",
   ]);
   for (const [name, value] of Object.entries(scene.attrs ?? {})) {
     if (!visual.has(name) || value === undefined || value === null || value === false) continue;
@@ -1160,11 +1191,15 @@ function paintInlineScene(scene: Scene): string {
   const attrs = [`data-model-node="${esc(scene.id)}"`, `data-node-kind="${scene.kind}"`];
   const content =
     scene.text !== undefined ? esc(scene.text) : scene.children.map(paintInlineScene).join("");
-  const inlineStyle =
-    scene.computed.values.lineHeight === undefined
-      ? paintStyle(scene).replace(`/${scene.computed.lineHeight}px `, " ")
-      : paintStyle(scene);
-  return `<${tag} ${attrs.join(" ")}${paintAttributes(scene)} style="${inlineStyle}">${content}</${tag}>`;
+  return `<${tag} ${attrs.join(" ")}${paintAttributes(scene)} style="${paintStyle(scene)}">${content}</${tag}>`;
+}
+
+function paintSvgChild(scene: Scene): string {
+  const tag = /^(svg|rect|circle|ellipse|line|path|polygon|polyline|g|text)$/.test(scene.tag ?? "")
+    ? scene.tag!
+    : "g";
+  const children = scene.children.map(paintSvgChild).join("");
+  return `<${tag}${paintAttributes(scene)}>${children}</${tag}>`;
 }
 
 function paintScene(
@@ -1180,7 +1215,7 @@ function paintScene(
   const top = y - parentY - parentBorderY;
   const base = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;box-sizing:border-box;margin:0`;
   const tag =
-    /^(div|section|main|header|footer|article|aside|nav|p|span|strong|em|small|code|button|input|textarea|select|option|h1|h2|h3|h4|h5|h6|ul|ol|li|label|form)$/.test(
+    /^(div|section|main|header|footer|article|aside|nav|p|span|strong|em|small|code|button|input|textarea|select|option|h1|h2|h3|h4|h5|h6|ul|ol|li|label|form|img|svg)$/.test(
       scene.tag ?? "",
     )
       ? scene.tag!
@@ -1192,7 +1227,7 @@ function paintScene(
   if (scene.kind === "text" || scene.text !== undefined) {
     return `<${tag} ${attrs.join(" ")}${paintAttributes(scene)} style="${style}">${esc(scene.text ?? "")}</${tag}>`;
   }
-  const voidTag = tag === "input";
+  const voidTag = tag === "input" || tag === "img";
   const controlAttrs =
     tag === "input" || tag === "textarea" || tag === "select"
       ? ' readonly tabindex="-1"'
@@ -1203,13 +1238,17 @@ function paintScene(
     scene.children.length > 0 &&
     scene.children.every((child) => child.kind === "text" || child.computed.display === "inline");
   const children =
-    tag === "select"
-      ? scene.children
-          .map((child) => `<option${paintAttributes(child)}>${esc(child.text ?? "")}</option>`)
-          .join("")
-      : inlineFlow
-        ? scene.children.map(paintInlineScene).join("")
-        : scene.children.map((child) => paintScene(child, x, y, border.left, border.top)).join("");
+    tag === "svg"
+      ? scene.children.map(paintSvgChild).join("")
+      : tag === "select"
+        ? scene.children
+            .map((child) => `<option${paintAttributes(child)}>${esc(child.text ?? "")}</option>`)
+            .join("")
+        : inlineFlow
+          ? scene.children.map(paintInlineScene).join("")
+          : scene.children
+              .map((child) => paintScene(child, x, y, border.left, border.top))
+              .join("");
   if (voidTag)
     return `<${tag} ${attrs.join(" ")}${controlAttrs}${paintAttributes(scene)} style="${style}" />`;
   return `<${tag} ${attrs.join(" ")}${controlAttrs}${paintAttributes(scene)} style="${style}">${children}</${tag}>`;
@@ -1292,7 +1331,7 @@ function renderEngine(
       scene.children.forEach(walk);
     };
     walk(root);
-    const markup = `<style>*{box-sizing:border-box}:host{display:block;color:#111;background:#fff}body{margin:0}</style><div class="dui-engine-frame" style="position:relative;display:block;width:${context.width}px;min-height:${Math.max(0, box.height)}px;overflow:visible">${body}</div>`;
+    const markup = `<style>*{box-sizing:border-box}:host{display:block;color:#111;background:transparent}body{margin:0}</style><div class="dui-engine-frame" style="position:relative;display:block;width:${context.width}px;min-height:${Math.max(0, box.height)}px;overflow:visible">${body}</div>`;
     return {
       html: `<!doctype html><html><head><meta charset="utf-8"></head><body>${markup}</body></html>`,
       markup,
