@@ -383,7 +383,9 @@ type FunctionContent = {
 const isNodeContent = (value: unknown): value is NodeContent =>
   typeof value === "object" && value !== null && (value as NodeContent).nodeContent === true;
 const isFunctionContent = (value: unknown): value is FunctionContent =>
-  typeof value === "object" && value !== null && (value as FunctionContent).functionContent === true;
+  typeof value === "object" &&
+  value !== null &&
+  (value as FunctionContent).functionContent === true;
 
 function lookupPath(value: unknown, path: string[] | undefined): Resolved {
   let current = value;
@@ -941,7 +943,9 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
         );
         if (target && n.children?.length) {
           const functionChild =
-            n.children.length === 1 && n.children[0].kind === "renderFunction" ? n.children[0] : undefined;
+            n.children.length === 1 && n.children[0].kind === "renderFunction"
+              ? n.children[0]
+              : undefined;
           const content: NodeContent | FunctionContent = functionChild
             ? {
                 functionContent: true,
@@ -1009,7 +1013,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       if (n.kind === "renderFunction") return placeholder("render function value");
       if (n.kind === "invoke") {
         const value = n.callee ? resolveExpr(n.callee, scope) : { known: false };
-        if (!value.known || !isFunctionContent(value.value)) return placeholder(exprLabel(n.callee!));
+        if (!value.known || !isFunctionContent(value.value))
+          return placeholder(exprLabel(n.callee!));
         const args = (n.arguments ?? []).map((argument) => resolveExpr(argument, scope));
         const nested = copyScope(value.value.scope);
         (value.value.parameters ?? []).forEach((parameter, index) => {
@@ -1030,7 +1035,8 @@ function renderDom(model: Model, componentId: string, context: ModelRenderContex
       }
       if (n.kind === "createElement") {
         const resolved = n.tag ? resolveExpr(n.tag, scope) : { known: false };
-        const tag = resolved.known && typeof resolved.value === "string" ? resolved.value : undefined;
+        const tag =
+          resolved.known && typeof resolved.value === "string" ? resolved.value : undefined;
         if (!tag || !tags.has(tag)) return placeholder(n.tag ? exprLabel(n.tag) : "createElement");
         const el = doc.createElement(tag);
         el.dataset.modelNode = n.id;
