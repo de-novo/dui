@@ -13,7 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const POLL_INTERVAL: Duration = Duration::from_millis(50);
+const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const LONG_POLL: Duration = Duration::from_secs(8);
 
 #[derive(Clone)]
@@ -389,7 +389,7 @@ fn scan_sources(root: &Path) -> BTreeMap<String, (u64, u128)> {
             if !kind.is_file()
                 || !matches!(
                     path.extension().and_then(|ext| ext.to_str()),
-                    Some("ts" | "tsx" | "css")
+                    Some("ts" | "tsx" | "css" | "woff" | "woff2" | "ttf" | "otf")
                 )
             {
                 continue;
@@ -756,6 +756,18 @@ mod tests {
             assert_eq!(patch[entity]["upsert"], json!([]), "{entity} upsert");
             assert_eq!(patch[entity]["remove"], json!([]), "{entity} remove");
         }
+    }
+
+    #[test]
+    fn scan_sources_includes_font_assets() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path();
+        std::fs::create_dir_all(root.join("src/assets")).expect("mkdir");
+        std::fs::write(root.join("src/app.tsx"), "export default function App() {}").expect("tsx");
+        std::fs::write(root.join("src/assets/font.woff2"), b"wOF2test").expect("font");
+        let scan = scan_sources(root);
+        assert!(scan.contains_key("src/app.tsx"));
+        assert!(scan.contains_key("src/assets/font.woff2"));
     }
 
     #[test]
