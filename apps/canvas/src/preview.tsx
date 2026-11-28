@@ -377,7 +377,7 @@ function MapView({
             diffVisualMode={diffVisualMode}
             beforeRunKey={compareBeforeKey || undefined}
             afterRunKey={run.key}
-            imageUrl={(name) => archiveUrl(name, run)}
+            imageUrl={imageUrl}
             mobileView={mobileView}
             openSearch={openSearch}
             onSelectMobileView={setMobileView}
