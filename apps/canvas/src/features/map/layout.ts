@@ -7,21 +7,28 @@ type Placed = { screen: Screen; position: Point; frameHeight: number };
 type Layout = { nodes: Placed[]; links: Link[] };
 
 export type NodeMetrics = {
+  /** Outer card width, including card padding and border when a source model needs room. */
   cardWidth: number;
+  /** Content width available to the capture or modeled document inside the card chrome. */
+  contentWidth: number;
   frameHeight: number;
   column: number;
   row: number;
 };
 
-export function nodeMetrics(captureWidth: number): NodeMetrics {
-  const cardWidth = Math.max(
+export function nodeMetrics(captureWidth: number, expandContent = false): NodeMetrics {
+  const contentWidth = Math.max(
     360,
     Number.isFinite(captureWidth) && captureWidth > 0 ? captureWidth : 375,
   );
-  const frameHeight = Math.round(cardWidth * (cardWidth <= 500 ? 1.6 : 0.625));
+  // Keep the modeled document itself at the capture width at 1:1. Large cards use
+  // --space-3 padding and small cards use --space-1, plus the 1px border on both sides.
+  const horizontalChrome = contentWidth >= 800 ? 26 : 10;
+  const cardWidth = contentWidth + (expandContent ? horizontalChrome : 0);
+  const frameHeight = Math.round(contentWidth * (contentWidth <= 500 ? 1.6 : 0.625));
   const column = cardWidth + Math.max(220, Math.round(cardWidth * 0.22));
   const row = frameHeight + Math.max(200, Math.round(frameHeight * 0.26));
-  return { cardWidth, frameHeight, column, row };
+  return { cardWidth, contentWidth, frameHeight, column, row };
 }
 
 export function screenFrameHeight(screen: Screen, width: number, metrics: NodeMetrics): number {
@@ -32,7 +39,7 @@ export function screenFrameHeight(screen: Screen, width: number, metrics: NodeMe
       ? screen.cells.find((c) => c.image === entry.image && c.imageWidth && c.imageHeight)
       : entry;
   if (cell?.imageWidth && cell?.imageHeight && cell.imageWidth > 0 && cell.imageHeight > 0) {
-    return Math.max(240, Math.round(metrics.cardWidth * (cell.imageHeight / cell.imageWidth)));
+    return Math.max(240, Math.round(metrics.contentWidth * (cell.imageHeight / cell.imageWidth)));
   }
   return metrics.frameHeight;
 }
@@ -84,8 +91,9 @@ export function layoutMap(
   width: number,
   mode: string,
   measured: ReadonlyMap<string, number> = new Map(),
+  expandModelContent = false,
 ): Layout & { total: number; metrics: NodeMetrics } {
-  const metrics = nodeMetrics(width);
+  const metrics = nodeMetrics(width, expandModelContent);
   const { column, row } = metrics;
   const rowGap = row - metrics.frameHeight;
   const screens = [...archive.screens].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
