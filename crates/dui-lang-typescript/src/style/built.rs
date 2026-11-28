@@ -2357,7 +2357,10 @@ impl<'a> Sheet<'a> {
                 if unknown.is_some() && selector_theme_scope(rule.selectors) == Some(scheme) {
                     rule
                 } else {
-                    best_exact.unwrap_or(rule)
+                    let Some(exact_rule) = best_exact else {
+                        continue;
+                    };
+                    exact_rule
                 };
             if themed_rule.when.as_ref().and_then(|when| when.color_scheme) == Some(scheme) {
                 continue;
