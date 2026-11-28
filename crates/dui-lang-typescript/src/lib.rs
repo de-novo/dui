@@ -135,7 +135,10 @@ fn object_type_fields(files: &Files, file: &File, node: Ast<'_>) -> Vec<m::Field
     if matches!(n.kind(), "object_type" | "interface_body") {
         return fields(files, file, n);
     }
-    if matches!(n.kind(), "intersection_type" | "union_type" | "parenthesized_type") {
+    if matches!(
+        n.kind(),
+        "intersection_type" | "union_type" | "parenthesized_type"
+    ) {
         return children(n)
             .into_iter()
             .flat_map(|part| object_type_fields(files, file, part))

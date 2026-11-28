@@ -189,11 +189,15 @@ impl File {
             if node.kind() != "export_statement" {
                 continue;
             }
-            if node.children(&mut node.walk()).any(|c| c.kind() == "default") {
+            if node
+                .children(&mut node.walk())
+                .any(|c| c.kind() == "default")
+            {
                 continue;
             }
             if let Some(decl) = field(node, "declaration") {
-                let decls = if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration") {
+                let decls = if matches!(decl.kind(), "ambient_declaration" | "lexical_declaration")
+                {
                     children(decl)
                 } else {
                     vec![decl]
@@ -204,7 +208,10 @@ impl File {
             if field(node, "source").is_some() {
                 continue;
             }
-            for clause in children(node).into_iter().filter(|c| c.kind() == "export_clause") {
+            for clause in children(node)
+                .into_iter()
+                .filter(|c| c.kind() == "export_clause")
+            {
                 for spec in children(clause) {
                     if spec.kind() == "export_specifier"
                         && let Some(local) = field(spec, "name")

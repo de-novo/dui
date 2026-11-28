@@ -1046,7 +1046,10 @@ fn parse_box_shadow(raw: &str, vars: &BTreeMap<&str, Option<&str>>) -> Option<St
                 continue;
             }
             if color.is_none()
-                && !token.bytes().next().is_some_and(|b| b.is_ascii_digit() || b == b'-' || b == b'+')
+                && !token
+                    .bytes()
+                    .next()
+                    .is_some_and(|b| b.is_ascii_digit() || b == b'-' || b == b'+')
                 && let Some(parsed) = shadow_color(token, vars)
             {
                 color = Some(parsed);
@@ -1545,7 +1548,9 @@ impl<'a> Sheet<'a> {
                 let mut count = 0usize;
                 let same = uncertain.all(|rule| {
                     count += 1;
-                    rule.value.split_ascii_whitespace().eq(value.split_ascii_whitespace())
+                    rule.value
+                        .split_ascii_whitespace()
+                        .eq(value.split_ascii_whitespace())
                 });
                 count != 0 && same
             });

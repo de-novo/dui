@@ -743,7 +743,10 @@ impl<'a> Check<'a> {
                         Expr::Slot { .. } | Expr::Item { .. } => {
                             self.expr(&read_pointer, read, scope);
                         }
-                        Expr::Literal { .. } | Expr::Opaque { .. } | Expr::Unary { .. } | Expr::Binary { .. } => {
+                        Expr::Literal { .. }
+                        | Expr::Opaque { .. }
+                        | Expr::Unary { .. }
+                        | Expr::Binary { .. } => {
                             self.error(read_pointer, "must be a slot or item read");
                         }
                     }
